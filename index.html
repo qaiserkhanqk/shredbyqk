@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0b0c">
+  <title>Shred by QK</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <template id="avatar-tpl">
+    <div class="avatar" data-avatar>
+      <div class="ring"></div>
+      <div class="face"><span class="mono">QK</span><img alt="Coach QK" hidden></div>
+      <div class="eq"><i></i><i></i><i></i><i></i><i></i></div>
+    </div>
+  </template>
+
+  <header class="top">
+    <div class="brand"><b>SHRED</b><span>by QK</span></div>
+    <button class="icon-btn" id="muteBtn" aria-label="Mute coach voice" title="Mute coach">🔊</button>
+  </header>
+
+  <main>
+    <!-- HOME / ACCOUNTABILITY -->
+    <section class="screen active" id="home">
+      <div class="hero card">
+        <div class="avatar-slot big"></div>
+        <div>
+          <p class="eyebrow" id="greet">Welcome</p>
+          <h1 id="nudge">Let's get to work.</h1>
+          <p class="caption" data-coach-caption></p>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat card"><span class="num" id="streak">0</span><span class="lbl">day streak 🔥</span></div>
+        <div class="stat card"><span class="num" id="week">0/4</span><span class="lbl">sessions this week</span></div>
+        <div class="stat card"><span class="num" id="reps">0</span><span class="lbl">reps checked</span></div>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" data-go="train">▶ Train with QK</button>
+        <button class="btn" id="checkinBtn">✓ I trained today</button>
+        <button class="btn" data-go="scan">◎ Body scan</button>
+      </div>
+
+      <div class="card" id="planCard">
+        <h2>Your training plan</h2>
+        <p class="muted">People who decide exactly <b>when</b> and <b>where</b> they'll train are far more likely to follow through. Pick your days.</p>
+        <div class="days" id="planDays"></div>
+        <div class="grid2">
+          <label>Time <input id="planTime" type="time"></label>
+          <label>Where <input id="planPlace" placeholder="e.g. PureGym, home"></label>
+        </div>
+        <p class="plan-line" id="planLine"></p>
+      </div>
+
+      <div class="card">
+        <h2>Recent</h2>
+        <ul class="list" id="recent"><li class="muted">No sessions yet. Your first one starts the streak.</li></ul>
+      </div>
+
+      <details class="card settings">
+        <summary>Profile &amp; coach settings</summary>
+        <label>Your name <input id="pName" placeholder="e.g. Sara"></label>
+        <label>Sex (for body-fat formula)
+          <select id="pSex"><option value="male">Male</option><option value="female">Female</option></select></label>
+        <label>Height (cm) <input id="pHeight" type="number" inputmode="decimal"></label>
+        <label>Weekly session goal <input id="pGoal" type="number" min="1" max="7"></label>
+        <label>Coach photo (QK's face for the avatar) <input id="coachPhoto" type="file" accept="image/*"></label>
+        <label>Coach voice <select id="voiceSel"></select></label>
+        <button class="btn small" id="testVoice">Test voice</button>
+      </details>
+    </section>
+
+    <!-- LIVE FORM CHECK -->
+    <section class="screen" id="train">
+      <div class="card picker" id="picker">
+        <h2>What are we training?</h2>
+        <div class="chips" id="exChips"></div>
+        <p class="muted" id="setupTip"></p>
+        <div class="actions">
+          <button class="btn primary" id="startCam">📷 Start camera</button>
+          <label class="btn">⬆ Analyse a video<input type="file" id="videoFile" accept="video/*" hidden></label>
+        </div>
+        <label class="inline"><input type="checkbox" id="recordChk" checked> Record my set so I can watch it back</label>
+      </div>
+
+      <div class="stage" id="stage" hidden>
+        <div class="viewport" id="viewport">
+          <video id="video" playsinline muted></video>
+          <canvas id="overlay"></canvas>
+        </div>
+        <div class="hud">
+          <div class="rep"><span id="repNum">0</span><small>reps</small></div>
+          <div class="angles" id="angleReadout"></div>
+        </div>
+        <div class="coach-bubble">
+          <span class="hint">tap QK: "how was that?"</span>
+          <div class="avatar-slot small"></div>
+          <p class="caption" data-coach-caption></p>
+        </div>
+        <div class="status" id="status">Loading coach vision…</div>
+        <div class="stage-actions">
+          <button class="btn small" id="flipCam">⟲ Flip</button>
+          <button class="btn primary small" id="endSet">■ End set</button>
+        </div>
+      </div>
+
+      <div class="card" id="summary" hidden>
+        <h2>Set summary</h2>
+        <div id="summaryBody"></div>
+        <video id="playback" controls playsinline hidden></video>
+        <div class="actions">
+          <a class="btn" id="downloadRec" hidden download="shred-set.webm">⬇ Save video</a>
+          <button class="btn primary" id="again">Go again</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- BODY SCAN -->
+    <section class="screen" id="scan">
+      <div class="card">
+        <h2>Body scan</h2>
+        <p class="muted">Stand relaxed, arms by your sides, whole body in frame, fitted clothes. Take one photo or a 5-second video <b>facing the camera</b>, and one <b>side-on</b>.</p>
+        <div class="actions">
+          <label class="btn primary">📷 Photo / video<input type="file" id="scanFile" accept="image/*,video/*" capture="environment" hidden></label>
+          <label class="btn">⬆ From gallery<input type="file" id="scanFile2" accept="image/*,video/*" hidden></label>
+        </div>
+        <p class="status-line" id="scanStatus"></p>
+      </div>
+
+      <div class="card" id="scanResult" hidden>
+        <h2 id="scanTitle">Posture &amp; joint angles</h2>
+        <canvas id="scanCanvas"></canvas>
+        <table class="metrics" id="scanMetrics"></table>
+        <div id="scanFindings"></div>
+      </div>
+
+      <div class="card">
+        <h2>Body composition</h2>
+        <p class="muted">Body fat from tape measurements (US Navy method, roughly ±3–4% vs a DEXA scan). Measure neck below the Adam's apple, waist at the navel, hips at the widest point.</p>
+        <div class="grid2">
+          <label>Weight (kg) <input id="bWeight" type="number" inputmode="decimal"></label>
+          <label>Neck (cm) <input id="bNeck" type="number" inputmode="decimal"></label>
+          <label>Waist (cm) <input id="bWaist" type="number" inputmode="decimal"></label>
+          <label id="hipWrap">Hips (cm) <input id="bHip" type="number" inputmode="decimal"></label>
+        </div>
+        <details>
+          <summary>Have a smart scale / InBody / DEXA? Log it too</summary>
+          <div class="grid2">
+            <label>Body water (%) <input id="bWater" type="number" inputmode="decimal"></label>
+            <label>Muscle mass (kg) <input id="bMuscle" type="number" inputmode="decimal"></label>
+            <label>Body fat from device (%) <input id="bDeviceBf" type="number" inputmode="decimal"></label>
+          </div>
+        </details>
+        <button class="btn primary" id="calcBf">Calculate &amp; save</button>
+        <div id="bfOut"></div>
+      </div>
+    </section>
+
+    <!-- PROGRESS -->
+    <section class="screen" id="progress">
+      <div class="card">
+        <h2>Body-fat trend</h2>
+        <canvas id="bfChart" height="160"></canvas>
+        <p class="muted" id="bfEmpty">Log two measurements to see your trend.</p>
+      </div>
+      <div class="card">
+        <h2>Form faults to work on</h2>
+        <ul class="list" id="faultList"><li class="muted">Train with the camera to see patterns.</li></ul>
+      </div>
+      <div class="card">
+        <h2>All sessions</h2>
+        <ul class="list" id="allSessions"></ul>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabs">
+    <button data-go="home" class="on">🏠<span>Coach</span></button>
+    <button data-go="train">🏋️<span>Train</span></button>
+    <button data-go="scan">◎<span>Scan</span></button>
+    <button data-go="progress">📈<span>Progress</span></button>
+  </nav>
+
+  <div class="unlock" id="unlock">
+    <div class="avatar-slot big"></div>
+    <h1>SHRED <span>by QK</span></h1>
+    <p>Your coach, in your pocket. He watches your form, counts your reps and talks you through every set.</p>
+    <button class="btn primary" id="unlockBtn">Start session</button>
+    <p class="fine">Camera footage is analysed on your phone and never uploaded.</p>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

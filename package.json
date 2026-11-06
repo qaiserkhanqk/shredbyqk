@@ -1,0 +1,16 @@
+{
+  "name": "shred-by-qk",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "test": "node tests/simulate.mjs",
+    "start": "python3 -m http.server 8080"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.14"
+  },
+  "type": "module"
+}
