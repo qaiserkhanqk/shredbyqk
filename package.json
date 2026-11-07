@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "test": "node tests/simulate.mjs",
+    "test": "node tests/simulate.mjs && node tests/gait.mjs && node tests/library.mjs",
     "start": "python3 -m http.server 8080"
   },
   "keywords": [],

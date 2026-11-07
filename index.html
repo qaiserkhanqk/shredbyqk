@@ -3,200 +3,307 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b0b0c">
+  <meta name="theme-color" content="#0a0d14">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Shred by QK</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <template id="avatar-tpl">
-    <div class="avatar" data-avatar>
-      <div class="ring"></div>
-      <div class="face"><span class="mono">QK</span><img alt="Coach QK" hidden></div>
-      <div class="eq"><i></i><i></i><i></i><i></i><i></i></div>
-    </div>
-  </template>
+<div class="stage-bg"></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs><linearGradient id="zoneStroke" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#45c3ff"/><stop offset=".55" stop-color="#7c6cff"/><stop offset="1" stop-color="#ff6b4a"/></linearGradient></defs>
+</svg>
 
-  <header class="top">
-    <div class="brand"><b>SHRED</b><span>by QK</span></div>
-    <button class="icon-btn" id="muteBtn" aria-label="Mute coach voice" title="Mute coach">🔊</button>
+<template id="orb-tpl"><button class="orb" data-orb type="button" aria-label="Coach QK"><span class="halo"></span><span class="core"><span class="mono">QK</span><img alt="" hidden></span><span class="wave"><b></b><b></b><b></b><b></b></span></button></template>
+
+<div class="app">
+  <header class="topbar">
+    <div class="wordmark"><i>SHRED</i><small>by QK</small></div>
+    <button class="iconbtn" id="muteBtn" type="button" aria-label="Mute coach voice">
+      <svg id="spk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+    </button>
   </header>
 
-  <main>
-    <!-- HOME / ACCOUNTABILITY -->
-    <section class="screen active" id="home">
-      <div class="hero card">
-        <div class="avatar-slot big"></div>
-        <div>
-          <p class="eyebrow" id="greet">Welcome</p>
-          <h1 id="nudge">Let's get to work.</h1>
-          <p class="caption" data-coach-caption></p>
+  <!-- TODAY -->
+  <section class="screen on" id="today">
+    <div class="hero">
+      <span class="orb-slot" data-size="84" id="heroOrb"></span>
+      <div><span class="eyebrow" id="dateLine"></span><h1 class="display h1" id="hello">Welcome.</h1></div>
+    </div>
+    <div class="bubble">
+      <div class="who"><span class="eyebrow">QK</span><button class="linkbtn" id="listenBtn" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Listen</button></div>
+      <span id="nudge"></span>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><div><span class="eyebrow">This week</span><h2 class="display h2" id="weekTitle">Let's start</h2></div></div>
+      <div class="rings">
+        <svg viewBox="0 0 150 150" role="img" id="ringsSvg" aria-label="Weekly progress rings">
+          <g fill="none" stroke-linecap="round" transform="rotate(-90 75 75)">
+            <circle cx="75" cy="75" r="64" stroke="#1a2130" stroke-width="13"/><circle cx="75" cy="75" r="47" stroke="#1a2130" stroke-width="13"/><circle cx="75" cy="75" r="30" stroke="#1a2130" stroke-width="13"/>
+            <circle class="ring-arc" id="ring1" cx="75" cy="75" r="64" stroke="#ff6b4a" stroke-width="13"/>
+            <circle class="ring-arc" id="ring2" cx="75" cy="75" r="47" stroke="#7c6cff" stroke-width="13"/>
+            <circle class="ring-arc" id="ring3" cx="75" cy="75" r="30" stroke="#45c3ff" stroke-width="13"/>
+          </g>
+        </svg>
+        <div class="legend">
+          <div><span class="dot" style="background:var(--z3)"></span><span class="v" id="lgSessions">0/4</span><span class="l">sessions this week</span></div>
+          <div><span class="dot" style="background:var(--z2)"></span><span class="v" id="lgForm">–</span><span class="l" id="lgFormL">form score</span></div>
+          <div><span class="dot" style="background:var(--z1)"></span><span class="v" id="lgStreak">0 days</span><span class="l">plan kept</span></div>
         </div>
       </div>
+    </div>
 
-      <div class="stats">
-        <div class="stat card"><span class="num" id="streak">0</span><span class="lbl">day streak 🔥</span></div>
-        <div class="stat card"><span class="num" id="week">0/4</span><span class="lbl">sessions this week</span></div>
-        <div class="stat card"><span class="num" id="reps">0</span><span class="lbl">reps checked</span></div>
+    <div class="card">
+      <div class="card-head"><div><span class="eyebrow" id="sessionMeta">Today</span><h2 class="display h2">Glute Builder</h2><span class="muted small">About 38 min · 4 exercises</span></div></div>
+      <div id="todayList"></div>
+      <div class="stack" style="margin-top:12px">
+        <button class="cta" type="button" data-train="hipThrust"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Train with QK</button>
+        <button class="ghost full" type="button" id="checkinBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12l5 5 9-10"/></svg>I trained without the camera</button>
       </div>
+    </div>
 
-      <div class="actions">
-        <button class="btn primary" data-go="train">▶ Train with QK</button>
-        <button class="btn" id="checkinBtn">✓ I trained today</button>
-        <button class="btn" data-go="scan">◎ Body scan</button>
+    <div class="card stack">
+      <div><span class="eyebrow">Your plan</span><h2 class="display h2" style="margin-top:6px">When will you train?</h2></div>
+      <p class="muted small" style="margin:0">People who decide exactly when and where they'll train are far more likely to follow through.</p>
+      <div class="days" id="planDays"></div>
+      <div class="grid2">
+        <label class="field">Time<input id="planTime" type="time"></label>
+        <label class="field">Where<input id="planPlace" placeholder="e.g. PureGym"></label>
       </div>
+      <p class="plan-line" id="planLine"></p>
+    </div>
 
-      <div class="card" id="planCard">
-        <h2>Your training plan</h2>
-        <p class="muted">People who decide exactly <b>when</b> and <b>where</b> they'll train are far more likely to follow through. Pick your days.</p>
-        <div class="days" id="planDays"></div>
+    <div class="card" id="focusCard" hidden>
+      <span class="eyebrow">Your focus</span>
+      <div style="display:flex;justify-content:space-between;gap:12px;margin:10px 0 8px"><b id="focusTitle"></b><span class="data muted" id="focusNum"></span></div>
+      <div class="bar"><i id="focusBar" style="width:0"></i></div>
+      <p class="muted small" style="margin:8px 0 0" id="focusWhy"></p>
+    </div>
+
+    <div class="card">
+      <span class="eyebrow">Recent</span>
+      <div class="list" id="recent" style="margin-top:6px"><p class="empty">Your sessions, scans and wins will show up here.</p></div>
+    </div>
+
+    <details class="card">
+      <summary>Profile &amp; coach</summary>
+      <div class="stack" style="margin-top:14px">
+        <label class="field">Your name<input id="pName" placeholder="e.g. Sara" autocomplete="given-name"></label>
         <div class="grid2">
-          <label>Time <input id="planTime" type="time"></label>
-          <label>Where <input id="planPlace" placeholder="e.g. PureGym, home"></label>
+          <label class="field">Sex (body-fat formula)<select id="pSex"><option value="male">Male</option><option value="female">Female</option></select></label>
+          <label class="field">Height (cm)<input id="pHeight" type="number" inputmode="decimal"></label>
         </div>
-        <p class="plan-line" id="planLine"></p>
+        <label class="field">Coach photo (QK's face)<input id="coachPhoto" type="file" accept="image/*"></label>
+        <label class="field">Coach voice<select id="voiceSel"></select></label>
+        <button class="ghost" type="button" id="testVoice">Test the voice</button>
       </div>
+    </details>
+  </section>
 
-      <div class="card">
-        <h2>Recent</h2>
-        <ul class="list" id="recent"><li class="muted">No sessions yet. Your first one starts the streak.</li></ul>
+  <!-- TRAIN -->
+  <section class="screen" id="train">
+    <div class="page-head"><div><span class="eyebrow">Form check</span><h1 class="display h1">What are we training?</h1></div></div>
+    <label class="field"><span class="eyebrow">Search</span><input id="exSearch" type="search" placeholder="Search 84 exercises, e.g. row, squat, cable" autocomplete="off"></label>
+    <div class="chips-scroll" id="muscleChips" role="group" aria-label="Filter by muscle"></div>
+    <p class="muted small" style="margin:0" id="exCount"></p>
+    <div class="ex-grid" id="exGrid"></div>
+  </section>
+
+  <!-- GAIT -->
+  <section class="screen" id="gait">
+    <div class="page-head"><div><span class="eyebrow">Gait analysis</span><h1 class="display h1">How you walk and run</h1></div></div>
+    <div class="card stack">
+      <div class="mode-switch" role="group" aria-label="Gait type">
+        <button type="button" class="on" data-gmode="walk">Walking</button>
+        <button type="button" data-gmode="run">Running</button>
       </div>
+      <div class="setup-fig">
+        <svg viewBox="0 0 320 110" aria-hidden="true">
+          <rect x="70" y="86" width="150" height="12" rx="6" fill="#252e40"/>
+          <circle cx="145" cy="18" r="8" fill="none" stroke="url(#zoneStroke)" stroke-width="4"/>
+          <path d="M145 26v30M145 56l-12 28M145 56l14 26M145 34l-12 16M145 34l12 14" stroke="url(#zoneStroke)" stroke-width="5" stroke-linecap="round" fill="none"/>
+          <rect x="280" y="50" width="16" height="30" rx="4" fill="none" stroke="#edf0f6" stroke-width="2.5"/>
+          <line x1="288" y1="80" x2="288" y2="98" stroke="#edf0f6" stroke-width="2.5"/>
+          <path d="M170 40 H272" stroke="#8c95a8" stroke-dasharray="4 4"/>
+          <text x="222" y="32" text-anchor="middle" fill="#8c95a8" font-family="IBM Plex Mono, monospace" font-size="10">3 m · side-on</text>
+        </svg>
+      </div>
+      <ol class="steps">
+        <li>Treadmill is ideal. Phone at hip height, side-on, about 3 metres away.</li>
+        <li>Wear shorts or leggings so knees and ankles are visible.</li>
+        <li>Walk naturally for 10 seconds. Film facing the camera too, to check hip drop and knees.</li>
+      </ol>
+      <div class="btn-row">
+        <button class="cta" type="button" id="gaitLive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M23 7l-7 5 7 5zM1 5h15v14H1z"/></svg>Record 10 seconds</button>
+      </div>
+      <div class="btn-row">
+        <label class="ghost">Upload a video<input type="file" id="gaitFile" accept="video/*" hidden></label>
+        <button class="ghost" type="button" id="gaitDemo">Watch a demo</button>
+      </div>
+    </div>
+    <div id="gaitResult" class="stack" hidden></div>
+  </section>
 
-      <details class="card settings">
-        <summary>Profile &amp; coach settings</summary>
-        <label>Your name <input id="pName" placeholder="e.g. Sara"></label>
-        <label>Sex (for body-fat formula)
-          <select id="pSex"><option value="male">Male</option><option value="female">Female</option></select></label>
-        <label>Height (cm) <input id="pHeight" type="number" inputmode="decimal"></label>
-        <label>Weekly session goal <input id="pGoal" type="number" min="1" max="7"></label>
-        <label>Coach photo (QK's face for the avatar) <input id="coachPhoto" type="file" accept="image/*"></label>
-        <label>Coach voice <select id="voiceSel"></select></label>
-        <button class="btn small" id="testVoice">Test voice</button>
+  <!-- SCAN -->
+  <section class="screen" id="scan">
+    <div class="page-head"><div><span class="eyebrow">Body scan</span><h1 class="display h1">How you stand</h1></div></div>
+    <div class="card stack">
+      <p class="muted small" style="margin:0">Stand relaxed with arms by your sides and your whole body in frame, in fitted clothes. Do one photo facing the camera and one side-on.</p>
+      <div class="btn-row">
+        <label class="cta" style="cursor:pointer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="12" r="3"/></svg>Take a photo<input type="file" id="scanFile" accept="image/*,video/*" capture="environment" hidden></label>
+      </div>
+      <label class="ghost">Choose from gallery<input type="file" id="scanFile2" accept="image/*,video/*" hidden></label>
+      <p class="note" id="scanStatus"></p>
+    </div>
+    <div class="card stack" id="scanResult" hidden>
+      <div class="card-head" style="margin:0"><div><span class="eyebrow" id="scanWhen"></span><h2 class="display h2" id="scanTitle">Posture &amp; joint angles</h2></div></div>
+      <canvas id="scanCanvas" aria-label="Your photo with joint angles marked"></canvas>
+      <div class="kv" id="scanMetrics"></div>
+      <div class="stack" id="scanFindings"></div>
+      <p class="muted small" style="margin:0">A screen, not a diagnosis. If something hurts, see a physio.</p>
+    </div>
+    <div class="card stack">
+      <div class="card-head" style="margin:0"><div><span class="eyebrow">Body composition</span><h2 class="display h2">Body fat</h2></div><span class="muted small" style="text-align:right">Tape method<br>±3–4%</span></div>
+      <p class="muted small" style="margin:0">Measure your neck just below the Adam's apple, your waist at the navel and your hips at the widest point.</p>
+      <div class="grid2">
+        <label class="field">Weight (kg)<input id="bWeight" type="number" inputmode="decimal"></label>
+        <label class="field">Neck (cm)<input id="bNeck" type="number" inputmode="decimal"></label>
+        <label class="field">Waist (cm)<input id="bWaist" type="number" inputmode="decimal"></label>
+        <label class="field" id="hipWrap">Hips (cm)<input id="bHip" type="number" inputmode="decimal"></label>
+      </div>
+      <details><summary class="small">Smart scale, InBody or DEXA readings</summary>
+        <div class="grid2" style="margin-top:12px">
+          <label class="field">Body water (%)<input id="bWater" type="number" inputmode="decimal"></label>
+          <label class="field">Muscle mass (kg)<input id="bMuscle" type="number" inputmode="decimal"></label>
+        </div>
+        <p class="muted small">A camera can't measure body water or muscle mass, so Shred logs your device's readings and never guesses them.</p>
       </details>
-    </section>
+      <button class="cta" type="button" id="calcBf">Calculate and save</button>
+      <div id="bfOut"></div>
+    </div>
+  </section>
 
-    <!-- LIVE FORM CHECK -->
-    <section class="screen" id="train">
-      <div class="card picker" id="picker">
-        <h2>What are we training?</h2>
-        <div class="chips" id="exChips"></div>
-        <p class="muted" id="setupTip"></p>
-        <div class="actions">
-          <button class="btn primary" id="startCam">📷 Start camera</button>
-          <label class="btn">⬆ Analyse a video<input type="file" id="videoFile" accept="video/*" hidden></label>
-        </div>
-        <label class="inline"><input type="checkbox" id="recordChk" checked> Record my set so I can watch it back</label>
-      </div>
+  <!-- PROGRESS -->
+  <section class="screen" id="progress">
+    <div class="page-head"><div><span class="eyebrow">Your progress</span><h1 class="display h1">Progress</h1></div></div>
+    <div class="card chart">
+      <div class="card-head"><div><span class="eyebrow">Form score</span><div class="num" style="font-size:2rem;margin-top:4px" id="pfScore">–</div></div><span class="data small" id="pfDelta"></span></div>
+      <div id="formChart"><p class="empty">Train with the camera twice to see your form trend.</p></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div><span class="eyebrow">Consistency · last 12 weeks</span><h2 class="display h2" id="consTitle">Every session counts</h2></div></div>
+      <div class="heat" id="heat"></div>
+    </div>
+    <div class="card chart">
+      <div class="card-head"><div><span class="eyebrow">Body fat</span><div class="num" style="font-size:2rem;margin-top:4px" id="bfNow">–</div></div></div>
+      <div id="bfChart"><p class="empty">Log two measurements to see your trend.</p></div>
+    </div>
+    <div class="card">
+      <span class="eyebrow">Faults QK is working on</span>
+      <div class="list" id="faultList" style="margin-top:6px"><p class="empty">Form faults from your sets will show here, and fade as you fix them.</p></div>
+    </div>
+  </section>
+</div>
 
-      <div class="stage" id="stage" hidden>
-        <div class="viewport" id="viewport">
-          <video id="video" playsinline muted></video>
-          <canvas id="overlay"></canvas>
-        </div>
-        <div class="hud">
-          <div class="rep"><span id="repNum">0</span><small>reps</small></div>
-          <div class="angles" id="angleReadout"></div>
-        </div>
-        <div class="coach-bubble">
-          <span class="hint">tap QK: "how was that?"</span>
-          <div class="avatar-slot small"></div>
-          <p class="caption" data-coach-caption></p>
-        </div>
-        <div class="status" id="status">Loading coach vision…</div>
-        <div class="stage-actions">
-          <button class="btn small" id="flipCam">⟲ Flip</button>
-          <button class="btn primary small" id="endSet">■ End set</button>
-        </div>
-      </div>
-
-      <div class="card" id="summary" hidden>
-        <h2>Set summary</h2>
-        <div id="summaryBody"></div>
-        <video id="playback" controls playsinline hidden></video>
-        <div class="actions">
-          <a class="btn" id="downloadRec" hidden download="shred-set.webm">⬇ Save video</a>
-          <button class="btn primary" id="again">Go again</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- BODY SCAN -->
-    <section class="screen" id="scan">
-      <div class="card">
-        <h2>Body scan</h2>
-        <p class="muted">Stand relaxed, arms by your sides, whole body in frame, fitted clothes. Take one photo or a 5-second video <b>facing the camera</b>, and one <b>side-on</b>.</p>
-        <div class="actions">
-          <label class="btn primary">📷 Photo / video<input type="file" id="scanFile" accept="image/*,video/*" capture="environment" hidden></label>
-          <label class="btn">⬆ From gallery<input type="file" id="scanFile2" accept="image/*,video/*" hidden></label>
-        </div>
-        <p class="status-line" id="scanStatus"></p>
-      </div>
-
-      <div class="card" id="scanResult" hidden>
-        <h2 id="scanTitle">Posture &amp; joint angles</h2>
-        <canvas id="scanCanvas"></canvas>
-        <table class="metrics" id="scanMetrics"></table>
-        <div id="scanFindings"></div>
-      </div>
-
-      <div class="card">
-        <h2>Body composition</h2>
-        <p class="muted">Body fat from tape measurements (US Navy method, roughly ±3–4% vs a DEXA scan). Measure neck below the Adam's apple, waist at the navel, hips at the widest point.</p>
-        <div class="grid2">
-          <label>Weight (kg) <input id="bWeight" type="number" inputmode="decimal"></label>
-          <label>Neck (cm) <input id="bNeck" type="number" inputmode="decimal"></label>
-          <label>Waist (cm) <input id="bWaist" type="number" inputmode="decimal"></label>
-          <label id="hipWrap">Hips (cm) <input id="bHip" type="number" inputmode="decimal"></label>
-        </div>
-        <details>
-          <summary>Have a smart scale / InBody / DEXA? Log it too</summary>
-          <div class="grid2">
-            <label>Body water (%) <input id="bWater" type="number" inputmode="decimal"></label>
-            <label>Muscle mass (kg) <input id="bMuscle" type="number" inputmode="decimal"></label>
-            <label>Body fat from device (%) <input id="bDeviceBf" type="number" inputmode="decimal"></label>
-          </div>
-        </details>
-        <button class="btn primary" id="calcBf">Calculate &amp; save</button>
-        <div id="bfOut"></div>
-      </div>
-    </section>
-
-    <!-- PROGRESS -->
-    <section class="screen" id="progress">
-      <div class="card">
-        <h2>Body-fat trend</h2>
-        <canvas id="bfChart" height="160"></canvas>
-        <p class="muted" id="bfEmpty">Log two measurements to see your trend.</p>
-      </div>
-      <div class="card">
-        <h2>Form faults to work on</h2>
-        <ul class="list" id="faultList"><li class="muted">Train with the camera to see patterns.</li></ul>
-      </div>
-      <div class="card">
-        <h2>All sessions</h2>
-        <ul class="list" id="allSessions"></ul>
-      </div>
-    </section>
-  </main>
-
-  <nav class="tabs">
-    <button data-go="home" class="on">🏠<span>Coach</span></button>
-    <button data-go="train">🏋️<span>Train</span></button>
-    <button data-go="scan">◎<span>Scan</span></button>
-    <button data-go="progress">📈<span>Progress</span></button>
+<div class="tabs">
+  <nav aria-label="Main">
+    <button type="button" class="on" data-tab="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg>Today</button>
+    <button type="button" data-tab="train"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11"/></svg>Train</button>
+    <button type="button" data-tab="gait"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 4c2 0 3 2 3 4s-1 5-3 5-3-3-3-5 1-4 3-4zM16 9c2 0 3 2 3 4s-1 4-3 4-3-2-3-4 1-4 3-4zM6 16h4M14 20h4"/></svg>Gait</button>
+    <button type="button" data-tab="scan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M12 7v10M9 10h6"/></svg>Scan</button>
+    <button type="button" data-tab="progress"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19 10 12l4 4 6-9"/></svg>Progress</button>
   </nav>
+</div>
 
-  <div class="unlock" id="unlock">
-    <div class="avatar-slot big"></div>
-    <h1>SHRED <span>by QK</span></h1>
-    <p>Your coach, in your pocket. He watches your form, counts your reps and talks you through every set.</p>
-    <button class="btn primary" id="unlockBtn">Start session</button>
-    <p class="fine">Camera footage is analysed on your phone and never uploaded.</p>
+<!-- Setup sheet -->
+<div class="sheet-wrap" id="setup" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setupTitle">
+    <div class="grab"></div>
+    <div><span class="eyebrow" id="setupEyebrow"></span><h2 class="display h2" id="setupTitle" style="margin-top:6px;font-size:1.4rem">Set up your phone</h2></div>
+    <ol class="steps" id="setupSteps"></ol>
+    <label class="check"><input type="checkbox" id="recordChk" checked> Record my set so I can watch it back</label>
+    <button class="cta" type="button" id="startGuided" hidden><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Start with QK</button>
+    <button class="cta" type="button" id="startCam"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M23 7l-7 5 7 5zM1 5h15v14H1z"/></svg>Start camera</button>
+    <div class="btn-row">
+      <label class="ghost">Upload a video<input type="file" id="videoFile" accept="video/*" hidden></label>
+      <button class="ghost" type="button" id="startDemo" hidden>Watch a demo set</button>
+    </div>
   </div>
+</div>
 
-  <script type="module" src="js/app.js"></script>
+<!-- Live (camera / video / demo) -->
+<div class="live" id="live" hidden>
+  <div class="live-inner">
+    <div class="live-top">
+      <div><span class="eyebrow" id="liveEyebrow"></span><div class="set" id="liveTitle"></div></div>
+      <span class="rec" id="recBadge" hidden>Rec</span>
+    </div>
+    <div class="viewport" id="viewport">
+      <div class="media"><video id="video" playsinline muted></video><canvas id="overlay"></canvas></div>
+      <div class="rep-big" id="repBig"><span class="num" id="repNum">0</span><small id="repLbl">reps</small></div>
+      <div class="readout" id="readout"></div>
+      <div class="countdown num" id="countdown" hidden></div>
+      <div class="tempo-ring" id="tempoRing" hidden><div class="word" id="tempoWord"></div></div>
+      <div class="status" id="status"></div>
+      <div class="cue" id="cueBox">
+        <span class="hint" id="cueHint">Tap QK: "how was that?"</span>
+        <span class="orb-slot" data-size="56" id="liveOrb"></span>
+        <p data-coach-caption></p>
+      </div>
+    </div>
+    <div class="meters" id="formMeters">
+      <div class="meter"><div class="row"><span class="eyebrow">Reps</span><span class="data muted small" id="cleanCt">0 clean</span></div><div class="dots" id="dots"></div></div>
+      <div class="meter"><div class="row"><span class="eyebrow">Rep speed</span><span class="data muted small" id="vlTxt">fresh</span></div><div class="speed"><i id="vlKnob"></i></div></div>
+    </div>
+    <div class="meters" id="gaitMeters" hidden>
+      <div class="meter"><div class="row"><span class="eyebrow">Steps seen</span></div><div class="num" style="font-size:1.6rem" id="gSteps">0</div></div>
+      <div class="meter"><div class="row"><span class="eyebrow">Recording</span></div><div class="bar" style="margin-top:8px"><i id="gProg" style="width:0"></i></div></div>
+    </div>
+    <div class="live-actions">
+      <button class="ghost" type="button" id="flipCam">Flip camera</button>
+      <button class="stop" type="button" id="endLive">End set</button>
+    </div>
+  </div>
+</div>
+
+<!-- Set summary -->
+<div class="live" id="summary" hidden>
+  <div class="live-inner scroll">
+    <div class="live-top"><div><span class="eyebrow" id="sumEyebrow"></span><h2 class="display h1" style="margin-top:6px">Set done.</h2></div><span class="orb-slot" data-size="52"></span></div>
+    <div class="card sum-hero">
+      <svg viewBox="0 0 120 120" role="img" id="scoreRing" aria-label="Form score"></svg>
+      <div><div class="num" style="font-size:2.2rem" id="sReps">0</div><span class="muted">reps · <b id="sClean" style="color:var(--text)">0 clean</b></span><p class="muted small" style="margin:8px 0 0" id="sCompare"></p></div>
+    </div>
+    <div class="one-thing" id="sFocusBox"><span class="eyebrow" style="color:var(--warn)">One thing for next set</span><p id="sFocus"></p><p class="why" id="sWhy"></p></div>
+    <div class="card"><span class="eyebrow">Range of motion per rep</span><div class="rom-bars" id="romBars" style="margin-top:12px"></div><p class="muted small" style="margin:10px 0 0" id="romNote"></p></div>
+    <div class="card kv" id="sTable"></div>
+    <div class="card rest" id="restCard">
+      <svg viewBox="0 0 76 76" aria-hidden="true"><circle cx="38" cy="38" r="32" fill="none" stroke="#1a2130" stroke-width="8"/><circle id="restArc" cx="38" cy="38" r="32" fill="none" stroke="url(#zoneStroke)" stroke-width="8" stroke-linecap="round" stroke-dasharray="201" stroke-dashoffset="0" transform="rotate(-90 38 38)"/></svg>
+      <div style="flex:1"><span class="eyebrow">Rest</span><div class="num" id="restClock">2:00</div><span class="muted small" id="restWhy"></span></div>
+      <button class="ghost" type="button" id="restBtn">Start</button>
+    </div>
+    <video id="playback" controls playsinline hidden></video>
+    <div class="btn-row"><button class="ghost" type="button" id="doneBtn">Done</button><button class="cta" type="button" id="nextSet">Next set</button></div>
+  </div>
+</div>
+
+<!-- Welcome -->
+<div class="welcome" id="welcome">
+  <span class="orb-slot" data-size="132"></span>
+  <h1 class="big"><i>SHRED</i></h1>
+  <p>Your coach in your pocket. QK watches your form, counts your reps and talks you through every set.</p>
+  <button class="cta" type="button" id="welcomeBtn">Start</button>
+  <p class="note">Camera footage is analysed on your phone and never uploaded.</p>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+<script type="module" src="js/app.js"></script>
 </body>
 </html>

@@ -36,7 +36,7 @@ const squatLeanLimit = m => Math.min(60, Math.max(38, 45 + (m.femurTorso - 0.85)
 
 export const EXERCISES = {
   squat: {
-    name: 'Squat', view: 'either', primary: 'knee', downT: 115, upT: 160, concentric: 'up',
+    track: 'hip', name: 'Squat', view: 'either', primary: 'knee', downT: 115, upT: 160, concentric: 'up',
     setup: 'Phone at hip height, side-on to the camera, whole body in frame.',
     metrics(p, view) {
       const m = common(p);
@@ -66,7 +66,7 @@ export const EXERCISES = {
   },
 
   hipThrust: {
-    name: 'Hip Thrust', view: 'side', primary: 'hip', downT: 125, upT: 155, concentric: 'up',
+    track: 'hip', name: 'Hip Thrust', view: 'side', primary: 'hip', downT: 125, upT: 155, concentric: 'up',
     setup: 'Side-on, camera at bench height about two metres away. Shoulders, hips, knees and feet visible.',
     metrics(p) {
       const m = common(p);
@@ -93,7 +93,7 @@ export const EXERCISES = {
   },
 
   pushUp: {
-    name: 'Push-up', view: 'side', primary: 'elbow', downT: 105, upT: 150, concentric: 'up',
+    track: 'sh', name: 'Push-up', view: 'side', primary: 'elbow', downT: 105, upT: 150, concentric: 'up',
     setup: 'Camera on the floor, side-on, about two metres away.',
     metrics(p) {
       const m = common(p);
@@ -117,7 +117,7 @@ export const EXERCISES = {
   },
 
   rdl: {
-    name: 'Romanian Deadlift', view: 'side', primary: 'hip', downT: 120, upT: 165, concentric: 'up',
+    track: 'wr', name: 'Romanian Deadlift', view: 'side', primary: 'hip', downT: 120, upT: 165, concentric: 'up',
     setup: 'Side-on, camera at hip height, whole body in frame.',
     metrics: p => common(p),
     bottom: [
@@ -133,7 +133,7 @@ export const EXERCISES = {
   },
 
   lunge: {
-    name: 'Lunge', view: 'side', primary: 'knee', downT: 115, upT: 155, concentric: 'up',
+    track: 'hip', name: 'Lunge', view: 'side', primary: 'knee', downT: 115, upT: 155, concentric: 'up',
     setup: 'Side-on, camera at hip height. Leave room in frame for the step.',
     metrics(p) {
       const m = common(p);
@@ -151,7 +151,7 @@ export const EXERCISES = {
   },
 
   curl: {
-    name: 'Bicep Curl', view: 'either', primary: 'elbow', downT: 60, upT: 145, concentric: 'down',
+    track: 'wr', name: 'Bicep Curl', view: 'either', primary: 'elbow', downT: 60, upT: 145, concentric: 'down',
     setup: 'Side-on or facing the camera, upper body clearly visible.',
     metrics(p) {
       const m = common(p);
@@ -176,7 +176,7 @@ export const EXERCISES = {
   },
 
   press: {
-    name: 'Overhead Press', view: 'front', primary: 'elbow', downT: 95, upT: 155, concentric: 'up',
+    track: 'wr', name: 'Overhead Press', view: 'front', primary: 'elbow', downT: 95, upT: 155, concentric: 'up',
     setup: 'Facing the camera, upper body and arms fully in frame.',
     metrics(p) {
       const m = common(p);
@@ -193,6 +193,184 @@ export const EXERCISES = {
         why: 'Full lockout trains the upper traps and triceps through range.' },
     ],
   },
+
+  // ---- Additional movement patterns. Each one powers many exercises in js/library.js. ----
+  row: {
+    track: 'wr', name: 'Row', view: 'side', primary: 'elbow', downT: 95, upT: 145, concentric: 'down',
+    setup: 'Side-on, camera at hip height. Arms, torso and hips in frame.',
+    metrics(p) { const m = common(p); return m; },
+    bottom: [
+      { id: 'row_short', priority: 3, test: m => m.elbow > 85, cue: 'Pull your elbows back past your ribs.', yes: 'Full squeeze. Good.',
+        why: 'The mid-back muscles (rhomboids, mid-traps) work hardest at the end of the pull.' },
+    ],
+    top: [
+      { id: 'row_reach', priority: 3, test: m => m.elbow < 150, cue: 'Let your arms reach all the way forward.', yes: 'Full stretch, nice.',
+        why: 'Reaching lets the shoulder blades move, training the lats through their full length.' },
+    ],
+  },
+
+  vPull: {
+    track: 'wr', name: 'Vertical Pull', view: 'front', primary: 'elbow', downT: 85, upT: 150, concentric: 'down',
+    setup: 'Facing the camera, arms and hands fully in frame at the top.',
+    metrics(p) {
+      const m = common(p);
+      m.elbow = Math.max(angle(p[11], p[13], p[15]), angle(p[12], p[14], p[16]));
+      m.wristDiff = Math.abs(p[15].y - p[16].y) / (dist(p[11], p[12]) || 1);
+      return m;
+    },
+    bottom: [
+      { id: 'vp_short', priority: 3, test: m => m.elbow > 80, cue: 'Drive your elbows down into your back pockets.', yes: 'That\'s a full pull.',
+        why: 'Pulling the elbows all the way down fully contracts the lats.' },
+      { id: 'vp_even', priority: 2, test: m => m.wristDiff > 0.25, cue: 'Pull both hands down evenly.', yes: 'Even pull, good.',
+        why: 'An uneven pull means one side is doing more of the work.' },
+    ],
+    top: [
+      { id: 'vp_hang', priority: 3, test: m => m.elbow < 155, cue: 'Let your arms go fully straight at the top.', yes: 'Full stretch.',
+        why: 'The stretched position at the top builds lat length and strength.' },
+    ],
+  },
+
+  bench: {
+    track: 'wr', name: 'Press', view: 'side', primary: 'elbow', downT: 105, upT: 150, concentric: 'up',
+    setup: 'Side-on, camera at bench height, about two metres away.',
+    metrics: p => common(p),
+    bottom: [
+      { id: 'bp_depth', priority: 3, test: m => m.elbow > 100, cue: 'Bring the weight all the way down to your chest.', yes: 'Good depth.',
+        why: 'Full range loads the chest in its stretched position, where much of the growth comes from.' },
+    ],
+    top: [
+      { id: 'bp_lockout', priority: 3, test: m => m.elbow < 155, cue: 'Press all the way up until your arms are straight.', yes: 'Locked out.',
+        why: 'Finishing each rep trains the triceps through range.' },
+    ],
+  },
+
+  dip: {
+    track: 'sh', name: 'Dip', view: 'side', primary: 'elbow', downT: 110, upT: 150, concentric: 'up',
+    setup: 'Side-on, camera at chest height. Whole upper body in frame.',
+    metrics: p => common(p),
+    bottom: [
+      { id: 'dip_depth', priority: 3, test: m => m.elbow > 100, cue: 'Lower until your upper arms are level with the floor.', yes: 'Good depth.',
+        why: 'Upper arms at parallel trains the chest and triceps without overloading the shoulder.' },
+      { id: 'dip_deep', priority: 1, test: m => m.elbow < 60, cue: 'Not so deep. Stop when your upper arms are level.', yes: 'Better depth.',
+        why: 'Going very deep puts a lot of stress on the front of the shoulder.' },
+    ],
+    top: [{ id: 'dip_lockout', priority: 3, test: m => m.elbow < 155, cue: 'Push all the way up and lock out.', yes: 'Locked out.', why: 'Full lockout trains the triceps.' }],
+  },
+
+  fly: {
+    track: 'wr', name: 'Fly', view: 'front', primary: 'spread', downT: 90, upT: 140, concentric: 'down',
+    setup: 'Facing the camera, arms and hands fully in frame.',
+    metrics(p) {
+      const m = common(p);
+      m.spread = dist(p[15], p[16]) / (dist(p[11], p[12]) || 1) * 60;
+      m.elbowBend = Math.min(angle(p[11], p[13], p[15]), angle(p[12], p[14], p[16]));
+      return m;
+    },
+    always: [
+      { id: 'fly_bend', priority: 2, test: m => m.elbowBend < 110, cue: 'Keep a soft, fixed bend in your elbows, like hugging a tree.', yes: 'Good arm shape.',
+        why: 'Bending the elbows more turns the fly into a press and takes load off the chest.' },
+    ],
+  },
+
+  triExt: {
+    track: 'wr', name: 'Triceps Extension', view: 'side', primary: 'elbow', downT: 95, upT: 155, concentric: 'up',
+    setup: 'Side-on, camera at chest height. Shoulder, elbow and hand in frame.',
+    metrics(p) { const m = common(p); m.upperArmSwing = fromVertical(m.s.sh, m.s.el); return m; },
+    top: [
+      { id: 'tri_lockout', priority: 3, test: m => m.elbow < 160, cue: 'Straighten your arm all the way and squeeze.', yes: 'Full lockout.',
+        why: 'The triceps are fully shortened at lockout, so finishing the rep matters.' },
+    ],
+    always: [],
+  },
+
+  raise: {
+    track: 'wr', name: 'Raise', view: 'either', primary: 'shoulderClosed', downT: 105, upT: 150, concentric: 'down',
+    setup: 'Facing the camera for side raises, side-on for front raises. Arms fully in frame.',
+    metrics(p, view) {
+      const m = common(p);
+      const abd = view === 'front' ? Math.max(angle(p[23], p[11], p[13]), angle(p[24], p[12], p[14])) : angle(m.s.hip, m.s.sh, m.s.el);
+      m.shoulder = abd; m.shoulderClosed = 180 - abd;
+      return m;
+    },
+    bottom: [
+      { id: 'raise_low', priority: 3, test: m => m.shoulder < 75, cue: 'Lift your hands up to shoulder height.', yes: 'Right height.',
+        why: 'The shoulder muscle does most of its work in the last part of the lift.' },
+      { id: 'raise_high', priority: 2, test: m => m.shoulder > 110, cue: 'Stop at shoulder height. No higher.', yes: 'Good height.',
+        why: 'Going above shoulder height shifts the work to the upper traps.' },
+    ],
+    always: [
+      { id: 'raise_swing', priority: 2, test: m => m.torsoLean > 15, cue: 'Stand tall. Lift with your shoulders, not momentum.', yes: 'Strict reps. Nice.',
+        why: 'Swinging the torso uses momentum instead of the target muscle.' },
+    ],
+  },
+
+  calf: {
+    track: 'an', name: 'Calf Raise', view: 'side', primary: 'heelDrop', downT: 88, upT: 96, concentric: 'down',
+    setup: 'Side-on, camera at ankle height, feet clearly visible.',
+    metrics(p) {
+      const m = common(p), s = m.s, heel = s.side === 'left' ? p[29] : p[30];
+      const foot = dist(heel, s.ft) || 1;
+      m.lift = (s.ft.y - heel.y) / foot; // + when the heel is above the toes
+      m.heelDrop = 100 - m.lift * 60;
+      return m;
+    },
+    bottom: [
+      { id: 'calf_high', priority: 3, test: m => m.lift < 0.35, cue: 'Push up higher onto the balls of your feet, and pause.', yes: 'Full height.',
+        why: 'The calves are strongest at the top. A one-second pause removes bounce.' },
+    ],
+  },
+
+  torsoCurl: {
+    track: 'sh', name: 'Crunch', view: 'side', primary: 'torsoAngle', downT: 72, upT: 82, concentric: 'down',
+    setup: 'Lying side-on to the camera, camera on the floor about two metres away.',
+    metrics(p) { const m = common(p); m.torsoAngle = fromVertical(m.s.hip, m.s.sh); return m; },
+    bottom: [
+      { id: 'cr_short', priority: 3, test: m => m.torsoAngle > 68, cue: 'Curl your ribs towards your hips.', yes: 'Good crunch.',
+        why: 'The abs flex the spine. Curling, not just lifting the head, is what trains them.' },
+    ],
+  },
+
+  legRaise: {
+    track: 'an', name: 'Leg Raise', view: 'side', primary: 'hipLine', downT: 125, upT: 160, concentric: 'down',
+    setup: 'Side-on to the camera, whole body in frame.',
+    metrics(p) { const m = common(p); m.hipLine = angle(m.s.sh, m.s.hip, m.s.an); return m; },
+    bottom: [
+      { id: 'lr_high', priority: 3, test: m => m.hipLine > 115, cue: 'Lift your legs up to ninety degrees.', yes: 'Good height.',
+        why: 'Lifting higher makes the lower abs curl the pelvis, not just the hip flexors.' },
+    ],
+  },
+
+  kneeExt: {
+    track: 'an', name: 'Leg Extension', view: 'side', primary: 'knee', downT: 110, upT: 160, concentric: 'up',
+    setup: 'Side-on to the camera, hip, knee and ankle in frame.',
+    metrics: p => common(p),
+    top: [{ id: 'ke_lockout', priority: 3, test: m => m.knee < 165, cue: 'Straighten your legs fully and squeeze your quads.', yes: 'Full squeeze.', why: 'The quads are fully contracted only at full knee extension.' }],
+  },
+
+  kneeFlex: {
+    track: 'an', name: 'Leg Curl', view: 'side', primary: 'knee', downT: 95, upT: 150, concentric: 'down',
+    setup: 'Side-on to the camera, hip, knee and ankle in frame.',
+    metrics: p => common(p),
+    bottom: [{ id: 'kf_short', priority: 3, test: m => m.knee > 85, cue: 'Curl your heels all the way towards your glutes.', yes: 'Full curl.', why: 'Hamstrings are trained best through their full range.' }],
+    top: [{ id: 'kf_extend', priority: 3, test: m => m.knee < 150, cue: 'Let your legs straighten fully between reps.', yes: 'Full stretch.', why: 'The stretched position builds the most hamstring strength.' }],
+  },
+
+  plank: {
+    track: 'hip', name: 'Plank', view: 'side', primary: 'line', downT: -1, upT: 999, hold: true, concentric: 'up',
+    setup: 'Side-on to the camera, camera on the floor about two metres away.',
+    metrics(p) {
+      const m = common(p);
+      m.line = angle(m.s.sh, m.s.hip, m.s.an);
+      m.sag = offsetFromLine(m.s.sh, m.s.hip, m.s.an);
+      return m;
+    },
+    always: [
+      { id: 'pl_sag', priority: 1, test: m => m.line < 162 && m.sag > 0, cue: 'Lift your hips. Squeeze your glutes and brace like someone\'s about to poke your stomach.', yes: 'Solid. Hold it.',
+        why: 'Sagging hips put the load on your lower back instead of your core.' },
+      { id: 'pl_pike', priority: 2, test: m => m.line < 162 && m.sag < 0, cue: 'Lower your hips into one straight line.', yes: 'Straight line, good.',
+        why: 'Piking the hips up makes the plank much easier for the abs.' },
+    ],
+  },
 };
 
 export const allRules = ex => [...(ex.bottom || []), ...(ex.top || []), ...(ex.always || [])];
@@ -207,7 +385,7 @@ export class RepEngine {
     this.phase = 'top'; this.reps = 0; this.goodReps = 0;
     this.bottomSnap = null; this.topSnap = null; this.alwaysCount = {};
     this.faultTally = {}; this.tempo = []; // [{ecc, con}] seconds per rep
-    this.tLeaveTop = null; this.tBottom = null;
+    this.tLeaveTop = null; this.tBottom = null; this.roms = [];
   }
 
   rules(list) { return (list || []).filter(r => !r.view || r.view === this.view); }
@@ -250,7 +428,9 @@ export class RepEngine {
           .sort((a, b) => a.priority - b.priority);
         faults.forEach(f => { this.faultTally[f.id] = (this.faultTally[f.id] || 0) + 1; });
         if (!faults.length) this.goodReps++;
-        events.push({ type: 'rep', reps: this.reps, faults, tempo: this.tempo[this.tempo.length - 1], vl: this.velocityLoss() });
+        const rom = Math.abs(this.topSnap[ex.primary] - this.bottomSnap[ex.primary]);
+        this.roms.push({ rom, clean: !faults.length });
+        events.push({ type: 'rep', reps: this.reps, faults, tempo: this.tempo[this.tempo.length - 1], vl: this.velocityLoss(), rom });
       }
     }
 

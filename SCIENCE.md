@@ -45,7 +45,31 @@ Each rule in the app comes from a published principle. This file maps the code t
 | **Identity-based framing** | "That's a vote for the person you're becoming." | Identity-based motivation (Oyserman, 2009). |
 | **Social presence** | A familiar coach's face and voice, plus a recorded-voice option. | Social facilitation and the working alliance in coaching: the reason people pay for in-person PT. |
 
-## 5. Known limits (honest list)
+## 5. Motion tracking (`js/motion.js`)
+
+- **Movement path.** One key point is traced through every rep: the hips for squats, hip thrusts and lunges, the wrist (bar) for RDLs, curls and presses, and the shoulder for push-ups. In squats and deadlifts an efficient bar path stays close to vertical over mid-foot. Sideways drift of more than about 25% of torso length is flagged in the set summary.
+- **Range of motion per rep.** Each rep's joint range is measured. A rep under 85% of the set's best range counts as a partial rep. Partial reps reduce the training stimulus, especially in the lengthened position (Pedrosa et al. 2022).
+
+## 6. Gait analysis (`js/gait.js`)
+
+| Measure | How it's measured | Typical range | Evidence |
+|---|---|---|---|
+| Gait events | Heel strike is the foot's most-forward point relative to the pelvis; toe-off is its most-backward point. | — | Zeni, Richards & Higginson (2008), *Gait & Posture*: coordinate-based event detection |
+| Cadence | Median step time | Walk 100–125, run 160–190 steps/min | Perry & Burnfield, *Gait Analysis* |
+| Stance time | Heel strike to toe-off, as a % of the stride | Walk ~60% | Perry & Burnfield |
+| Knee bend in swing | Peak knee flexion between toe-off and the next heel strike | Walk ~55–70° | Perry & Burnfield |
+| Hip extension | Thigh angle behind vertical in late stance | Walk 8°+ | Reduced hip extension is linked to tight hip flexors and shorter stride |
+| Left/right symmetry | Robinson symmetry index | Under 10% | Robinson et al. (1987) |
+| Pelvic drop (front view) | Hip-line tilt during single-leg stance | Under 5° | Trendelenburg sign; glute medius weakness |
+| Overstriding (running) | Foot lands far ahead of the hips with a near-straight knee | — | Heiderscheit et al. (2011): a 5–10% cadence increase lowers knee and hip loading |
+
+Each finding maps to corrective exercises. Results are flagged as a screen: a phone gives a 2D estimate, not a 3D gait-lab measurement.
+
+## 7. Exercise library (`js/library.js`)
+
+84 exercises are grouped by **movement pattern**. A pattern is defined by the joint that moves, how a rep is counted and which faults matter. Different exercises in the same pattern share the same biomechanics (for example, a cable row and a dumbbell row are both horizontal pulls), so they share the same checks. Movements the camera can't measure reliably from one 2D view are **tempo-coached by voice instead**, with no form score shown: rotation (Russian twist), loaded carries, small wrist movements and machine hip abduction. Tempo coaching uses about 3 s lowering, 1 s pause and 1 s lifting. Controlled eccentrics increase time under tension and lower injury risk.
+
+## 8. Known limits (honest list)
 
 - A 2D camera can't see rotation well. One angle per exercise is the best it can do, so the setup instructions tell the client where to put the phone.
 - Thresholds are evidence-informed starting points. **They must be tuned on real client footage reviewed by QK**, and this is the most important next step.

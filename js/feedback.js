@@ -83,7 +83,7 @@ export class FeedbackCoach {
 // Rest between sets from the goal and how hard the set was (Schoenfeld 2016: ≥2 min supports
 // hypertrophy for compound lifts; closer to failure → more recovery needed).
 export function restSeconds(exKey, vl) {
-  const compound = ['squat', 'hipThrust', 'rdl', 'lunge', 'press'].includes(exKey);
+  const compound = ['squat', 'hipThrust', 'rdl', 'lunge', 'press', 'bench', 'row', 'vPull', 'dip'].includes(exKey);
   let s = compound ? 120 : 75;
   if (vl >= 0.3) s += 45;
   return s;
