@@ -105,6 +105,21 @@
         <button class="ghost" type="button" id="testVoice">Test the voice</button>
       </div>
     </details>
+
+    <details class="card" id="diagCard">
+      <summary>App health &amp; diagnostics</summary>
+      <div class="stack" style="margin-top:14px">
+        <label class="field">Tracking precision<select id="precisionSel">
+          <option value="">Automatic</option><option value="lite">Fast (older phones)</option><option value="full">Balanced</option><option value="heavy">Precise (slower, newest phones)</option>
+        </select></label>
+        <div class="kv" id="diagTable"></div>
+        <p class="muted small" style="margin:0">Something looked wrong, like a missed rep or an odd result? Export the last session and send it to your coach. It contains body-point positions only, never video.</p>
+        <div class="btn-row">
+          <button class="ghost" type="button" id="exportSession">Export last session</button>
+          <button class="ghost" type="button" id="exportErrors">Export error log</button>
+        </div>
+      </div>
+    </details>
   </section>
 
   <!-- TRAIN -->
@@ -116,39 +131,55 @@
     <div class="ex-grid" id="exGrid"></div>
   </section>
 
-  <!-- GAIT -->
+  <!-- TESTS -->
   <section class="screen" id="gait">
-    <div class="page-head"><div><span class="eyebrow">Gait analysis</span><h1 class="display h1">How you walk and run</h1></div></div>
-    <div class="card stack">
+    <div class="page-head"><div><span class="eyebrow">Movement tests</span><h1 class="display h1">Test how you move</h1></div></div>
+    <div class="mode-switch three" role="group" aria-label="Choose a test">
+      <button type="button" class="on" data-test="gait">Gait</button>
+      <button type="button" data-test="jump">Jump</button>
+      <button type="button" data-test="sls">Knee test</button>
+    </div>
+
+    <div class="card stack" data-panel="gait">
       <div class="mode-switch" role="group" aria-label="Gait type">
         <button type="button" class="on" data-gmode="walk">Walking</button>
         <button type="button" data-gmode="run">Running</button>
       </div>
-      <div class="setup-fig">
-        <svg viewBox="0 0 320 110" aria-hidden="true">
-          <rect x="70" y="86" width="150" height="12" rx="6" fill="#252e40"/>
-          <circle cx="145" cy="18" r="8" fill="none" stroke="url(#zoneStroke)" stroke-width="4"/>
-          <path d="M145 26v30M145 56l-12 28M145 56l14 26M145 34l-12 16M145 34l12 14" stroke="url(#zoneStroke)" stroke-width="5" stroke-linecap="round" fill="none"/>
-          <rect x="280" y="50" width="16" height="30" rx="4" fill="none" stroke="#edf0f6" stroke-width="2.5"/>
-          <line x1="288" y1="80" x2="288" y2="98" stroke="#edf0f6" stroke-width="2.5"/>
-          <path d="M170 40 H272" stroke="#8c95a8" stroke-dasharray="4 4"/>
-          <text x="222" y="32" text-anchor="middle" fill="#8c95a8" font-family="IBM Plex Mono, monospace" font-size="10">3 m · side-on</text>
-        </svg>
-      </div>
       <ol class="steps">
-        <li>Treadmill is ideal. Phone at hip height, side-on, about 3 metres away.</li>
+        <li>Treadmill is ideal. Phone at hip height, side-on, about 3 metres away, zoomed in slightly.</li>
         <li>Wear shorts or leggings so knees and ankles are visible.</li>
-        <li>Walk naturally for 10 seconds. Film facing the camera too, to check hip drop and knees.</li>
+        <li>Walk naturally for 10 seconds. Then film facing the camera to check hip drop and knees.</li>
       </ol>
-      <div class="btn-row">
-        <button class="cta" type="button" id="gaitLive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M23 7l-7 5 7 5zM1 5h15v14H1z"/></svg>Record 10 seconds</button>
-      </div>
+      <label class="field">Treadmill speed (km/h, optional, gives stride length in cm)<input id="tmSpeed" type="number" inputmode="decimal" placeholder="e.g. 5.0"></label>
+    </div>
+
+    <div class="card stack" data-panel="jump" hidden>
+      <div><b>Countermovement jump</b><p class="muted small" style="margin:4px 0 0">Measures jump height from your time in the air, the method jump mats use. Track it to see power and day-to-day readiness.</p></div>
+      <ol class="steps">
+        <li>Phone on the floor or a low step, side-on, 2–3 metres away. Your feet must stay in view.</li>
+        <li>Hands on hips. Stand still for a second, dip, and jump straight up. Land on the same spot with straight legs.</li>
+        <li>Do 3 jumps with a short rest. For the most precise result, film in slow-motion and upload it.</li>
+      </ol>
+    </div>
+
+    <div class="card stack" data-panel="sls" hidden>
+      <div><b>Single-leg squat knee test</b><p class="muted small" style="margin:4px 0 0">Measures how far your knee drifts inward on one leg (the frontal plane projection angle), a screen clinics use for knee-injury risk.</p></div>
+      <ol class="steps">
+        <li>Face the camera from 2–3 metres, phone at knee height. Whole legs in view, shorts or leggings.</li>
+        <li>Stand on your left leg, other foot lifted. Do 5 slow squats to a comfortable depth.</li>
+        <li>QK tells you when to switch. Then 5 on your right leg. 30 seconds in total.</li>
+      </ol>
+    </div>
+
+    <div class="stack">
+      <button class="cta" type="button" id="testLive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M23 7l-7 5 7 5zM1 5h15v14H1z"/></svg><span id="testLiveLbl">Record 10 seconds</span></button>
       <div class="btn-row">
         <label class="ghost">Upload a video<input type="file" id="gaitFile" accept="video/*" hidden></label>
         <button class="ghost" type="button" id="gaitDemo">Watch a demo</button>
       </div>
     </div>
     <div id="gaitResult" class="stack" hidden></div>
+    <div class="card" id="testHistory" hidden><span class="eyebrow">Your history</span><div class="list" id="testHistoryList" style="margin-top:6px"></div></div>
   </section>
 
   <!-- SCAN -->
@@ -161,6 +192,14 @@
       </div>
       <label class="ghost">Choose from gallery<input type="file" id="scanFile2" accept="image/*,video/*" hidden></label>
       <p class="note" id="scanStatus"></p>
+    </div>
+    <div class="card stack">
+      <div><span class="eyebrow">Full posture screen</span><h2 class="display h2" style="margin-top:6px">Front + side</h2><p class="muted small" style="margin:6px 0 0">Two photos give the full picture: level and alignment from the front, head and shoulder position from the side.</p></div>
+      <div class="btn-row">
+        <label class="ghost" id="frontSlot">1 · Front photo<input type="file" id="scanFront" accept="image/*,video/*" capture="environment" hidden></label>
+        <label class="ghost" id="sideSlot">2 · Side photo<input type="file" id="scanSide" accept="image/*,video/*" capture="environment" hidden></label>
+      </div>
+      <div id="fullScreen" class="stack" hidden></div>
     </div>
     <div class="card stack" id="scanResult" hidden>
       <div class="card-head" style="margin:0"><div><span class="eyebrow" id="scanWhen"></span><h2 class="display h2" id="scanTitle">Posture &amp; joint angles</h2></div></div>
@@ -216,7 +255,7 @@
   <nav aria-label="Main">
     <button type="button" class="on" data-tab="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg>Today</button>
     <button type="button" data-tab="train"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11"/></svg>Train</button>
-    <button type="button" data-tab="gait"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 4c2 0 3 2 3 4s-1 5-3 5-3-3-3-5 1-4 3-4zM16 9c2 0 3 2 3 4s-1 4-3 4-3-2-3-4 1-4 3-4zM6 16h4M14 20h4"/></svg>Gait</button>
+    <button type="button" data-tab="gait"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 4c2 0 3 2 3 4s-1 5-3 5-3-3-3-5 1-4 3-4zM16 9c2 0 3 2 3 4s-1 4-3 4-3-2-3-4 1-4 3-4zM6 16h4M14 20h4"/></svg>Tests</button>
     <button type="button" data-tab="scan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M12 7v10M9 10h6"/></svg>Scan</button>
     <button type="button" data-tab="progress"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19 10 12l4 4 6-9"/></svg>Progress</button>
   </nav>
@@ -228,6 +267,10 @@
     <div class="grab"></div>
     <div><span class="eyebrow" id="setupEyebrow"></span><h2 class="display h2" id="setupTitle" style="margin-top:6px;font-size:1.4rem">Set up your phone</h2></div>
     <ol class="steps" id="setupSteps"></ol>
+    <div class="grid2" id="loadWrap" hidden>
+      <label class="field">Weight (kg) for bar speed<input id="loadKg" type="number" inputmode="decimal" placeholder="e.g. 80"></label>
+      <p class="muted small" style="margin:0;align-self:end">Tap <b>Calibrate</b> during the set and mark a 45 cm plate for exact speed.</p>
+    </div>
     <label class="check"><input type="checkbox" id="recordChk" checked> Record my set so I can watch it back</label>
     <button class="cta" type="button" id="startGuided" hidden><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Start with QK</button>
     <button class="cta" type="button" id="startCam"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M23 7l-7 5 7 5zM1 5h15v14H1z"/></svg>Start camera</button>
@@ -268,6 +311,7 @@
     </div>
     <div class="live-actions">
       <button class="ghost" type="button" id="flipCam">Flip camera</button>
+      <button class="ghost" type="button" id="calBtn" hidden>Calibrate</button>
       <button class="stop" type="button" id="endLive">End set</button>
     </div>
   </div>
@@ -283,6 +327,12 @@
     </div>
     <div class="one-thing" id="sFocusBox"><span class="eyebrow" style="color:var(--warn)">One thing for next set</span><p id="sFocus"></p><p class="why" id="sWhy"></p></div>
     <div class="card"><span class="eyebrow">Range of motion per rep</span><div class="rom-bars" id="romBars" style="margin-top:12px"></div><p class="muted small" style="margin:10px 0 0" id="romNote"></p></div>
+    <div class="card stack" id="vbtCard" hidden>
+      <div class="card-head" style="margin:0"><div><span class="eyebrow">Bar speed</span><div class="num" style="font-size:2rem;margin-top:4px" id="vbtBest">–</div></div><span class="chip-note" id="vbtZone"></span></div>
+      <div class="rom-bars" id="vbtBars"></div>
+      <div class="kv" id="vbtTable"></div>
+      <p class="muted small" style="margin:0" id="vbtNote"></p>
+    </div>
     <div class="card kv" id="sTable"></div>
     <div class="card rest" id="restCard">
       <svg viewBox="0 0 76 76" aria-hidden="true"><circle cx="38" cy="38" r="32" fill="none" stroke="#1a2130" stroke-width="8"/><circle id="restArc" cx="38" cy="38" r="32" fill="none" stroke="url(#zoneStroke)" stroke-width="8" stroke-linecap="round" stroke-dasharray="201" stroke-dashoffset="0" transform="rotate(-90 38 38)"/></svg>

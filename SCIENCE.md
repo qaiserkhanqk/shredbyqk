@@ -69,7 +69,19 @@ Each finding maps to corrective exercises. Results are flagged as a screen: a ph
 
 84 exercises are grouped by **movement pattern**. A pattern is defined by the joint that moves, how a rep is counted and which faults matter. Different exercises in the same pattern share the same biomechanics (for example, a cable row and a dumbbell row are both horizontal pulls), so they share the same checks. Movements the camera can't measure reliably from one 2D view are **tempo-coached by voice instead**, with no form score shown: rotation (Russian twist), loaded carries, small wrist movements and machine hip abduction. Tempo coaching uses about 3 s lowering, 1 s pause and 1 s lifting. Controlled eccentrics increase time under tension and lower injury risk.
 
-## 8. Known limits (honest list)
+## 8. Single-camera measurement tests (`js/vbt.js`, `js/jump.js`, `js/kneetest.js`, `js/measure.js`)
+
+| Test | Method | Evidence | Measured accuracy on known-answer synthetic tests |
+|---|---|---|---|
+| **Bar speed (VBT)** | Bar tracked through the wrists (or shoulders for squats). A 45 cm plate tapped on screen converts pixels to metres. Mean concentric velocity is timed over the upward movement only, so pauses don't count. | Load–velocity relationship and minimum velocity thresholds: González-Badillo & Sánchez-Medina 2010; Jovanović & Flanagan 2014. Velocity zones: Mann. | 0.64 vs true 0.625 m/s (+2.5%); within 0.05 m/s with jitter; 1-rep max exact on a known line |
+| **Jump height** | Flight time: h = g·t²/8 (Bosco 1983). Take-off and landing are interpolated between frames; the hip rise cross-checks for tucked legs. | Basis of jump mats and the validated My Jump app | ±0.6 cm at 240 fps, ±1.2 at 120, ±2.3 at 60, ±4.7 at 30 |
+| **Knee test** | Frontal plane projection angle on a single-leg squat, measured at the deepest point, per leg | Willson & Davis 2008; Munro et al. 2012 | Within 1.5° clean, 2.5° with jitter |
+| **Scale** | Plate taps (exact) or height × 0.779 shoulder-to-ankle (Drillis & Contini), used only for standing lifts | Anthropometric segment tables | Exact maths; height method ±5% between people |
+| **Recording quality** | Score from frame rate, joint visibility, body in frame and camera view. Results are blocked below 40/100. | — | Every rule unit-tested |
+
+These are tests against simulated movement with known answers: they prove the maths, not real-world accuracy. Real-world accuracy comes from the validation study in TESTING.md.
+
+## 9. Known limits (honest list)
 
 - A 2D camera can't see rotation well. One angle per exercise is the best it can do, so the setup instructions tell the client where to put the phone.
 - Thresholds are evidence-informed starting points. **They must be tuned on real client footage reviewed by QK**, and this is the most important next step.

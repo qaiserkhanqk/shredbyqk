@@ -21,6 +21,12 @@ All video is processed **on the phone** (MediaPipe Pose) and nothing is uploaded
   - overstriding (running)
   - a knee-angle chart through one stride against the typical range
   - findings, each with fixes
+- **Bar speed (velocity-based training):** m/s per rep, speed loss in the set, training zone, and estimated 1-rep max from your load–speed profile. Tap a 45 cm plate to calibrate.
+- **Jump test:** jump height from time in the air, precision shown for your frame rate, and day-to-day readiness against your own baseline.
+- **Single-leg squat knee test:** knee drift per leg (frontal plane projection angle), hip drop, and left/right difference.
+- **Guided two-view posture screen:** front and side photos merged into one report.
+- **Accuracy:** 3 model sizes (precise model for uploads and tests), 60 fps capture for tests, and a recording-quality score that blocks results from bad recordings.
+- **Diagnostics:** export any session (body points only, no video) and replay it on a computer to find bugs. See [TESTING.md](TESTING.md).
 - **Demo modes.** A simulated athlete (hip thrust) and walker run through the real engine, so you can show clients how it works without a camera.
 - **Body scan.** Shows a posture picture with joint angles and asymmetries, plus fixes, and gives body fat by the US Navy method. Readings from a smart scale or InBody can be logged.
 - **Accountability.** Training plan (implementation intention), plan-aware streak, weekly goal and supportive nudges.

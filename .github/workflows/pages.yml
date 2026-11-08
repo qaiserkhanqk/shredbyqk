@@ -30,3 +30,13 @@ jobs:
           path: .
       - id: deployment
         uses: actions/deploy-pages@v4
+  e2e:
+    # Browser end-to-end test. Separate job so a flaky browser run never blocks a deploy.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-save playwright@1.49.1 && npx playwright install --with-deps chromium
+      - run: npm run test:e2e

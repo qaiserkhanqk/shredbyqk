@@ -3,7 +3,11 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "test": "node tests/simulate.mjs && node tests/gait.mjs && node tests/library.mjs && node tests/squatTracker.test.ts",
+    "test": "node tests/simulate.mjs && node tests/gait.mjs && node tests/library.mjs && node tests/squatTracker.test.ts && node tests/measurement.test.mjs && node tests/regression.test.mjs",
+    "test:e2e": "node tests/e2e.cjs",
+    "replay": "node tests/replay.mjs",
+    "validate": "node tests/validate.mjs",
+    "fixtures": "node tests/make-fixtures.mjs",
     "start": "python3 -m http.server 8080"
   },
   "keywords": [],

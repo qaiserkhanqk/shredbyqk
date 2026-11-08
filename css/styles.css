@@ -297,3 +297,13 @@ details[open] > summary::after { content: "–"; }
 .pill.voice { color: var(--z3); background: rgba(255,107,74,.1); }
 .tempo-ring { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
 .tempo-ring .word { font-family: var(--f-display); font-stretch: 118%; font-weight: 800; font-size: 2.4rem; text-align: center; }
+
+.mode-switch.three { grid-template-columns: repeat(3, 1fr); }
+.quality { display: flex; gap: 10px; align-items: center; font-size: .85rem; }
+.quality .q { font: 700 .78rem var(--f-data); padding: 4px 10px; border-radius: 99px; background: rgba(61,220,151,.12); color: var(--good); }
+.quality .q.mid { background: rgba(255,181,71,.12); color: var(--warn); }
+.quality .q.low { background: rgba(255,90,95,.12); color: var(--bad); }
+.issues { margin: 0; padding-left: 18px; font-size: .84rem; color: var(--muted); }
+.big-result { font-family: var(--f-display); font-weight: 800; font-size: 3rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.big-result small { font-size: 1rem; color: var(--muted); font-weight: 600; margin-left: 4px; }
+.viewport.calibrating { outline: 2px dashed var(--z1); outline-offset: -2px; cursor: crosshair; }
