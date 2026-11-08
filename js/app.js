@@ -52,14 +52,19 @@ function mountOrbs() {
 /* ---------- Navigation ---------- */
 function tab(id) {
   $$('.screen').forEach(s => s.classList.toggle('on', s.id === id));
-  $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === id));
+  const tabFor = ['gait', 'scan', 'rehab'].includes(id) ? 'body' : id;
+  $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tabFor));
   if (id === 'today') renderToday();
-  if (id === 'progress') { renderProgress(); renderLoad(); }
+  if (id === 'progress') { renderProgress(); renderLoad(); renderToday(); $('#youName').textContent = S.profile.name || 'You'; }
   if (id === 'rehab') renderRehab();
   if (id === 'scan') $('#hipWrap').hidden = S.profile.sex === 'male';
   window.scrollTo(0, 0);
 }
 $$('.tabs button').forEach(b => b.onclick = () => tab(b.dataset.tab));
+document.addEventListener('click', e => {
+  const g = e.target.closest('[data-go]'); if (g) return tab(g.dataset.go);
+  if (e.target.closest('[data-back]')) tab('body');
+});
 
 /* ---------- Today ---------- */
 const TODAY = [['hipThrust', '4×10'], ['rdl', '3×10'], ['lunge', '3×12'], ['bandedWalk', '2×20']];
@@ -79,7 +84,7 @@ function nudgeLine() {
   const since = store.daysSinceLast(S), st = store.streak(S), wk = store.thisWeek(S), goal = S.profile.weeklyGoal || 4;
   const plan = S.plan || {}, planned = (plan.days || []).includes(new Date().getDay());
   const when = plan.time ? ` at ${plan.time}` : '', where = plan.place ? ` at ${plan.place}` : '';
-  if (since === null) return plan.days?.length ? 'Your plan is set. First session today, and I\'ll be right here with you.' : 'Pick your training days below, then let\'s do your first session together.';
+  if (since === null) return plan.days?.length ? 'Your plan is set. First session today, and I\'ll be right here with you.' : 'Tap Train with QK and let\'s do your first session together. You can set your training days under You.';
   if (since === 0) return st > 1 ? `${st} days on plan. This is who you are now.` : 'Session done today. That\'s a vote for the person you\'re becoming.';
   if (planned) return `Today's a training day${when}${where}. You planned it, so let's keep that promise to yourself.`;
   if (since === 1) return wk >= goal ? 'Weekly goal hit. Recovery is where the muscle is built.' : `${goal - wk} more session${goal - wk > 1 ? 's' : ''} this week gets you to your goal.`;
@@ -445,7 +450,7 @@ function endSet() {
   $('#romNote').textContent = roms.length ? (rs.partial ? `${rs.partial} rep${rs.partial > 1 ? 's were' : ' was'} short of your full range (under 85% of your best ${Math.round(rs.best)}°).` : `Every rep hit full range. Best ${Math.round(rs.best)}°.`) : 'No reps yet.';
   const driftTxt = ['squat', 'rdl'].includes(ex.patternKey) ? `<span>Bar / hip path drift</span><span class="${drift > .25 ? 'hot' : 'ok'}">${Math.round(drift * 100)}% of torso</span>` : '';
   $('#sTable').innerHTML = `<span>Lowering time</span><span>${avg('ecc')} s</span><span>Lifting time</span><span>${avg('con')} s</span>
-    <span>Rep speed loss</span><span class="${vl >= .3 ? 'hot' : ''}">${Math.round(vl * 100)}%</span><span>Reps left in the tank</span><span>${tempo.length >= 3 ? estimateRIR(vl) : '–'}</span>${driftTxt}`;
+    <span>Slowing down by the end</span><span class="${vl >= .3 ? 'hot' : ''}">${Math.round(vl * 100)}%</span><span>Reps left in the tank</span><span>${tempo.length >= 3 ? estimateRIR(vl) : '–'}</span>${driftTxt}`;
   renderVBT(ex, reps);
   recorder2.finish({ reps, good, faults: tally });
   const rest = restSeconds(ex.patternKey, vl); restLeft = rest; restTotal = rest; drawRest();
@@ -975,7 +980,7 @@ function renderRehabDashboard() {
     </div>
     ${c.tests.length || ph.criteria.some(k => k.type === 'kneeTest') ? `<div class="card"><span class="eyebrow">Your measurements</span><div class="list" style="margin-top:6px">${c.tests.map(testRow).join('')}
       ${ph.criteria.some(k => k.type === 'kneeTest') ? `<div class="row"><div><b class="small">Single-leg squat knee test</b><br><span class="muted small">${p.kneeTests.length ? `L ${p.kneeTests.slice(-1)[0].L ?? '–'}° · R ${p.kneeTests.slice(-1)[0].R ?? '–'}°` : 'not tested'}</span></div><button type="button" class="ghost" id="goKneeTest">Test</button></div>` : ''}</div></div>` : ''}
-    <div class="card stack"><div class="card-head" style="margin:0"><div><span class="eyebrow">Daily activities (PSFS)</span><div class="num" style="font-size:1.8rem;margin-top:4px">${psfsSeries.length ? psfsSeries[psfsSeries.length - 1] + '/10' : '–'}</div></div><button type="button" class="ghost" id="rerate">Re-rate</button></div>
+    <div class="card stack"><div class="card-head" style="margin:0"><div><span class="eyebrow">Daily activities</span><div class="num" style="font-size:1.8rem;margin-top:4px">${psfsSeries.length ? psfsSeries[psfsSeries.length - 1] + '/10' : '–'}</div></div><button type="button" class="ghost" id="rerate">Re-rate</button></div>
       ${psfsSeries.length >= 2 ? lineChart(psfsSeries, { min: 0, max: 10, labels: p.psfs.map(x => new Date(x.at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })) }) : '<span class="muted small">Re-rate every week to see your progress.</span>'}
       ${painSeries.length >= 2 ? `<span class="eyebrow">Pain during exercise</span>${lineChart(painSeries, { min: 0, max: 10, labels: painSeries.map((_, i) => String(i + 1)) })}` : ''}</div>
     <details class="card"><summary>About ${esc(c.name.toLowerCase())}</summary><p class="small" style="margin:10px 0 0">${esc(c.about)}</p><p class="muted small">${esc(c.evidence)}</p>
@@ -1074,12 +1079,21 @@ function renderReady() {
   const rl = rk ? painLight({ ...rk, usualMorning: S.rehab.active.usualMorning }, COND[S.rehab.active.cond].painLimit).light : null;
   const rec = recommendToday({ check: c, history: hist, sessions: S.loads, jumpStatus: jr?.status, rehabLight: rl });
   const card = $('#readyCard'); card.className = 'card stack ' + (c ? rec.level : '');
-  $('#readyTitle').textContent = c ? rec.title : 'Check in to see today\'s plan';
-  $('#readyScore').textContent = c ? readiness(c, hist).score : '–';
-  $('#readyReasons').innerHTML = rec.reasons.map(r => `<li>${esc(r)}</li>`).join('');
-  $('#morningCheck').textContent = c ? 'Update check-in' : 'Morning check-in';
+  $('#readyResult').hidden = !c;
+  $$('[data-feel]').forEach(b => b.classList.toggle('on', !!c && c.feel === b.dataset.feel));
+  $('#readyTitle').textContent = c ? rec.title : '';
+  $('#readyScore').textContent = c ? readiness(c, hist).score + '/100' : '';
+  $('#readyReasons').innerHTML = c ? rec.reasons.map(r => '<li>' + esc(r) + '</li>').join('') : '';
+  $('#morningCheck').textContent = c ? 'Change or add detail' : 'Add more detail';
 }
 const scale7 = (id, label, lo, hi, v = 3) => `<label class="field slider">${label} <span class="val" id="${id}v">${v}</span><input type="range" min="1" max="7" value="${v}" id="${id}"><span class="muted small" style="display:flex;justify-content:space-between"><span>${lo}</span><span>${hi}</span></span></label>`;
+// One tap: Great / OK / Rough maps onto the Hooper scale (1 = very good ... 7 = very bad).
+const FEEL = { great: { sleepQ: 2, fatigue: 2, stress: 2, soreness: 2 }, ok: { sleepQ: 4, fatigue: 4, stress: 3, soreness: 3 }, rough: { sleepQ: 6, fatigue: 6, stress: 5, soreness: 6 } };
+$$('[data-feel]').forEach(b => b.onclick = () => {
+  const entry = { at: Date.now(), sleepH: null, feel: b.dataset.feel, ...FEEL[b.dataset.feel] };
+  S.readiness = S.readiness.filter(x => dayKey(x.at) !== dayKey(entry.at)); S.readiness.push(entry); persist(); renderReady();
+  say($('#readyTitle').textContent + '.', { id: 'ready_' + Date.now(), priority: 'high' });
+});
 $('#morningCheck').onclick = () => {
   const c = todayCheck() || {};
   openSheet(`<div><span class="eyebrow">Morning check-in · 20 seconds</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">How are you today?</h2></div>
@@ -1105,19 +1119,19 @@ $('#logSession').onclick = () => {
   $('#rpe').oninput = e => $('#rpeV').textContent = e.target.value;
   $('#loadSave').onclick = () => {
     const s = { at: Date.now(), rpe: +$('#rpe').value, minutes: Math.max(0, parseInt($('#mins').value) || 0) };
-    S.loads.push(s); persist(); closeSheet(); renderReady(); toast(`Logged ${sessionLoad(s)} load units`);
+    S.loads.push(s); persist(); closeSheet(); renderReady(); toast('Saved: ' + sessionLoad(s) + ' training points');
   };
 };
 function renderLoad() {
   const weeks = [7, 6, 5, 4, 3, 2, 1, 0].map(w => weekStats(S.loads, Date.now() - w * 7 * 864e5).load);
   const sp = loadSpike(S.loads), wk = weekStats(S.loads);
-  $('#loadNow').textContent = S.loads.length ? `${wk.load} AU` : '–';
+  $('#loadNow').textContent = S.loads.length ? wk.load + ' points' : '–';
   $('#loadDelta').textContent = sp.ratio ? `${sp.ratio >= 1 ? '+' : ''}${Math.round((sp.ratio - 1) * 100)}% vs usual` : '';
   $('#loadDelta').style.color = sp.spike ? 'var(--warn)' : 'var(--muted)';
   if (!S.loads.length) return;
   const max = Math.max(...weeks, 1), W = 360, H = 130, bw = (W - 40) / 8;
   $('#loadChart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Weekly training load, last 8 weeks">${weeks.map((v, i) => { const h = v / max * (H - 30); return `<rect x="${30 + i * bw + 4}" y="${H - 20 - h}" width="${bw - 8}" height="${h}" rx="5" fill="${i === 7 ? (sp.spike ? '#ffb547' : 'url(#zoneStroke)') : '#2a3348'}"/><text x="${30 + i * bw + bw / 2}" y="${H - 5}" text-anchor="middle" fill="#8c95a8" font-size="10" font-family="IBM Plex Mono, monospace">${i === 7 ? 'now' : '-' + (7 - i) + 'w'}</text>`; }).join('')}</svg>`;
-  $('#loadNote').textContent = (sp.spike ? 'This week is well above your recent average. Rapid jumps in load raise injury risk, so build gradually. ' : '') + `Monotony ${wk.monotony} (above about 2 means too little variety between hard and easy days).`;
+  $('#loadNote').textContent = (sp.spike ? 'This week is well above your usual. Big jumps raise injury risk, so build up gradually. ' : '') + (wk.monotony > 2 ? 'Most days are the same effort. Mix in some easier days.' : 'Effort × minutes for each session you rate.');
 }
 
 /* ---------- Studio ---------- */
@@ -1151,7 +1165,10 @@ $('#studioExport').onclick = async () => { const data = await exportClips(); if 
 
 /* ---------- Boot ---------- */
 mountOrbs(); bindPlan(); bindProfile(); renderTrain(); renderToday(); applyMute(); renderTestHistory();
+if (S.profile.name) $('#welcomeNameWrap').hidden = true;
 $('#welcomeBtn').onclick = () => {
+  const nm = $('#welcomeName').value.trim();
+  if (nm && !S.profile.name) { S.profile.name = nm; $('#pName').value = nm; persist(); renderToday(); }
   $('#welcome').hidden = true;
   say(`${greeting(S.profile.name)} ${nudgeLine()}`, { id: 'greet', priority: 'high' });
   getVideoLandmarker().catch(() => {}); // warm the model up in the background

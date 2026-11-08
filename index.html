@@ -41,104 +41,28 @@
       <span id="nudge"></span>
     </div>
 
-    <div class="card">
-      <div class="card-head"><div><span class="eyebrow">This week</span><h2 class="display h2" id="weekTitle">Let's start</h2></div></div>
-      <div class="rings">
-        <svg viewBox="0 0 150 150" role="img" id="ringsSvg" aria-label="Weekly progress rings">
-          <g fill="none" stroke-linecap="round" transform="rotate(-90 75 75)">
-            <circle cx="75" cy="75" r="64" stroke="#1a2130" stroke-width="13"/><circle cx="75" cy="75" r="47" stroke="#1a2130" stroke-width="13"/><circle cx="75" cy="75" r="30" stroke="#1a2130" stroke-width="13"/>
-            <circle class="ring-arc" id="ring1" cx="75" cy="75" r="64" stroke="#ff6b4a" stroke-width="13"/>
-            <circle class="ring-arc" id="ring2" cx="75" cy="75" r="47" stroke="#7c6cff" stroke-width="13"/>
-            <circle class="ring-arc" id="ring3" cx="75" cy="75" r="30" stroke="#45c3ff" stroke-width="13"/>
-          </g>
-        </svg>
-        <div class="legend">
-          <div><span class="dot" style="background:var(--z3)"></span><span class="v" id="lgSessions">0/4</span><span class="l">sessions this week</span></div>
-          <div><span class="dot" style="background:var(--z2)"></span><span class="v" id="lgForm">–</span><span class="l" id="lgFormL">form score</span></div>
-          <div><span class="dot" style="background:var(--z1)"></span><span class="v" id="lgStreak">0 days</span><span class="l">plan kept</span></div>
-        </div>
+    <div class="card stack" id="readyCard">
+      <div><span class="eyebrow">How do you feel today?</span></div>
+      <div class="feel" role="group" aria-label="How do you feel today?">
+        <button type="button" data-feel="great"><b>Great</b><span>Fresh, slept well</span></button>
+        <button type="button" data-feel="ok"><b>OK</b><span>A bit tired</span></button>
+        <button type="button" data-feel="rough"><b>Rough</b><span>Sore or drained</span></button>
       </div>
+      <div id="readyResult" hidden><b id="readyTitle"></b> <span class="ready-score num" id="readyScore"></span><ul class="issues" id="readyReasons" style="margin-top:6px"></ul></div>
+      <button type="button" class="linkbtn" id="morningCheck">Add more detail</button>
     </div>
 
     <div class="card">
       <div class="card-head"><div><span class="eyebrow" id="sessionMeta">Today</span><h2 class="display h2">Glute Builder</h2><span class="muted small">About 38 min · 4 exercises</span></div></div>
-      <div id="todayList"></div>
-      <div class="stack" style="margin-top:12px">
+      <div class="stack" style="margin:4px 0 8px">
         <button class="cta" type="button" data-train="hipThrust"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Train with QK</button>
-        <button class="ghost full" type="button" id="checkinBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12l5 5 9-10"/></svg>I trained without the camera</button>
+        <div class="btn-row"><button class="ghost" type="button" id="checkinBtn">Log a session</button><button class="ghost" type="button" id="logSession">Rate effort</button></div>
       </div>
-    </div>
-
-    <div class="card stack">
-      <div><span class="eyebrow">Your plan</span><h2 class="display h2" style="margin-top:6px">When will you train?</h2></div>
-      <p class="muted small" style="margin:0">People who decide exactly when and where they'll train are far more likely to follow through.</p>
-      <div class="days" id="planDays"></div>
-      <div class="grid2">
-        <label class="field">Time<input id="planTime" type="time"></label>
-        <label class="field">Where<input id="planPlace" placeholder="e.g. PureGym"></label>
-      </div>
-      <p class="plan-line" id="planLine"></p>
-    </div>
-
-    <div class="card stack" id="readyCard">
-      <div class="card-head" style="margin:0"><div><span class="eyebrow">Today's readiness</span><h2 class="display h2" id="readyTitle">Check in to see today's plan</h2></div><span class="ready-score num" id="readyScore">–</span></div>
-      <ul class="issues" id="readyReasons"></ul>
-      <div class="btn-row"><button class="ghost" type="button" id="morningCheck">Morning check-in</button><button class="ghost" type="button" id="logSession">Log session effort</button></div>
+      <div id="todayList"></div>
     </div>
 
     <button type="button" class="card rehab-today" id="rehabToday" hidden></button>
 
-    <div class="card" id="focusCard" hidden>
-      <span class="eyebrow">Your focus</span>
-      <div style="display:flex;justify-content:space-between;gap:12px;margin:10px 0 8px"><b id="focusTitle"></b><span class="data muted" id="focusNum"></span></div>
-      <div class="bar"><i id="focusBar" style="width:0"></i></div>
-      <p class="muted small" style="margin:8px 0 0" id="focusWhy"></p>
-    </div>
-
-    <div class="card">
-      <span class="eyebrow">Recent</span>
-      <div class="list" id="recent" style="margin-top:6px"><p class="empty">Your sessions, scans and wins will show up here.</p></div>
-    </div>
-
-    <details class="card">
-      <summary>Profile &amp; coach</summary>
-      <div class="stack" style="margin-top:14px">
-        <label class="field">Your name<input id="pName" placeholder="e.g. Sara" autocomplete="given-name"></label>
-        <div class="grid2">
-          <label class="field">Sex (body-fat formula)<select id="pSex"><option value="male">Male</option><option value="female">Female</option></select></label>
-          <label class="field">Height (cm)<input id="pHeight" type="number" inputmode="decimal"></label>
-        </div>
-        <label class="field">Coach photo (QK's face)<input id="coachPhoto" type="file" accept="image/*"></label>
-        <label class="field">Coach voice<select id="voiceSel"></select></label>
-        <button class="ghost" type="button" id="testVoice">Test the voice</button>
-      </div>
-    </details>
-
-    <details class="card" id="studioCard">
-      <summary>Studio: record QK's voice</summary>
-      <div class="stack" style="margin-top:14px">
-        <p class="muted small" style="margin:0">Record each coaching line once in your own voice. You'll hear it straight away on this phone. Export the recordings to publish them for every client (see README). Lines with live numbers stay in the synthetic voice.</p>
-        <div class="bar"><i id="studioBar" style="width:0"></i></div><span class="muted small" id="studioCount"></span>
-        <div class="chips-scroll" id="studioGroups"></div>
-        <div class="list" id="studioList"></div>
-        <button class="ghost" type="button" id="studioExport">Export recordings</button>
-      </div>
-    </details>
-
-    <details class="card" id="diagCard">
-      <summary>App health &amp; diagnostics</summary>
-      <div class="stack" style="margin-top:14px">
-        <label class="field">Tracking precision<select id="precisionSel">
-          <option value="">Automatic</option><option value="lite">Fast (older phones)</option><option value="full">Balanced</option><option value="heavy">Precise (slower, newest phones)</option>
-        </select></label>
-        <div class="kv" id="diagTable"></div>
-        <p class="muted small" style="margin:0">Something looked wrong, like a missed rep or an odd result? Export the last session and send it to your coach. It contains body-point positions only, never video.</p>
-        <div class="btn-row">
-          <button class="ghost" type="button" id="exportSession">Export last session</button>
-          <button class="ghost" type="button" id="exportErrors">Export error log</button>
-        </div>
-      </div>
-    </details>
   </section>
 
   <!-- TRAIN -->
@@ -150,8 +74,17 @@
     <div class="ex-grid" id="exGrid"></div>
   </section>
 
+  <!-- BODY hub -->
+  <section class="screen" id="body">
+    <div class="page-head"><div><span class="eyebrow">Body</span><h1 class="display h1">What do you need?</h1></div></div>
+    <button type="button" class="tile" data-go="rehab"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.5-9-9.5C1.6 7.6 4.2 4 7.8 4c1.8 0 3.2 1 4.2 2.4C13 5 14.4 4 16.2 4 19.8 4 22.4 7.6 21 11.5 19 16.5 12 21 12 21z"/><path d="M9 12h6M12 9v6"/></svg></span><span><b>Fix a pain or injury</b><span>Back, shoulder, knee, ankle and more. A safe, step-by-step plan.</span></span></button>
+    <button type="button" class="tile" data-go="gait"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round"><path d="M8 4c2 0 3 2 3 4s-1 5-3 5-3-3-3-5 1-4 3-4zM16 9c2 0 3 2 3 4s-1 4-3 4-3-2-3-4 1-4 3-4z"/></svg></span><span><b>Test how you move</b><span>Walking and running, jump height, knee control.</span></span></button>
+    <button type="button" class="tile" data-go="scan"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="12" r="3"/></svg></span><span><b>Posture &amp; body fat</b><span>A photo check of how you stand, plus body fat.</span></span></button>
+  </section>
+
   <!-- TESTS -->
   <section class="screen" id="gait">
+    <button type="button" class="back" data-back>‹ Body</button>
     <div class="page-head"><div><span class="eyebrow">Movement tests</span><h1 class="display h1">Test how you move</h1></div></div>
     <div class="mode-switch three" role="group" aria-label="Choose a test">
       <button type="button" class="on" data-test="gait">Gait</button>
@@ -203,6 +136,7 @@
 
   <!-- SCAN -->
   <section class="screen" id="scan">
+    <button type="button" class="back" data-back>‹ Body</button>
     <div class="page-head"><div><span class="eyebrow">Body scan</span><h1 class="display h1">How you stand</h1></div></div>
     <div class="card stack">
       <p class="muted small" style="margin:0">Stand relaxed with arms by your sides and your whole body in frame, in fitted clothes. Do one photo facing the camera and one side-on.</p>
@@ -250,6 +184,7 @@
 
   <!-- REHAB CLINIC -->
   <section class="screen" id="rehab">
+    <button type="button" class="back" data-back>‹ Body</button>
     <div class="page-head"><div><span class="eyebrow">Rehab clinic</span><h1 class="display h1" id="rehabTitle">Recover with a plan</h1></div></div>
     <div id="rehabStart" class="stack">
       <div class="card stack">
@@ -264,7 +199,26 @@
 
   <!-- PROGRESS -->
   <section class="screen" id="progress">
-    <div class="page-head"><div><span class="eyebrow">Your progress</span><h1 class="display h1">Progress</h1></div></div>
+    <div class="page-head"><div><span class="eyebrow" id="youName">You</span><h1 class="display h1">Your progress</h1></div></div>
+    <div class="card">
+      <div class="card-head"><div><span class="eyebrow">This week</span><h2 class="display h2" id="weekTitle">Let's start</h2></div></div>
+      <div class="rings">
+        <svg viewBox="0 0 150 150" role="img" id="ringsSvg" aria-label="Weekly progress rings">
+          <g fill="none" stroke-linecap="round" transform="rotate(-90 75 75)">
+            <circle cx="75" cy="75" r="64" stroke="#1a2130" stroke-width="13"/><circle cx="75" cy="75" r="47" stroke="#1a2130" stroke-width="13"/><circle cx="75" cy="75" r="30" stroke="#1a2130" stroke-width="13"/>
+            <circle class="ring-arc" id="ring1" cx="75" cy="75" r="64" stroke="#ff6b4a" stroke-width="13"/>
+            <circle class="ring-arc" id="ring2" cx="75" cy="75" r="47" stroke="#7c6cff" stroke-width="13"/>
+            <circle class="ring-arc" id="ring3" cx="75" cy="75" r="30" stroke="#45c3ff" stroke-width="13"/>
+          </g>
+        </svg>
+        <div class="legend">
+          <div><span class="dot" style="background:var(--z3)"></span><span class="v" id="lgSessions">0/4</span><span class="l">sessions this week</span></div>
+          <div><span class="dot" style="background:var(--z2)"></span><span class="v" id="lgForm">–</span><span class="l" id="lgFormL">form score</span></div>
+          <div><span class="dot" style="background:var(--z1)"></span><span class="v" id="lgStreak">0 days</span><span class="l">plan kept</span></div>
+        </div>
+      </div>
+    </div>
+
     <div class="card chart">
       <div class="card-head"><div><span class="eyebrow">Form score</span><div class="num" style="font-size:2rem;margin-top:4px" id="pfScore">–</div></div><span class="data small" id="pfDelta"></span></div>
       <div id="formChart"><p class="empty">Train with the camera twice to see your form trend.</p></div>
@@ -282,10 +236,74 @@
       <div id="loadChart"><p class="empty">Log your session effort after training to see your weekly load.</p></div>
       <p class="muted small" style="margin:8px 0 0" id="loadNote"></p>
     </div>
+    <div class="card" id="focusCard" hidden>
+      <span class="eyebrow">Your focus</span>
+      <div style="display:flex;justify-content:space-between;gap:12px;margin:10px 0 8px"><b id="focusTitle"></b><span class="data muted" id="focusNum"></span></div>
+      <div class="bar"><i id="focusBar" style="width:0"></i></div>
+      <p class="muted small" style="margin:8px 0 0" id="focusWhy"></p>
+    </div>
+
+    <div class="card">
+      <span class="eyebrow">Recent</span>
+      <div class="list" id="recent" style="margin-top:6px"><p class="empty">Your sessions, scans and wins will show up here.</p></div>
+    </div>
+
     <div class="card">
       <span class="eyebrow">Faults QK is working on</span>
       <div class="list" id="faultList" style="margin-top:6px"><p class="empty">Form faults from your sets will show here, and fade as you fix them.</p></div>
     </div>
+    <span class="eyebrow" style="padding:8px 2px 0">Settings</span>
+    <details class="card" id="planCard">
+      <summary>Training days</summary>
+      <div class="stack" style="margin-top:14px">
+        <p class="muted small" style="margin:0">People who decide exactly when and where they'll train are far more likely to follow through.</p>
+        <div class="days" id="planDays"></div>
+        <div class="grid2">
+          <label class="field">Time<input id="planTime" type="time"></label>
+          <label class="field">Where<input id="planPlace" placeholder="e.g. PureGym"></label>
+        </div>
+        <p class="plan-line" id="planLine"></p>
+      </div>
+    </details>
+    <details class="card" id="profileCard">
+      <summary>Profile &amp; coach</summary>
+      <div class="stack" style="margin-top:14px">
+        <label class="field">Your name<input id="pName" placeholder="e.g. Sara" autocomplete="given-name"></label>
+        <div class="grid2">
+          <label class="field">Sex (body-fat formula)<select id="pSex"><option value="male">Male</option><option value="female">Female</option></select></label>
+          <label class="field">Height (cm)<input id="pHeight" type="number" inputmode="decimal"></label>
+        </div>
+        <label class="field">Coach photo (QK's face)<input id="coachPhoto" type="file" accept="image/*"></label>
+        <label class="field">Coach voice<select id="voiceSel"></select></label>
+        <button class="ghost" type="button" id="testVoice">Test the voice</button>
+      </div>
+    </details>
+
+    <details class="card" id="studioCard">
+      <summary>Studio: record QK's voice</summary>
+      <div class="stack" style="margin-top:14px">
+        <p class="muted small" style="margin:0">Record each coaching line once in your own voice. You'll hear it straight away on this phone. Export the recordings to publish them for every client (see README). Lines with live numbers stay in the synthetic voice.</p>
+        <div class="bar"><i id="studioBar" style="width:0"></i></div><span class="muted small" id="studioCount"></span>
+        <div class="chips-scroll" id="studioGroups"></div>
+        <div class="list" id="studioList"></div>
+        <button class="ghost" type="button" id="studioExport">Export recordings</button>
+      </div>
+    </details>
+
+    <details class="card" id="diagCard">
+      <summary>App health &amp; diagnostics</summary>
+      <div class="stack" style="margin-top:14px">
+        <label class="field">Tracking precision<select id="precisionSel">
+          <option value="">Automatic</option><option value="lite">Fast (older phones)</option><option value="full">Balanced</option><option value="heavy">Precise (slower, newest phones)</option>
+        </select></label>
+        <div class="kv" id="diagTable"></div>
+        <p class="muted small" style="margin:0">Something looked wrong, like a missed rep or an odd result? Export the last session and send it to your coach. It contains body-point positions only, never video.</p>
+        <div class="btn-row">
+          <button class="ghost" type="button" id="exportSession">Export last session</button>
+          <button class="ghost" type="button" id="exportErrors">Export error log</button>
+        </div>
+      </div>
+    </details>
   </section>
 </div>
 
@@ -293,10 +311,8 @@
   <nav aria-label="Main">
     <button type="button" class="on" data-tab="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg>Today</button>
     <button type="button" data-tab="train"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11"/></svg>Train</button>
-    <button type="button" data-tab="gait"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 4c2 0 3 2 3 4s-1 5-3 5-3-3-3-5 1-4 3-4zM16 9c2 0 3 2 3 4s-1 4-3 4-3-2-3-4 1-4 3-4zM6 16h4M14 20h4"/></svg>Tests</button>
-    <button type="button" data-tab="rehab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.5-9-9.5C1.6 7.6 4.2 4 7.8 4c1.8 0 3.2 1 4.2 2.4C13 5 14.4 4 16.2 4 19.8 4 22.4 7.6 21 11.5 19 16.5 12 21 12 21z"/><path d="M9 12h6M12 9v6"/></svg>Rehab</button>
-    <button type="button" data-tab="scan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M12 7v10M9 10h6"/></svg>Scan</button>
-    <button type="button" data-tab="progress"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19 10 12l4 4 6-9"/></svg>Progress</button>
+    <button type="button" data-tab="body"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.5-9-9.5C1.6 7.6 4.2 4 7.8 4c1.8 0 3.2 1 4.2 2.4C13 5 14.4 4 16.2 4 19.8 4 22.4 7.6 21 11.5 19 16.5 12 21 12 21z"/></svg>Body</button>
+    <button type="button" data-tab="progress"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>You</button>
   </nav>
 </div>
 
@@ -396,6 +412,7 @@
   <span class="orb-slot" data-size="132"></span>
   <h1 class="big"><i>SHRED</i></h1>
   <p>Your coach in your pocket. QK watches your form, counts your reps and talks you through every set.</p>
+  <label class="field" id="welcomeNameWrap" style="width:100%;max-width:320px;text-align:left">What should QK call you?<input id="welcomeName" placeholder="Your first name" autocomplete="given-name"></label>
   <button class="cta" type="button" id="welcomeBtn">Start</button>
   <p class="note">Camera footage is analysed on your phone and never uploaded.</p>
 </div>

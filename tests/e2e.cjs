@@ -20,13 +20,23 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   });
   const p = await ctx.newPage(); const errs = [];
   p.on('pageerror', e => errs.push(e.message)); p.on('console', m => m.type() === 'error' && !/favicon|fonts\.g/.test(m.text()) && errs.push(m.text()));
-  await p.goto('https://shred.local/'); await p.click('#welcomeBtn');
+  // Centre an element before tapping it, so the fixed tab bar never covers it.
+  const tap = async sel => { await p.$eval(sel, el => el.scrollIntoView({ block: 'center' })); await p.click(sel); };
+  const go = async id => {
+    if (['gait', 'scan', 'rehab'].includes(id)) { await go('body'); await p.click(`[data-go=${id}]`); }
+    else await p.click(`.tabs [data-tab=${id}]`);
+  };
+  await p.goto('https://shred.local/');
+  check('welcome: asks for a first name', await p.isVisible('#welcomeName'));
+  await p.fill('#welcomeName', 'Sara'); await p.click('#welcomeBtn');
+  check('today: greets by name', /Sara/.test(await p.textContent('#hello')));
+  check('navigation: 4 tabs', (await p.$$('.tabs button')).length === 4);
 
   // Profile height enables height-scaled bar speed.
-  await p.click('#today details.card:not(#diagCard) summary'); await p.fill('#pHeight', '178'); await p.press('#pHeight', 'Tab');
+  await go('progress'); await tap('#profileCard summary'); await p.fill('#pHeight', '178'); await p.press('#pHeight', 'Tab'); await go('today');
 
   // 1. Demo set through the real engine
-  await p.click('.tabs [data-tab=train]'); await p.click('.ex-card.feature');
+  await go('train'); await p.click('.ex-card.feature');
   check('setup: weight field shown for a barbell lift', await p.isVisible('#loadWrap'));
   await p.fill('#loadKg', '80'); await p.click('#startDemo');
   await p.waitForSelector('#summary:not([hidden])', { timeout: 60000 });
@@ -35,7 +45,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.click('#doneBtn');
 
   // 2. Library + voice-guided hold
-  await p.click('.tabs [data-tab=train]'); await p.click('[data-muscle=Core]');
+  await go('train'); await p.click('[data-muscle=Core]');
   check('library: core filter', /15 exercises/.test(await p.textContent('#exCount')));
 
   // 3. Live camera form check (fake camera, no person) starts without errors
@@ -47,18 +57,18 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.click('#endLive'); await p.click('#doneBtn');
 
   // 4. Tests tab: gait demo, jump + knee test panels, live test capture starts
-  await p.click('.tabs [data-tab=gait]'); await p.click('#gaitDemo');
+  await go('gait'); await p.click('#gaitDemo');
   await p.waitForSelector('#gaitResult:not([hidden])', { timeout: 30000 });
   const gait = await p.textContent('#gaitResult');
   check('gait demo: report with quality badge and hip finding', /Quality 100\/100/.test(gait) && /hip extension \(right/i.test(gait));
   // Diagnostics: shows the last session (the gait demo) and exports it for replay
-  await p.click('.tabs [data-tab=today]'); await p.click('#diagCard summary'); await p.waitForTimeout(300);
+  await go('progress'); await tap('#diagCard summary'); await p.waitForTimeout(300);
   check('diagnostics: last session listed ', /gait · \d+ frames/.test(await p.textContent('#diagTable')), await p.textContent('#diagTable'));
   const [dl] = await Promise.all([p.waitForEvent('download'), p.click('#exportSession')]);
   const json = JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
   check('diagnostics: exported session replayable (meta + frames)', json.meta.kind === 'gait' && json.frames.length > 10 && Array.isArray(json.frames[0].p));
 
-  await p.click('#diagCard summary'); await p.click('.tabs [data-tab=gait]');
+  await tap('#diagCard summary'); await go('gait');
   await p.click('[data-test=jump]');
   check('jump panel shown, demo hidden', await p.isVisible('[data-panel=jump]') && !(await p.isVisible('#gaitDemo')));
   await p.click('[data-test=sls]'); await p.click('#testLive'); await p.waitForTimeout(6000);
@@ -67,13 +77,13 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('knee test with no person: refuses to give a result', /No result yet/.test(await p.textContent('#gaitResult')));
 
   // 5. Two-view scan rejects a non-neutral pose (the sample photo is a yoga lunge)
-  await p.click('.tabs [data-tab=scan]');
+  await go('scan');
   await p.setInputFiles('#scanFront', process.argv[2] || path.join(ROOT, 'tests/pose.jpg')).catch(() => {});
   await p.waitForSelector('#toast:not([hidden])', { timeout: 60000 }).catch(() => {});
   check('two-view scan: lunge photo rejected with advice', /knees|arms|feet|Stand/.test(await p.textContent('#toast')));
 
   // 6. Rehab clinic: normal path (knee pain at the front) and an emergency red-flag path (back pain)
-  await p.click('.tabs [data-tab=rehab]'); await p.click('[data-area=Knee]'); await p.click('[data-cond=pfp]');
+  await go('rehab'); await p.click('[data-area=Knee]'); await p.click('[data-cond=pfp]');
   const answerAll = async (yesIndex = -1) => {
     const rows = await p.$$('#flagList .flag-q');
     for (let i = 0; i < rows.length; i++) {
@@ -93,7 +103,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('rehab: camera measurement starts', await p.isVisible('#live') && /Knee bend/.test(await p.textContent('#liveEyebrow')));
   await p.click('#endLive'); await p.waitForTimeout(800);
   check('rehab: no-person measurement refused safely', await p.isVisible('#rehabActive'));
-  await p.click('.tabs [data-tab=today]');
+  await go('today');
   check('today: rehab card shown', await p.isVisible('#rehabToday') && /Rehab · phase 1/.test(await p.textContent('#rehabToday')));
   await p.click('#rehabToday'); await p.click('#endPlan'); await p.click('#endYes');
   await p.click('[data-area="Lower back"]'); await p.click('[data-cond=lbp]');
@@ -103,16 +113,18 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.click('#stopOk');
 
   // 7. Readiness, load and Studio
-  await p.click('.tabs [data-tab=today]'); await p.click('#morningCheck');
+  await go('today'); await p.click('[data-feel=great]');
+  check('readiness: one tap "Great" → train as planned', /Train as planned/.test(await p.textContent('#readyTitle')), await p.textContent('#readyTitle'));
+  await p.click('#morningCheck');
   for (const id of ['#rdS', '#rdF', '#rdT', '#rdM']) await p.fill(id, '6');
   await p.fill('#rdH', '5'); await p.click('#rdSave');
   check('readiness: poor check-in → lighter or recovery day', /lighter|Recovery/.test(await p.textContent('#readyTitle')), await p.textContent('#readyTitle'));
   await p.click('#logSession'); await p.fill('#mins', '60'); await p.click('#loadSave');
-  await p.click('.tabs [data-tab=progress]'); await p.waitForTimeout(300);
-  check('load: weekly load shown in Progress', /300 AU/.test(await p.textContent('#loadNow')) && !!(await p.$('#loadChart svg')));
-  await p.click('.tabs [data-tab=today]'); await p.click('#studioCard summary'); await p.waitForTimeout(400);
+  await go('progress'); await p.waitForTimeout(300);
+  check('load: weekly load shown in Progress', /300 points/.test(await p.textContent('#loadNow')) && !!(await p.$('#loadChart svg')));
+  await go('progress'); await tap('#studioCard summary'); await p.waitForTimeout(400);
   check('studio: lists coaching lines', /of \d+ lines recorded/.test(await p.textContent('#studioCount')));
-  await p.click('#studioList [data-act=rec]'); await p.waitForTimeout(1200); await p.click('#studioList [data-act=rec]'); await p.waitForTimeout(600);
+  await tap('#studioList [data-act=rec]'); await p.waitForTimeout(1200); await tap('#studioList [data-act=rec]'); await p.waitForTimeout(600);
   check('studio: record with the microphone and save a clip', /1 of \d+ lines recorded/.test(await p.textContent('#studioCount')) && /recorded/.test(await p.textContent('#studioList')));
 
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));

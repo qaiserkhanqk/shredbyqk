@@ -261,7 +261,7 @@ details[open] > summary::after { content: "–"; }
 .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; justify-content: center;
   padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
   background: linear-gradient(to top, var(--ink) 55%, transparent); }
-.tabs nav { width: 100%; max-width: 440px; display: grid; grid-template-columns: repeat(6, 1fr); background: rgba(18,23,34,.9); backdrop-filter: blur(14px);
+.tabs nav { width: 100%; max-width: 420px; display: grid; grid-template-columns: repeat(4, 1fr); background: rgba(18,23,34,.9); backdrop-filter: blur(14px);
   border: 1px solid var(--line); border-radius: 22px; padding: 6px; }
 .tabs button { border: 0; background: none; border-radius: 16px; padding: 8px 0 6px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--muted); font-size: .66rem; font-weight: 650; }
 .tabs button svg { width: 21px; height: 21px; }
@@ -349,3 +349,26 @@ details[open] > summary::after { content: "–"; }
 .studio-row button { border: 1px solid var(--line); background: var(--surface-2); border-radius: 10px; padding: 8px 10px; font-weight: 700; cursor: pointer; font-size: .8rem; }
 .studio-row button.rec { background: var(--bad); color: #fff; border-color: var(--bad); }
 .studio-row .done { color: var(--good); font-size: .75rem; font-weight: 700; }
+
+/* Simplified UI */
+.tabs button { font-size: .72rem; padding: 9px 0 7px; }
+.tabs button svg { width: 23px; height: 23px; }
+.feel { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.feel button { border: 1px solid var(--line); background: var(--surface-2); border-radius: var(--r-md); padding: 14px 8px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; align-items: center; text-align: center; }
+.feel button b { font-size: 1.05rem; }
+.feel button span { font-size: .72rem; color: var(--muted); }
+.feel button.on { border-color: var(--z2); background: rgba(124,108,255,.16); }
+#readyResult b { font-size: 1rem; }
+#readyResult .ready-score { font-size: 1.1rem; margin-left: 6px; }
+.tile { width: 100%; text-align: left; display: grid; grid-template-columns: 56px 1fr; gap: 14px; align-items: center; padding: 18px; border-radius: var(--r-lg); background: var(--surface); border: 1px solid var(--line); cursor: pointer; }
+.tile:hover { border-color: #3a4660; }
+.tile:active { transform: scale(.99); }
+.tile-ic { width: 56px; height: 56px; border-radius: 16px; background: var(--surface-2); display: grid; place-items: center; }
+.tile-ic svg { width: 30px; height: 30px; }
+.tile b { display: block; font-size: 1.1rem; margin-bottom: 3px; }
+.tile span span { color: var(--muted); font-size: .86rem; }
+.back { align-self: flex-start; border: 0; background: none; color: var(--z1); font-weight: 700; font-size: .95rem; padding: 4px 2px; cursor: pointer; }
+/* The tab bar's fade area must not swallow taps meant for content behind it. */
+.tabs { pointer-events: none; }
+.tabs nav { pointer-events: auto; }
+.app { padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)); }
