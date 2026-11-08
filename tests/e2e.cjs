@@ -10,7 +10,8 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
 
 (async () => {
   const b = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
-  const ctx = await b.newContext({ viewport: { width: 400, height: 860 }, acceptDownloads: true });
+  // Service workers are blocked: their script fetch bypasses request interception, which only exists in this test.
+  const ctx = await b.newContext({ viewport: { width: 400, height: 860 }, acceptDownloads: true, serviceWorkers: 'block' });
   await ctx.route('https://shred.local/**', r => {
     let p = new URL(r.request().url()).pathname; if (p === '/') p = '/index.html';
     const f = path.join(ROOT, p);
