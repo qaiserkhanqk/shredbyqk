@@ -81,7 +81,30 @@ Each finding maps to corrective exercises. Results are flagged as a screen: a ph
 
 These are tests against simulated movement with known answers: they prove the maths, not real-world accuracy. Real-world accuracy comes from the validation study in TESTING.md.
 
-## 9. Known limits (honest list)
+## 9. Rehab clinic (`js/rehab.js`, `js/rom.js`)
+
+Rehab **support**, modelled on how physiotherapy clinics run rehabilitation. It doesn't diagnose, and it doesn't "cure everything". No clinic can promise that, and claiming it would be unsafe and misleading.
+
+**18 conditions** across 9 body areas:
+- **Back and neck:** lower back pain, neck pain.
+- **Shoulder and elbow:** frozen shoulder, rotator cuff pain, tennis elbow, golfer's elbow.
+- **Hip and knee:** gluteal tendinopathy, hip/knee osteoarthritis, patellofemoral pain, patellar tendinopathy, ACL, PCL, degenerative meniscus tear.
+- **Thigh, leg and foot:** hamstring strain, Achilles tendinopathy, ankle sprain, plantar heel pain, shin splints.
+
+| Component | How it works | Basis |
+|---|---|---|
+| **Safety screen** | General and region-specific red flags. Emergency signs (bladder or bowel changes, DVT signs, chest pain, neck-artery symptoms) stop the programme and show the emergency number. Questions about how an injury happened send unassessed injuries to a clinician, but don't block someone already diagnosed. ACL, PCL and meniscus require a diagnosis before starting. | Standard musculoskeletal red-flag screening; Ottawa ankle and knee rules |
+| **Phased programmes** | 3–4 phases per condition. A phase is passed on **criteria**, with a minimum time: pain, measured movement, side-to-side symmetry and daily function. | Criteria-based progression (e.g. Grindem 2016 for ACL return to sport) |
+| **Pain monitoring** | Traffic light from pain during exercise, after it, and the next morning, with a limit per condition: 3/10 generally, up to 5/10 for tendon problems, 0 for hamstring strain. | Pain-monitoring model (Silbernagel et al. 2007) |
+| **Function** | Patient-Specific Functional Scale: 1–3 of the client's own activities rated 0–10, re-rated weekly. | Stratford et al. 1995 |
+| **Camera measurements** | Shoulder raise forward and sideways; forward and backward bend; knee bend and straightening; knee-to-wall ankle bend; 30-second sit-to-stand; single-leg calf-raise endurance; single-leg hop distance; drop-landing knee drift. The 95th-percentile peak is used so one jittery frame can't inflate a result. Left and right are compared as a limb symmetry index. | Standard clinical tests; LSI ≥90% as a common return-to-sport criterion |
+| **After surgery** | ACL and PCL are marked as physio-led. The surgeon's protocol overrides the app. | — |
+
+Each condition's evidence summary (NICE NG59, NG226; JOSPT clinical practice guidelines; CSAW, LEAP, Kise, Coombes, Askling, Grindem and others) is shown in the app.
+
+**All rehab content must be reviewed and signed off by a registered physiotherapist before public release.**
+
+## 10. Known limits (honest list)
 
 - A 2D camera can't see rotation well. One angle per exercise is the best it can do, so the setup instructions tell the client where to put the phone.
 - Thresholds are evidence-informed starting points. **They must be tuned on real client footage reviewed by QK**, and this is the most important next step.

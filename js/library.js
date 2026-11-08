@@ -113,6 +113,59 @@ export const LIBRARY = [
   X('thruster', 'Thruster', ['Full body', 'Quads', 'Shoulders'], 'Dumbbells', 'squat'),
   X('burpee', 'Burpee', ['Full body'], 'Bodyweight', null, { guide: 'Chest to the floor, jump your feet in, explode up. Land softly.' }),
   X('jumpSquat', 'Jump Squat', ['Full body', 'Quads', 'Glutes'], 'Bodyweight', 'squat'),
+  // ---- Rehab & prehab exercises (used by the Rehab clinic programmes; rehab: true keeps them grouped) ----
+  // Spine & neck
+  X('catCamel', 'Cat-Camel', ['Core', 'Back'], 'Bodyweight', null, { rehab: true, guide: 'On hands and knees, slowly round your back up, then let it dip. Move gently, only as far as is comfortable.' }),
+  X('birdDog', 'Bird Dog', ['Core', 'Glutes'], 'Bodyweight', null, { rehab: true, guide: 'On hands and knees, reach one arm and the opposite leg out long. Keep your back still, like balancing a cup on it. Hold for 5 seconds.' }),
+  X('mcgillCurlUp', 'McGill Curl-up', ['Core'], 'Bodyweight', null, { rehab: true, guide: 'Lie down, one knee bent, hands under your lower back. Lift your head and shoulders a few centimetres, keeping your neck still. Hold 8–10 seconds.' }),
+  X('hipHingeDowel', 'Hip Hinge with Dowel', ['Hamstrings', 'Glutes', 'Back'], 'Dowel', 'rdl', { rehab: true, setup: 'Side-on, a broomstick held along your back touching head, upper back and tailbone.' }),
+  X('walk', 'Brisk Walk', ['Full body'], 'None', null, { rehab: true, hold: 600, guide: 'Walk at a pace where you can talk but not sing. Walking is one of the best treatments for back pain.' }),
+  X('chinTuck', 'Chin Tuck', ['Back'], 'Bodyweight', null, { rehab: true, guide: 'Sit tall. Glide your chin straight back, making a double chin, without tipping your head. Hold 5 seconds.' }),
+  X('neckIso', 'Neck Isometrics', ['Back'], 'Bodyweight', null, { rehab: true, guide: 'Press your hand gently against your forehead, then the side and back of your head, without letting your head move. Hold each for 10 seconds at about 30% effort.' }),
+  X('thoracicExt', 'Thoracic Extension on Roller', ['Back'], 'Foam roller', null, { rehab: true, guide: 'Lie with the roller across your upper back, hands supporting your head. Gently extend over it, then move it up a few centimetres.' }),
+  X('bandPullApart', 'Band Pull-apart', ['Shoulders', 'Back'], 'Band', 'raise', { rehab: true, setup: 'Facing the camera, arms straight out in front holding the band.' }),
+  // Shoulder
+  X('pendulum', 'Pendulum Swings', ['Shoulders'], 'Bodyweight', null, { rehab: true, guide: 'Lean on a table with your good arm. Let the painful arm hang loose and swing it in small circles. Relax your shoulder completely.' }),
+  X('tableSlide', 'Table Slide', ['Shoulders'], 'Table', null, { rehab: true, guide: 'Sit by a table, hand on a towel. Slide your hand forward as you lean your body forward, then back. Stay within mild discomfort.' }),
+  X('wallSlide', 'Wall Slide', ['Shoulders'], 'Wall', 'raise', { rehab: true, setup: 'Side-on to the camera, facing a wall, forearms on the wall.' }),
+  X('crossBody', 'Cross-body Stretch', ['Shoulders'], 'Bodyweight', null, { rehab: true, hold: 30, guide: 'Bring your arm across your chest and gently hold it with the other hand. Mild stretch only, never sharp pain.' }),
+  X('towelBehindBack', 'Towel Stretch Behind Back', ['Shoulders'], 'Towel', null, { rehab: true, hold: 30, guide: 'Hold a towel behind your back, top hand over the shoulder. Gently pull the lower hand up with the top hand.' }),
+  X('isoER', 'External Rotation Isometric', ['Shoulders'], 'Wall', null, { rehab: true, hold: 30, guide: 'Elbow bent to 90° at your side, back of the hand against a door frame. Push outward at about 30–50% effort without moving. 5 holds.' }),
+  X('isoAbd', 'Abduction Isometric', ['Shoulders'], 'Wall', null, { rehab: true, hold: 30, guide: 'Stand side-on to a wall, elbow bent, press the outside of your elbow into the wall at 30–50% effort. 5 holds.' }),
+  X('bandER', 'Band External Rotation', ['Shoulders'], 'Band', null, { rehab: true, guide: 'Elbow at your side bent to 90°, a towel under the elbow. Rotate your forearm outward against the band, slowly back. 3 seconds each way.' }),
+  // Elbow & wrist
+  X('isoWristExt', 'Wrist Extension Isometric', ['Forearms'], 'Dumbbell', null, { rehab: true, hold: 45, guide: 'Forearm on a table, palm down. Hold a light weight with the wrist level, or push up into your other hand. 5 holds; mild pain up to 5/10 is OK.' }),
+  X('eccWristExt', 'Eccentric Wrist Extension', ['Forearms'], 'Dumbbell', null, { rehab: true, guide: 'Palm down, use your other hand to lift the weight up, then lower it with the sore wrist over 4 seconds. 3×15.' }),
+  X('isoWristFlex', 'Wrist Flexion Isometric', ['Forearms'], 'Dumbbell', null, { rehab: true, hold: 45, guide: 'Forearm on a table, palm up. Hold a light weight with the wrist level. 5 holds.' }),
+  X('eccWristFlex', 'Eccentric Wrist Flexion', ['Forearms'], 'Dumbbell', null, { rehab: true, guide: 'Palm up, lift with the other hand, lower slowly over 4 seconds with the sore wrist. 3×15.' }),
+  X('gripSqueeze', 'Grip Squeeze', ['Forearms'], 'Ball', null, { rehab: true, guide: 'Squeeze a soft ball or rolled towel for 5 seconds, relax. Stay at a comfortable effort.' }),
+  // Hip
+  X('clamshell', 'Clamshell', ['Glutes'], 'Band', null, { rehab: true, guide: 'Lie on your side, knees bent, feet together. Lift the top knee without rolling your hips back. Slow, 3 seconds up and down.' }),
+  X('sideLyingAbd', 'Side-lying Hip Abduction', ['Glutes'], 'Bodyweight', null, { rehab: true, guide: 'Lie on your side, bottom knee bent. Lift the straight top leg slightly behind you, toes forward. Lower over 3 seconds.' }),
+  X('isoHipAbd', 'Standing Hip Abduction Isometric', ['Glutes'], 'Wall', null, { rehab: true, hold: 45, guide: 'Stand side-on to a wall, press the outside of your knee into a folded towel against the wall. Keep hips level. 5 holds.' }),
+  X('sitToStand', 'Sit to Stand', ['Quads', 'Glutes'], 'Chair', 'squat', { rehab: true, setup: 'Side-on to the camera, sitting on a firm chair.' }),
+  // Knee
+  X('quadSet', 'Quad Set', ['Quads'], 'Towel', null, { rehab: true, guide: 'Sit with your leg straight, a rolled towel under the knee. Tighten your thigh to push the knee down. Hold 5 seconds. Aim for full straightening.' }),
+  X('straightLegRaise', 'Straight Leg Raise', ['Quads'], 'Bodyweight', 'legRaise', { rehab: true, setup: 'Lying side-on to the camera, the working leg nearest the camera.' }),
+  X('heelSlide', 'Heel Slide', ['Quads', 'Hamstrings'], 'Bodyweight', 'kneeFlex', { rehab: true, setup: 'Lying or sitting side-on to the camera, the working leg nearest the camera.' }),
+  X('terminalKneeExt', 'Terminal Knee Extension', ['Quads'], 'Band', null, { rehab: true, guide: 'Band behind your knee anchored in front. Bend the knee slightly, then straighten it fully against the band and squeeze 2 seconds.' }),
+  X('spanishSquat', 'Spanish Squat Hold', ['Quads'], 'Band', null, { rehab: true, hold: 45, guide: 'Strong band behind both knees anchored in front. Sit back, shins vertical, to a pain-free depth and hold. Mild pain up to 5/10 is OK for tendon pain.' }),
+  X('stepDown', 'Step-down', ['Quads', 'Glutes'], 'Step', 'lunge', { rehab: true, setup: 'Facing the camera on a low step. Lower one heel to the floor slowly, knee over the middle toes.' }),
+  X('declineSquat', 'Single-leg Decline Squat', ['Quads'], 'Slant board', 'squat', { rehab: true, setup: 'Side-on to the camera, standing on a 25° slant board or a plate under your heel.' }),
+  X('singleLegBalance', 'Single-leg Balance', ['Calves', 'Core'], 'Bodyweight', null, { rehab: true, hold: 30, guide: 'Stand on one leg, knee soft. When easy, close your eyes or stand on a cushion. Switch legs.' }),
+  X('hopDrill', 'Hop Drill (low level)', ['Quads', 'Calves', 'Full body'], 'Bodyweight', null, { rehab: true, guide: 'Small hops on the spot on two legs, then one leg, landing softly with the knee over the toes. Stop if pain rises above 3/10.' }),
+  // Hamstring
+  X('hamIso', 'Hamstring Bridge Isometric', ['Hamstrings', 'Glutes'], 'Bodyweight', null, { rehab: true, hold: 30, guide: 'Lie on your back, heel on a bench, knee slightly bent. Lift your hips and hold. Pain-free effort only in the early phase.' }),
+  X('extender', 'Askling Extender', ['Hamstrings'], 'Bodyweight', null, { rehab: true, guide: 'Lie on your back holding your thigh at 90°. Slowly straighten the knee as far as comfortable, then lower. No pain allowed.' }),
+  X('diver', 'Askling Diver', ['Hamstrings', 'Glutes'], 'Bodyweight', null, { rehab: true, guide: 'Stand on one leg and tip forward like a dive, arms reaching ahead, the back leg lifting, standing knee slightly bent.' }),
+  X('glider', 'Askling Glider', ['Hamstrings'], 'Bodyweight', null, { rehab: true, guide: 'Feet hip-width, one foot on a towel. Slide it back slowly into a long stride, then pull back with your arms helping on a rail.' }),
+  // Ankle & foot
+  X('ankleAlphabet', 'Ankle Alphabet', ['Calves'], 'Bodyweight', null, { rehab: true, guide: 'Sit with your foot off the floor and trace the letters A to Z with your big toe. Gentle, pain-free movement.' }),
+  X('isoCalf', 'Calf Isometric', ['Calves'], 'Bodyweight', null, { rehab: true, hold: 45, guide: 'Rise halfway onto your toes (or push against a wall) and hold. 5 holds; mild tendon pain up to 5/10 is OK if it settles by the next morning.' }),
+  X('heelDrop', 'Eccentric Heel Drop', ['Calves'], 'Step', 'calf', { rehab: true, setup: 'Side-on to the camera on a step edge. Rise on both feet, lower slowly on one.' }),
+  X('calfStretch', 'Calf Stretch', ['Calves'], 'Wall', null, { rehab: true, hold: 30, guide: 'Hands on a wall, the back leg straight with the heel down. Lean in until you feel a stretch. Then repeat with the back knee bent.' }),
+  X('plantarStretch', 'Plantar Fascia Stretch', ['Calves'], 'Bodyweight', null, { rehab: true, hold: 30, guide: 'Sit, cross the foot over your knee, pull your toes back towards you until you feel a stretch under the arch. First thing in the morning helps most.' }),
+  X('towelHeelRaise', 'High-load Heel Raise (towel under toes)', ['Calves'], 'Step', 'calf', { rehab: true, setup: 'Side-on to the camera, toes on a rolled towel on a step. 3 seconds up, 2 at the top, 3 down.' }),
 ];
 
 export const LIB = Object.fromEntries(LIBRARY.map(x => [x.id, x]));

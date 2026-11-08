@@ -72,6 +72,36 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.waitForSelector('#toast:not([hidden])', { timeout: 60000 }).catch(() => {});
   check('two-view scan: lunge photo rejected with advice', /knees|arms|feet|Stand/.test(await p.textContent('#toast')));
 
+  // 6. Rehab clinic: normal path (knee pain at the front) and an emergency red-flag path (back pain)
+  await p.click('.tabs [data-tab=rehab]'); await p.click('[data-area=Knee]'); await p.click('[data-cond=pfp]');
+  const answerAll = async (yesIndex = -1) => {
+    const rows = await p.$$('#flagList .flag-q');
+    for (let i = 0; i < rows.length; i++) {
+      const isDx = (await rows[i].getAttribute('data-i')) === 'dx';
+      await (await rows[i].$(i === yesIndex || isDx ? '[data-v="1"]' : '[data-v="0"]')).click();
+    }
+  };
+  await p.click('#safetyGo');
+  check('rehab: safety screen requires every answer', /answer every/.test(await p.textContent('#safetyMsg')));
+  await answerAll(); await p.click('#safetyGo');
+  await p.fill('#act0', 'Walking downstairs'); await p.click('#startPlan');
+  check('rehab: programme starts at phase 1 with exercises', /Phase 1 of 3/.test(await p.textContent('#rehabActive')) && (await p.$$('#rehabActive [data-train]')).length >= 4);
+  await p.click('#checkinRehab'); await p.click('#saveCheckin');
+  check('rehab: check-in gives a traffic light', /On track|Hold the load|Ease off/.test(await p.textContent('#rehabActive')));
+  check('rehab: phase criteria listed and not yet met', (await p.$$('#rehabActive .crit')).length >= 3 && !(await p.$('#nextPhase')));
+  await p.click('#rehabActive [data-romtest=kneeFlexion]'); await p.click('#rsheetBody [data-side]'); await p.waitForTimeout(6000);
+  check('rehab: camera measurement starts', await p.isVisible('#live') && /Knee bend/.test(await p.textContent('#liveEyebrow')));
+  await p.click('#endLive'); await p.waitForTimeout(800);
+  check('rehab: no-person measurement refused safely', await p.isVisible('#rehabActive'));
+  await p.click('.tabs [data-tab=today]');
+  check('today: rehab card shown', await p.isVisible('#rehabToday') && /Rehab · phase 1/.test(await p.textContent('#rehabToday')));
+  await p.click('#rehabToday'); await p.click('#endPlan'); await p.click('#endYes');
+  await p.click('[data-area="Lower back"]'); await p.click('[data-cond=lbp]');
+  await answerAll(0); await p.click('#safetyGo');
+  const alertText = await p.textContent('#rsheetBody');
+  check('rehab: cauda equina red flag → emergency advice with 999', /Get emergency help now/.test(alertText) && /999/.test(alertText));
+  await p.click('#stopOk');
+
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();
   console.log(fails ? `${fails} FAILED` : 'ALL PASS'); process.exit(fails ? 1 : 0);

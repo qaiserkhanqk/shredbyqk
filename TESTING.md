@@ -63,9 +63,16 @@ Crashes are logged on the device. **Export error log** in the same panel gives t
   - plate and height scaling
   - every quality-check rule
 - **`tests/regression.test.mjs`:** replays every fixture, and checks the validation statistics against data with known properties.
+- **`tests/rehab.test.mjs`:**
+  - every programme exercise and camera test exists
+  - red-flag triage, including diagnosed versus undiagnosed injuries and DVT
+  - pain traffic lights
+  - phase progression (ACL return-to-sport symmetry)
+  - camera measurements on known movements: shoulder 150°, knee 125°, forward bend 80°, 11 sit-to-stands, 18 calf raises, a 120 cm hop
 - **`tests/e2e.cjs`:**
   - demo set and exercise library
   - live camera and calibration
+  - rehab clinic: safety screen, programme start, check-in, measurement, emergency red flag
   - gait report
   - knee-test capture, scan rejection and diagnostics export
   - zero JavaScript errors

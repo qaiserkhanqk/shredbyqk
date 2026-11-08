@@ -27,6 +27,20 @@ All video is processed **on the phone** (MediaPipe Pose) and nothing is uploaded
 - **Guided two-view posture screen:** front and side photos merged into one report.
 - **Accuracy:** 3 model sizes (precise model for uploads and tests), 60 fps capture for tests, and a recording-quality score that blocks results from bad recordings.
 - **Diagnostics:** export any session (body points only, no video) and replay it on a computer to find bugs. See [TESTING.md](TESTING.md).
+- **Rehab clinic:** 18 injuries and pain conditions:
+  - lower back, neck
+  - frozen shoulder, rotator cuff, tennis and golfer's elbow
+  - hip, knee osteoarthritis, kneecap pain, jumper's knee, ACL, PCL, meniscus
+  - hamstring, Achilles, ankle sprain, heel pain, shin splints
+
+  Each one has:
+  - a red-flag safety screen with emergency guidance
+  - phased programmes passed on measured criteria
+  - pain traffic lights
+  - camera measurements (range of motion, hop test with left/right symmetry, calf-raise and sit-to-stand counts)
+  - weekly function scores
+
+  It supports rehab and doesn't diagnose; content must be signed off by a physio before launch.
 - **Demo modes.** A simulated athlete (hip thrust) and walker run through the real engine, so you can show clients how it works without a camera.
 - **Body scan.** Shows a posture picture with joint angles and asymmetries, plus fixes, and gives body fat by the US Navy method. Readings from a smart scale or InBody can be logged.
 - **Accountability.** Training plan (implementation intention), plan-aware streak, weekly goal and supportive nudges.

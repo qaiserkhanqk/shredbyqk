@@ -10,6 +10,8 @@ import { analyseJumps, jumpReadiness } from './jump.js';
 import { analyseSingleLegSquat } from './kneetest.js';
 import { BarTracker, estimate1RM, velocityZone } from './vbt.js';
 import { scaleFromPlate, scaleFromHeight, assessQuality, measuredFps } from './measure.js';
+import { CONDITIONS, COND, AREAS, GENERAL_FLAGS, FLAG_ADVICE, triage, painLight, evaluatePhase, psfsScore } from './rehab.js';
+import { ROM_TESTS, runRomTest } from './rom.js';
 import { SessionRecorder, ErrorLog, downloadJSON, APP_VERSION } from './diagnostics.js';
 import { LIBRARY, LIB, MUSCLES, exFor } from './library.js';
 import { HipThrustDemo, WalkDemo, DEMO_W, DEMO_H } from './demo.js';
@@ -51,6 +53,7 @@ function tab(id) {
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === id));
   if (id === 'today') renderToday();
   if (id === 'progress') renderProgress();
+  if (id === 'rehab') renderRehab();
   if (id === 'scan') $('#hipWrap').hidden = S.profile.sex === 'male';
   window.scrollTo(0, 0);
 }
@@ -96,6 +99,7 @@ function setRing(id, frac) {
 }
 
 function renderToday() {
+  if (typeof renderRehabToday === 'function' && S.rehab) renderRehabToday();
   const now = new Date();
   $('#dateLine').textContent = now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
   const part = now.getHours() < 12 ? 'Morning' : now.getHours() < 18 ? 'Afternoon' : 'Evening';
@@ -212,9 +216,10 @@ const PATTERN_ICON = { bench: 'pushUp', dip: 'press', fly: 'press', row: 'rdl', 
 const iconKey = id => { const p = LIB[id]?.pattern; return p ? (ICONS[p] ? p : PATTERN_ICON[p]) : 'band'; };
 let muscleFilter = 'All', searchQ = '';
 function renderTrain() {
-  $('#muscleChips').innerHTML = ['All', ...MUSCLES].map(m => `<button type="button" class="mchip ${m === muscleFilter ? 'on' : ''}" data-muscle="${m}" aria-pressed="${m === muscleFilter}">${m}</button>`).join('');
+  $('#muscleChips').innerHTML = ['All', ...MUSCLES, 'Rehab'].map(m => `<button type="button" class="mchip ${m === muscleFilter ? 'on' : ''}" data-muscle="${m}" aria-pressed="${m === muscleFilter}">${m}</button>`).join('');
   const q = searchQ.trim().toLowerCase();
-  const list = LIBRARY.filter(x => (muscleFilter === 'All' || x.muscles.includes(muscleFilter)) && (!q || `${x.name} ${x.muscles.join(' ')} ${x.equipment}`.toLowerCase().includes(q)));
+  // Physio exercises live under their own Rehab filter so they don't clutter the gym library.
+  const list = LIBRARY.filter(x => (muscleFilter === 'Rehab' ? x.rehab : !x.rehab && (muscleFilter === 'All' || x.muscles.includes(muscleFilter))) && (!q || `${x.name} ${x.muscles.join(' ')} ${x.equipment}`.toLowerCase().includes(q)));
   const cam = list.filter(x => x.pattern).length;
   $('#exCount').textContent = `${list.length} exercise${list.length === 1 ? '' : 's'} · ${cam} with camera form check`;
   $('#exGrid').innerHTML = list.map(x => x.id === 'hipThrust' && muscleFilter === 'All' && !q
@@ -268,9 +273,9 @@ async function startLive({ mode, source, file }) {
   $('#repBig').hidden = mode !== 'form'; $('#cueHint').hidden = mode !== 'form';
   $('#repNum').textContent = '0'; $('#repLbl').textContent = ex?.hold ? 'seconds' : 'reps'; $('#dots').innerHTML = ''; $('#cleanCt').textContent = '0 clean'; $('#vlKnob').style.left = '0%'; $('#vlTxt').textContent = 'fresh';
   $('#gSteps').textContent = '0'; $('#gProg').style.width = '0';
-  const testName = { gait: `Gait · ${gaitMode === 'run' ? 'running' : 'walking'}`, jump: 'Jump test', sls: 'Single-leg squat knee test' };
+  const testName = { rom: TEST.rom?.label || 'Measurement', gait: `Gait · ${gaitMode === 'run' ? 'running' : 'walking'}`, jump: 'Jump test', sls: 'Single-leg squat knee test' };
   $('#liveEyebrow').textContent = mode === 'form' ? ex.name : testName[mode];
-  $('#liveTitle').textContent = mode === 'form' ? `Set ${setsToday(exKey) + 1}${source === 'demo' ? ' · demo' : ''}` : (source === 'demo' ? 'Demo walker' : source === 'file' ? 'Analysing your video (precise mode)' : mode === 'gait' ? 'Walk naturally for 10 seconds' : mode === 'jump' ? 'Up to 3 jumps' : 'Left leg first, then right');
+  $('#liveTitle').textContent = mode === 'form' ? `Set ${setsToday(exKey) + 1}${source === 'demo' ? ' · demo' : ''}` : (source === 'demo' ? 'Demo walker' : source === 'file' ? 'Analysing your video (precise mode)' : mode === 'gait' ? 'Walk naturally for 10 seconds' : mode === 'jump' ? 'Up to 3 jumps' : mode === 'rom' ? `${TEST.rom.secs} seconds` : 'Left leg first, then right');
   $('#endLive').textContent = mode === 'form' ? 'End set' : 'Stop';
   $('#flipCam').hidden = source !== 'camera';
   $('#calBtn').hidden = !(mode === 'form' && vbtOn() && source !== 'demo');
@@ -464,7 +469,7 @@ function stopLive() {
   if (live) live.done = true;
 }
 
-$('#endLive').onclick = () => { if (!live) return; ['gait', 'jump', 'sls'].includes(live.mode) ? finishTest() : endSet(); };
+$('#endLive').onclick = () => { if (!live) return; ['gait', 'jump', 'sls', 'rom'].includes(live.mode) ? finishTest() : endSet(); };
 $('#flipCam').onclick = () => { const m = live?.mode || 'form'; live && (live.done = true); facing = facing === 'user' ? 'environment' : 'user'; stopLive(); live = null; startLive({ mode: m, source: 'camera' }); };
 $('#doneBtn').onclick = () => { stopRest(); $('#summary').hidden = true; tab('today'); };
 $('#nextSet').onclick = () => { stopRest(); $('#summary').hidden = true; openSetup(exKey); };
@@ -591,6 +596,7 @@ function finishTest() {
   const cfg = TEST[mode];
   // Quality gate first: a bad recording gives a bad answer, so say what to fix instead.
   const q = demo ? { ok: true, score: 100, issues: [], fps: 30 } : assessQuality(frames, { w, h, minFps: cfg.minFps, view: cfg.view, viewOf, joints: mode === 'jump' ? [23, 24, 25, 26, 27, 28, 29, 30, 31, 32] : undefined });
+  if (mode === 'rom') { recorder2.finish({ mode, quality: q }); return finishRom(frames, q); }
   const mPerPx = scaleFromHeight(frames.slice(0, 20), (S.profile.heightCm || 0) / 100);
   const r = mode === 'gait' ? analyseGait(frames, { mode: gaitMode }) : mode === 'jump' ? analyseJumps(frames, { mPerPx }) : analyseSingleLegSquat(frames);
   recorder2.finish({ mode, quality: q, result: summarise(mode, r) });
@@ -616,7 +622,7 @@ function finishTest() {
   } else {
     if (!r.ok) return fail(r.issues[0] || 'No single-leg squats found.');
     S.knees ||= [];
-    if (!demo) { S.knees.push({ at: Date.now(), L: r.legs.L?.meanFppa ?? null, R: r.legs.R?.meanFppa ?? null, quality: q.score }); persist(); }
+    if (!demo) { const kt = { at: Date.now(), L: r.legs.L?.meanFppa ?? null, R: r.legs.R?.meanFppa ?? null, quality: q.score }; S.knees.push(kt); if (S.rehab?.active) S.rehab.active.kneeTests.push(kt); persist(); }
     box.innerHTML = qHTML + slsHTML(r);
     const issues = r.findings.filter(f => !f.ok);
     say(issues.length ? `Knee test done. ${issues[0].title}. I've added the fixes below.` : 'Knee test done. Good knee control on both legs.', { id: 'sls_done_' + Date.now(), priority: 'high' });
@@ -850,6 +856,209 @@ try { $('#precisionSel').value = localStorage.getItem('qk_precision') || ''; } c
 $('#precisionSel').onchange = e => { try { e.target.value ? localStorage.setItem('qk_precision', e.target.value) : localStorage.removeItem('qk_precision'); } catch {} renderDiag(); toast('Tracking precision saved'); };
 $('#exportSession').onclick = () => { if (!recorder2.meta.kind) return toast('No session recorded yet.'); downloadJSON(`shred-session-${Date.now()}.json`, recorder2.toJSON()); };
 $('#exportErrors').onclick = () => downloadJSON(`shred-errors-${Date.now()}.json`, { app: APP_VERSION, ua: navigator.userAgent, errors: ErrorLog.read() });
+
+/* ---------- Rehab clinic ---------- */
+S.rehab ||= { active: null, history: [] };
+let rehabArea = 'Knee';
+const plan = () => S.rehab.active;
+const condOf = p => COND[p.cond];
+const openSheet = html => { $('#rsheetBody').innerHTML = html; $('#rsheet').hidden = false; };
+const closeSheet = () => { $('#rsheet').hidden = true; };
+$('#rsheet').onclick = e => { if (e.target.id === 'rsheet') closeSheet(); };
+
+function renderRehab() {
+  const p = plan();
+  $('#rehabStart').hidden = !!p; $('#rehabActive').hidden = !p;
+  $('#rehabTitle').textContent = p ? condOf(p).name : 'Recover with a plan';
+  if (!p) {
+    $('#areaChips').innerHTML = AREAS.map(a => `<button type="button" class="mchip ${a === rehabArea ? 'on' : ''}" data-area="${a}">${a}</button>`).join('');
+    $('#condList').innerHTML = CONDITIONS.filter(c => c.area === rehabArea).map(c => `<button type="button" class="cond" data-cond="${c.id}"><b>${esc(c.name)}</b><span>${esc(c.about)}</span>
+      <span class="tags"><span class="pill">${c.phases.length} phases</span>${c.tests.length ? `<span class="pill cam">${c.tests.length} camera test${c.tests.length > 1 ? 's' : ''}</span>` : ''}${c.postOp ? '<span class="pill voice">Physio-led after surgery</span>' : ''}</span></button>`).join('');
+    return;
+  }
+  renderRehabDashboard();
+}
+$('#areaChips').onclick = e => { const b = e.target.closest('[data-area]'); if (b) { rehabArea = b.dataset.area; renderRehab(); } };
+$('#condList').onclick = e => { const b = e.target.closest('[data-cond]'); if (b) openSafety(COND[b.dataset.cond]); };
+
+// 1. Safety screen: every question must be answered.
+function openSafety(c) {
+  const qs = [...c.flags, ...GENERAL_FLAGS];
+  const structural = ['acl', 'pcl', 'meniscus'].includes(c.id);
+  openSheet(`<div><span class="eyebrow">Step 1 of 2 · safety check</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">${esc(c.name)}</h2>
+    <p class="muted small" style="margin:6px 0 0">Answer honestly. These questions pick up problems that need a doctor, not exercise.</p></div>
+    <div id="flagList">${qs.map((f, i) => `<div class="flag-q" data-i="${i}"><span>${esc(f.q)}</span><span class="yn"><button type="button" class="yes" data-v="1">Yes</button><button type="button" class="no" data-v="0">No</button></span></div>`).join('')}
+    <div class="flag-q" data-i="dx"><span>Has a physio or doctor diagnosed this problem?</span><span class="yn"><button type="button" class="yes" data-v="1">Yes</button><button type="button" class="no" data-v="0">No</button></span></div>
+    ${c.postOp ? `<div class="flag-q" data-i="op"><span>Have you had surgery for this?</span><span class="yn"><button type="button" class="yes" data-v="1">Yes</button><button type="button" class="no" data-v="0">No</button></span></div>` : ''}</div>
+    <button class="cta" type="button" id="safetyGo">Continue</button><p class="note" id="safetyMsg"></p>`);
+  const ans = {};
+  $('#flagList').onclick = e => {
+    const b = e.target.closest('[data-v]'); if (!b) return;
+    const row = b.closest('.flag-q'); ans[row.dataset.i] = b.dataset.v === '1';
+    row.querySelectorAll('[data-v]').forEach(x => x.classList.toggle('on', x === b));
+  };
+  $('#safetyGo').onclick = () => {
+    const need = [...qs.map((_, i) => String(i)), 'dx', ...(c.postOp ? ['op'] : [])];
+    if (need.some(k => ans[k] === undefined)) { $('#safetyMsg').textContent = 'Please answer every question.'; return; }
+    const level = triage(qs.map((f, i) => ({ yes: ans[i], level: f.level, unchecked: f.unchecked })), { diagnosed: ans.dx });
+    const hit = qs.filter((f, i) => ans[i] && f.level === level && !(ans.dx && (f.unchecked || f.level === 'assess')));
+    if (level) return showStop(level, hit);
+    if (!ans.dx && structural) return showStop('assess', [{ q: 'This injury needs a confirmed diagnosis (often a scan) before rehab, because the right programme depends on what\'s damaged.' }]);
+    openBaseline(c, { diagnosed: ans.dx, postOp: !!ans.op });
+  };
+}
+
+function showStop(level, hits) {
+  const a = FLAG_ADVICE[level];
+  openSheet(`<div class="alert ${level}"><b>${a.title}</b><span>${a.text}</span>
+    ${level === 'emergency' ? '<span class="emergency-num">999</span><span class="small">UK emergency number. Outside the UK, use your local number.</span>' : ''}
+    ${hits.map(h => `<span class="small">• ${esc(h.q)}${h.why ? ' ' + esc(h.why) : ''}</span>`).join('')}</div>
+    <p class="muted small" style="margin:0">Once you've been checked and cleared, come back and start your programme.</p>
+    <button class="ghost full" type="button" id="stopOk">OK</button>`);
+  say(`${a.title}. ${a.text}`, { id: 'stop_' + Date.now(), priority: 'high' });
+  $('#stopOk').onclick = closeSheet;
+}
+
+// 2. Baseline: side, PSFS activities, usual morning pain.
+function openBaseline(c, info) {
+  const limb = !['lbp', 'neck'].includes(c.id);
+  openSheet(`<div><span class="eyebrow">Step 2 of 2 · your starting point</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">What can't you do?</h2>
+    <p class="muted small" style="margin:6px 0 0">List up to 3 everyday activities this problem makes hard, and rate each one: 0 = can't do it, 10 = as well as before.</p></div>
+    ${limb ? `<div class="mode-switch three" role="group" aria-label="Injured side" id="sideSel"><button type="button" data-s="L">Left</button><button type="button" data-s="R">Right</button><button type="button" class="on" data-s="">Both / n/a</button></div>` : ''}
+    ${[0, 1, 2].map(i => `<div class="grid2"><label class="field">Activity ${i + 1}<input id="act${i}" placeholder="${['e.g. Walking upstairs', 'e.g. Running 5 km', 'e.g. Squatting to lift'][i]}"></label>
+      <label class="field slider">Ability <span class="val" id="actv${i}">5</span><input type="range" min="0" max="10" value="5" id="actr${i}"></label></div>`).join('')}
+    <label class="field slider">Pain first thing in the morning (usual) <span class="val" id="umv">2</span><input type="range" min="0" max="10" value="2" id="um"></label>
+    ${info.postOp ? '<div class="alert assess"><b>After surgery</b><span class="small">Follow your surgeon\'s and physio\'s protocol first: their timelines and restrictions override this programme. Use Shred to track your measurements and do the exercises they approve.</span></div>' : ''}
+    ${!info.diagnosed ? '<div class="alert assess"><b>Not yet diagnosed</b><span class="small">Book a physio assessment to confirm what this is. Start phase 1 gently meanwhile, and stop if anything gets worse.</span></div>' : ''}
+    <button class="cta" type="button" id="startPlan">Start my programme</button>`);
+  let side = '';
+  $('#sideSel')?.addEventListener('click', e => { const b = e.target.closest('[data-s]'); if (!b) return; side = b.dataset.s; $$('#sideSel button').forEach(x => x.classList.toggle('on', x === b)); });
+  [0, 1, 2].forEach(i => $('#actr' + i).oninput = e => $('#actv' + i).textContent = e.target.value);
+  $('#um').oninput = e => $('#umv').textContent = e.target.value;
+  $('#startPlan').onclick = () => {
+    const acts = [0, 1, 2].map(i => ({ name: $('#act' + i).value.trim(), v: +$('#actr' + i).value })).filter(a => a.name);
+    const now = Date.now();
+    S.rehab.active = { cond: c.id, startedAt: now, phase: 0, phaseStartedAt: now, injured: side || null, postOp: info.postOp, diagnosed: info.diagnosed,
+      acts: acts.map(a => a.name), psfs: acts.length ? [{ at: now, score: psfsScore(acts.map(a => a.v)), ratings: acts.map(a => a.v) }] : [],
+      usualMorning: +$('#um').value, checkins: [], tests: [], kneeTests: [] };
+    persist(); closeSheet(); renderRehab(); renderToday();
+    say(`Your ${c.name.toLowerCase()} programme is ready. Phase one: ${c.phases[0].name}. Do today's exercises, then check in so I can adjust your load.`, { id: 'rehab_start', priority: 'high' });
+  };
+}
+
+// 3. Dashboard
+function renderRehabDashboard() {
+  const p = plan(), c = condOf(p), ph = c.phases[p.phase], ev = evaluatePhase(c, p.phase, p);
+  const last = p.checkins.slice(-1)[0], lightInfo = last ? painLight(last, c.painLimit) : null;
+  const pending = p.checkins.find(k => k.nextMorning == null && Date.now() - k.at > 8 * 3600e3 && Date.now() - k.at < 48 * 3600e3);
+  const latest = id => [...p.tests].reverse().find(t => t.test === id);
+  const testRow = id => { const d = ROM_TESTS[id], t = latest(id); const v = t ? (t.value != null ? `${t.value}${d.unit === '°' ? '°' : ' ' + d.unit}${t.side ? ` (${t.side === 'L' ? 'left' : 'right'})` : ''}` : `L ${t.L ?? '–'} · R ${t.R ?? '–'}`) : 'not tested'; return `<div class="row"><div><b class="small">${esc(d.name)}</b><br><span class="muted small">${esc(v)} · typical ${esc(d.norm)}</span></div><button type="button" class="ghost" data-romtest="${id}">Test</button></div>`; };
+  const painSeries = p.checkins.slice(-12).map(k => k.during), psfsSeries = p.psfs.map(x => x.score);
+  $('#rehabActive').innerHTML = `
+    ${pending ? `<button type="button" class="card rehab-today" id="morningBtn"><span class="eyebrow" style="color:var(--warn)">Quick check</span><b>How does it feel this morning?</b><span class="muted small">This tells QK whether yesterday's load was right.</span></button>` : ''}
+    <div class="card stack">
+      <div class="card-head" style="margin:0"><div><span class="eyebrow">Phase ${p.phase + 1} of ${c.phases.length}${p.postOp ? ' · after surgery: physio-led' : ''}</span><h2 class="display h2">${esc(ph.name)}</h2><span class="muted small">${esc(ph.goal)}</span></div></div>
+      <div class="phase-track">${c.phases.map((_, i) => `<i class="${i < p.phase ? 'done' : i === p.phase ? 'now' : ''}"></i>`).join('')}</div>
+    </div>
+    <div class="card"><span class="eyebrow">Today's exercises</span>
+      <div style="margin-top:4px">${ph.exercises.map(([id, dose]) => { const x = LIB[id]; return `<button type="button" class="ex-row" data-train="${id}" style="width:100%;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;cursor:pointer;padding-inline:0"><span class="pic">${icon(iconKey(id))}</span><div><b>${esc(x.name)}</b><span class="tag" style="${x.pattern ? '' : 'color:var(--z3)'}">${x.pattern ? 'QK checks your form' : 'QK coaches your tempo'}</span></div><span class="sets">${esc(dose)}</span></button>`; }).join('')}</div>
+      <div class="stack" style="margin-top:12px"><button class="cta" type="button" id="checkinRehab">Check in after today's session</button></div>
+      ${lightInfo ? `<p style="margin:12px 0 0"><span class="light ${lightInfo.light}">${lightInfo.light === 'green' ? 'On track' : lightInfo.light === 'amber' ? 'Hold the load' : 'Ease off'}</span><br><span class="muted small">${esc(lightInfo.advice)}</span></p>` : ''}
+    </div>
+    <div class="card"><span class="eyebrow">To move to the next phase</span>
+      <div style="margin-top:8px">${ev.items.map(i => `<div class="crit ${i.met ? 'met' : ''}"><span class="tick">${i.met ? '✓' : ''}</span><span>${esc(i.label)}<small>${esc(i.detail || '')}</small></span></div>`).join('')}</div>
+      ${ev.allMet && p.phase < c.phases.length - 1 ? `<button class="cta" type="button" id="nextPhase" style="margin-top:10px">Move to phase ${p.phase + 2}</button>` : ''}
+      ${ev.allMet && p.phase === c.phases.length - 1 ? `<div class="alert assess" style="margin-top:10px"><b>All criteria met</b><span class="small">You've completed the programme. Keep the strength work going 2× a week to prevent it coming back.</span></div>` : ''}
+    </div>
+    ${c.tests.length || ph.criteria.some(k => k.type === 'kneeTest') ? `<div class="card"><span class="eyebrow">Your measurements</span><div class="list" style="margin-top:6px">${c.tests.map(testRow).join('')}
+      ${ph.criteria.some(k => k.type === 'kneeTest') ? `<div class="row"><div><b class="small">Single-leg squat knee test</b><br><span class="muted small">${p.kneeTests.length ? `L ${p.kneeTests.slice(-1)[0].L ?? '–'}° · R ${p.kneeTests.slice(-1)[0].R ?? '–'}°` : 'not tested'}</span></div><button type="button" class="ghost" id="goKneeTest">Test</button></div>` : ''}</div></div>` : ''}
+    <div class="card stack"><div class="card-head" style="margin:0"><div><span class="eyebrow">Daily activities (PSFS)</span><div class="num" style="font-size:1.8rem;margin-top:4px">${psfsSeries.length ? psfsSeries[psfsSeries.length - 1] + '/10' : '–'}</div></div><button type="button" class="ghost" id="rerate">Re-rate</button></div>
+      ${psfsSeries.length >= 2 ? lineChart(psfsSeries, { min: 0, max: 10, labels: p.psfs.map(x => new Date(x.at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })) }) : '<span class="muted small">Re-rate every week to see your progress.</span>'}
+      ${painSeries.length >= 2 ? `<span class="eyebrow">Pain during exercise</span>${lineChart(painSeries, { min: 0, max: 10, labels: painSeries.map((_, i) => String(i + 1)) })}` : ''}</div>
+    <details class="card"><summary>About ${esc(c.name.toLowerCase())}</summary><p class="small" style="margin:10px 0 0">${esc(c.about)}</p><p class="muted small">${esc(c.evidence)}</p>
+      <p class="muted small">Pain rule: up to ${c.painLimit}/10 during exercise is OK if it settles by the next morning.</p></details>
+    <div class="btn-row">${p.phase > 0 ? '<button class="ghost" type="button" id="prevPhase">Step back a phase</button>' : ''}<button class="ghost" type="button" id="endPlan">End programme</button></div>
+    <p class="muted small" style="margin:0">Shred supports rehabilitation; it doesn't diagnose or replace your physiotherapist or doctor. If symptoms get worse, or a warning sign appears, stop and get checked.</p>`;
+  $('#checkinRehab').onclick = openCheckin;
+  $('#morningBtn') && ($('#morningBtn').onclick = () => openMorning(pending));
+  $('#nextPhase') && ($('#nextPhase').onclick = () => { p.phase++; p.phaseStartedAt = Date.now(); persist(); renderRehab(); say(`Great work. Phase ${p.phase + 1}: ${c.phases[p.phase].name}.`, { id: 'phase_' + Date.now(), priority: 'high' }); });
+  $('#prevPhase') && ($('#prevPhase').onclick = () => { p.phase--; p.phaseStartedAt = Date.now(); persist(); renderRehab(); toast('Stepped back a phase. That\'s a normal part of rehab.'); });
+  $('#endPlan').onclick = () => openSheet(`<b id="rsheetTitle">End this programme?</b><p class="muted small" style="margin:0">Your results are kept in your history.</p><div class="btn-row"><button class="ghost" type="button" id="endNo">Keep going</button><button class="stop" type="button" id="endYes">End programme</button></div>`) || ($('#endNo').onclick = closeSheet, $('#endYes').onclick = () => { S.rehab.history.push({ ...p, endedAt: Date.now() }); S.rehab.active = null; persist(); closeSheet(); renderRehab(); renderToday(); });
+  $('#rerate').onclick = openRerate;
+  $('#goKneeTest') && ($('#goKneeTest').onclick = () => { tab('gait'); $('[data-test=sls]').click(); });
+  $$('#rehabActive [data-romtest]').forEach(b => b.onclick = () => startRomTest(b.dataset.romtest));
+}
+
+function slider(id, label, v = 0) { return `<label class="field slider">${label} <span class="val" id="${id}v">${v}</span><input type="range" min="0" max="10" value="${v}" id="${id}"></label>`; }
+function bindSliders(ids) { ids.forEach(id => $('#' + id).oninput = e => $('#' + id + 'v').textContent = e.target.value); }
+
+function openCheckin() {
+  const c = condOf(plan());
+  openSheet(`<div><span class="eyebrow">Session check-in</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">How did it feel?</h2>
+    <p class="muted small" style="margin:6px 0 0">0 = no pain, 10 = worst imaginable. Your limit for this condition is ${c.painLimit}/10.</p></div>
+    ${slider('pd', 'Highest pain during the exercises', 2)}${slider('pa', 'Pain now, after the session', 2)}
+    <button class="cta" type="button" id="saveCheckin">Save</button>`);
+  bindSliders(['pd', 'pa']);
+  $('#saveCheckin').onclick = () => {
+    const k = { at: Date.now(), during: +$('#pd').value, after: +$('#pa').value, nextMorning: null };
+    plan().checkins.push(k); persist(); closeSheet(); renderRehab();
+    const l = painLight({ ...k, usualMorning: plan().usualMorning }, c.painLimit);
+    say(l.light === 'green' ? 'Good session. Pain stayed in your safe zone. I\'ll check how it feels tomorrow morning.' : l.light === 'amber' ? 'A little over your limit. Keep the same load next time and we\'ll see how it settles.' : 'That was too much today. Next session, ease off: fewer sets or a smaller range.', { id: 'ck_' + Date.now(), priority: 'high' });
+  };
+}
+function openMorning(k) {
+  openSheet(`<h2 class="display h2" id="rsheetTitle" style="font-size:1.3rem">This morning</h2>${slider('pm', 'Pain or stiffness right now', plan().usualMorning ?? 2)}<button class="cta" type="button" id="saveMorning">Save</button>`);
+  bindSliders(['pm']);
+  $('#saveMorning').onclick = () => {
+    k.nextMorning = +$('#pm').value; persist(); closeSheet(); renderRehab();
+    const l = painLight({ ...k, usualMorning: plan().usualMorning }, condOf(plan()).painLimit);
+    say(l.light === 'red' ? 'It\'s more irritated than usual this morning, so we\'ll go lighter today.' : 'It settled well. Yesterday\'s load was right.', { id: 'mn_' + Date.now(), priority: 'high' });
+  };
+}
+function openRerate() {
+  const p = plan(), acts = p.acts.length ? p.acts : ['Your main activity'];
+  openSheet(`<h2 class="display h2" id="rsheetTitle" style="font-size:1.3rem">Rate your activities</h2><p class="muted small" style="margin:0">0 = can't do it, 10 = as well as before.</p>
+    ${acts.map((a, i) => slider('rr' + i, esc(a), p.psfs.slice(-1)[0]?.ratings?.[i] ?? 5)).join('')}<button class="cta" type="button" id="saveRr">Save</button>`);
+  bindSliders(acts.map((_, i) => 'rr' + i));
+  $('#saveRr').onclick = () => { const r = acts.map((_, i) => +$('#rr' + i).value); p.psfs.push({ at: Date.now(), score: psfsScore(r), ratings: r }); persist(); closeSheet(); renderRehab(); };
+}
+
+// 4. Camera measurement tests
+function startRomTest(id) {
+  const d = ROM_TESTS[id];
+  const go = side => {
+    closeSheet();
+    TEST.rom = { secs: d.secs, label: d.name, minFps: 20, view: d.view, intro: () => d.how, romId: id, side };
+    startLive({ mode: 'rom', source: 'camera' });
+  };
+  openSheet(`<div><span class="eyebrow">Measurement</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">${esc(d.name)}</h2></div>
+    <ol class="steps"><li>${esc(d.how)}</li><li>Recording lasts ${d.secs} seconds and starts after a countdown.</li>${d.view === 'side' && !d.chooseSide ? '<li>The side nearest the camera is measured. Turn around to test the other side.</li>' : ''}</ol>
+    ${d.chooseSide ? `<p class="small" style="margin:0">Which leg are you testing?</p><div class="btn-row"><button class="cta" type="button" data-side="L">Left leg</button><button class="cta" type="button" data-side="R">Right leg</button></div>`
+      : '<button class="cta" type="button" data-side="">Start</button>'}
+    <label class="ghost">Upload a video instead<input type="file" id="romFile" accept="video/*" hidden></label>`);
+  $$('#rsheetBody [data-side]').forEach(b => b.onclick = () => go(b.dataset.side || null));
+  $('#romFile').onchange = e => { const f = e.target.files[0]; if (!f) return; closeSheet(); TEST.rom = { secs: d.secs, label: d.name, minFps: 20, view: d.view, intro: () => d.how, romId: id, side: null }; startLive({ mode: 'rom', source: 'file', file: f }); };
+}
+
+async function finishRom(frames, q) {
+  const cfg = TEST.rom, d = ROM_TESTS[cfg.romId], p = plan();
+  const mPerPx = scaleFromHeight(frames.slice(0, 20), (S.profile.heightCm || 0) / 100);
+  const r = await runRomTest(cfg.romId, frames, { mPerPx });
+  tab('rehab');
+  if (q.score < 40 || !r.ok) { const msg = q.score < 40 ? 'Recording quality was too low: ' + (q.issues[0] || 'check the camera view.') : r.issues[0]; toast(msg); say(msg, { id: 'rom_fail_' + Date.now(), priority: 'high' }); return; }
+  const rec = { at: Date.now(), test: cfg.romId, side: cfg.side || r.side || null, value: r.value, L: r.L, R: r.R, quality: q.score };
+  if (p) { p.tests.push(rec); persist(); renderRehab(); }
+  const val = r.value != null ? `${r.value}${d.unit === '°' ? ' degrees' : ' ' + d.unit}` : `left ${r.L}, right ${r.R}`;
+  say(`${d.name}: ${val}.`, { id: 'rom_' + Date.now(), priority: 'high' });
+  toast(`${d.name}: ${r.value != null ? r.value + (d.unit === '°' ? '°' : ' ' + d.unit) : `L ${r.L} · R ${r.R}`}`);
+}
+
+function renderRehabToday() {
+  const p = plan(), el = $('#rehabToday'); el.hidden = !p; if (!p) return;
+  const c = condOf(p), ev = evaluatePhase(c, p.phase, p);
+  el.innerHTML = `<span class="eyebrow" style="color:var(--good)">Rehab · phase ${p.phase + 1} of ${c.phases.length}</span><b>${esc(c.name)}</b><span class="muted small">${c.phases[p.phase].exercises.length} exercises today · ${ev.items.filter(i => i.met).length}/${ev.items.length} phase goals met</span>`;
+  el.onclick = () => tab('rehab');
+}
 
 /* ---------- Boot ---------- */
 mountOrbs(); bindPlan(); bindProfile(); renderTrain(); renderToday(); applyMute(); renderTestHistory();

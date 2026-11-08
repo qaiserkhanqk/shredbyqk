@@ -80,6 +80,8 @@
       <p class="plan-line" id="planLine"></p>
     </div>
 
+    <button type="button" class="card rehab-today" id="rehabToday" hidden></button>
+
     <div class="card" id="focusCard" hidden>
       <span class="eyebrow">Your focus</span>
       <div style="display:flex;justify-content:space-between;gap:12px;margin:10px 0 8px"><b id="focusTitle"></b><span class="data muted" id="focusNum"></span></div>
@@ -229,6 +231,20 @@
     </div>
   </section>
 
+  <!-- REHAB CLINIC -->
+  <section class="screen" id="rehab">
+    <div class="page-head"><div><span class="eyebrow">Rehab clinic</span><h1 class="display h1" id="rehabTitle">Recover with a plan</h1></div></div>
+    <div id="rehabStart" class="stack">
+      <div class="card stack">
+        <p style="margin:0">Pick where it hurts. Shred checks for warning signs first, then builds a phased programme. Each phase is passed by measurable progress, not just time.</p>
+        <p class="muted small" style="margin:0">Supports rehab; doesn't diagnose. If you haven't been assessed, or you've had surgery, your physio or surgeon's plan comes first.</p>
+      </div>
+      <div class="chips-scroll" id="areaChips" role="group" aria-label="Body area"></div>
+      <div class="stack" id="condList"></div>
+    </div>
+    <div id="rehabActive" class="stack" hidden></div>
+  </section>
+
   <!-- PROGRESS -->
   <section class="screen" id="progress">
     <div class="page-head"><div><span class="eyebrow">Your progress</span><h1 class="display h1">Progress</h1></div></div>
@@ -256,6 +272,7 @@
     <button type="button" class="on" data-tab="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg>Today</button>
     <button type="button" data-tab="train"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11"/></svg>Train</button>
     <button type="button" data-tab="gait"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 4c2 0 3 2 3 4s-1 5-3 5-3-3-3-5 1-4 3-4zM16 9c2 0 3 2 3 4s-1 4-3 4-3-2-3-4 1-4 3-4zM6 16h4M14 20h4"/></svg>Tests</button>
+    <button type="button" data-tab="rehab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.5-9-9.5C1.6 7.6 4.2 4 7.8 4c1.8 0 3.2 1 4.2 2.4C13 5 14.4 4 16.2 4 19.8 4 22.4 7.6 21 11.5 19 16.5 12 21 12 21z"/><path d="M9 12h6M12 9v6"/></svg>Rehab</button>
     <button type="button" data-tab="scan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M12 7v10M9 10h6"/></svg>Scan</button>
     <button type="button" data-tab="progress"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19 10 12l4 4 6-9"/></svg>Progress</button>
   </nav>
@@ -278,6 +295,14 @@
       <label class="ghost">Upload a video<input type="file" id="videoFile" accept="video/*" hidden></label>
       <button class="ghost" type="button" id="startDemo" hidden>Watch a demo set</button>
     </div>
+  </div>
+</div>
+
+<!-- Rehab sheet (safety screen, baseline, check-in, test side) -->
+<div class="sheet-wrap" id="rsheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rsheetTitle">
+    <div class="grab"></div>
+    <div id="rsheetBody" class="stack"></div>
   </div>
 </div>
 
