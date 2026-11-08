@@ -312,8 +312,9 @@ export class SquatTracker {
    * Front-view knee angle from foreshortening. A segment of true length L tilted φ from vertical
    * (toward/away from the camera) appears with vertical length L·cos φ, so φ = arccos(observed / L).
    * In a squat the thigh tilts forward by φ and the shin by ψ, and knee angle = 180° − (φ + ψ).
-   * Needs one standing frame first to learn L. Accuracy is typically within ~10°: enough to count reps
-   * and see depth trends, but judge depth from a side view or with world landmarks.
+   * Needs about a second of standing first to learn L. It is an estimate (it assumes the leg moves straight
+   * toward the camera and is sensitive to landmark jitter near full extension): good for counting reps,
+   * not precise enough to pass/fail depth, so depth is only judged side-on or with world landmarks.
    */
   private frontalKneeAngle(lm: Landmark[]): number {
     if (this.thighLen <= 0 || this.shinLen <= 0) return NaN;
