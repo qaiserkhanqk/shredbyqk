@@ -340,3 +340,12 @@ details[open] > summary::after { content: "–"; }
 .light.amber::before { background: var(--warn); } .light.red::before { background: var(--bad); }
 .rehab-today { text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 6px; background: linear-gradient(135deg, rgba(61,220,151,.1), transparent), var(--surface); }
 .emergency-num { font: 800 2rem var(--f-display); letter-spacing: .04em; user-select: all; }
+
+.ready-score { font-size: 2.4rem; line-height: 1; background: var(--zone); -webkit-background-clip: text; background-clip: text; color: transparent; }
+#readyCard.go { border-color: rgba(61,220,151,.45); } #readyCard.adjust { border-color: rgba(255,181,71,.5); } #readyCard.recover { border-color: rgba(255,90,95,.5); }
+.studio-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); font-size: .9rem; }
+.studio-row:first-child { border-top: 0; }
+.studio-row .acts { display: flex; gap: 6px; }
+.studio-row button { border: 1px solid var(--line); background: var(--surface-2); border-radius: 10px; padding: 8px 10px; font-weight: 700; cursor: pointer; font-size: .8rem; }
+.studio-row button.rec { background: var(--bad); color: #fff; border-color: var(--bad); }
+.studio-row .done { color: var(--good); font-size: .75rem; font-weight: 700; }

@@ -102,6 +102,19 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('rehab: cauda equina red flag → emergency advice with 999', /Get emergency help now/.test(alertText) && /999/.test(alertText));
   await p.click('#stopOk');
 
+  // 7. Readiness, load and Studio
+  await p.click('.tabs [data-tab=today]'); await p.click('#morningCheck');
+  for (const id of ['#rdS', '#rdF', '#rdT', '#rdM']) await p.fill(id, '6');
+  await p.fill('#rdH', '5'); await p.click('#rdSave');
+  check('readiness: poor check-in → lighter or recovery day', /lighter|Recovery/.test(await p.textContent('#readyTitle')), await p.textContent('#readyTitle'));
+  await p.click('#logSession'); await p.fill('#mins', '60'); await p.click('#loadSave');
+  await p.click('.tabs [data-tab=progress]'); await p.waitForTimeout(300);
+  check('load: weekly load shown in Progress', /300 AU/.test(await p.textContent('#loadNow')) && !!(await p.$('#loadChart svg')));
+  await p.click('.tabs [data-tab=today]'); await p.click('#studioCard summary'); await p.waitForTimeout(400);
+  check('studio: lists coaching lines', /of \d+ lines recorded/.test(await p.textContent('#studioCount')));
+  await p.click('#studioList [data-act=rec]'); await p.waitForTimeout(1200); await p.click('#studioList [data-act=rec]'); await p.waitForTimeout(600);
+  check('studio: record with the microphone and save a clip', /1 of \d+ lines recorded/.test(await p.textContent('#studioCount')) && /recorded/.test(await p.textContent('#studioList')));
+
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();
   console.log(fails ? `${fails} FAILED` : 'ALL PASS'); process.exit(fails ? 1 : 0);

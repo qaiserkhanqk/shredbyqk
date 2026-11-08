@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "test": "node tests/simulate.mjs && node tests/gait.mjs && node tests/library.mjs && node tests/squatTracker.test.ts && node tests/measurement.test.mjs && node tests/regression.test.mjs && node tests/rehab.test.mjs",
+    "test": "node tests/simulate.mjs && node tests/gait.mjs && node tests/library.mjs && node tests/squatTracker.test.ts && node tests/measurement.test.mjs && node tests/regression.test.mjs && node tests/rehab.test.mjs && node tests/load.test.mjs",
     "test:e2e": "node tests/e2e.cjs",
     "replay": "node tests/replay.mjs",
     "validate": "node tests/validate.mjs",

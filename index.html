@@ -80,6 +80,12 @@
       <p class="plan-line" id="planLine"></p>
     </div>
 
+    <div class="card stack" id="readyCard">
+      <div class="card-head" style="margin:0"><div><span class="eyebrow">Today's readiness</span><h2 class="display h2" id="readyTitle">Check in to see today's plan</h2></div><span class="ready-score num" id="readyScore">–</span></div>
+      <ul class="issues" id="readyReasons"></ul>
+      <div class="btn-row"><button class="ghost" type="button" id="morningCheck">Morning check-in</button><button class="ghost" type="button" id="logSession">Log session effort</button></div>
+    </div>
+
     <button type="button" class="card rehab-today" id="rehabToday" hidden></button>
 
     <div class="card" id="focusCard" hidden>
@@ -105,6 +111,17 @@
         <label class="field">Coach photo (QK's face)<input id="coachPhoto" type="file" accept="image/*"></label>
         <label class="field">Coach voice<select id="voiceSel"></select></label>
         <button class="ghost" type="button" id="testVoice">Test the voice</button>
+      </div>
+    </details>
+
+    <details class="card" id="studioCard">
+      <summary>Studio: record QK's voice</summary>
+      <div class="stack" style="margin-top:14px">
+        <p class="muted small" style="margin:0">Record each coaching line once in your own voice. You'll hear it straight away on this phone. Export the recordings to publish them for every client (see README). Lines with live numbers stay in the synthetic voice.</p>
+        <div class="bar"><i id="studioBar" style="width:0"></i></div><span class="muted small" id="studioCount"></span>
+        <div class="chips-scroll" id="studioGroups"></div>
+        <div class="list" id="studioList"></div>
+        <button class="ghost" type="button" id="studioExport">Export recordings</button>
       </div>
     </details>
 
@@ -259,6 +276,11 @@
     <div class="card chart">
       <div class="card-head"><div><span class="eyebrow">Body fat</span><div class="num" style="font-size:2rem;margin-top:4px" id="bfNow">–</div></div></div>
       <div id="bfChart"><p class="empty">Log two measurements to see your trend.</p></div>
+    </div>
+    <div class="card chart">
+      <div class="card-head"><div><span class="eyebrow">Training load · effort × minutes</span><div class="num" style="font-size:2rem;margin-top:4px" id="loadNow">–</div></div><span class="data small" id="loadDelta"></span></div>
+      <div id="loadChart"><p class="empty">Log your session effort after training to see your weekly load.</p></div>
+      <p class="muted small" style="margin:8px 0 0" id="loadNote"></p>
     </div>
     <div class="card">
       <span class="eyebrow">Faults QK is working on</span>

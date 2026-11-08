@@ -62,9 +62,10 @@ export class FeedbackCoach {
 
     if (!faults.length) {
       this.lastSummary = 'That rep was clean.';
-      return { text: reps % 3 === 0 ? `${countWord(reps)}. ${praise()}` : countWord(reps), priority: 'low' };
+      // Plain counts carry an id (n1…n20) so QK's own recorded voice is used when it exists.
+      return reps % 3 === 0 ? { text: `${countWord(reps)}. ${praise()}`, priority: 'low' } : { text: countWord(reps), id: reps <= 20 ? `n${reps}` : undefined, priority: 'low' };
     }
-    return { text: countWord(reps), priority: 'low' };
+    return { text: countWord(reps), id: reps <= 20 ? `n${reps}` : undefined, priority: 'low' };
   }
 
   onContinuousFault(f) {

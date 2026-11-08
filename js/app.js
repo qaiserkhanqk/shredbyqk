@@ -12,6 +12,8 @@ import { BarTracker, estimate1RM, velocityZone } from './vbt.js';
 import { scaleFromPlate, scaleFromHeight, assessQuality, measuredFps } from './measure.js';
 import { CONDITIONS, COND, AREAS, GENERAL_FLAGS, FLAG_ADVICE, triage, painLight, evaluatePhase, psfsScore } from './rehab.js';
 import { ROM_TESTS, runRomTest } from './rom.js';
+import { readiness, recommendToday, sessionLoad, weekStats, loadSpike, dayKey } from './load.js';
+import { cueList, saveClip, getClip, deleteClip, listClipIds, startRecording, exportClips } from './studio.js';
 import { SessionRecorder, ErrorLog, downloadJSON, APP_VERSION } from './diagnostics.js';
 import { LIBRARY, LIB, MUSCLES, exFor } from './library.js';
 import { HipThrustDemo, WalkDemo, DEMO_W, DEMO_H } from './demo.js';
@@ -52,7 +54,7 @@ function tab(id) {
   $$('.screen').forEach(s => s.classList.toggle('on', s.id === id));
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === id));
   if (id === 'today') renderToday();
-  if (id === 'progress') renderProgress();
+  if (id === 'progress') { renderProgress(); renderLoad(); }
   if (id === 'rehab') renderRehab();
   if (id === 'scan') $('#hipWrap').hidden = S.profile.sex === 'male';
   window.scrollTo(0, 0);
@@ -100,6 +102,7 @@ function setRing(id, frac) {
 
 function renderToday() {
   if (typeof renderRehabToday === 'function' && S.rehab) renderRehabToday();
+  if (S.readiness) renderReady();
   const now = new Date();
   $('#dateLine').textContent = now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
   const part = now.getHours() < 12 ? 'Morning' : now.getHours() < 18 ? 'Afternoon' : 'Evening';
@@ -1059,6 +1062,92 @@ function renderRehabToday() {
   el.innerHTML = `<span class="eyebrow" style="color:var(--good)">Rehab · phase ${p.phase + 1} of ${c.phases.length}</span><b>${esc(c.name)}</b><span class="muted small">${c.phases[p.phase].exercises.length} exercises today · ${ev.items.filter(i => i.met).length}/${ev.items.length} phase goals met</span>`;
   el.onclick = () => tab('rehab');
 }
+
+/* ---------- Readiness and training load ---------- */
+S.readiness ||= []; S.loads ||= [];
+const todayCheck = () => S.readiness.find(c => dayKey(c.at) === dayKey(Date.now()));
+function renderReady() {
+  const c = todayCheck(), hist = S.readiness.filter(x => x !== c);
+  const lastJump = (S.jumps || []).slice(-1)[0], jumpHist = (S.jumps || []).slice(0, -1).map(j => j.cm);
+  const jr = lastJump && dayKey(lastJump.at) === dayKey(Date.now()) ? jumpReadiness(lastJump.cm, jumpHist) : null;
+  const rk = S.rehab?.active?.checkins?.slice(-1)[0];
+  const rl = rk ? painLight({ ...rk, usualMorning: S.rehab.active.usualMorning }, COND[S.rehab.active.cond].painLimit).light : null;
+  const rec = recommendToday({ check: c, history: hist, sessions: S.loads, jumpStatus: jr?.status, rehabLight: rl });
+  const card = $('#readyCard'); card.className = 'card stack ' + (c ? rec.level : '');
+  $('#readyTitle').textContent = c ? rec.title : 'Check in to see today\'s plan';
+  $('#readyScore').textContent = c ? readiness(c, hist).score : '–';
+  $('#readyReasons').innerHTML = rec.reasons.map(r => `<li>${esc(r)}</li>`).join('');
+  $('#morningCheck').textContent = c ? 'Update check-in' : 'Morning check-in';
+}
+const scale7 = (id, label, lo, hi, v = 3) => `<label class="field slider">${label} <span class="val" id="${id}v">${v}</span><input type="range" min="1" max="7" value="${v}" id="${id}"><span class="muted small" style="display:flex;justify-content:space-between"><span>${lo}</span><span>${hi}</span></span></label>`;
+$('#morningCheck').onclick = () => {
+  const c = todayCheck() || {};
+  openSheet(`<div><span class="eyebrow">Morning check-in · 20 seconds</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">How are you today?</h2></div>
+    <label class="field">Hours slept<input id="rdH" type="number" inputmode="decimal" min="0" max="14" step="0.5" value="${c.sleepH ?? 7.5}"></label>
+    ${scale7('rdS', 'Sleep quality', 'great', 'awful', c.sleepQ ?? 3)}${scale7('rdF', 'Tiredness', 'fresh', 'exhausted', c.fatigue ?? 3)}
+    ${scale7('rdT', 'Stress', 'relaxed', 'very stressed', c.stress ?? 3)}${scale7('rdM', 'Muscle soreness', 'none', 'very sore', c.soreness ?? 3)}
+    <button class="cta" type="button" id="rdSave">Save</button>`);
+  bindSliders(['rdS', 'rdF', 'rdT', 'rdM']);
+  $('#rdSave').onclick = () => {
+    const entry = { at: Date.now(), sleepH: parseFloat($('#rdH').value) || null, sleepQ: +$('#rdS').value, fatigue: +$('#rdF').value, stress: +$('#rdT').value, soreness: +$('#rdM').value };
+    S.readiness = S.readiness.filter(x => dayKey(x.at) !== dayKey(entry.at)); S.readiness.push(entry); persist(); closeSheet(); renderReady();
+    say(`${$('#readyTitle').textContent}.`, { id: 'ready_' + Date.now(), priority: 'high' });
+  };
+};
+$('#logSession').onclick = () => {
+  const firstToday = [...S.sessions, ...S.checkins].filter(s => dayKey(s.at) === dayKey(Date.now())).map(s => s.at).sort()[0];
+  const guess = firstToday ? Math.max(10, Math.round((Date.now() - firstToday) / 60000) + 5) : 45;
+  openSheet(`<div><span class="eyebrow">Session effort</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">How hard was today's session?</h2>
+    <p class="muted small" style="margin:6px 0 0">Rate the whole session about 30 minutes after finishing. 0 = rest, 3 = moderate, 5 = hard, 7 = very hard, 10 = maximal.</p></div>
+    <label class="field slider">Effort <span class="val" id="rpeV">5</span><input type="range" min="0" max="10" value="5" id="rpe"></label>
+    <label class="field">Minutes<input id="mins" type="number" inputmode="numeric" value="${Math.min(guess, 180)}"></label>
+    <button class="cta" type="button" id="loadSave">Save</button>`);
+  $('#rpe').oninput = e => $('#rpeV').textContent = e.target.value;
+  $('#loadSave').onclick = () => {
+    const s = { at: Date.now(), rpe: +$('#rpe').value, minutes: Math.max(0, parseInt($('#mins').value) || 0) };
+    S.loads.push(s); persist(); closeSheet(); renderReady(); toast(`Logged ${sessionLoad(s)} load units`);
+  };
+};
+function renderLoad() {
+  const weeks = [7, 6, 5, 4, 3, 2, 1, 0].map(w => weekStats(S.loads, Date.now() - w * 7 * 864e5).load);
+  const sp = loadSpike(S.loads), wk = weekStats(S.loads);
+  $('#loadNow').textContent = S.loads.length ? `${wk.load} AU` : '–';
+  $('#loadDelta').textContent = sp.ratio ? `${sp.ratio >= 1 ? '+' : ''}${Math.round((sp.ratio - 1) * 100)}% vs usual` : '';
+  $('#loadDelta').style.color = sp.spike ? 'var(--warn)' : 'var(--muted)';
+  if (!S.loads.length) return;
+  const max = Math.max(...weeks, 1), W = 360, H = 130, bw = (W - 40) / 8;
+  $('#loadChart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Weekly training load, last 8 weeks">${weeks.map((v, i) => { const h = v / max * (H - 30); return `<rect x="${30 + i * bw + 4}" y="${H - 20 - h}" width="${bw - 8}" height="${h}" rx="5" fill="${i === 7 ? (sp.spike ? '#ffb547' : 'url(#zoneStroke)') : '#2a3348'}"/><text x="${30 + i * bw + bw / 2}" y="${H - 5}" text-anchor="middle" fill="#8c95a8" font-size="10" font-family="IBM Plex Mono, monospace">${i === 7 ? 'now' : '-' + (7 - i) + 'w'}</text>`; }).join('')}</svg>`;
+  $('#loadNote').textContent = (sp.spike ? 'This week is well above your recent average. Rapid jumps in load raise injury risk, so build gradually. ' : '') + `Monotony ${wk.monotony} (above about 2 means too little variety between hard and easy days).`;
+}
+
+/* ---------- Studio ---------- */
+let studioGroup = 'Coaching', studioRec = null, studioHave = new Set();
+async function renderStudio() {
+  const cues = cueList(); studioHave = new Set(await listClipIds());
+  const groups = [...new Set(cues.map(c => c.group))];
+  $('#studioGroups').innerHTML = groups.map(g => `<button type="button" class="mchip ${g === studioGroup ? 'on' : ''}" data-sg="${esc(g)}">${esc(g)}</button>`).join('');
+  const done = cues.filter(c => studioHave.has(c.id)).length;
+  $('#studioBar').style.width = (done / cues.length * 100) + '%';
+  $('#studioCount').textContent = `${done} of ${cues.length} lines recorded`;
+  $('#studioList').innerHTML = cues.filter(c => c.group === studioGroup).map(c => `<div class="studio-row" data-cue="${c.id}"><span>${esc(c.text)}${studioHave.has(c.id) ? ' <span class="done">✓ recorded</span>' : ''}</span>
+    <span class="acts"><button type="button" data-act="rec">${studioRec?.id === c.id ? 'Stop' : 'Record'}</button>${studioHave.has(c.id) ? '<button type="button" data-act="play">Play</button><button type="button" data-act="del">✕</button>' : ''}</span></div>`).join('');
+  if (studioRec) $(`[data-cue="${studioRec.id}"] [data-act=rec]`)?.classList.add('rec');
+}
+$('#studioCard').addEventListener('toggle', () => { if ($('#studioCard').open) renderStudio(); });
+$('#studioGroups').onclick = e => { const b = e.target.closest('[data-sg]'); if (b) { studioGroup = b.dataset.sg; renderStudio(); } };
+$('#studioList').onclick = async e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const id = b.closest('[data-cue]').dataset.cue, act = b.dataset.act;
+  try {
+    if (act === 'rec') {
+      if (studioRec?.id === id) { const blob = await studioRec.r.stop(); studioRec = null; await saveClip(id, blob); toast('Saved'); }
+      else { if (studioRec) await studioRec.r.stop(); studioRec = { id, r: await startRecording() }; }
+    } else if (act === 'play') { const blob = await getClip(id); if (blob) new Audio(URL.createObjectURL(blob)).play(); }
+    else if (act === 'del') { await deleteClip(id); }
+  } catch (err) { toast('Microphone not available. Allow microphone access for this site.'); studioRec = null; }
+  renderStudio();
+};
+$('#studioExport').onclick = async () => { const data = await exportClips(); if (!Object.keys(data.clips).length) return toast('Record some lines first.'); downloadJSON(`shred-voice-${Date.now()}.json`, data); };
 
 /* ---------- Boot ---------- */
 mountOrbs(); bindPlan(); bindProfile(); renderTrain(); renderToday(); applyMute(); renderTestHistory();

@@ -1,8 +1,9 @@
 // "QK" coach: the avatar + voice layer. Every spoken line goes through here.
 //
 // Voice sources, best first:
-//   1. A clip QK recorded himself: audio/cues/<cueId>.mp3 listed in audio/cues/manifest.json.
-//      Cues are a fixed list, so recording them once gives a 100% authentic voice for free.
+//   0. A clip recorded in this phone's Studio (IndexedDB), heard immediately by the person who recorded it.
+//   1. A clip QK recorded and published: audio/cues/<file> listed in audio/cues/manifest.json
+//      ({id: filename}). Cues are a fixed list, so recording them once gives his real voice for free.
 //   2. A cloned-voice TTS endpoint (e.g. ElevenLabs) behind YOUR server — set CONFIG.ttsEndpoint.
 //      Never put a TTS API key in the app itself.
 //   3. The device's built-in speech voice (works offline, default).
@@ -14,8 +15,9 @@ export const CONFIG = {
   anyCueGapMs: 2200,          // minimum gap between corrections
 };
 
-let manifest = new Set();
-fetch('audio/cues/manifest.json').then(r => r.ok ? r.json() : []).then(list => { manifest = new Set(list); }).catch(() => {});
+import { getClip } from './studio.js';
+let manifest = {};
+fetch('audio/cues/manifest.json').then(r => r.ok ? r.json() : {}).then(m => { manifest = Array.isArray(m) ? Object.fromEntries(m.map(id => [id, id + '.mp3'])) : m; }).catch(() => {});
 
 const lastSaid = {};
 let lastAny = 0;
@@ -44,7 +46,11 @@ async function play(text, id) {
   setTalking(true);
   showCaption(text);
   try {
-    if (id && manifest.has(id)) return await playUrl(`audio/cues/${id}.mp3`);
+    if (id) {
+      const local = await getClip(id).catch(() => null);
+      if (local) return await playUrl(URL.createObjectURL(local));
+      if (manifest[id]) return await playUrl(`audio/cues/${manifest[id]}`);
+    }
     if (CONFIG.ttsEndpoint) {
       const r = await fetch(CONFIG.ttsEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
       if (r.ok) return await playUrl(URL.createObjectURL(await r.blob()));
