@@ -20,7 +20,7 @@
 13. [Limitations](#limitations)
 14. [Open items and blockers](#open-items-and-blockers)
 
-Related: [validation plan](docs/cycle-validation-plan.md) · [evidence register](docs/cycle-evidence-register.md) · [wearable SDK requirements](docs/wearable-sdk-requirements.md) · [synthetic evaluation report](docs/cycle-eval-synthetic.md)
+Related: [audit and fix status](docs/cycle-audit-9f87b83.md) · [validation plan](docs/cycle-validation-plan.md) · [evidence register](docs/cycle-evidence-register.md) · [wearable SDK requirements](docs/wearable-sdk-requirements.md) · [synthetic evaluation report](docs/cycle-eval-synthetic.md)
 
 ## What was built
 
@@ -37,7 +37,8 @@ It uses the existing stack: a static PWA with vanilla ES modules, no build step 
 | `js/cycle/reminders.js` | Reminder scheduling: quiet hours, pause, delete, "why", neutral lock-screen text |
 | `js/cycle/wearables.js` | Adapter contract, normalisation, nightly summaries, mock device, SWL DS07 placeholder |
 | `js/cycle/tempshift.js` | **Research only:** retrospective temperature-rise detector |
-| `js/cycle/store.js` | Encrypted per-user repository: AES-GCM, consent, export, delete |
+| `js/cycle/store.js` | Encrypted per-user repository: AES-GCM, consent, export, delete; serialised and versioned across tabs |
+| `js/cycle/nudges.js` | Low-effort mode logic: wearable-timed questions and one-tap suggestions (no screen yet) |
 | `js/cycle/eval.js`, `tools/cycle-eval.mjs` | Reproducible evaluation harness (synthetic cohort) |
 | `js/cycle/ui.js` | The Cycle screen (Body → Cycle tracking) |
 | `tests/cycle.test.mjs`, `tests/cycle-integration.test.mjs` | Unit and integration tests; cycle steps added to `tests/e2e.cjs` |
@@ -57,6 +58,8 @@ Existing features were not changed. Changes to shared files are small:
 | `phaseEducation` | off | Phase card (settings inside the Cycle screen) |
 | `symptomForecast` | off | Experimental "you may want to check in about X" suggestions |
 | `temperatureResearch` | off | Retrospective temperature-rise display. Never feeds the period estimate. |
+| `quickSuggestions` | off | Low-effort mode: one-tap pre-filled answers from the person's own patterns. **Logic only, no screen yet.** |
+| `sensorPrompts` | off | Low-effort mode: wearable-timed questions. **Logic only, no screen yet.** |
 
 Flags live in `localStorage['shred_flags_v1']` because they are not health data. `main` auto-deploys to GitHub Pages, and the default-off flag means a merge does not expose the feature to real users.
 
@@ -150,6 +153,25 @@ See [docs/wearable-sdk-requirements.md](docs/wearable-sdk-requirements.md).
 - **Labels:** wrist skin temperature is labelled "not core body temperature". Heart-rate variability is labelled vendor-derived.
 - **Data minimisation:** only nightly summaries are stored; raw samples are discarded.
 
+## Low-effort mode (logic and tests only; no screen yet)
+
+`js/cycle/nudges.js`. The aim is less typing without the app recording anything on its own. **Nothing here writes data.**
+
+- **"Has your period started?" timed by the wearable.** The question is asked when last night's wrist skin temperature is ≥ 0.2 °C below the mean of the previous 5 valid nights, from cycle day 15 onwards, and not within 10 days of a logged period.
+  - Only the person's "Yes" records a period, marked `source: 'sensor_prompt'`.
+  - It is off for pregnancy and hormonal contraception.
+  - It needs wearable consent.
+  - Nights that are missing, flagged, from a device change, or marked unwell or travelling are ignored.
+- **"How are you feeling?" timed by HRV.** Asked when last night's HRV is ≥ 20% below the person's own median of up to 14 nights (7 needed).
+  - The text never names or guesses a mood, and says that training, sleep, alcohol, illness and stress also cause this.
+- **One-tap suggestions.** "Energy: around this time you logged 'lower than usual' in 4 of 4 cycles. Same today?"
+  - These come only from a found personal pattern.
+  - "Yes" saves with `source: 'suggestion'`; "No" saves nothing.
+- **Every entry records where it came from:** `typed`, `suggestion`, `range_prompt` or `sensor_prompt`.
+  - Pattern evidence states how many entries were accepted suggestions, which guards against self-reinforcing patterns.
+- **Why it isn't switched on:** all thresholds are placeholders. The audit (`docs/cycle-audit-9f87b83.md`) found weaknesses these rules inherit: the night-coverage rule (3.1–3.2) and pattern false positives (5.1–5.3). Fix those first.
+- **The synthetic evaluation** compares this prompt with a dates-only range prompt. See `docs/cycle-eval-synthetic.md`; it is synthetic, so the wearable prompt looks good **by construction**.
+
 ## Reminders
 
 `reminders.js`. Optional, and they need their own consent.
@@ -193,6 +215,9 @@ the coach voice / TTS endpoint, analytics (none exist), AI prompts (none exist) 
 | Minimum data: symptom categories off by default; only nightly wearable summaries kept | model, wearables |
 | Encryption at rest (AES-GCM-256, random IV, non-extractable key). **No plaintext fallback:** if WebCrypto is missing, the feature refuses to store anything. | `store.js` |
 | Per-user isolation: separate slot and key per user, user ID bound as AAD, owner check on read and write | `store.js`, integration tests |
+| Multi-tab safety: operations queued in each tab and locked across tabs (Web Locks); every save re-reads the latest stored version (no lost updates); revision and generation are bound into the AAD | `store.js`, integration and e2e tests |
+| Deletion can't be undone by another tab or a pending save: a generation counter is bumped first; stale tabs are refused (`STALE_SESSION`) and clear themselves; records from an older generation are discarded unread | `store.js`, `ui.js` (storage events) |
+| Recovery: unreadable data shows a "Reset cycle data on this device" button | `resetCycleStorage`, e2e |
 | Tampered ciphertext rejected (GCM authentication) | integration tests |
 | Export everything (JSON, with a "keep this private" note) | `repo.exportData()` |
 | Delete everything, including destroying the key, so old ciphertext copies become unreadable | `repo.deleteAll()` |
@@ -205,6 +230,8 @@ the coach voice / TTS endpoint, analytics (none exist), AI prompts (none exist) 
 - Deletion can't reach files the user exported, or device or browser backups made before deletion. Those hold ciphertext, but a backup may also hold the IndexedDB key.
 - Clearing site data in the browser also deletes the key, which makes stored data unrecoverable. That is intended.
 - The service-worker cache holds app code only, never user data.
+
+**Threat model in one line:** a random ID identifies the **browser profile**, not a person, so anyone using the same profile is the "same user". Real per-person isolation needs login plus server-side authorisation (not built).
 
 **What the encryption does *not* protect against:** malware on the device, someone using the unlocked phone, or a malicious script running on the same origin. It is not a substitute for server-side access control once a backend exists.
 
@@ -223,13 +250,13 @@ the coach voice / TTS endpoint, analytics (none exist), AI prompts (none exist) 
 npm test
 ```
 
-This runs all existing suites plus `tests/cycle.test.mjs` (103 checks) and `tests/cycle-integration.test.mjs` (27 checks).
+This runs all existing suites (296 checks in total) plus the cycle suites: `tests/cycle.test.mjs` (103 checks), `tests/cycle-integration.test.mjs` (46 checks, including deletion and multi-tab regressions with and without a cross-tab lock) and `tests/cycle-nudges.test.mjs` (33 checks).
 
 ```bash
 npm run test:e2e
 ```
 
-This runs the browser flow, including 17 cycle checks.
+This runs the browser flow (53 checks), including 21 cycle checks, with two real tabs.
 
 ```bash
 npm run eval:cycle

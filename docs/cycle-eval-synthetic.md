@@ -42,4 +42,13 @@ This only checks that the detector behaves as designed on data built to contain 
 | lastCycle | 1894 | 423 | 1471 | 4.35 | 22.3% | 36.6% |
 | baseRate | 0 | 0 | 0 | 0 | –% | 0% |
 
+## Low-effort mode: "Has your period started?" prompt (held-out test)
+
+| Prompt | Cycles | Hit (−1…+2 days) | Median lag (days) | False prompts per cycle |
+|---|---|---|---|---|
+| wearable-timed | 338 | 85.8% | 1 | 0.03 |
+| dates-only range | 338 | 91.7% | -1 | 2.83 |
+
+Neither prompt records anything: a hit saves the person a tap, a false prompt costs one "Not yet". The wearable-timed prompt looks good here by construction (the synthetic generator puts a temperature step before each period).
+
 `pattern` = the app's personal-pattern rule; `lastCycle` = alert if the same cycle day (±1) was notable last cycle; `baseRate` = alert every day if the person logs "notable" on half or more of their days.

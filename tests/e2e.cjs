@@ -174,6 +174,30 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   const after = await p.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('shred_cycle_v1:')));
   check('cycle: delete all → data gone and consent asked again', await p.isVisible('#cyConsent') && after.length === 0);
 
+  // Two tabs (audit of 9f87b83, findings 1.1 and 1.3): no lost updates, and a deletion can't be undone by another tab
+  await p.check('#cyAgree'); await cy('[data-act=consent]', 600);
+  const q = await ctx.newPage(); q.on('dialog', d => d.accept()); q.on('pageerror', e => errs.push('tab2: ' + e.message));
+  await q.goto('https://shred.local/'); await q.click('#welcomeBtn'); await q.click('.tabs [data-tab=body]'); await q.click('[data-go=cycle]'); await q.waitForSelector('#cyLog');
+  await p.fill('#cyDate', dayStr(-40)); await cy('[data-act=logStart]', 500);
+  await q.fill('#cyDate', dayStr(-10)); await q.click('[data-act=logStart]'); await q.waitForTimeout(600);
+  await p.waitForTimeout(400); if (!(await p.$('#cyHistory[open]'))) await tap('#cyHistory summary');
+  const both = await p.$$eval('#cyHistory [data-edit=start]', els => els.map(e => e.value).sort());
+  check('two tabs: entries from both tabs are kept (no lost update)', JSON.stringify(both) === JSON.stringify([dayStr(-40), dayStr(-10)].sort()), JSON.stringify(both));
+  if (!(await p.$('#cySettings[open]'))) await tap('#cySettings summary');
+  await cy('[data-act=deleteAll]', 800);
+  await q.waitForTimeout(600);
+  check('two tabs: the other tab clears itself after a delete elsewhere', await q.isVisible('#cyConsent'));
+  const slotsAfter = await p.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('shred_cycle_v1:')).length);
+  await p.reload(); await p.click('#welcomeBtn'); await p.click('.tabs [data-tab=body]'); await p.click('[data-go=cycle]'); await p.waitForTimeout(700);
+  check('two tabs: after delete + reload, nothing comes back and no "can\'t unlock" error', slotsAfter === 0 && await p.isVisible('#cyConsent') && !(await p.$('#cyUnavailable')));
+  await q.close();
+  // Recovery path (finding 1.4): unreadable data → reset button → consent screen
+  await p.evaluate(() => { const uid = localStorage.getItem('shred_cycle_uid'); localStorage.setItem('shred_cycle_v1:' + uid, JSON.stringify({ v: 2, gen: Number(localStorage.getItem('shred_cycle_gen:' + uid)) || 0, rev: 1, alg: 'AES-GCM-256', iv: 'AAAAAAAAAAAAAAAA', ct: 'AAAAAAAAAAAAAAAAAAAAAA==' })); });
+  await p.reload(); await p.click('#welcomeBtn'); await p.click('.tabs [data-tab=body]'); await p.click('[data-go=cycle]'); await p.waitForTimeout(700);
+  const stuck = await p.isVisible('#cyUnavailable') && await p.isVisible('[data-act=resetStorage]');
+  await cy('[data-act=resetStorage]', 800);
+  check('unreadable data: a reset button is offered and returns to the consent screen', stuck && await p.isVisible('#cyConsent'));
+
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();
   console.log(fails ? `${fails} FAILED` : 'ALL PASS'); process.exit(fails ? 1 : 0);

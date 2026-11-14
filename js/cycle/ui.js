@@ -7,7 +7,7 @@ import { phaseInfo, PHASE_EDUCATION } from './phase.js';
 import { KINDS, addReminder, updateReminder, deleteReminder, nextFire, dueNow, markDelivered, notificationContent } from './reminders.js';
 import { MockWearable, SwlDs07Adapter, normalise, summariseNights, mergeNights, nightTable, METRICS } from './wearables.js';
 import { retrospectiveShift } from './tempshift.js';
-import { openCycleRepo, indexedDbKeys, syncStorage, localUserId } from './store.js';
+import { openCycleRepo, indexedDbKeys, syncStorage, localUserId, webLock, resetCycleStorage } from './store.js';
 import { today as localToday, localMinutes, addDays, diffDays, human, deviceTimeZone } from './dates.js';
 import { readFlags, setFlag, FLAG_DEFS } from './flags.js';
 
@@ -16,7 +16,8 @@ const MSG = {
   NO_CONSENT: 'Please agree to the terms first.', CATEGORY_OFF: 'Turn this category on in settings first.', FUTURE_DATE: 'That date is in the future.',
   END_BEFORE_START: 'The end can\'t be before the start.', OVERLAP: 'That overlaps a period you already logged. Edit that one instead.', INVALID_DATE: 'Choose a valid date.',
   NOT_VERIFIED: 'This device isn\'t available: its integration is not verified.', CRYPTO_UNAVAILABLE: 'This browser can\'t encrypt data, so cycle tracking is unavailable here.',
-  DECRYPT_FAILED: 'Your saved cycle data could not be unlocked on this device.', KEYSTORE_UNAVAILABLE: 'Secure storage is blocked in this browser (private mode?).',
+  DECRYPT_FAILED: 'Your saved cycle data could not be unlocked on this device.', CORRUPT: 'Your saved cycle data is damaged.',
+  STALE_SESSION: 'Your cycle data was changed or deleted in another tab. The screen has been refreshed; nothing was saved.', KEYSTORE_UNAVAILABLE: 'Secure storage is blocked in this browser (private mode?).',
 };
 let repo = null, root = null, toast = () => {}, openErr = null, notified = new Set(), timer = null;
 const flags = () => readFlags();
@@ -25,15 +26,27 @@ const now = () => ({ today: localToday(), nowMin: localMinutes(Date.now(), devic
 export async function initCycle(opts) {
   root = opts.root; toast = opts.toast;
   root.addEventListener('click', onClick); root.addEventListener('change', onChange);
+  // Another tab saved, deleted or switched user: re-read instead of overwriting (audit 1.1, 1.3, 1.6).
+  window.addEventListener('storage', e => {
+    if (e.key !== null && !/^shred_cycle_/.test(e.key)) return; // null = storage cleared
+    if (e.key === null || e.key === 'shred_cycle_uid') reopen();
+    if (root.closest('.screen.on')) renderCycle();
+  });
 }
+const repoOpts = () => { const userId = localUserId(); return { storage: syncStorage(localStorage), keys: indexedDbKeys(), userId, lock: webLock(`shred-cycle-${userId}`) }; };
+async function reopen() { repo = null; openErr = null; }
 async function ensureRepo() {
+  if (repo && repo.userId !== localUserId()) repo = null; // user switched elsewhere (audit 1.6)
   if (repo || openErr) return;
-  try { repo = await openCycleRepo({ storage: syncStorage(localStorage), keys: indexedDbKeys(), userId: localUserId() }); }
+  try { repo = await openCycleRepo(repoOpts()); }
   catch (e) { openErr = e.code || 'UNKNOWN'; }
 }
 async function act(fn, ok) {
   try { await repo.update(s => fn(s, now().today)); if (ok) toast(ok); }
-  catch (e) { toast(MSG[e.code] || 'That didn\'t work. Nothing was changed.'); } // codes only: no data in messages
+  catch (e) {
+    toast(MSG[e.code] || 'That didn\'t work. Nothing was changed.'); // codes only: no data in messages
+    if (e.code === 'STALE_SESSION') { await reopen(); return renderCycle(); }
+  }
   render();
 }
 
@@ -41,7 +54,13 @@ export async function renderCycle() {
   if (!root) return;
   if (!flags().cycleTracking) { root.innerHTML = '<p class="muted small">This prototype is switched off.</p>'; return; }
   await ensureRepo();
-  if (openErr) { root.innerHTML = `<div class="card"><b>Cycle tracking is unavailable</b><p class="muted small">${esc(MSG[openErr] || 'Secure storage could not be opened.')}</p></div>`; return; }
+  if (repo && !(await repo.refresh().catch(e => { openErr = e.code || 'UNKNOWN'; repo = null; return true; }))) { await reopen(); await ensureRepo(); }
+  if (openErr) {
+    const canReset = ['DECRYPT_FAILED', 'CORRUPT'].includes(openErr);
+    root.innerHTML = `<div class="card stack" id="cyUnavailable"><b>Cycle tracking is unavailable</b><p class="muted small">${esc(MSG[openErr] || 'Secure storage could not be opened.')}</p>
+      ${canReset ? '<p class="muted small">You can reset cycle tracking on this device. This deletes the unreadable data and its key; it can\'t be recovered.</p><button class="stop" type="button" data-act="resetStorage">Reset cycle data on this device</button>' : ''}</div>`;
+    return;
+  }
   render();
   clearInterval(timer); timer = setInterval(() => { if (root.closest('.screen.on')) notifyDue(); }, 60e3);
 }
@@ -225,7 +244,12 @@ async function notifyDue() {
 /* ---------- Events ---------- */
 const val = sel => root.querySelector(sel)?.value;
 async function onClick(e) {
-  const b = e.target.closest('[data-act]'); if (!b || !repo) return;
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  if (b.dataset.act === 'resetStorage') { // recovery path (audit 1.4): works without an open repository
+    if (!confirm('Reset cycle tracking on this device? Unreadable data and its key are deleted.')) return;
+    await resetCycleStorage(repoOpts()); await reopen(); toast('Cycle data reset'); return renderCycle();
+  }
+  if (!repo) return;
   const a = b.dataset.act, date = () => val('#cyDate');
   const run = {
     consent: () => { if (!root.querySelector('#cyAgree')?.checked) return toast('Tick the box to agree first.'); act(s => M.giveConsent(s), 'Cycle tracking is on'); },

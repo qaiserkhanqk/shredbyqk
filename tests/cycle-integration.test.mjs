@@ -94,6 +94,70 @@ const fresh = await openCycleRepo({ storage, keys, userId: 'alice' });
 check('delete: reopening gives an empty state that needs consent again', fresh.read().periods.length === 0 && !M.hasConsent(fresh.read()));
 check('delete: other users are untouched', storage.raw.has('shred_cycle_v1:bob'));
 storage.raw.set('shred_cycle_v1:alice', before);
-check('delete: an old backup of the ciphertext is unreadable once the key is destroyed', await rejects(openCycleRepo({ storage, keys, userId: 'alice' }), 'DECRYPT_FAILED'));
+const restored = await openCycleRepo({ storage, keys, userId: 'alice' });
+check('delete: an old copy of the ciphertext put back later is discarded unread, never decrypted', restored.read().periods.length === 0 && !M.hasConsent(restored.read()) && !storage.raw.has('shred_cycle_v1:alice'));
+
+/* ---------- Audit 9f87b83 §1: deletion and multi-tab regressions ---------- */
+const { memoryLock, resetCycleStorage } = await import('../js/cycle/store.js');
+async function twoTabs({ withLock = true } = {}) {
+  const st = memoryStorage(), ks = memoryKeys(), lock = withLock ? memoryLock() : null;
+  const A = await openCycleRepo({ storage: st, keys: ks, userId: 'u', lock }); await A.update(s => M.giveConsent(s));
+  const B = await openCycleRepo({ storage: st, keys: ks, userId: 'u', lock });
+  return { st, ks, lock, A, B, reopen: () => openCycleRepo({ storage: st, keys: ks, userId: 'u', lock }) };
+}
+for (const withLock of [true, false]) {
+  const tag = withLock ? '(with cross-tab lock)' : '(no lock available)';
+  { // 1.3 lost update
+    const { A, B, reopen } = await twoTabs({ withLock });
+    await A.update(s => M.logPeriodStart(s, '2026-10-01', { today: T }));
+    await B.update(s => M.logPeriodStart(s, '2026-11-01', { today: T }));
+    check(`1.3 two tabs: both entries kept, nothing overwritten ${tag}`, JSON.stringify((await reopen()).read().periods.map(p => p.start)) === '["2026-10-01","2026-11-01"]');
+  }
+  { // 1.1 stale tab after delete
+    const { st, A, B, reopen } = await twoTabs({ withLock });
+    await A.update(s => M.logPeriodStart(s, '2026-10-01', { today: T }));
+    await A.deleteAll();
+    const refused = await rejects(B.update(s => M.logDay(s, '2026-11-02', { bleeding: 'spotting' }, { today: T })), 'STALE_SESSION');
+    check(`1.1 stale tab after delete: its save is refused and nothing is written back ${tag}`, refused && !st.raw.has('shred_cycle_v1:u'));
+    check(`1.1 stale tab drops the deleted data from memory ${tag}`, B.read().periods.length === 0 && B.stale);
+    const r = await reopen();
+    check(`1.1 reload after delete: empty, asks for consent, no unlock error ${tag}`, r.read().periods.length === 0 && !M.hasConsent(r.read()));
+  }
+  { // 1.2 delete during an outstanding save (same tab)
+    const { st, A, reopen } = await twoTabs({ withLock });
+    const pending = A.update(s => M.logPeriodStart(s, '2026-10-01', { today: T }));
+    await A.deleteAll(); await pending.catch(() => {});
+    const r = await reopen();
+    check(`1.2 delete during a save: deletion wins (memory, disk and reload all empty) ${tag}`, A.read().periods.length === 0 && !st.raw.has('shred_cycle_v1:u') && r.read().periods.length === 0);
+  }
+  { // 1.2 variant: a save started in another tab just before the delete
+    const { st, A, B, reopen } = await twoTabs({ withLock });
+    const pending = B.update(s => M.logPeriodStart(s, '2026-10-01', { today: T }));
+    await A.deleteAll(); await pending.catch(() => {});
+    const r = await reopen();
+    check(`1.2 save in another tab racing a delete: no data survives on disk or after reload ${tag}`, !st.raw.has('shred_cycle_v1:u') && r.read().periods.length === 0 && !M.hasConsent(r.read()));
+  }
+  { // refresh picks up another tab's change without overwriting
+    const { A, B } = await twoTabs({ withLock });
+    await A.update(s => M.logPeriodStart(s, '2026-10-01', { today: T }));
+    check(`refresh: another tab's entry appears after refresh ${tag}`, B.read().periods.length === 0 && (await B.refresh()) === true && B.read().periods.length === 1);
+    await A.deleteAll();
+    check(`refresh: after a delete elsewhere, refresh reports stale and shows nothing ${tag}`, (await B.refresh()) === false && B.read().periods.length === 0);
+  }
+}
+{ // 1.4 recovery from undecryptable data
+  const st = memoryStorage(), ks = memoryKeys();
+  st.raw.set('shred_cycle_v1:u', JSON.stringify({ v: 2, gen: 0, rev: 3, alg: 'AES-GCM-256', iv: 'AAAAAAAAAAAAAAAA', ct: 'AAAAAAAAAAAAAAAAAAAAAA==' }));
+  check('1.4 undecryptable record: opening fails with DECRYPT_FAILED', await rejects(openCycleRepo({ storage: st, keys: ks, userId: 'u' }), 'DECRYPT_FAILED'));
+  await resetCycleStorage({ storage: st, keys: ks, userId: 'u' });
+  const r = await openCycleRepo({ storage: st, keys: ks, userId: 'u' });
+  check('1.4 reset: record and key removed, opens empty and asks for consent', !st.raw.has('shred_cycle_v1:u') && r.read().periods.length === 0 && !M.hasConsent(r.read()));
+}
+{ // integrity of the new envelope: revision number can't be edited
+  const st = memoryStorage(), ks = memoryKeys(), a = await openCycleRepo({ storage: st, keys: ks, userId: 'u' });
+  await a.update(s => M.giveConsent(s));
+  const blob = JSON.parse(st.raw.get('shred_cycle_v1:u')); blob.rev = 99; st.raw.set('shred_cycle_v1:u', JSON.stringify(blob));
+  check('envelope: editing the revision or generation number makes the record fail to decrypt', await rejects(openCycleRepo({ storage: st, keys: ks, userId: 'u' }), 'DECRYPT_FAILED'));
+}
 
 console.log(fails ? `${fails} FAILED` : 'ALL PASS'); process.exit(fails ? 1 : 0);

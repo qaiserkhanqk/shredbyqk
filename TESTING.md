@@ -69,7 +69,7 @@ Crashes are logged on the device. **Export error log** in the same panel gives t
   - pain traffic lights
   - phase progression (ACL return-to-sport symmetry)
   - camera measurements on known movements: shoulder 150°, knee 125°, forward bend 80°, 11 sit-to-stands, 18 calf raises, a 120 cm hop
-- **`tests/cycle.test.mjs`** and **`tests/cycle-integration.test.mjs`:** cycle tracking: irregular/long cycles, corrected and missing logs, spotting, sparse history, time zones, consent changes, reminders, bad sensor readings, device changes, deletion, cross-user isolation. `npm run eval:cycle` runs the synthetic evaluation harness (results are synthetic, never accuracy). See [CYCLE.md](CYCLE.md).
+- **`tests/cycle.test.mjs`**, **`tests/cycle-integration.test.mjs`** and **`tests/cycle-nudges.test.mjs`:** (plus deletion and two-tab regressions from the audit in `docs/cycle-audit-9f87b83.md`) cycle tracking (including low-effort mode prompts and suggestions): irregular/long cycles, corrected and missing logs, spotting, sparse history, time zones, consent changes, reminders, bad sensor readings, device changes, deletion, cross-user isolation. `npm run eval:cycle` runs the synthetic evaluation harness (results are synthetic, never accuracy). See [CYCLE.md](CYCLE.md).
 - **`tests/e2e.cjs`:**
   - demo set and exercise library
   - live camera and calibration

@@ -57,49 +57,106 @@ export function localUserId(ls = globalThis.localStorage) {
   return id;
 }
 
-async function encrypt(key, userId, obj) {
-  const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
-  const ct = new Uint8Array(await subtle().encrypt({ name: 'AES-GCM', iv, additionalData: aad(userId) }, key, enc.encode(JSON.stringify(obj))));
-  return JSON.stringify({ v: 1, alg: 'AES-GCM-256', iv: b64(iv), ct: b64(ct) });
+/* AAD binds the user ID and, for v2 records, the generation and revision, so a record can't be moved to another
+   user, replayed into another generation, or have its revision number edited without failing to decrypt. */
+const aadFor = (userId, blob) => (blob.v >= 2 ? enc.encode(`shred-cycle|${userId}|v2|${blob.gen}|${blob.rev}`) : aad(userId));
+
+async function encrypt(key, userId, obj, gen, rev) {
+  const iv = globalThis.crypto.getRandomValues(new Uint8Array(12)), meta = { v: 2, gen, rev };
+  const ct = new Uint8Array(await subtle().encrypt({ name: 'AES-GCM', iv, additionalData: aadFor(userId, meta) }, key, enc.encode(JSON.stringify(obj))));
+  return JSON.stringify({ ...meta, alg: 'AES-GCM-256', iv: b64(iv), ct: b64(ct) });
 }
-async function decrypt(key, userId, text) {
-  let blob; try { blob = JSON.parse(text); } catch { throw new CycleError('CORRUPT'); }
+function parseBlob(text) { try { return JSON.parse(text); } catch { throw new CycleError('CORRUPT'); } }
+async function decrypt(key, userId, blob) {
   try {
-    const pt = await subtle().decrypt({ name: 'AES-GCM', iv: unb64(blob.iv), additionalData: aad(userId) }, key, unb64(blob.ct));
+    const pt = await subtle().decrypt({ name: 'AES-GCM', iv: unb64(blob.iv), additionalData: aadFor(userId, blob) }, key, unb64(blob.ct));
     return JSON.parse(dec.decode(pt));
   } catch { throw new CycleError('DECRYPT_FAILED'); }
 }
 
-export async function openCycleRepo({ storage, keys, userId }) {
+/* ---------- Serialisation ----------
+   localQueue: runs one operation at a time inside this tab (fixes "delete during an outstanding save").
+   lock: optional cross-tab mutex. In the browser use webLock() (Web Locks API); in tests use a shared memoryLock().
+   Without a cross-tab lock the generation/revision checks still detect conflicts, with a small race window. */
+export function memoryLock() {
+  let chain = Promise.resolve();
+  return { run(fn) { const p = chain.then(() => fn()); chain = p.catch(() => {}); return p; } };
+}
+export function webLock(name) {
+  return globalThis.navigator?.locks ? { run: fn => globalThis.navigator.locks.request(name, () => fn()) } : null;
+}
+
+const GEN = 'shred_cycle_gen:';
+const readGen = async (storage, userId) => Number(await storage.get(GEN + userId)) || 0;
+
+/** Recovery when stored data can't be unlocked: removes the record and the key, and invalidates every open tab. */
+export async function resetCycleStorage({ storage, keys, userId, lock = null }) {
+  const run = async () => { await storage.set(GEN + userId, String((await readGen(storage, userId)) + 1)); await storage.remove(PREFIX + userId); await keys.delete(userId); };
+  return lock ? lock.run(run) : run();
+}
+
+export async function openCycleRepo({ storage, keys, userId, lock = null }) {
   if (!userId || typeof userId !== 'string') throw new CycleError('ACCESS_DENIED');
   subtle(); // fail early, before anything is written, if encryption is unavailable
-  const slot = PREFIX + userId;
-  let key = await keys.get(userId), state;
-  const text = await storage.get(slot);
-  if (text) {
-    state = await decrypt(key, userId, text);
-    if (state.owner !== userId) throw new CycleError('ACCESS_DENIED');
-  } else state = blankState(userId);
+  const slot = PREFIX + userId, local = memoryLock();
+  const exclusive = fn => local.run(() => (lock ? lock.run(fn) : fn()));
+  let key, state = blankState(userId), gen = 0, rev = 0, stale = false;
 
-  const repo = {
+  /** Bring memory in line with storage. Throws STALE_SESSION if everything was deleted (by any tab) since we opened. */
+  async function sync() {
+    if (stale) throw new CycleError('STALE_SESSION');
+    const g = await readGen(storage, userId);
+    if (g !== gen) { stale = true; state = blankState(userId); key = null; throw new CycleError('STALE_SESSION'); }
+    const text = await storage.get(slot);
+    if (!text) { if (rev !== 0) { state = blankState(userId); rev = 0; } return; }
+    const blob = parseBlob(text);
+    if (blob.v >= 2 && blob.gen < gen) { await storage.remove(slot); state = blankState(userId); rev = 0; return; } // left by a tab after deletion: discard unread
+    const r = blob.v >= 2 ? blob.rev : 0;
+    if (r !== rev || state.owner !== userId || !state.consent) {
+      const next = await decrypt(key, userId, blob);
+      if (next.owner !== userId) throw new CycleError('ACCESS_DENIED');
+      state = next; rev = r;
+    }
+  }
+
+  await exclusive(async () => {
+    gen = await readGen(storage, userId); key = await keys.get(userId);
+    const text = await storage.get(slot);
+    if (!text) return;
+    const blob = parseBlob(text);
+    if (blob.v >= 2 && blob.gen < gen) { await storage.remove(slot); return; }
+    state = await decrypt(key, userId, blob); rev = blob.v >= 2 ? blob.rev : 0;
+    if (state.owner !== userId) throw new CycleError('ACCESS_DENIED');
+  });
+
+  return {
     userId,
-    /** A copy of the state. Mutating it changes nothing. */
+    get stale() { return stale; },
+    /** A copy of the in-memory state. Call refresh() first to pick up changes from other tabs. */
     read: () => structuredClone(state),
-    /** Apply a change atomically: if fn throws, nothing is saved. */
-    async update(fn) {
-      const draft = structuredClone(state); const out = fn(draft);
+    /** Re-read from storage. Resolves false (and empties memory) if the data was deleted elsewhere. */
+    refresh: () => exclusive(sync).then(() => true, e => { if (e.code === 'STALE_SESSION') return false; throw e; }),
+    /** Apply a change atomically to the LATEST stored data. If fn throws, nothing is saved. */
+    update: fn => exclusive(async () => {
+      await sync();
+      const draft = structuredClone(state), out = fn(draft);
       if (draft.owner !== userId) throw new CycleError('ACCESS_DENIED');
-      await storage.set(slot, await encrypt(key, userId, draft)); state = draft; return out;
-    },
+      const nrev = rev + 1;
+      await storage.set(slot, await encrypt(key, userId, draft, gen, nrev));
+      if ((await readGen(storage, userId)) !== gen) { await storage.remove(slot); stale = true; state = blankState(userId); throw new CycleError('STALE_SESSION'); } // deleted meanwhile (no lock)
+      state = draft; rev = nrev; return out;
+    }),
     /** Everything this user has stored, decrypted, for the user to keep. */
     exportData: () => ({ format: 'shred-cycle-export', schema: SCHEMA, exportedAt: new Date().toISOString(),
       note: 'Your cycle data from Shred by QK. Keep this file private: it is not encrypted.', data: structuredClone(state) }),
-    /** Delete everything: ciphertext and key. Returns what was done and what can't be reached. */
-    async deleteAll() {
-      await storage.remove(slot); await keys.delete(userId); state = blankState(userId); key = await keys.get(userId);
+    /** Delete everything: ciphertext and key. Waits for pending saves; invalidates every other open tab. */
+    deleteAll: () => exclusive(async () => {
+      gen = (await readGen(storage, userId)) + 1;
+      await storage.set(GEN + userId, String(gen)); // first, so any other tab's pending write is refused
+      await storage.remove(slot); await keys.delete(userId);
+      state = blankState(userId); rev = 0; stale = false; key = await keys.get(userId);
       return { deleted: ['cycle records', 'symptom logs', 'reminders', 'wearable summaries', 'consent record', 'encryption key'],
         notReached: ['files you exported yourself', 'device or browser backups made before deletion (they hold only encrypted data, but may also hold the key)'] };
-    },
+    }),
   };
-  return repo;
 }
