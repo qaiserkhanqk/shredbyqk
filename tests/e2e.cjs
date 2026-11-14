@@ -127,6 +127,53 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await tap('#studioList [data-act=rec]'); await p.waitForTimeout(1200); await tap('#studioList [data-act=rec]'); await p.waitForTimeout(600);
   check('studio: record with the microphone and save a clip', /1 of \d+ lines recorded/.test(await p.textContent('#studioCount')) && /recorded/.test(await p.textContent('#studioList')));
 
+  // 8. Cycle tracking prototype (synthetic data): off by default, consent-gated, encrypted, deletable
+  p.on('dialog', d => d.accept());
+  const dayStr = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const cy = async (sel, ms = 350) => { await tap(sel); await p.waitForTimeout(ms); };
+  await go('body');
+  check('cycle: hidden by default (flag off)', !(await p.isVisible('#cycleTile')));
+  await go('progress'); await tap('#diagCard summary'); await tap('#flagCycle'); await tap('#diagCard summary');
+  await go('body'); check('cycle: tile shown once the prototype flag is on', await p.isVisible('#cycleTile'));
+  await p.click('[data-go=cycle]'); await p.waitForSelector('#cyConsent');
+  check('cycle: consent screen first, says no sharing and not contraception', /not contraception/.test(await p.textContent('#cyConsent')) && /Nothing is shared/.test(await p.textContent('#cyConsent')));
+  await cy('[data-act=consent]');
+  check('cycle: consent needs the box ticked', await p.isVisible('#cyConsent'));
+  await p.check('#cyAgree'); await cy('[data-act=consent]', 600); await p.waitForSelector('#cyEstimate');
+  check('cycle: no history → "not enough data", no range', /Not enough data/.test(await p.textContent('#cyHeadline')) && !(await p.$('.cy-range')));
+  for (const n of [-161, -132, -101, -71, -41, -10]) { await p.fill('#cyDate', dayStr(n)); await cy('[data-act=logStart]'); }
+  const detail = await p.textContent('#cyDetail');
+  check('cycle: 5 cycles → estimated range with the cycles explained', /Estimated range/.test(await p.textContent('#cyHeadline')) && /between 29 and 31 days/.test(detail) && await p.isVisible('.cy-range'), detail);
+  await p.fill('#cyDate', dayStr(-3)); await cy('[data-act=logSpotting]');
+  check('cycle: spotting logged without changing the estimate', (await p.textContent('#cyDetail')) === detail);
+  await tap('#cyHistory summary');
+  await p.$eval('#cyHistory [data-pid] [data-edit=start]', (el, v) => { el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); }, dayStr(-16)); await p.waitForTimeout(500);
+  check('cycle: correcting the latest start updates the estimate', /between 25 and 31 days/.test(await p.textContent('#cyDetail')), await p.textContent('#cyDetail'));
+  await tap('#cySettings summary'); await cy('#cySettings [data-cat=energy]', 500);
+  await p.selectOption('#cyLog [data-sym=energy]', 'low'); await cy('[data-act=saveDay]');
+  check('cycle: optional symptom (energy) logged after switching it on', /\(current\)[\s\S]*energy low/.test(await p.textContent('#cyHistory')) && /Energy: not enough data/.test(await p.textContent('#cyPatterns')));
+  await cy('[data-act=remindersOn]', 500); await cy('[data-act=addRem]', 500);
+  check('cycle: reminder added with its next time and reason', (await p.$$('#cyReminders [data-rid]')).length === 1 && /You asked for a daily reminder/.test(await p.textContent('#cyReminders')));
+  await cy('#cyReminders [data-act=pauseRem]', 500);
+  check('cycle: reminder paused', /Resume/.test(await p.textContent('#cyReminders [data-rid]')));
+  await cy('#cyReminders [data-act=delRem]', 500);
+  check('cycle: reminder deleted', (await p.$$('#cyReminders [data-rid]')).length === 0);
+  await cy('[data-act=wearableOn]', 1500);
+  const wtxt = await p.textContent('#cyWearable');
+  check('cycle: demo wearable labelled synthetic, skin temp not core temp, DS07 unavailable', /synthetic demo/.test(wtxt) && /°C/.test(wtxt) && /Not core body temperature/.test(wtxt) && /SWL DS07 \(not available\)/.test(wtxt), wtxt.slice(0, 200));
+  await cy('#cySettings [data-flag=phaseEducation]', 500);
+  check('cycle: phase education (opt-in) has a "not enough data" state, no day-14 assumption', /Not enough data|Menstruation/.test(await p.textContent('#cyPhase')) && !/day 14/i.test(await p.textContent('#cyPhase')));
+  const ls = await p.evaluate(() => Object.fromEntries(Object.entries(localStorage)));
+  const cyKey = Object.keys(ls).find(k => k.startsWith('shred_cycle_v1:'));
+  check('cycle: stored encrypted (no dates or words in the stored value)', !!cyKey && /AES-GCM/.test(ls[cyKey]) && !/20\d\d-|spotting|energy/.test(ls[cyKey]));
+  check('cycle: nothing cycle-related in the main store or error log', !/spotting|period|energy|cycle/i.test((ls.shred_qk_v1 || '') + (ls.shred_errors_v1 || '')));
+  const [cdl] = await Promise.all([p.waitForEvent('download'), tap('[data-act=export]')]);
+  const exp = JSON.parse(fs.readFileSync(await cdl.path(), 'utf8'));
+  check('cycle: export contains the user\'s data', exp.format === 'shred-cycle-export' && exp.data.periods.length === 6);
+  await cy('[data-act=deleteAll]', 800);
+  const after = await p.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('shred_cycle_v1:')));
+  check('cycle: delete all → data gone and consent asked again', await p.isVisible('#cyConsent') && after.length === 0);
+
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();
   console.log(fails ? `${fails} FAILED` : 'ALL PASS'); process.exit(fails ? 1 : 0);

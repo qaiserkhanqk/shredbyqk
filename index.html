@@ -80,6 +80,14 @@
     <button type="button" class="tile" data-go="rehab"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.5-9-9.5C1.6 7.6 4.2 4 7.8 4c1.8 0 3.2 1 4.2 2.4C13 5 14.4 4 16.2 4 19.8 4 22.4 7.6 21 11.5 19 16.5 12 21 12 21z"/><path d="M9 12h6M12 9v6"/></svg></span><span><b>Fix a pain or injury</b><span>Back, shoulder, knee, ankle and more. A safe, step-by-step plan.</span></span></button>
     <button type="button" class="tile" data-go="gait"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round"><path d="M8 4c2 0 3 2 3 4s-1 5-3 5-3-3-3-5 1-4 3-4zM16 9c2 0 3 2 3 4s-1 4-3 4-3-2-3-4 1-4 3-4z"/></svg></span><span><b>Test how you move</b><span>Walking and running, jump height, knee control.</span></span></button>
     <button type="button" class="tile" data-go="scan"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="12" r="3"/></svg></span><span><b>Posture &amp; body fat</b><span>A photo check of how you stand, plus body fat.</span></span></button>
+    <button type="button" class="tile" data-go="cycle" id="cycleTile" hidden><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16"/><circle cx="12" cy="4" r="1.6" fill="currentColor"/></svg></span><span><b>Cycle tracking</b><span>Prototype. Log periods and symptoms, see a transparent estimate.</span></span></button>
+  </section>
+
+  <!-- CYCLE (prototype, behind the cycleTracking flag) -->
+  <section class="screen" id="cycle">
+    <button type="button" class="back" data-back>‹ Body</button>
+    <div class="page-head"><div><span class="eyebrow">Cycle tracking</span><h1 class="display h1">Your cycle</h1></div></div>
+    <div id="cycleRoot" class="stack"></div>
   </section>
 
   <!-- TESTS -->
@@ -293,6 +301,7 @@
     <details class="card" id="diagCard">
       <summary>App health &amp; diagnostics</summary>
       <div class="stack" style="margin-top:14px">
+        <label class="check"><input type="checkbox" id="flagCycle"> Cycle tracking prototype (synthetic data only, off by default)</label>
         <label class="field">Tracking precision<select id="precisionSel">
           <option value="">Automatic</option><option value="lite">Fast (older phones)</option><option value="full">Balanced</option><option value="heavy">Precise (slower, newest phones)</option>
         </select></label>

@@ -41,6 +41,7 @@ All video is processed **on the phone** (MediaPipe Pose) and nothing is uploaded
   - weekly function scores
 
   It supports rehab and doesn't diagnose; content must be signed off by a physio before launch.
+- **Cycle tracking (prototype, off by default).** Log periods, spotting and optional symptoms; a transparent next-period range from your own history; explainable personal patterns; optional reminders; encrypted on the device. Not clinically validated, not contraception. See **[CYCLE.md](CYCLE.md)**.
 - **Demo modes.** A simulated athlete (hip thrust) and walker run through the real engine, so you can show clients how it works without a camera.
 - **Body scan.** Shows a posture picture with joint angles and asymmetries, plus fixes, and gives body fat by the US Navy method. Readings from a smart scale or InBody can be logged.
 - **Accountability.** Training plan (implementation intention), plan-aware streak, weekly goal and supportive nudges.
@@ -89,3 +90,4 @@ This simulates a full hip-thrust set (checks the coach's cueing logic) and a wal
 | `js/demo.js` | Demo athletes that feed the real camera pipeline |
 | `js/bodyscan.js` | Posture screen and body-fat calculation |
 | `js/store.js` | Local storage (replace with a backend for the coach dashboard) |
+| `js/cycle/*` | Cycle tracking prototype: model, estimate, patterns, reminders, wearables, encrypted store, evaluation harness (see [CYCLE.md](CYCLE.md)) |

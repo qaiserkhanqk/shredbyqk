@@ -18,6 +18,8 @@ import { SessionRecorder, ErrorLog, downloadJSON, APP_VERSION } from './diagnost
 import { LIBRARY, LIB, MUSCLES, exFor } from './library.js';
 import { HipThrustDemo, WalkDemo, DEMO_W, DEMO_H } from './demo.js';
 import { landmarksFrom, analyse, render, navyBodyFat, bfCategory, stanceProblem } from './bodyscan.js';
+import { initCycle, renderCycle } from './cycle/ui.js';
+import { readFlags, setFlag } from './cycle/flags.js';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -52,11 +54,12 @@ function mountOrbs() {
 /* ---------- Navigation ---------- */
 function tab(id) {
   $$('.screen').forEach(s => s.classList.toggle('on', s.id === id));
-  const tabFor = ['gait', 'scan', 'rehab'].includes(id) ? 'body' : id;
+  const tabFor = ['gait', 'scan', 'rehab', 'cycle'].includes(id) ? 'body' : id;
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tabFor));
   if (id === 'today') renderToday();
   if (id === 'progress') { renderProgress(); renderLoad(); renderToday(); $('#youName').textContent = S.profile.name || 'You'; }
   if (id === 'rehab') renderRehab();
+  if (id === 'cycle') renderCycle();
   if (id === 'scan') $('#hipWrap').hidden = S.profile.sex === 'male';
   window.scrollTo(0, 0);
 }
@@ -1163,8 +1166,15 @@ $('#studioList').onclick = async e => {
 };
 $('#studioExport').onclick = async () => { const data = await exportClips(); if (!Object.keys(data.clips).length) return toast('Record some lines first.'); downloadJSON(`shred-voice-${Date.now()}.json`, data); };
 
+/* ---------- Cycle tracking (prototype, off by default) ----------
+   Lives in its own encrypted store (js/cycle/store.js). Nothing from it goes into S, the coach voice,
+   session exports or the error log. */
+function applyCycleFlag() { const on = readFlags().cycleTracking; $('#cycleTile').hidden = !on; $('#flagCycle').checked = on; }
+$('#flagCycle').onchange = e => { setFlag('cycleTracking', e.target.checked); applyCycleFlag(); };
+initCycle({ root: $('#cycleRoot'), toast });
+
 /* ---------- Boot ---------- */
-mountOrbs(); bindPlan(); bindProfile(); renderTrain(); renderToday(); applyMute(); renderTestHistory();
+applyCycleFlag(); mountOrbs(); bindPlan(); bindProfile(); renderTrain(); renderToday(); applyMute(); renderTestHistory();
 if (S.profile.name) $('#welcomeNameWrap').hidden = true;
 $('#welcomeBtn').onclick = () => {
   const nm = $('#welcomeName').value.trim();

@@ -372,3 +372,14 @@ details[open] > summary::after { content: "–"; }
 .tabs { pointer-events: none; }
 .tabs nav { pointer-events: auto; }
 .app { padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)); }
+
+/* Cycle tracking (prototype) */
+.cy-banner { margin: 0; padding: 10px 12px; border: 1px dashed var(--warn); border-radius: var(--r-sm); color: var(--warn); font-size: .8rem; }
+.cy-range { font-size: 1.6rem; }
+.cy-ask { border-color: var(--z2); }
+.cy-row { align-items: flex-start !important; flex-wrap: wrap; }
+.cy-row input[type=time] { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 6px 8px; color: var(--text); }
+#cycle details > summary { cursor: pointer; list-style: none; }
+#cycle .check { align-items: flex-start; }
+#cycle .check input { margin-top: 3px; flex: none; }
+#cyNights span:nth-child(even) { font-size: .8rem; }
