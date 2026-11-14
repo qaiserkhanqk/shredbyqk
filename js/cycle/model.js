@@ -97,12 +97,16 @@ function checkPeriod(s, start, end, ignoreId, todayStr) {
 }
 
 /** Log the first day of a period (a confirmed start). */
-export function logPeriodStart(s, start, { today: t, at = new Date().toISOString() } = {}) {
+/** Where an entry came from. Every stored value is something the user typed or confirmed; predictions are never stored. */
+export const SOURCES = ['typed', 'suggestion', 'range_prompt', 'sensor_prompt'];
+const src = v => (SOURCES.includes(v) ? v : 'typed');
+
+export function logPeriodStart(s, start, { today: t, at = new Date().toISOString(), source } = {}) {
   requireConsent(s); checkPeriod(s, start, null, null, t);
   // An earlier period with no end stays without an end: we never invent an end date. The user can add it.
-  const p = { id: newId(), start, end: null, missedBefore: false, createdAt: at, updatedAt: at };
+  const p = { id: newId(), start, end: null, missedBefore: false, source: src(source), createdAt: at, updatedAt: at };
   s.periods.push(p); s.periods = sorted(s);
-  if (s.days[start]?.bleeding) delete s.days[start].bleeding; // the period record now covers that day
+  if (s.days[start]?.bleeding) { delete s.days[start].bleeding; pruneDays(s); } // the period record now covers that day
   return p;
 }
 export function logPeriodEnd(s, id, end, { today: t, at = new Date().toISOString() } = {}) {
@@ -136,7 +140,7 @@ export function periodOn(s, date, t = date) {
 const minDate = (a, b) => (a < b ? a : b);
 
 /* ---------- Day logs ---------- */
-export function logDay(s, date, fields, { today: t } = {}) {
+export function logDay(s, date, fields, { today: t, source } = {}) {
   requireConsent(s);
   if (!isDate(date)) throw new CycleError('INVALID_DATE');
   if (t && date > t) throw new CycleError('FUTURE_DATE');
@@ -148,11 +152,17 @@ export function logDay(s, date, fields, { today: t } = {}) {
       if (!categoryOn(s, k)) throw new CycleError('CATEGORY_OFF');
       if (v != null && !CATEGORIES[k].options.some(([o]) => o === v)) throw new CycleError('INVALID_INPUT');
     } else throw new CycleError('INVALID_INPUT');
-    if (v == null || v === false) delete d[k]; else d[k] = v;
+    if (v == null || v === false) { delete d[k]; if (d.src) delete d.src[k]; }
+    else { d[k] = v; if (k in CATEGORIES || k === 'bleeding') (d.src ||= {})[k] = src(source); }
   }
   s.days[date] = d; pruneDays(s); return d;
 }
-function pruneDays(s) { for (const [k, v] of Object.entries(s.days)) if (!Object.keys(v).length) delete s.days[k]; }
+function pruneDays(s) {
+  for (const [k, v] of Object.entries(s.days)) {
+    if (v.src) { for (const f of Object.keys(v.src)) if (!(f in v)) delete v.src[f]; if (!Object.keys(v.src).length) delete v.src; }
+    if (!Object.keys(v).length) delete s.days[k];
+  }
+}
 
 /* ---------- Confirmation prompts ----------
    The app asks; it never decides. Two prompts:

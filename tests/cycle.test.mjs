@@ -286,7 +286,7 @@ check('SWL DS07: unverified adapter refuses to connect', await new SwlDs07Adapte
 /* ---------- Flags ---------- */
 {
   const mem = new Map(), st = { getItem: k => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
-  check('flags: everything off by default', Object.values(readFlags(st)).every(v => v === false) && Object.keys(FLAG_DEFS).length === 4);
+  check('flags: everything off by default', Object.values(readFlags(st)).every(v => v === false) && Object.keys(FLAG_DEFS).length === 6);
   setFlag('cycleTracking', true, st);
   check('flags: can be turned on; others stay off', readFlags(st).cycleTracking && !readFlags(st).symptomForecast);
 }

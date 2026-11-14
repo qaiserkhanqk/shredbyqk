@@ -21,6 +21,7 @@ import { retrospectiveShift, SHIFT_PARAMS, SHIFT_VERSION } from './tempshift.js'
 import { MockWearable, normalise, summariseNights, rng, gauss } from './wearables.js';
 import { findPatterns, PATTERN_PARAMS } from './patterns.js';
 import { CATEGORIES } from './model.js';
+import { periodPrompt, NUDGE_PARAMS, NUDGE_VERSION } from './nudges.js';
 
 export const SYNTHETIC_BANNER = 'SYNTHETIC DATA. These results test the software only. They are not real-world or clinical performance and must not be quoted as accuracy.';
 
@@ -28,7 +29,8 @@ export const FROZEN = Object.freeze({
   cohortVersion: 'synthetic-cohort-1', seed: 20261114, participants: 40, cyclesEach: 12,
   device: { model: 'Mock Band (synthetic)', firmware: 'mock-1.0' },
   algorithms: { baseline: ALGORITHM_VERSION, sensor: `sensor-candidate-0.1.0+${SHIFT_VERSION}` },
-  params: { predict: PARAMS, shift: SHIFT_PARAMS, patterns: PATTERN_PARAMS },
+  params: { predict: PARAMS, shift: SHIFT_PARAMS, patterns: PATTERN_PARAMS, nudges: NUDGE_PARAMS },
+  nudgeVersion: NUDGE_VERSION,
 });
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -61,7 +63,7 @@ export function makeParticipant(i, seed = FROZEN.seed, cyclesEach = FROZEN.cycle
 
 /** Build the participant's full logged state (everything they would ever log). */
 export function participantState(p) {
-  const s = blankState(p.id); giveConsent(s, '2025-01-01T00:00:00Z'); setCategory(s, 'energy', true, { at: '2025-01-01T00:00:00Z' });
+  const s = blankState(p.id); giveConsent(s, '2025-01-01T00:00:00Z'); setCategory(s, 'energy', true, { at: '2025-01-01T00:00:00Z' }); s.consent.wearable = '2025-01-01T00:00:00Z';
   const logged = p.truth.filter(t => t.logged);
   s.periods = logged.map((t, k) => ({ id: `${p.id}-${k}`, start: t.start, end: addDays(t.start, 4), missedBefore: false }));
   const last = p.truth.at(-1).start, r = rng(hash(p.id));
@@ -197,6 +199,34 @@ export function evaluateSymptoms(cohort, split = 'test') {
     recallPct: t.notableDays ? Math.round((1000 * t.caught) / t.notableDays) / 10 : null, falseAlertsPerCycle: t.cycles ? +(t.falseAlerts / t.cycles).toFixed(2) : null }]));
 }
 
+/* ---------- Low-effort mode: "Has your period started?" prompt timing ----------
+   Compares the wearable-timed prompt with a dates-only prompt that asks every day from the start of the
+   estimated range until a period is logged. A prompt counts as a HIT if it is shown between the day before and
+   two days after the logged start; earlier prompts are FALSE prompts (nagging). Nothing is auto-recorded in
+   either case, so a false prompt costs one "Not yet" tap. Synthetic data: the generator puts a temperature
+   step before each period, so the sensor prompt is expected to look good here BY CONSTRUCTION. */
+export function evaluateSensorPrompt(cohort, split = 'test') {
+  const z = () => ({ cycles: 0, hits: 0, lags: [], falsePrompts: 0 }), t = { sensor: z(), rangeOnly: z() };
+  for (const p of cohort.filter(x => splitOf(x.id) === split)) {
+    const s = participantState(p), starts = s.periods.map(x => x.start);
+    for (let k = 1; k + 1 < starts.length; k++) {
+      const prev = starts[k], actual = starts[k + 1];
+      const hit = { sensor: null, rangeOnly: null }, asked = new Set();
+      for (let d = addDays(prev, NUDGE_PARAMS.MIN_CYCLE_DAY - 1); d <= addDays(actual, 2); d = addDays(d, 1)) {
+        // The person has not logged this period yet: answering the prompt is how it gets logged.
+        const view = stateAsOf(s, d); view.periods = view.periods.filter(x => x.start < actual);
+        const pr = periodPrompt(view, d);
+        if (pr.ask && !asked.has(pr.key)) { asked.add(pr.key); if (d < addDays(actual, -1)) t.sensor.falsePrompts++; else if (!hit.sensor) hit.sensor = d; }
+        const e = estimateNext(view, d), rangeAsk = e.rangeStart && d >= e.rangeStart;
+        if (rangeAsk) { if (d < addDays(actual, -1)) t.rangeOnly.falsePrompts++; else if (!hit.rangeOnly) hit.rangeOnly = d; }
+      }
+      for (const m of ['sensor', 'rangeOnly']) { t[m].cycles++; if (hit[m]) { t[m].hits++; t[m].lags.push(diffDays(actual, hit[m])); } }
+    }
+  }
+  return Object.fromEntries(Object.entries(t).map(([m, x]) => [m, { cycles: x.cycles, hitPct: x.cycles ? Math.round((1000 * x.hits) / x.cycles) / 10 : null,
+    medianLagDays: x.lags.length ? median(x.lags) : null, falsePromptsPerCycle: x.cycles ? +(x.falsePrompts / x.cycles).toFixed(2) : null }]));
+}
+
 /* ---------- Leakage self-check ---------- */
 export function leakageCheck(p, model = baselineModel) {
   const s = participantState(p), asOf = s.periods[4].start, a = model(stateAsOf(s, asOf), asOf);
@@ -213,7 +243,7 @@ export function runEvaluation({ participants = FROZEN.participants, seed = FROZE
   return { banner: SYNTHETIC_BANNER, frozen: { ...FROZEN, participants, seed },
     splits: { development: cohort.filter(p => splitOf(p.id) === 'development').length, test: cohort.filter(p => splitOf(p.id) === 'test').length },
     leakageFree: leakageCheck(cohort[1], baselineModel) && leakageCheck(cohort[1], sensorModel),
-    periodStart: periodReport(rows, 'test'), ovulationEndpoint: evaluateShift(cohort, 'test'), symptomForecast: evaluateSymptoms(cohort, 'test') };
+    periodStart: periodReport(rows, 'test'), ovulationEndpoint: evaluateShift(cohort, 'test'), symptomForecast: evaluateSymptoms(cohort, 'test'), periodPrompt: evaluateSensorPrompt(cohort, 'test') };
 }
 
 /** Markdown rendering of a report. */
@@ -238,6 +268,11 @@ export function toMarkdown(rep) {
     '## Symptom check-in forecast vs personal simple baselines (energy, held-out test)', '',
     '| Method | Alerts | True | False | False per cycle | Precision | Recall |', '|---|---|---|---|---|---|---|');
   for (const [m, t] of Object.entries(rep.symptomForecast)) L.push(`| ${m} | ${t.alerts} | ${t.trueAlerts} | ${t.falseAlerts} | ${t.falseAlertsPerCycle} | ${t.precisionPct ?? '–'}% | ${t.recallPct ?? '–'}% |`);
+  if (rep.periodPrompt) {
+    L.push('', '## Low-effort mode: "Has your period started?" prompt (held-out test)', '', '| Prompt | Cycles | Hit (−1…+2 days) | Median lag (days) | False prompts per cycle |', '|---|---|---|---|---|');
+    for (const [m, x] of Object.entries(rep.periodPrompt)) L.push(`| ${m === 'sensor' ? 'wearable-timed' : 'dates-only range'} | ${x.cycles} | ${x.hitPct}% | ${x.medianLagDays ?? '–'} | ${x.falsePromptsPerCycle} |`);
+    L.push('', 'Neither prompt records anything: a hit saves the person a tap, a false prompt costs one "Not yet". The wearable-timed prompt looks good here by construction (the synthetic generator puts a temperature step before each period).');
+  }
   L.push('', '`pattern` = the app\'s personal-pattern rule; `lastCycle` = alert if the same cycle day (±1) was notable last cycle; `baseRate` = alert every day if the person logs "notable" on half or more of their days.');
   return L.join('\n');
 }

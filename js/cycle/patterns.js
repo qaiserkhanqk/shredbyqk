@@ -18,7 +18,7 @@ export const PATTERN_PARAMS = Object.freeze({ RECENT: 6, HALF_WINDOW: 1, MIN_OBS
 
 function cycleLogs(s, c, cat) {
   const out = [];
-  for (let i = 0; i < c.length; i++) { const d = addDays(c.start, i), v = s.days[d]?.[cat]; if (v != null) out.push({ day: i + 1, date: d, value: v }); }
+  for (let i = 0; i < c.length; i++) { const d = addDays(c.start, i), v = s.days[d]?.[cat]; if (v != null) out.push({ day: i + 1, date: d, value: v, source: s.days[d].src?.[cat] || 'typed' }); }
   return out;
 }
 
@@ -28,9 +28,10 @@ export const evaluateWindow = (s, cat, centre, p = PATTERN_PARAMS) => evaluateRa
 export function evaluateRange(s, cat, from, to, p = PATTERN_PARAMS) {
   const def = CATEGORIES[cat];
   const complete = cycles(s).filter(c => c.usable).slice(-p.RECENT);
-  let observed = 0, notable = 0, outN = 0, outNotable = 0, daysLogged = 0; const evidence = [];
+  let observed = 0, notable = 0, outN = 0, outNotable = 0, daysLogged = 0, fromSuggestions = 0; const evidence = [];
   for (const c of complete) {
     const logs = cycleLogs(s, c, cat); daysLogged += logs.length;
+    fromSuggestions += logs.filter(l => l.source === 'suggestion').length;
     const inWin = logs.filter(l => l.day >= from && l.day <= to), outWin = logs.filter(l => l.day < from || l.day > to);
     outN += outWin.length; outNotable += outWin.filter(l => def.notable.includes(l.value)).length;
     if (!inWin.length) { evidence.push({ cycleStart: c.start, observed: false, entries: [] }); continue; }
@@ -44,7 +45,7 @@ export function evaluateRange(s, cat, from, to, p = PATTERN_PARAMS) {
   else if (observed < p.MIN_OBSERVED) why = `${def.label} was logged around these days in only ${observed} of ${complete.length} complete cycles.`;
   else if (!found && outsideRate >= p.MAX_OUTSIDE && notable / observed >= p.MIN_SHARE) why = `You logged ${def.notableLabel} on many days at other times too, so these days don't stand out.`;
   else if (!found) why = `Not consistent: ${def.notableLabel} in ${notable} of ${observed} cycles with logs here.`;
-  return { category: cat, from, to, found, observed, notable, completeCycles: complete.length, daysLogged, outsideRate, evidence, why };
+  return { category: cat, from, to, found, observed, notable, completeCycles: complete.length, daysLogged, fromSuggestions, outsideRate, evidence, why };
 }
 
 /** All patterns for enabled categories, merged into day ranges, with plain-language text. */
@@ -80,7 +81,7 @@ export function patternText(w) {
   return `You logged ${def.notableLabel} around cycle days ${w.from}–${w.to} in ${w.notable} of your last ${w.observed} recorded cycles with ${def.label.toLowerCase()} logs there.`;
 }
 export function evidenceText(w) {
-  return `Based on ${w.completeCycles} complete cycles and ${w.daysLogged} days with ${CATEGORIES[w.category].label.toLowerCase()} logs. ${w.observed} cycles had a log in this window. ${Math.round(w.outsideRate * 100)}% of your logs at other times were ${CATEGORIES[w.category].notableLabel}.`;
+  return `Based on ${w.completeCycles} complete cycles and ${w.daysLogged} days with ${CATEGORIES[w.category].label.toLowerCase()} logs. ${w.observed} cycles had a log in this window. ${Math.round(w.outsideRate * 100)}% of your logs at other times were ${CATEGORIES[w.category].notableLabel}.${w.fromSuggestions ? ` ${w.fromSuggestions} of these logs were one-tap suggestions you accepted.` : ''}`;
 }
 
 /** The insight for "around now": a found, non-dismissed pattern whose window covers today's cycle day. */
