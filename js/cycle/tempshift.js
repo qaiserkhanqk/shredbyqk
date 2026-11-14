@@ -35,14 +35,24 @@ export function retrospectiveShift(s, cycleStart, asOf, params = SHIFT_PARAMS) {
   res.nightsUsed = valid.length;
   const { BASELINE: B, CONFIRM: C, DELTA, MAX_BASELINE_SPAN, MAX_CONFIRM_SPAN } = params;
   if (valid.length < B + C) return { ...res, why: `Only ${valid.length} usable nights${res.deviceChangedThisCycle ? ' since the device changed' : ''}; ${B + C} are needed.` };
+  // Continuity (issue 8 reproduced in 0f26696): the baseline and the high nights must be close together, not
+  // separated by a long gap. No new physiological number is introduced: the gap allowed between the two windows
+  // is the same number of missing nights the confirmation window already tolerates (MAX_CONFIRM_SPAN − CONFIRM + 1).
+  // It is a data-continuity rule pending device evidence, not a claim about physiology.
+  const MAX_JOIN_MISSING = MAX_CONFIRM_SPAN - C + 1;
+  let gapBlocked = 0, judged = 0;
   for (let i = B; i + C <= valid.length; i++) {
     const base = valid.slice(i - B, i), high = valid.slice(i, i + C);
-    if (diffDays(base[0].night, base.at(-1).night) > MAX_BASELINE_SPAN || diffDays(high[0].night, high.at(-1).night) > MAX_CONFIRM_SPAN) continue;
+    if (diffDays(base[0].night, base.at(-1).night) > MAX_BASELINE_SPAN || diffDays(high[0].night, high.at(-1).night) > MAX_CONFIRM_SPAN ||
+        diffDays(base.at(-1).night, high[0].night) - 1 > MAX_JOIN_MISSING) { gapBlocked++; continue; }
+    judged++;
     const bMax = Math.max(...base.map(n => n.value)), bMean = base.reduce((a, n) => a + n.value, 0) / B, hMean = high.reduce((a, n) => a + n.value, 0) / C;
     if (high.every(n => n.value > bMax) && hMean - bMean >= DELTA) {
       return { ...res, detected: true, firstHighNight: high[0].night, confirmedNight: high.at(-1).night, baselineMean: +bMean.toFixed(2), highMean: +hMean.toFixed(2), rise: +(hMean - bMean).toFixed(2),
         cycleDayOfRise: diffDays(cycleStart, high[0].night) + 1, why: 'A sustained rise was seen. This may be consistent with a past ovulation. It is not proof.' };
     }
   }
+  if (!judged) return { ...res, abstained: true, why: 'Not judged: there are gaps in the nightly data, so there is not enough continuous data to compare nights.' };
+  if (gapBlocked) return { ...res, why: 'No sustained rise seen in the continuous stretches of data; some gaps could not be judged.' };
   return { ...res, why: 'No sustained rise seen in this cycle so far.' };
 }

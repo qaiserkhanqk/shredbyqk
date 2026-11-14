@@ -33,6 +33,8 @@ export function updateReminder(s, id, patch) {
   const r = s.reminders.find(x => x.id === id); if (!r) throw new CycleError('NOT_FOUND');
   if (patch.time != null && hm(patch.time) == null) throw new CycleError('INVALID_INPUT');
   for (const k of ['time', 'enabled', 'pausedUntil', 'offsetDays', 'weekday']) if (k in patch) r[k] = patch[k];
+  if (patch.enabled && r.kind === 'pattern' && !s.consent.categories?.[r.category]) throw new CycleError('CATEGORY_OFF'); // can't re-enable while the category is off
+  if (patch.enabled) delete r.disabledReason;
   return r;
 }
 export function deleteReminder(s, id) { s.reminders = s.reminders.filter(r => r.id !== id); delete s.delivered[id]; }
@@ -79,7 +81,7 @@ export function schedule(r, s, from, to, est) {
 
 /** The next time this reminder will appear, or null with a reason. */
 export function nextFire(r, s, { today, nowMin, estimate }) {
-  if (!r.enabled) return { next: null, why: 'Turned off.' };
+  if (!r.enabled) return { next: null, why: r.disabledReason === 'category_off' ? `Turned off because you stopped logging ${CATEGORIES[r.category]?.label.toLowerCase() || 'that category'}.` : 'Turned off.' };
   const occ = schedule(r, s, today, addDays(today, 62), estimate).find(o => (o.date > today || o.mins >= nowMin) && s.delivered[r.id] !== o.date);
   if (occ) return { next: occ, why: reasonFor(r, estimate) };
   const why = r.kind === 'periodCheck' && !estimate?.rangeStart ? 'Waiting: there is no estimated range yet.'

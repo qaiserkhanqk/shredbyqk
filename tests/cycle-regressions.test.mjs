@@ -176,4 +176,45 @@ function moodUser(valuesPerCycle) {
   check('10 a day backfilled later is unknown in earlier views', !M.stateAsOf(s, '2025-12-20').days['2025-12-10']?.bleeding);
 }
 
+/* ---------- Additional coverage added with the fixes (not part of the failing-first set) ---------- */
+{ // 5: exact tie between two moods (2 cycles each) → no single word pre-filled
+  const { s, day } = moodUser([{ 24: 'low' }, { 24: 'low' }, { 24: 'anxious' }, { 24: 'anxious' }]);
+  const sg = suggestions(s, day)[0];
+  check('5 tie (low 2 cycles, anxious 2 cycles): nothing pre-filled, combined wording', sg && sg.value === null && /not always the same/.test(sg.text), sg?.text);
+}
+await safe('1 persistent conflict', async () => { // 1: a store where every write loses the race → retryable CONFLICT, nothing saved
+  const st = memoryStorage(), ks = memoryKeys();
+  const A = await openCycleRepo({ storage: st, keys: ks, userId: 'u' }); await A.update(s => M.giveConsent(s));
+  const before = st.raw.get('shred_cycle_v1:u');
+  const flaky = { ...st, cas: async () => 'conflict' };
+  const B = await openCycleRepo({ storage: flaky, keys: ks, userId: 'u', maxRetries: 3 });
+  let code = null; try { await B.update(s => M.logPeriodStart(s, '2026-10-01', { today: T })); } catch (e) { code = e.code; }
+  check('1 repeated conflicts: fails with retryable CONFLICT and saves nothing', code === 'CONFLICT' && st.raw.get('shred_cycle_v1:u') === before);
+});
+await safe('1 non-atomic storage refused', async () => {
+  let code = null; try { await openCycleRepo({ storage: { get: async () => null, set: async () => {}, remove: async () => {} }, keys: memoryKeys(), userId: 'u' }); } catch (e) { code = e.code; }
+  check('1 a storage without atomic operations is refused (STORAGE_NOT_ATOMIC)', code === 'STORAGE_NOT_ATOMIC');
+});
+await safe('2 device user id', async () => {
+  const st = memoryStorage(); const ids = await Promise.all([st.userId(), st.userId(), st.userId()]);
+  check('2 the device user ID is created once even when several tabs ask at the same moment', new Set(ids).size === 1);
+});
+await safe('2 legacy migration', async () => {
+  const { migrateLegacyLocalStorage } = await import('../js/cycle/store.js');
+  const ks = memoryKeys(), old = memoryStorage(), a = await openCycleRepo({ storage: old, keys: ks, userId: 'u' });
+  await a.update(s => { M.giveConsent(s); M.logPeriodStart(s, '2026-10-01', { today: T }); });
+  const ls = new Map([['shred_cycle_v1:u', old.raw.get('shred_cycle_v1:u')]]), L = { getItem: k => ls.get(k) ?? null, removeItem: k => ls.delete(k) };
+  const fresh = memoryStorage(); await migrateLegacyLocalStorage({ ls: L, storage: fresh, userId: 'u' });
+  const r = await openCycleRepo({ storage: fresh, keys: ks, userId: 'u' });
+  check('2 records from earlier versions are moved once into the transactional store and removed from localStorage', r.read().periods.length === 1 && ls.size === 0);
+});
+await safe('3 purge then export', async () => {
+  const st = memoryStorage(), ks = memoryKeys(), A = await openCycleRepo({ storage: st, keys: ks, userId: 'u' });
+  await A.update(s => { M.giveConsent(s); M.setCategory(s, 'mood', true); M.setScopeConsent(s, 'reminders', true); M.logPeriodStart(s, '2026-11-01', { today: T });
+    M.logDay(s, '2026-11-02', { mood: 'irritable' }, { today: T }); addReminder(s, { kind: 'pattern', time: '09:00', cycleDay: 3, category: 'mood', origin: 'You logged low, anxious or irritable mood around cycle days 2–4' }); });
+  await A.update(s => M.setCategory(s, 'mood', false, { purge: true }));
+  const exp = JSON.stringify((await openCycleRepo({ storage: st, keys: ks, userId: 'u' })).exportData());
+  check('3 after purge, a fresh export contains no mood values, mood reminders or their pattern text', !/irritable/.test(exp) && !/"category":"mood"/.test(exp));
+});
+
 console.log(fails ? `${fails} FAILED` : 'ALL PASS'); process.exit(fails ? 1 : 0);

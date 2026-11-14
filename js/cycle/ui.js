@@ -7,7 +7,7 @@ import { phaseInfo, PHASE_EDUCATION } from './phase.js';
 import { KINDS, addReminder, updateReminder, deleteReminder, nextFire, dueNow, markDelivered, notificationContent } from './reminders.js';
 import { MockWearable, SwlDs07Adapter, normalise, summariseNights, mergeNights, nightTable, METRICS } from './wearables.js';
 import { retrospectiveShift } from './tempshift.js';
-import { openCycleRepo, indexedDbKeys, syncStorage, localUserId, webLock, resetCycleStorage } from './store.js';
+import { openCycleRepo, indexedDbKeys, indexedDbStorage, migrateLegacyLocalStorage, webLock, resetCycleStorage } from './store.js';
 import { today as localToday, localMinutes, addDays, diffDays, human, deviceTimeZone } from './dates.js';
 import { readFlags, setFlag, FLAG_DEFS } from './flags.js';
 
@@ -17,6 +17,7 @@ const MSG = {
   END_BEFORE_START: 'The end can\'t be before the start.', OVERLAP: 'That overlaps a period you already logged. Edit that one instead.', INVALID_DATE: 'Choose a valid date.',
   NOT_VERIFIED: 'This device isn\'t available: its integration is not verified.', CRYPTO_UNAVAILABLE: 'This browser can\'t encrypt data, so cycle tracking is unavailable here.',
   DECRYPT_FAILED: 'Your saved cycle data could not be unlocked on this device.', CORRUPT: 'Your saved cycle data is damaged.',
+  CONFLICT: 'Another tab kept saving at the same moment, so this change was not saved. Please try again.', STORAGE_NOT_ATOMIC: 'This browser can\'t store cycle data safely.',
   STALE_SESSION: 'Your cycle data was changed or deleted in another tab. The screen has been refreshed; nothing was saved.', KEYSTORE_UNAVAILABLE: 'Secure storage is blocked in this browser (private mode?).',
 };
 let repo = null, root = null, toast = () => {}, openErr = null, notified = new Set(), timer = null;
@@ -26,20 +27,33 @@ const now = () => ({ today: localToday(), nowMin: localMinutes(Date.now(), devic
 export async function initCycle(opts) {
   root = opts.root; toast = opts.toast;
   root.addEventListener('click', onClick); root.addEventListener('change', onChange);
-  // Another tab saved, deleted or switched user: re-read instead of overwriting (audit 1.1, 1.3, 1.6).
+  // Another tab saved or deleted: re-read instead of overwriting. IndexedDB writes don't fire 'storage' events,
+  // so tabs tell each other through a BroadcastChannel; 'storage' still covers a cleared localStorage.
+  if (typeof BroadcastChannel !== 'undefined') { channel = new BroadcastChannel('shred-cycle'); channel.onmessage = () => { if (root.closest('.screen.on')) renderCycle(); }; }
   window.addEventListener('storage', e => {
     if (e.key !== null && !/^shred_cycle_/.test(e.key)) return; // null = storage cleared
     if (e.key === null || e.key === 'shred_cycle_uid') reopen();
     if (root.closest('.screen.on')) renderCycle();
   });
 }
-const repoOpts = () => { const userId = localUserId(); return { storage: syncStorage(localStorage), keys: indexedDbKeys(), userId, lock: webLock(`shred-cycle-${userId}`) }; };
+let channel = null;
+const storage = indexedDbStorage(), keys = indexedDbKeys();
+/** The device's user ID, created atomically in IndexedDB (an existing localStorage ID is kept), mirrored to localStorage. */
+async function deviceUserId() {
+  const id = await storage.userId(localStorage.getItem('shred_cycle_uid') || undefined);
+  if (localStorage.getItem('shred_cycle_uid') !== id) localStorage.setItem('shred_cycle_uid', id);
+  return id;
+}
+const repoOpts = async () => { const userId = await deviceUserId(); return { storage, keys, userId, lock: webLock(`shred-cycle-${userId}`), notify: () => channel?.postMessage('changed') }; };
 async function reopen() { repo = null; openErr = null; }
 async function ensureRepo() {
-  if (repo && repo.userId !== localUserId()) repo = null; // user switched elsewhere (audit 1.6)
+  if (repo && repo.userId !== localStorage.getItem('shred_cycle_uid')) repo = null; // user switched elsewhere
   if (repo || openErr) return;
-  try { repo = await openCycleRepo(repoOpts()); }
-  catch (e) { openErr = e.code || 'UNKNOWN'; }
+  try {
+    const o = await repoOpts();
+    await migrateLegacyLocalStorage({ storage, userId: o.userId }); // records from earlier prototype versions
+    repo = await openCycleRepo(o);
+  } catch (e) { openErr = e.code || 'UNKNOWN'; }
 }
 async function act(fn, ok) {
   try { await repo.update(s => fn(s, now().today)); if (ok) toast(ok); }
@@ -69,13 +83,32 @@ function render() {
   const s = repo.read(), { today, nowMin } = now(), f = flags();
   if (!M.hasConsent(s)) { root.innerHTML = consentHTML(); return; }
   const open = [...root.querySelectorAll('details[id][open]')].map(d => d.id); // keep sections the user opened
+  const unsaved = unsavedInputs(); // a redraw (e.g. another tab saved) must never change what the person typed
   const est = estimateNext(s, today);
   const tempShift = f.temperatureResearch && est.lastStart ? retrospectiveShift(s, est.lastStart, addDays(today, 1)) : null;
   root.innerHTML = [banner(), promptsHTML(s, est, today), dueHTML(s, est, today, nowMin), estimateHTML(s, est), logHTML(s, today), insightHTML(s, today),
     f.phaseEducation ? phaseHTML(s, today, tempShift) : '', historyHTML(s), patternsHTML(s, today, f), remindersHTML(s, est, today, nowMin),
     wearableHTML(s, today, f, tempShift), situationHTML(s), settingsHTML(s, f)].join('');
   for (const id of open) { const d = root.querySelector('#' + id); if (d) d.open = true; }
+  restoreInputs(unsaved);
   notifyDue();
+}
+
+/* Unsaved form input survives redraws (defect found by the simultaneous-save browser test on this fix: a redraw
+   triggered by another tab reset the date field to today, so the person's click saved today instead of their date). */
+const FORM = '#cyDate, #cyUnwell, #cyTravel, #cyRemKind, #cyRemTime, [data-sym]';
+const inputKey = el => el.id || `sym:${el.dataset.sym}`;
+function unsavedInputs() {
+  const out = {};
+  for (const el of root.querySelectorAll(FORM)) {
+    if (el.type === 'checkbox') { if (el.checked !== el.defaultChecked) out[inputKey(el)] = { checked: el.checked }; }
+    else if (el.tagName === 'SELECT') { const def = [...el.options].find(o => o.defaultSelected)?.value ?? el.options[0]?.value; if (el.value !== def) out[inputKey(el)] = { value: el.value }; }
+    else if (el.value !== el.defaultValue) out[inputKey(el)] = { value: el.value };
+  }
+  return out;
+}
+function restoreInputs(saved) {
+  for (const el of root.querySelectorAll(FORM)) { const v = saved[inputKey(el)]; if (!v) continue; if ('checked' in v) el.checked = v.checked; else el.value = v.value; }
 }
 
 /* ---------- Sections ---------- */
@@ -247,7 +280,7 @@ async function onClick(e) {
   const b = e.target.closest('[data-act]'); if (!b) return;
   if (b.dataset.act === 'resetStorage') { // recovery path (audit 1.4): works without an open repository
     if (!confirm('Reset cycle tracking on this device? Unreadable data and its key are deleted.')) return;
-    await resetCycleStorage(repoOpts()); await reopen(); toast('Cycle data reset'); return renderCycle();
+    await resetCycleStorage(await repoOpts()); channel?.postMessage('changed'); await reopen(); toast('Cycle data reset'); return renderCycle();
   }
   if (!repo) return;
   const a = b.dataset.act, date = () => val('#cyDate');

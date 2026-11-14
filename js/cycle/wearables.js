@@ -25,7 +25,29 @@ export const METRICS = {
   hrv_rmssd: { label: 'Heart rate variability (RMSSD)', unit: 'ms', min: 1, max: 300 },
   breathing_rate: { label: 'Breathing rate', unit: 'brpm', min: 4, max: 40 },
 };
-export const NIGHT_PARAMS = Object.freeze({ minCoverageMin: 180, minSamples: 6 });
+// minCoverageMin, minSamples, maxSampleMin and EARLIEST are placeholders that need device evidence
+// (docs/wearable-sdk-requirements.md). EARLIEST only rejects obviously wrong clocks (e.g. epoch 0).
+export const NIGHT_PARAMS = Object.freeze({ minCoverageMin: 180, minSamples: 6, maxSampleMin: 60 });
+const EARLIEST = Date.UTC(2015, 0, 1);
+
+/** Why a packet's timestamps can't be trusted, or null (issue 6 reproduced in 0f26696: tEnd = Infinity was accepted). */
+function timestampProblem(p, now, params = NIGHT_PARAMS) {
+  if (!Number.isFinite(p.tStart) || !Number.isFinite(p.tEnd)) return 'bad_timestamp';
+  if (p.tEnd <= p.tStart) return 'bad_timestamp';                   // reversed or zero-length
+  if (p.tStart < EARLIEST || p.tEnd > now + 5 * 60e3) return 'bad_timestamp'; // implausibly old, or in the future
+  if (p.tEnd - p.tStart > params.maxSampleMin * 60e3) return 'bad_duration';
+  return null;
+}
+/** Total minutes covered by the UNION of [tStart, tEnd) intervals, so overlapping readings are not counted twice. */
+function unionMinutes(rs) {
+  let total = 0, curS = null, curE = null;
+  for (const r of [...rs].sort((a, b) => a.tStart - b.tStart)) {
+    if (curE == null || r.tStart > curE) { if (curE != null) total += curE - curS; curS = r.tStart; curE = r.tEnd; }
+    else curE = Math.max(curE, r.tEnd);
+  }
+  if (curE != null) total += curE - curS;
+  return Math.round(total / 60e3);
+}
 
 /* ---------- Normalisation ---------- */
 export function normalise(packets, { now = Date.now() } = {}) {
@@ -36,8 +58,20 @@ export function normalise(packets, { now = Date.now() } = {}) {
     if (!m) { stats.unknownMetric++; continue; }
     const key = `${p.deviceId}|${p.metric}|${p.tStart}`;
     if (seen.has(key)) {
-      if (Object.is(seen.get(key).originalValue, p.value)) { stats.duplicates++; continue; } // resent packet
-      seen.get(key).flags.push('conflict'); stats.conflicts++; continue;          // same time, different value: keep first, flag it
+      // Issue 7 reproduced in 0f26696: only an EXACT resend is a duplicate. If only the quality flag changed, keep
+      // the worse quality (conservative, either arrival order). Any other change is a conflict and is excluded.
+      const prev = seen.get(key), q = p.vendorQuality || null;
+      const sameCore = Object.is(prev.originalValue, p.value) && prev.originalUnit === p.unit && Object.is(prev.tEnd, p.tEnd) && prev.firmware === p.firmware &&
+        prev.model === p.model && (prev.tzOffsetMin ?? null) === (p.tzOffsetMin ?? null) && prev.kind === (p.kind === 'vendor_derived' ? 'vendor_derived' : 'raw');
+      if (sameCore && q === prev.vendorQuality) { stats.duplicates++; continue; }
+      if (sameCore) {
+        if (q === 'off_wrist' && !prev.flags.includes('off_wrist')) { prev.flags.push('off_wrist'); stats.offWrist++; }
+        if (q === 'poor' && !prev.flags.includes('vendor_poor')) prev.flags.push('vendor_poor');
+        if (!prev.flags.includes('quality_changed')) prev.flags.push('quality_changed');
+        stats.qualityChanged = (stats.qualityChanged || 0) + 1; continue;
+      }
+      if (!prev.flags.includes('conflict')) prev.flags.push('conflict');
+      stats.conflicts++; continue;
     }
     const flags = [];
     let value = Number(p.value), unit = p.unit;
@@ -45,16 +79,17 @@ export function normalise(packets, { now = Date.now() } = {}) {
     if (value != null && p.metric === 'skin_temp' && unit === 'degF') { value = +((value - 32) * 5 / 9).toFixed(3); unit = 'degC'; }
     if (value != null && unit !== m.unit) { flags.push('unit_unknown'); stats.invalid++; value = null; }
     if (value != null && (value < m.min || value > m.max)) { flags.push('out_of_range'); stats.outOfRange++; }
-    if (!(p.tEnd >= p.tStart) || p.tStart > now + 5 * 60e3 || !Number.isFinite(p.tStart)) { flags.push('bad_timestamp'); stats.badTimestamp++; }
+    const tsProblem = timestampProblem(p, now);
+    if (tsProblem) { flags.push(tsProblem); stats.badTimestamp++; }
     if (p.vendorQuality === 'off_wrist') { flags.push('off_wrist'); stats.offWrist++; }
     if (p.vendorQuality === 'poor') flags.push('vendor_poor');
     const r = { deviceId: p.deviceId, model: p.model, firmware: p.firmware, metric: p.metric, value, unit, originalValue: p.value, originalUnit: p.unit,
-      tStart: p.tStart, tEnd: p.tEnd, tzOffsetMin: p.tzOffsetMin ?? null, kind: p.kind === 'vendor_derived' ? 'vendor_derived' : 'raw', flags };
+      tStart: p.tStart, tEnd: p.tEnd, tzOffsetMin: p.tzOffsetMin ?? null, kind: p.kind === 'vendor_derived' ? 'vendor_derived' : 'raw', vendorQuality: p.vendorQuality || null, flags };
     seen.set(key, r); out.push(r);
   }
   return { readings: out, stats };
 }
-export const isUsable = r => r.value != null && !r.flags.some(f => ['invalid', 'out_of_range', 'bad_timestamp', 'off_wrist', 'conflict', 'unit_unknown'].includes(f));
+export const isUsable = r => r.value != null && !r.flags.some(f => ['invalid', 'out_of_range', 'bad_timestamp', 'bad_duration', 'off_wrist', 'conflict', 'unit_unknown', 'quality_changed'].includes(f));
 
 /** The "night" a reading belongs to: the local date of the evening it started (local time − 12 h). */
 export function nightOf(r) {
@@ -66,7 +101,7 @@ export function nightOf(r) {
 export function summariseNights(readings, params = NIGHT_PARAMS) {
   const groups = new Map();
   for (const r of readings) {
-    if (r.flags.includes('bad_timestamp')) continue;
+    if (r.flags.includes('bad_timestamp') || r.flags.includes('bad_duration')) continue;
     const k = `${nightOf(r)}|${r.deviceId}|${r.firmware}|${r.metric}`;
     if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r);
   }
@@ -74,7 +109,7 @@ export function summariseNights(readings, params = NIGHT_PARAMS) {
   for (const [k, rs] of groups) {
     const [night, deviceId, firmware, metric] = k.split('|');
     const good = rs.filter(isUsable).sort((a, b) => a.tStart - b.tStart);
-    const coverageMin = Math.round(good.reduce((a, r) => a + (r.tEnd - r.tStart), 0) / 60e3);
+    const coverageMin = unionMinutes(good);
     const tzs = [...new Set(rs.map(r => r.tzOffsetMin))];
     const vals = good.map(r => r.value).sort((a, b) => a - b);
     const enough = good.length >= params.minSamples && coverageMin >= params.minCoverageMin;
@@ -100,9 +135,9 @@ function markTravel(nights) {
 }
 
 /** Merge new summaries into stored ones (re-syncing a night replaces it, never duplicates it). */
-export function mergeNights(stored, fresh) {
+export function mergeNights(stored, fresh, { at = new Date().toISOString() } = {}) {
   const k = n => `${n.night}|${n.deviceId}|${n.firmware}|${n.metric}`;
-  const m = new Map(stored.map(n => [k(n), n])); for (const n of fresh) m.set(k(n), n);
+  const m = new Map(stored.map(n => [k(n), n])); for (const n of fresh) m.set(k(n), { ...n, syncedAt: n.syncedAt || at }); // when it became known
   return [...m.values()].sort((a, b) => a.night.localeCompare(b.night) || a.metric.localeCompare(b.metric));
 }
 

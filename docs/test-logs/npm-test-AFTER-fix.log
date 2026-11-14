@@ -1,0 +1,393 @@
+
+> shred-by-qk@1.0.0 test
+> node tests/simulate.mjs && node tests/gait.mjs && node tests/library.mjs && node tests/squatTracker.test.ts && node tests/measurement.test.mjs && node tests/regression.test.mjs && node tests/rehab.test.mjs && node tests/load.test.mjs && node tests/cycle.test.mjs && node tests/cycle-integration.test.mjs && node tests/cycle-nudges.test.mjs && node tests/cycle-regressions.test.mjs
+
+rep 1: Walk your feet back toward the bench, shins vertical at the top.
+rep 2: two
+rep 3: Walk your feet back toward the bench, shins vertical at the top.
+rep 4: four. That's the spot. Shins vertical.
+rep 5: five
+rep 6: six. Perfect, keep going.
+rep 7: seven
+rep 8: eight. It's getting hard now. Two more strong reps.
+rep 9: Your reps have slowed right down. That's a great place to end the set. Quality over quantity.
+rep 10: ten
+{ reps: 10, clean: 7, velocityLoss: '50%', RIR: '0–1' }
+ALL PASS
+ok - detects side view
+┌─────────┬──────────────────────┬─────────────┬───────────────┬───────┬───────────┐
+│ (index) │ label                │ value       │ unit          │ ok    │ si        │
+├─────────┼──────────────────────┼─────────────┼───────────────┼───────┼───────────┤
+│ 0       │ 'Cadence'            │ '106'       │ 'steps/min'   │ true  │ undefined │
+│ 1       │ 'Stance time'        │ '67 / 70'   │ '% L / R'     │ false │ '4.4'     │
+│ 2       │ 'Step length'        │ '51 / 67'   │ '% leg L / R' │ false │ '27.0'    │
+│ 3       │ 'Knee bend in swing' │ '59° / 57°' │ 'L / R'       │ true  │ '2.4'     │
+│ 4       │ 'Hip extension'      │ '11° / 3°'  │ 'L / R'       │ false │ '119.2'   │
+│ 5       │ 'Trunk lean'         │ '4'         │ '° forward'   │ true  │ undefined │
+└─────────┴──────────────────────┴─────────────┴───────────────┴───────┴───────────┘
+[
+  'Limited hip extension (right side)',
+  'Uneven steps (step length differs 27%)'
+]
+ok - cadence ≈ 109 (got 105.9)
+ok - finds the right hip restriction
+ok - symmetric walker: no hip finding
+ALL PASS
+129 exercises, 76 with camera form check
+{
+  Chest: 13,
+  Back: 21,
+  Shoulders: 25,
+  Biceps: 12,
+  Triceps: 16,
+  Forearms: 10,
+  Quads: 22,
+  Hamstrings: 17,
+  Glutes: 31,
+  Calves: 11,
+  Core: 19,
+  'Full body': 8
+}
+ALL PASS
+ok   angleAt: right angle = 90°
+ok   angleAt: straight line = 180°
+ok   angleAt: degenerate → NaN
+ok   side, deep: counts 3 reps  — got 3
+ok   side, deep: depth OK every rep  — 80,80,80
+ok   side: valgus not assessed (null)
+ok   side: tempo measured  — 1033/833 1033/833 1033/833
+ok   side, shallow: counted but flagged  — 112,112
+ok   side, quarter dip: not a rep  — got 0
+ok   side, noisy landmarks: still exactly 5 reps  — got 5
+ok   front, no cave: counts 3 reps (foreshortening angle)  — got 3, min 86,86,86
+ok   front, no cave: valgus false  — 1,1,1
+ok   front: depth not judged without world landmarks
+ok   front, knees cave: valgus true  — 0.3,0.3,0.3
+ok   front, cave + noise: valgus still detected  — reps 3
+ok   world landmarks: depth judged
+ok   20 noise seeds: exact reps + correct valgus every time  — 20/20
+ok   low visibility: frame rejected, no crash
+ALL PASS
+ok   plate scale: 225 px across a 45 cm plate = 2 mm/px
+ok   measured fps ignores one dropped frame
+ok   linear fit exact line
+ok   height scale: shoulder–ankle 0.779·H
+ok   bar speed: MCV within 0.03 m/s of truth (0.625)  — 0.641 0.641 0.641 0.641 0.641
+ok   bar speed: range of motion = 0.50 m
+ok   bar speed with 2 px jitter: MCV within 0.05 m/s  — 0.641 0.638 0.646 0.640 0.618
+ok   velocity loss detected as reps slow (~50%)  — 46%
+ok   tiny movement is not a rep
+ok   1RM estimate from load–velocity line = 133 kg  — 133.3
+ok   1RM refused with one load only
+ok   velocity zones
+ok   jump 40 cm at 240 fps: within ±1 cm  — 40 cm, precision ±0.6
+ok   jump 40 cm at 120 fps: within ±1.5 cm  — 40 cm, precision ±1.2
+ok   jump 40 cm at 60 fps: within ±2.5 cm  — 40 cm, precision ±2.3
+ok   jump 40 cm at 30 fps: within ±5 cm  — 40 cm, precision ±4.7
+ok   3 noisy jumps at 120 fps: all found, each within ±2 cm  — 39.9, 39.9, 39.9
+ok   30 fps warns to use slow-motion
+ok   no jump → clear message
+ok   readiness: 15% below baseline = fatigued  — {"z":-6.72,"pct":-15.7,"status":"fatigued"}
+ok   FPPA straight leg = 0°
+ok   FPPA knee toward midline = +10°  — 10.00
+ok   FPPA knee away from midline = −10° (varus)  — -10.00
+ok   SLS: both legs, 4 reps each  — {"L":{"reps":4,"maxFppa":15,"meanFppa":15,"pelvicDrop":0},"R":{"reps":4,"maxFppa":4,"meanFppa":4,"pelvicDrop":0}}
+ok   SLS: left FPPA ≈ 15° (±1.5)  — 15
+ok   SLS: right FPPA ≈ 4° (±1.5)  — 4
+ok   SLS: flags left valgus + asymmetry, not right
+ok   SLS with 2 px jitter: within ±2.5°  — 14.5 / 4.9
+ok   SLS: good control → no warnings
+ok   quality: clean recording passes
+ok   quality: poorly visible joints flagged
+ok   quality: body out of frame flagged
+ok   quality: low fps flagged
+ok   quality: wrong camera view flagged
+ALL PASS
+ok   hipthrust-demo.json: 10 reps, 7 clean  — got 10 reps, 7 clean
+ok   walk-demo.json: cadence 100–118, finds "hip extension (right"  — cadence 105.9
+ok   agreement: identical data → bias 0, ICC 1
+ok   agreement: +2 offset → bias 2, MAE 2, LoA collapses to 2
+ok   agreement: constant offset lowers absolute-agreement ICC below 1  — 0.956
+ok   agreement: small random error → ICC excellent  — 0.989
+ALL PASS
+ok   every programme exercise exists in the library
+ok   every referenced camera test exists
+ok   every condition has red flags, 3+ phases, evidence and an area
+ok   every phase has a minimum time and pain criterion
+ok   18 conditions across 9 body areas
+ok   post-surgical conditions marked (ACL, PCL)
+ok   cauda equina symptoms → emergency
+ok   Achilles snap → emergency; calf swelling (DVT) → emergency
+ok   every flag level has advice text
+ok   triage: all no → clear
+ok   triage: worst level wins
+ok   triage: diagnosed ACL with injury history → not blocked
+ok   triage: same answers, NOT diagnosed → sent for assessment
+ok   triage: DVT signs → emergency even when diagnosed
+ok   triage: urgent beats assess
+ok   pain: 2/10 during, settled → green
+ok   pain: 4/10 with limit 3 → amber
+ok   pain: 4/10 with tendon limit 5 → green
+ok   pain: worse next morning → red
+ok   pain: 7/10 during → red
+ok   ACL phase 1: blocked with no data  — Pain 3/10 or less during exercise (last 3 check-ins) | Knee straightens to within 3° | Knee bends 110°+
+ok   ACL phase 1: passes when straight, 118° bend, pain ≤3, 2+ weeks  — ✓ At least 2 weeks in this phase | ✓ Pain 3/10 or less during exercise (last 3 check-ins) | ✓ Knee straightens to within 3° | ✓ Knee bends 110°+
+ok   ACL phase 1: still blocked if under the minimum time
+ok   ACL return to sport: hop LSI 85% blocks (needs 90%)  — ✓ At least 8 weeks in this phase (70 days so far) | ✓ Pain 1/10 or less during exercise (last 3 check-ins) (0, 0, 0) | ✗ Hop distance 90%+ of your other leg (85%) | ✓ Landing knee drift under 10° (latest 8) | ✓ Daily activities rated 9/10 or better (latest 9.3/10)
+ok   ACL return to sport: hop LSI 93% passes
+ok   PSFS score = mean of activities
+ok   LSI 135/150 = 90%; inverted for lower-is-better
+ok   shoulder forward raise: 150° (±3)  — 149.5°
+ok   knee bend: 125° (±3)  — 124.6°
+ok   30-s sit-to-stand: counts 11 reps  — 11
+ok   hop: 120 cm (±6)  — 120 cm
+ok   hop without a scale asks for height
+ok   calf raise endurance: counts 18  — 18
+ok   forward bend, side-on: 80° (±3)  — 79.8°
+ALL PASS
+ok   Hooper index sums 4 items
+ok   readiness: absolute scale, best possible = 100
+ok   readiness: short sleep costs 10 points
+ok   readiness: uses personal baseline after 7 days  — 90
+ok   readiness: much worse than usual → low score  — 0
+ok   session load = effort × minutes (Foster)
+ok   weekly load: 4 sessions × 360 AU  — 1440
+ok   monotony and strain computed  — 1.15
+ok   steady training → no spike  — {"ratio":1,"thisWeek":1440,"chronic":1440,"spike":false,"low":false}
+ok   doubling this week → spike flagged  — ratio 3
+ok   new user with little history → no false spike
+ok   recommendation: good readiness, steady load → go
+ok   recommendation: load spike → adjust
+ok   recommendation: very poor readiness → recovery day
+ok   recommendation: rehab red light → adjust
+ok   recommendation: no check-in asks for one
+ok   studio: every cue has a unique id and text
+ok   studio: includes rep counts, praise and form corrections  — 124 lines
+ALL PASS
+ok   dates: validates real calendar dates only
+ok   dates: day maths ignores daylight saving (UK spring change)
+ok   time zones: same instant is a different calendar day in London and Sydney
+ok   time zones: local minutes follow the zone
+ok   travel: a logged start keeps the calendar date the user chose
+ok   consent: nothing can be logged before consent
+ok   periods: start logged, end open
+ok   periods: end before start refused
+ok   periods: future dates refused
+ok   periods: overlapping period refused
+ok   periods: correcting a start replaces it
+ok   spotting: logged as a day, never creates a period
+ok   spotting: no "did a period start?" prompt for spotting
+ok   confirmation: period-type bleeding outside a period asks, does not assume
+ok   confirmation: confirming creates the period and clears the prompt
+ok   open period: asks whether it ended after a week, never closes it itself
+ok   open period: no "ended?" prompt a month later (left blank, never guessed)
+ok   periods: delete removes the entry
+ok   errors: messages carry a code, never the data
+ok   missing logs: no entry means unknown (no "none" written for gaps)
+ok   missing logs: cycles are computed from confirmed starts only
+ok   sparse: no data → insufficient-data state, no range
+ok   sparse: one start → still no estimate
+ok   no 28-day default: one 40-day cycle → early estimate around day 40  — 2026-12-07–2026-12-11
+ok   early estimate explains why the range is padded
+ok   regular history → estimate, range = shortest…longest
+ok   estimate text lists the cycles used
+ok   irregular: spread > 9 days → labelled variable with a wide range
+ok   very irregular: spread > 20 days → no range, check-in offered
+ok   long cycles (37–41 days) are estimated from the person's own lengths  — estimate 37-41
+ok   missed log: a 60-day gap is usable unless marked (no silent exclusion of long cycles)
+ok   missed log: marking it excludes that gap and shows why
+ok   implausible length (7 d) kept but marked for checking, not used
+ok   user can confirm an unusual length is right
+ok   stale history → no estimate from old data
+ok   pregnancy: estimates paused
+ok   hormonal contraception: estimate carries a withdrawal-bleed note
+ok   disclaimer: not a guarantee, not a confidence interval, not contraception
+ok   no invented end dates: a new start never closes the previous period
+ok   no end logged: an older period covers only its known start day
+ok   typical period length needs 2 logged ends
+ok   no future leakage: an estimate "as of" a date ignores later entries
+ok   symptoms: categories are off by default; logging one is refused
+ok   symptoms: invalid values refused
+ok   disable category: stops collection, keeps past entries unless purge
+ok   disable category with purge deletes its entries
+ok   pattern: found from 4 complete cycles of logs, range = the days actually logged  — [[24,25,4,4]]
+ok   pattern: text is past tense with the counts  — You logged lower energy around cycle days 24–25 in 4 of your last 4 recorded cycles with energy logs there.
+ok   pattern: evidence lists every cycle
+ok   insight: shown when today falls in the pattern window
+ok   insight: dismissed insights are not shown again
+ok   pattern: cycles without logs in the window are not counted as "no symptom"  — Energy was logged around these days in only 2 of 4 complete cycles.
+ok   pattern: 2 complete cycles → insufficient, says so
+ok   pattern: something logged all the time is not a pattern
+ok   pattern: none found → offers a check-in instead of a prediction
+ok   experimental forecast: produces check-in suggestions only from found patterns
+ok   phase: menstruation shown as observed during a logged period
+ok   phase: otherwise "not enough data", no day-14 assumption
+ok   phase: an estimate only with a retrospective temperature rise
+ok   phase: not shown on hormonal contraception
+ok   phase: never labelled "confirmed"
+ok   reminders: need their own consent
+ok   reminders: period check fires the chosen days before the range  — {"id":"rmwfxsr3u0","date":"2026-11-10","time":"08:00","mins":480,"shiftedForQuietHours":false}
+ok   reminders: "why" names the estimate and the offset
+ok   quiet hours across midnight: 23:30 moves to 07:00 next day
+ok   quiet hours: 06:15 moves to 07:00 same day
+ok   pause: a paused reminder resumes after the pause date
+ok   pause all: nothing due while everything is paused
+ok   due now: early-morning reminder due after quiet hours end
+ok   delivered once: not repeated the same day
+ok   lock screen: neutral by default
+ok   lock screen detail (opt-in) still has no symptom values or dates
+ok   delete: reminder and its delivery record are gone
+ok   period check without an estimate waits and says why
+ok   pregnancy: period check-ins do not fire
+ok   weekly check-in lands on the chosen weekday
+ok   consent withdrawn: all reminders deleted and none due
+ok   sensor: exact duplicate packets dropped
+ok   sensor: same timestamp, different value → first kept, flagged conflict
+ok   sensor: °F converted to °C, original value and unit kept
+ok   sensor: missing value flagged invalid, not filled
+ok   sensor: implausible skin temperature flagged out of range
+ok   sensor: future timestamp flagged
+ok   sensor: unsupported metric ignored
+ok   sensor: source, model, firmware and kind preserved
+ok   night: assigned by the device's local evening date
+ok   missing wear: missing nights shown as "no data" with no value (no interpolation)
+ok   missing wear: short nights marked insufficient with no value
+ok   re-sync: merging the same nights again does not duplicate them
+ok   device change: flagged and split into separate segments
+ok   travel: time-zone change flagged
+ok   device change: a higher new device is not mistaken for a temperature rise  — No sustained rise seen in this cycle so far.
+ok   temp rise: detected retrospectively, only confirmed on the third high night  — {"version":"three-over-six-skin-0.1.0-research","detected":true,"segment":{"model":"Mock Band (synthetic)","firmware":"mock-1.0"},"deviceChangedThisCycle":false,"excluded":{"notOk":0,"flagged":0,"userFlagged":0},"nightsUsed":25,"firstHighNight":"2026-10-15","confirmedNight":"2026-10-17","baselineMean":33.79,"highMean":34.09,"rise":0.3,"cycleDayOfRise":15,"why":"A sustained rise was seen. This may be consistent with a past ovulation. It is not proof."}
+ok   temp rise: cannot be seen before it is confirmed (no advance warning)
+ok   temp rise: wording says "may be consistent", "not proof"
+ok   illness: nights marked unwell are excluded
+ok   SWL DS07: unverified adapter refuses to connect
+ok   wearable consent withdrawn: device data deleted
+ok   flags: everything off by default
+ok   flags: can be turned on; others stay off
+ok   eval: participant split is deterministic
+ok   eval: no future-data leakage in either model
+ok   eval: baseline output is identical with or without wearable data
+ALL PASS
+ok   repo: new user starts empty with no consent
+ok   repo: writes before consent are refused and nothing is saved
+ok   repo: data survives reopening (decrypts with the same key)
+ok   estimate after reopen: range from own history  — 2026-11-26–2026-11-27
+ok   repo: a failed edit saves nothing
+ok   at rest: stored value is AES-GCM ciphertext, no dates or words in it
+ok   isolation: another user sees none of Alice's data
+ok   isolation: Bob's writes never touch Alice's record
+ok   isolation: Alice's blob copied into Bob's slot cannot be decrypted
+ok   isolation: even with the same key, a blob bound to another user ID is rejected
+ok   isolation: a change can't reassign the owner
+ok   isolation: no user ID → access denied
+ok   integrity: tampered ciphertext is rejected, not half-read
+ok   no WebCrypto: repository refuses to open (no plaintext fallback)
+ok   consent change: turning off a category with delete removes its entries from storage
+ok   reminders: due after their time, with neutral text
+ok   wearable: ingest refused without wearable consent
+ok   wearable: nightly summaries stored with source, model, firmware, unit and flags
+ok   wearable: raw samples are not stored (data minimisation)
+ok   wearable: a watch never creates or edits a period
+ok   wearable consent withdrawn: summaries and device deleted
+ok   export: the user gets all their data in a readable file
+ok   delete: record and key removed
+ok   delete: reports what it cannot reach (exports, backups)
+ok   delete: reopening gives an empty state that needs consent again
+ok   delete: other users are untouched
+ok   delete: an old copy of the ciphertext put back later is discarded unread, never decrypted
+ok   1.3 two tabs: both entries kept, nothing overwritten (with cross-tab lock)
+ok   1.1 stale tab after delete: its save is refused and nothing is written back (with cross-tab lock)
+ok   1.1 stale tab drops the deleted data from memory (with cross-tab lock)
+ok   1.1 reload after delete: empty, asks for consent, no unlock error (with cross-tab lock)
+ok   1.2 delete during a save: deletion wins (memory, disk and reload all empty) (with cross-tab lock)
+ok   1.2 save in another tab racing a delete: no data survives on disk or after reload (with cross-tab lock)
+ok   refresh: another tab's entry appears after refresh (with cross-tab lock)
+ok   refresh: after a delete elsewhere, refresh reports stale and shows nothing (with cross-tab lock)
+ok   1.3 two tabs: both entries kept, nothing overwritten (no lock available)
+ok   1.1 stale tab after delete: its save is refused and nothing is written back (no lock available)
+ok   1.1 stale tab drops the deleted data from memory (no lock available)
+ok   1.1 reload after delete: empty, asks for consent, no unlock error (no lock available)
+ok   1.2 delete during a save: deletion wins (memory, disk and reload all empty) (no lock available)
+ok   1.2 save in another tab racing a delete: no data survives on disk or after reload (no lock available)
+ok   refresh: another tab's entry appears after refresh (no lock available)
+ok   refresh: after a delete elsewhere, refresh reports stale and shows nothing (no lock available)
+ok   1.4 undecryptable record: opening fails with DECRYPT_FAILED
+ok   1.4 reset: record and key removed, opens empty and asks for consent
+ok   envelope: editing the revision or generation number makes the record fail to decrypt
+ALL PASS
+ok   period prompt: a clear overnight drop asks the question  — {"ask":true,"key":"sensor:2026-11-13","night":"2026-11-13","drop":0.3,"baseMean":34.1,"value":33.8,"text":"Your wrist skin temperature last night was 0.3 °C below your recent nights. That sometimes happens around the start of a period, but it has other causes too. Has your period started?"}
+ok   period prompt: wording is a question with caveats, never "detected"
+ok   period prompt: asking never writes anything (no period, no prediction stored)
+ok   period prompt: only a "Yes" records a period, marked as sensor_prompt
+ok   period prompt: no further prompt right after a period was logged
+ok   period prompt: no drop → no question
+ok   period prompt: needs wearable consent
+ok   period prompt: missing last night → no question (gaps are not guessed)
+ok   period prompt: too little wear last night → no question
+ok   period prompt: too early in the cycle → no question
+ok   period prompt: a device change is not mistaken for a drop
+ok   period prompt: travel night (time-zone change) is ignored
+ok   period prompt: a night marked unwell is ignored
+ok   period prompt: off on hormonal contraception and in pregnancy
+ok   period prompt: "Not yet" is remembered for that night
+ok   check-in timing: HRV well below the person's usual offers a check-in
+ok   check-in timing: never names or guesses a mood, lists other causes
+ok   check-in timing: usual HRV → no check-in
+ok   check-in timing: no symptom categories on → no check-in
+ok   suggestion: offered from the person's own pattern on the matching cycle day  — ["Energy: around this time you logged \"lower than usual\" in 4 of 4 cycles. Same today?"]
+ok   suggestion: phrased as "Same today?" with the counts
+ok   suggestion: not offered on other cycle days
+ok   suggestion: showing it saves nothing
+ok   suggestion: "Yes" saves the value marked as an accepted suggestion
+ok   suggestion: not offered again once that category is logged today
+ok   provenance: typed entries are marked typed
+ok   provenance: clearing a value clears its source too
+ok   suggestion: "No" saves nothing and is not repeated that day
+ok   suggestion: a dismissed insight gives no suggestions
+ok   anchoring: pattern evidence says how many logs were accepted suggestions
+ok   eval: sensor prompt and range prompt both scored on held-out participants  — {"sensor":{"cycles":65,"hitPct":80,"medianLagDays":1,"falsePromptsPerCycle":0.05},"rangeOnly":{"cycles":65,"hitPct":86.2,"medianLagDays":-1,"falsePromptsPerCycle":3.05}}
+ok   eval: reports hit rate, lag and false prompts per cycle
+ok   eval (synthetic sanity): wearable-timed prompt finds most starts on data built to contain the signal  — {"cycles":65,"hitPct":80,"medianLagDays":1,"falsePromptsPerCycle":0.05}
+ALL PASS
+ok   1 no lock: two simultaneous saves never silently lose one (both kept, or one rejected as retryable CONFLICT)  — ["2026-09-01","2026-10-01"]
+ok   1 no lock: a save racing a delete leaves nothing behind
+ok   1 no lock: withdrawing reminder consent can't be undone by a racing save  — {"consent":null,"n":0}
+ok   2 simultaneous first opens share one key: reopen after a save decrypts
+ok   2 the second first-opener can save, and the result still decrypts
+ok   3 purge: pattern reminders for the purged category are deleted
+ok   3 purge: their origin text, delivery state and dismissals are gone from the data (and so from exports)
+ok   3 purge: no reminder for the purged category is delivered
+ok   3 turning a category off (no purge) disables its pattern reminders
+ok   4 explicit "none" inside an open period is not "observed menstruation"
+ok   4 spotting inside an open period is not "observed menstruation"
+ok   4 an unlogged later day of an open period is unknown, not observed
+ok   4 the logged start day is observed
+ok   4 confirmed end: days inside a confirmed start–end are observed
+ok   4 confirmed end: a day logged as spotting inside it is not observed menstruation
+ok   5 different moods in different cycles are never reported as one exact mood "in 3 of N"  — ["Mood: around this time you logged low, anxious or irritable mood in 3 of 4 cycles, not always the same. How is it today?"]
+ok   5 repeated logs in one cycle count once; ties and majorities use exact per-cycle counts  — Mood: around this time you logged "anxious" in 3 of 4 cycles. Same today?
+ok   6 tEnd = Infinity: never an "ok" night, coverage stays finite
+ok   6 NaNend is flagged and never usable
+ok   6 NaNstart is flagged and never usable
+ok   6 futureEnd is flagged and never usable
+ok   6 reversed is flagged and never usable
+ok   6 infStart is flagged and never usable
+ok   7 same value, new off-wrist warning (clean then off-wrist): the reading is not usable
+ok   7 same value, new off-wrist warning (off-wrist then clean): the reading is not usable
+ok   7 same value but different firmware: not treated as an exact duplicate  — {"received":2,"duplicates":0,"conflicts":1,"invalid":0,"outOfRange":0,"badTimestamp":0,"offWrist":0,"unknownMetric":0}
+ok   7 same value but different unit: not treated as an exact duplicate  — {"received":2,"duplicates":0,"conflicts":1,"invalid":0,"outOfRange":0,"badTimestamp":0,"offWrist":0,"unknownMetric":0}
+ok   7 same value but different end time: not treated as an exact duplicate  — {"received":2,"duplicates":0,"conflicts":1,"invalid":0,"outOfRange":0,"badTimestamp":0,"offWrist":0,"unknownMetric":0}
+ok   8 six baseline nights, a 19-night gap, three high nights: abstains (detected:false) and says why  — {"detected":false,"why":"Not judged: there are gaps in the nightly data, so there is not enough continuous data to compare nights."}
+ok   9 a two-year-old HRV baseline is not called "your usual"  — {"ask":false,"why":"Not enough recent nights from this device (0 in the last 28 days; 7 needed)."}
+ok   9 after a device change, old-device nights are not used as the baseline
+ok   10 a period dated 1 Jan but entered 1 Jun is not visible as of 15 Jan
+ok   10 …and is visible once it had been entered
+ok   10 a later correction does not change what the forecast was as of an earlier date
+ok   10 a day backfilled later is unknown in earlier views
+ok   5 tie (low 2 cycles, anxious 2 cycles): nothing pre-filled, combined wording  — Mood: around this time you logged low, anxious or irritable mood in 4 of 4 cycles, not always the same. How is it today?
+ok   1 repeated conflicts: fails with retryable CONFLICT and saves nothing
+ok   1 a storage without atomic operations is refused (STORAGE_NOT_ATOMIC)
+ok   2 the device user ID is created once even when several tabs ask at the same moment
+ok   2 records from earlier versions are moved once into the transactional store and removed from localStorage
+ok   3 after purge, a fresh export contains no mood values, mood reminders or their pattern text
+ALL PASS

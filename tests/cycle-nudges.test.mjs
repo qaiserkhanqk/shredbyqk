@@ -59,7 +59,7 @@ function hrvUser(last, { category = true } = {}) {
 {
   const c = checkinTiming(hrvUser(32), T);
   check('check-in timing: HRV well below the person\'s usual offers a check-in', c.ask);
-  check('check-in timing: never names or guesses a mood, lists other causes', !/(angry|irritable|anxious|sad|low mood|moody)/i.test(c.text) && /Training/.test(c.text) && /doesn't tell us how you feel/.test(c.text));
+  check('check-in timing: never names or guesses a mood, lists other causes', !/(angry|irritable|anxious|sad|low mood|moody)/i.test(c.text) && /Training/.test(c.text) && /doesn't tell us how you feel/.test(c.text) && /over \d+ nights from/.test(c.text));
   check('check-in timing: usual HRV → no check-in', !checkinTiming(hrvUser(50), T).ask);
   check('check-in timing: no symptom categories on → no check-in', !checkinTiming(hrvUser(32, { category: false }), T).ask);
 }

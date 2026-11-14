@@ -20,7 +20,7 @@
 13. [Limitations](#limitations)
 14. [Open items and blockers](#open-items-and-blockers)
 
-Related: [audit and fix status](docs/cycle-audit-9f87b83.md) · [validation plan](docs/cycle-validation-plan.md) · [evidence register](docs/cycle-evidence-register.md) · [wearable SDK requirements](docs/wearable-sdk-requirements.md) · [synthetic evaluation report](docs/cycle-eval-synthetic.md)
+Related: [fixes for issues reproduced in 0f26696](docs/cycle-fixes-0f26696.md) · [audit and fix status](docs/cycle-audit-9f87b83.md) · [validation plan](docs/cycle-validation-plan.md) · [evidence register](docs/cycle-evidence-register.md) · [wearable SDK requirements](docs/wearable-sdk-requirements.md) · [synthetic evaluation report](docs/cycle-eval-synthetic.md)
 
 ## What was built
 
@@ -196,7 +196,7 @@ Mock adapter ──► wearables.normalise ──► summariseNights ──┐
 (DS07: refuses)                                            ▼
                          store.js  repo.update(fn)  ── atomic ──► AES-GCM-256 encrypt (AAD = user ID)
                                                                    │
-                         localStorage['shred_cycle_v1:<uid>'] ◄────┘   key: non-extractable CryptoKey in IndexedDB
+                         IndexedDB 'records' (atomic compare-and-swap) ◄─┘   key: non-extractable CryptoKey per generation, same database
                                 │
                      repo.read() ──► predict / patterns / phase / reminders / tempshift (pure) ──► ui.js
                                 │
@@ -215,7 +215,8 @@ the coach voice / TTS endpoint, analytics (none exist), AI prompts (none exist) 
 | Minimum data: symptom categories off by default; only nightly wearable summaries kept | model, wearables |
 | Encryption at rest (AES-GCM-256, random IV, non-extractable key). **No plaintext fallback:** if WebCrypto is missing, the feature refuses to store anything. | `store.js` |
 | Per-user isolation: separate slot and key per user, user ID bound as AAD, owner check on read and write | `store.js`, integration tests |
-| Multi-tab safety: operations queued in each tab and locked across tabs (Web Locks); every save re-reads the latest stored version (no lost updates); revision and generation are bound into the AAD | `store.js`, integration and e2e tests |
+| Multi-tab safety: every save is an **atomic compare-and-swap** in one IndexedDB transaction (safe with or without Web Locks); a lost race re-applies the change to fresh data, or fails with retryable `CONFLICT` and saves nothing; keys and the device user ID are created atomically, one key per generation; revision and generation are bound into the AAD; tabs notify each other via BroadcastChannel; unsaved form input survives redraws | `store.js`, `ui.js`, regression, integration and e2e tests |
+| What was known when: period versions, day-field entry times and wearable sync times; `stateAsOf(…, { knownAt })` replays only what had been entered, so forecasts are frozen and backfilled data can't leak into history | `model.js`, `eval.js` |
 | Deletion can't be undone by another tab or a pending save: a generation counter is bumped first; stale tabs are refused (`STALE_SESSION`) and clear themselves; records from an older generation are discarded unread | `store.js`, `ui.js` (storage events) |
 | Recovery: unreadable data shows a "Reset cycle data on this device" button | `resetCycleStorage`, e2e |
 | Tampered ciphertext rejected (GCM authentication) | integration tests |
@@ -250,13 +251,13 @@ the coach voice / TTS endpoint, analytics (none exist), AI prompts (none exist) 
 npm test
 ```
 
-This runs all existing suites (296 checks in total) plus the cycle suites: `tests/cycle.test.mjs` (103 checks), `tests/cycle-integration.test.mjs` (46 checks, including deletion and multi-tab regressions with and without a cross-tab lock) and `tests/cycle-nudges.test.mjs` (33 checks).
+This runs all suites (337 checks in total), including `tests/cycle.test.mjs` (103), `tests/cycle-integration.test.mjs` (46, deletion and multi-tab regressions with and without a cross-tab lock), `tests/cycle-nudges.test.mjs` (33) and `tests/cycle-regressions.test.mjs` (41: the 10 issues reproduced in 0f26696, written failing-first).
 
 ```bash
 npm run test:e2e
 ```
 
-This runs the browser flow (53 checks), including 21 cycle checks, with two real tabs.
+This runs the browser flow (63 checks) in Chromium, including the cycle checks with two real tabs, simultaneous first opens, saves and save-vs-delete **with and without Web Locks**, and purge through the UI.
 
 ```bash
 npm run eval:cycle

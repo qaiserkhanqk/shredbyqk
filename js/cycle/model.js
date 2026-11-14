@@ -67,8 +67,23 @@ export function setCategory(s, cat, on, { purge = false, at = new Date().toISOSt
   if (on) s.consent.categories[cat] = at; else delete s.consent.categories[cat];
   stamp(s, `category:${cat}:${on ? 'on' : 'off'}${purge ? ':purged' : ''}`, at);
   if (!on && purge) for (const d of Object.values(s.days)) delete d[cat];
+  if (!on) invalidateDerived(s, cat, purge);
   pruneDays(s);
   return s;
+}
+
+/* Things derived from a category's logs: pattern reminders (whose `origin` copies pattern text), their delivery
+   records, dismissed insights and suggestion answers. Turning a category off disables its reminders (with a
+   reason shown to the user); purging deletes all of it, so nothing derived from purged logs remains or is exported. */
+function invalidateDerived(s, cat, purge) {
+  const derived = (s.reminders || []).filter(r => r.kind === 'pattern' && r.category === cat);
+  if (purge) {
+    const ids = new Set(derived.map(r => r.id));
+    s.reminders = s.reminders.filter(r => !ids.has(r.id));
+    for (const id of ids) delete s.delivered[id];
+    for (const k of Object.keys(s.dismissed)) if (k.startsWith(`${cat}:`)) delete s.dismissed[k];
+    for (const k of Object.keys(s.promptsDismissed)) if (k.startsWith(`sugg:${cat}:`)) delete s.promptsDismissed[k];
+  } else for (const r of derived) { r.enabled = false; r.disabledReason = 'category_off'; }
 }
 export const categoryOn = (s, cat) => !!s.consent.categories[cat];
 
@@ -104,15 +119,21 @@ const src = v => (SOURCES.includes(v) ? v : 'typed');
 export function logPeriodStart(s, start, { today: t, at = new Date().toISOString(), source } = {}) {
   requireConsent(s); checkPeriod(s, start, null, null, t);
   // An earlier period with no end stays without an end: we never invent an end date. The user can add it.
-  const p = { id: newId(), start, end: null, missedBefore: false, source: src(source), createdAt: at, updatedAt: at };
+  const p = { id: newId(), start, end: null, missedBefore: false, source: src(source), createdAt: at, updatedAt: at, versions: [] };
+  addVersion(p, at);
   s.periods.push(p); s.periods = sorted(s);
   if (s.days[start]?.bleeding) { delete s.days[start].bleeding; pruneDays(s); } // the period record now covers that day
   return p;
 }
+/* Version history (issue 10 reproduced in 0f26696): each period keeps what it looked like after every entry or
+   correction, with the time that happened, so "what was known on date D" can be replayed exactly. Deleting a period
+   removes it and its history (privacy wins); a historical replay then treats it as never entered. */
+function addVersion(p, at) { (p.versions ||= []).push({ at, start: p.start, end: p.end, missedBefore: !!p.missedBefore, lengthConfirmed: !!p.lengthConfirmed }); }
+
 export function logPeriodEnd(s, id, end, { today: t, at = new Date().toISOString() } = {}) {
   requireConsent(s);
   const p = s.periods.find(x => x.id === id); if (!p) throw new CycleError('NOT_FOUND');
-  checkPeriod(s, p.start, end, id, t); p.end = end; p.updatedAt = at; return p;
+  checkPeriod(s, p.start, end, id, t); p.end = end; p.updatedAt = at; addVersion(p, at); return p;
 }
 /** Edit (correct) a period. Corrections replace the old values; nothing is kept from the wrong entry. */
 export function editPeriod(s, id, { start, end, missedBefore, lengthConfirmed }, { today: t, at = new Date().toISOString() } = {}) {
@@ -123,6 +144,7 @@ export function editPeriod(s, id, { start, end, missedBefore, lengthConfirmed },
   Object.assign(p, { start: ns, end: ne, updatedAt: at });
   if (missedBefore != null) p.missedBefore = !!missedBefore;
   if (lengthConfirmed != null) p.lengthConfirmed = !!lengthConfirmed; // "yes, the gap before this start is right"
+  addVersion(p, at);
   s.periods = sorted(s); return p;
 }
 export function deletePeriod(s, id) {
@@ -131,16 +153,30 @@ export function deletePeriod(s, id) {
   if (s.periods.length === n) throw new CycleError('NOT_FOUND');
 }
 
-/** The period covering a date, if any. Without a logged end, an older period covers only its start day; the
- *  latest one covers up to `today` for at most 7 days, after which the app asks whether it has ended. */
+/** The period EPISODE a date may belong to, used only to decide whether to ask "did a new period start?".
+ *  It is NOT evidence of bleeding on that day: use observedBleeding() for that.
+ *  Without a logged end, an older period covers only its start day; the latest one covers up to `today` for at
+ *  most 7 days, after which the app asks whether it has ended. */
 export function periodOn(s, date, t = date) {
   const latest = sorted(s).at(-1);
   return s.periods.find(p => p.start <= date && date <= (p.end ?? (p === latest ? minDate(t, addDays(p.start, 6)) : p.start)));
 }
 const minDate = (a, b) => (a < b ? a : b);
 
+/** What the log actually says about bleeding on a date (issue 4 reproduced in 0f26696):
+ *   'period'   — the logged first day of a period, a day inside a period whose end the user confirmed, or a day
+ *                the user logged as period bleeding;
+ *   'spotting' / 'none' — the user logged that for the day (an explicit day entry always wins);
+ *   'unknown'  — anything else, including later days of a period that has no end logged yet. */
+export function observedBleeding(s, date) {
+  const d = s.days[date]?.bleeding;
+  if (d) return d;
+  if (s.periods.some(p => p.start === date || (p.end && p.start <= date && date <= p.end))) return 'period';
+  return 'unknown';
+}
+
 /* ---------- Day logs ---------- */
-export function logDay(s, date, fields, { today: t, source } = {}) {
+export function logDay(s, date, fields, { today: t, source, at = new Date().toISOString() } = {}) {
   requireConsent(s);
   if (!isDate(date)) throw new CycleError('INVALID_DATE');
   if (t && date > t) throw new CycleError('FUTURE_DATE');
@@ -152,14 +188,14 @@ export function logDay(s, date, fields, { today: t, source } = {}) {
       if (!categoryOn(s, k)) throw new CycleError('CATEGORY_OFF');
       if (v != null && !CATEGORIES[k].options.some(([o]) => o === v)) throw new CycleError('INVALID_INPUT');
     } else throw new CycleError('INVALID_INPUT');
-    if (v == null || v === false) { delete d[k]; if (d.src) delete d.src[k]; }
-    else { d[k] = v; if (k in CATEGORIES || k === 'bleeding') (d.src ||= {})[k] = src(source); }
+    if (v == null || v === false) { delete d[k]; if (d.src) delete d.src[k]; if (d.rec) delete d.rec[k]; }
+    else { d[k] = v; if (k in CATEGORIES || k === 'bleeding') (d.src ||= {})[k] = src(source); (d.rec ||= {})[k] = at; } // rec = when this value was entered
   }
   s.days[date] = d; pruneDays(s); return d;
 }
 function pruneDays(s) {
   for (const [k, v] of Object.entries(s.days)) {
-    if (v.src) { for (const f of Object.keys(v.src)) if (!(f in v)) delete v.src[f]; if (!Object.keys(v.src).length) delete v.src; }
+    for (const meta of ['src', 'rec']) if (v[meta]) { for (const f of Object.keys(v[meta])) if (!(f in v)) delete v[meta][f]; if (!Object.keys(v[meta]).length) delete v[meta]; }
     if (!Object.keys(v).length) delete s.days[k];
   }
 }
@@ -203,11 +239,36 @@ export function cycles(s) {
   return out;
 }
 
-/** State restricted to what was known before `asOf` (exclusive). Used to prevent future-data leakage. */
-export function stateAsOf(s, asOf) {
+/** State as it was known at `knownAt` (an ISO instant; default: the start of `asOf`, UTC), restricted to events
+ *  before `asOf`. Used to prevent future-data leakage (issue 10 reproduced in 0f26696):
+ *   • periods: the latest version entered before knownAt; periods entered later are invisible;
+ *   • day fields: a value entered after knownAt is UNKNOWN in this view (we don't know what, if anything, was there);
+ *   • wearable nights: only those synced before knownAt.
+ *  Entries from older versions without entry times are kept by event date and counted in `recordTimeUnknown`, so an
+ *  evaluation can report or exclude them. */
+export function stateAsOf(s, asOf, { knownAt = `${asOf}T00:00:00.000Z` } = {}) {
   const c = JSON.parse(JSON.stringify(s));
-  c.periods = c.periods.filter(p => p.start < asOf).map(p => ({ ...p, end: p.end && p.end < asOf ? p.end : null }));
-  c.days = Object.fromEntries(Object.entries(c.days).filter(([d]) => d < asOf));
-  c.wearable.nights = c.wearable.nights.filter(r => r.night < asOf);
+  let unknownTime = 0;
+  c.periods = c.periods.map(p => {
+    if (p.versions?.length) { const v = p.versions.filter(x => x.at < knownAt).at(-1); return v ? { ...p, start: v.start, end: v.end, missedBefore: v.missedBefore, lengthConfirmed: v.lengthConfirmed, versions: undefined } : null; }
+    if (p.createdAt) return p.createdAt < knownAt ? p : null;
+    unknownTime++; return p;
+  }).filter(p => p && p.start < asOf).map(p => ({ ...p, end: p.end && p.end < asOf ? p.end : null }));
+  c.periods.sort((a, b) => a.start.localeCompare(b.start));
+  const days = {};
+  for (const [d, day] of Object.entries(c.days)) {
+    if (d >= asOf) continue;
+    const kept = {};
+    for (const [k, v] of Object.entries(day)) {
+      if (k === 'src' || k === 'rec') continue;
+      const at = day.rec?.[k];
+      if (at == null) { if (k in CATEGORIES || k === 'bleeding') unknownTime++; kept[k] = v; }
+      else if (at < knownAt) kept[k] = v;
+    }
+    if (Object.keys(kept).length) days[d] = kept;
+  }
+  c.days = days;
+  c.wearable.nights = c.wearable.nights.filter(n => n.night < asOf && (!n.syncedAt || n.syncedAt < knownAt));
+  c.recordTimeUnknown = unknownTime;
   return c;
 }

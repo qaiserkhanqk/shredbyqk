@@ -15,7 +15,9 @@
 //    identical output.
 //  • Outcomes are LOGGED period starts, as in a real study. Cycles whose end was not logged are not scored.
 import { addDays, diffDays } from './dates.js';
-import { blankState, giveConsent, stateAsOf, cycles, setCategory } from './model.js';
+import { blankState, giveConsent, stateAsOf as stateAsOfModel, cycles, setCategory } from './model.js';
+/** Every prediction "on day D" is made at midday on D, using only what had been entered or synced by then. */
+const stateAsOf = (s, asOf) => stateAsOfModel(s, asOf, { knownAt: `${asOf}T12:00:00.000Z` });
 import { estimateNext, PARAMS, ALGORITHM_VERSION } from './predict.js';
 import { retrospectiveShift, SHIFT_PARAMS, SHIFT_VERSION } from './tempshift.js';
 import { MockWearable, normalise, summariseNights, rng, gauss } from './wearables.js';
@@ -65,7 +67,11 @@ export function makeParticipant(i, seed = FROZEN.seed, cyclesEach = FROZEN.cycle
 export function participantState(p) {
   const s = blankState(p.id); giveConsent(s, '2025-01-01T00:00:00Z'); setCategory(s, 'energy', true, { at: '2025-01-01T00:00:00Z' }); s.consent.wearable = '2025-01-01T00:00:00Z';
   const logged = p.truth.filter(t => t.logged);
-  s.periods = logged.map((t, k) => ({ id: `${p.id}-${k}`, start: t.start, end: addDays(t.start, 4), missedBefore: false }));
+  // Entry times (issue 10): a start is entered on its own evening, its end on the end date's evening.
+  s.periods = logged.map((t, k) => { const end = addDays(t.start, 4);
+    return { id: `${p.id}-${k}`, start: t.start, end, missedBefore: false, versions: [
+      { at: `${t.start}T20:00:00.000Z`, start: t.start, end: null, missedBefore: false, lengthConfirmed: false },
+      { at: `${end}T20:00:00.000Z`, start: t.start, end, missedBefore: false, lengthConfirmed: false }] }; });
   const last = p.truth.at(-1).start, r = rng(hash(p.id));
   // Symptom logs on a fraction of days; missing days stay missing.
   for (let k = 0; k + 1 < p.truth.length; k++) {
@@ -76,11 +82,11 @@ export function participantState(p) {
       let notable = r() < 0.12;
       if (p.sym?.from && d >= p.sym.from && d <= p.sym.to) notable = r() < 0.85;
       if (p.sym?.preMenstrual && d > c.length - p.sym.preMenstrual) notable = r() < 0.85;
-      s.days[date] = { energy: notable ? 'low' : 'usual' };
+      s.days[date] = { energy: notable ? 'low' : 'usual', src: { energy: 'typed' }, rec: { energy: `${date}T21:00:00.000Z` } };
     }
   }
   const { readings } = normalise(p.device.packets(p.truth[0].start, addDays(last, -1)), { now: Date.parse(last + 'T12:00:00Z') });
-  s.wearable.nights = summariseNights(readings).filter(n => n.metric === 'skin_temp');
+  s.wearable.nights = summariseNights(readings).filter(n => n.metric === 'skin_temp').map(n => ({ ...n, syncedAt: `${addDays(n.night, 1)}T08:00:00.000Z` })); // synced the next morning
   return s;
 }
 

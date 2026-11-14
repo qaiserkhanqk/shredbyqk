@@ -1,0 +1,42 @@
+ok   1 no lock: two simultaneous saves never silently lose one (both kept, or one rejected as retryable CONFLICT)  — ["2026-09-01","2026-10-01"]
+ok   1 no lock: a save racing a delete leaves nothing behind
+ok   1 no lock: withdrawing reminder consent can't be undone by a racing save  — {"consent":null,"n":0}
+ok   2 simultaneous first opens share one key: reopen after a save decrypts
+ok   2 the second first-opener can save, and the result still decrypts
+ok   3 purge: pattern reminders for the purged category are deleted
+ok   3 purge: their origin text, delivery state and dismissals are gone from the data (and so from exports)
+ok   3 purge: no reminder for the purged category is delivered
+ok   3 turning a category off (no purge) disables its pattern reminders
+ok   4 explicit "none" inside an open period is not "observed menstruation"
+ok   4 spotting inside an open period is not "observed menstruation"
+ok   4 an unlogged later day of an open period is unknown, not observed
+ok   4 the logged start day is observed
+ok   4 confirmed end: days inside a confirmed start–end are observed
+ok   4 confirmed end: a day logged as spotting inside it is not observed menstruation
+ok   5 different moods in different cycles are never reported as one exact mood "in 3 of N"  — ["Mood: around this time you logged low, anxious or irritable mood in 3 of 4 cycles, not always the same. How is it today?"]
+ok   5 repeated logs in one cycle count once; ties and majorities use exact per-cycle counts  — Mood: around this time you logged "anxious" in 3 of 4 cycles. Same today?
+ok   6 tEnd = Infinity: never an "ok" night, coverage stays finite
+ok   6 NaNend is flagged and never usable
+ok   6 NaNstart is flagged and never usable
+ok   6 futureEnd is flagged and never usable
+ok   6 reversed is flagged and never usable
+ok   6 infStart is flagged and never usable
+ok   7 same value, new off-wrist warning (clean then off-wrist): the reading is not usable
+ok   7 same value, new off-wrist warning (off-wrist then clean): the reading is not usable
+ok   7 same value but different firmware: not treated as an exact duplicate  — {"received":2,"duplicates":0,"conflicts":1,"invalid":0,"outOfRange":0,"badTimestamp":0,"offWrist":0,"unknownMetric":0}
+ok   7 same value but different unit: not treated as an exact duplicate  — {"received":2,"duplicates":0,"conflicts":1,"invalid":0,"outOfRange":0,"badTimestamp":0,"offWrist":0,"unknownMetric":0}
+ok   7 same value but different end time: not treated as an exact duplicate  — {"received":2,"duplicates":0,"conflicts":1,"invalid":0,"outOfRange":0,"badTimestamp":0,"offWrist":0,"unknownMetric":0}
+ok   8 six baseline nights, a 19-night gap, three high nights: abstains (detected:false) and says why  — {"detected":false,"why":"Not judged: there are gaps in the nightly data, so there is not enough continuous data to compare nights."}
+ok   9 a two-year-old HRV baseline is not called "your usual"  — {"ask":false,"why":"Not enough recent nights from this device (0 in the last 28 days; 7 needed)."}
+ok   9 after a device change, old-device nights are not used as the baseline
+ok   10 a period dated 1 Jan but entered 1 Jun is not visible as of 15 Jan
+ok   10 …and is visible once it had been entered
+ok   10 a later correction does not change what the forecast was as of an earlier date
+ok   10 a day backfilled later is unknown in earlier views
+ok   5 tie (low 2 cycles, anxious 2 cycles): nothing pre-filled, combined wording  — Mood: around this time you logged low, anxious or irritable mood in 4 of 4 cycles, not always the same. How is it today?
+ok   1 repeated conflicts: fails with retryable CONFLICT and saves nothing
+ok   1 a storage without atomic operations is refused (STORAGE_NOT_ATOMIC)
+ok   2 the device user ID is created once even when several tabs ask at the same moment
+ok   2 records from earlier versions are moved once into the transactional store and removed from localStorage
+ok   3 after purge, a fresh export contains no mood values, mood reminders or their pattern text
+ALL PASS

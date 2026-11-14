@@ -12,12 +12,13 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   const b = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
   // Service workers are blocked: their script fetch bypasses request interception, which only exists in this test.
   const ctx = await b.newContext({ viewport: { width: 400, height: 860 }, acceptDownloads: true, serviceWorkers: 'block' });
-  await ctx.route('https://shred.local/**', r => {
+  const serve = r => {
     let p = new URL(r.request().url()).pathname; if (p === '/') p = '/index.html';
     const f = path.join(ROOT, p);
     if (!fs.existsSync(f)) return r.fulfill({ status: 404, body: '' });
     r.fulfill({ status: 200, body: fs.readFileSync(f), headers: { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' } });
-  });
+  };
+  await ctx.route('https://shred.local/**', serve);
   const p = await ctx.newPage(); const errs = [];
   p.on('pageerror', e => errs.push(e.message)); p.on('console', m => m.type() === 'error' && !/favicon|fonts\.g/.test(m.text()) && errs.push(m.text()));
   // Centre an element before tapping it, so the fixed tab bar never covers it.
@@ -163,16 +164,19 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('cycle: demo wearable labelled synthetic, skin temp not core temp, DS07 unavailable', /synthetic demo/.test(wtxt) && /°C/.test(wtxt) && /Not core body temperature/.test(wtxt) && /SWL DS07 \(not available\)/.test(wtxt), wtxt.slice(0, 200));
   await cy('#cySettings [data-flag=phaseEducation]', 500);
   check('cycle: phase education (opt-in) has a "not enough data" state, no day-14 assumption', /Not enough data|Menstruation/.test(await p.textContent('#cyPhase')) && !/day 14/i.test(await p.textContent('#cyPhase')));
+  // Encrypted record now lives in IndexedDB (transactional store); read it raw, as an attacker with storage access would.
+  const rawRecord = pg => pg.evaluate(async () => { const m = await import('/js/cycle/store.js'); return m.indexedDbStorage().snapshot(localStorage.getItem('shred_cycle_uid')); });
   const ls = await p.evaluate(() => Object.fromEntries(Object.entries(localStorage)));
-  const cyKey = Object.keys(ls).find(k => k.startsWith('shred_cycle_v1:'));
-  check('cycle: stored encrypted (no dates or words in the stored value)', !!cyKey && /AES-GCM/.test(ls[cyKey]) && !/20\d\d-|spotting|energy/.test(ls[cyKey]));
+  const rec = await rawRecord(p);
+  check('cycle: stored encrypted in IndexedDB (no dates or words in the stored value)', !!rec.text && /AES-GCM/.test(rec.text) && !/20\d\d-|spotting|energy/.test(rec.text));
+  check('cycle: no cycle record left in localStorage', !Object.keys(ls).some(k => k.startsWith('shred_cycle_v1:')));
   check('cycle: nothing cycle-related in the main store or error log', !/spotting|period|energy|cycle/i.test((ls.shred_qk_v1 || '') + (ls.shred_errors_v1 || '')));
   const [cdl] = await Promise.all([p.waitForEvent('download'), tap('[data-act=export]')]);
   const exp = JSON.parse(fs.readFileSync(await cdl.path(), 'utf8'));
   check('cycle: export contains the user\'s data', exp.format === 'shred-cycle-export' && exp.data.periods.length === 6);
   await cy('[data-act=deleteAll]', 800);
-  const after = await p.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('shred_cycle_v1:')));
-  check('cycle: delete all → data gone and consent asked again', await p.isVisible('#cyConsent') && after.length === 0);
+  const after = await rawRecord(p);
+  check('cycle: delete all → data gone and consent asked again', await p.isVisible('#cyConsent') && after.text === null);
 
   // Two tabs (audit of 9f87b83, findings 1.1 and 1.3): no lost updates, and a deletion can't be undone by another tab
   await p.check('#cyAgree'); await cy('[data-act=consent]', 600);
@@ -187,17 +191,86 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await cy('[data-act=deleteAll]', 800);
   await q.waitForTimeout(600);
   check('two tabs: the other tab clears itself after a delete elsewhere', await q.isVisible('#cyConsent'));
-  const slotsAfter = await p.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('shred_cycle_v1:')).length);
+  const slotsAfter = (await rawRecord(p)).text === null ? 0 : 1;
   await p.reload(); await p.click('#welcomeBtn'); await p.click('.tabs [data-tab=body]'); await p.click('[data-go=cycle]'); await p.waitForTimeout(700);
   check('two tabs: after delete + reload, nothing comes back and no "can\'t unlock" error', slotsAfter === 0 && await p.isVisible('#cyConsent') && !(await p.$('#cyUnavailable')));
   await q.close();
   // Recovery path (finding 1.4): unreadable data → reset button → consent screen
-  await p.evaluate(() => { const uid = localStorage.getItem('shred_cycle_uid'); localStorage.setItem('shred_cycle_v1:' + uid, JSON.stringify({ v: 2, gen: Number(localStorage.getItem('shred_cycle_gen:' + uid)) || 0, rev: 1, alg: 'AES-GCM-256', iv: 'AAAAAAAAAAAAAAAA', ct: 'AAAAAAAAAAAAAAAAAAAAAA==' })); });
+  await p.evaluate(async () => { // write an unreadable record straight into IndexedDB
+    const uid = localStorage.getItem('shred_cycle_uid'), m = await import('/js/cycle/store.js'), snap = await m.indexedDbStorage().snapshot(uid);
+    await new Promise((res, rej) => { const r = indexedDB.open('shred_cycle_keys', 2); r.onsuccess = () => { const db = r.result, t = db.transaction('records', 'readwrite');
+      t.objectStore('records').put(JSON.stringify({ v: 2, gen: snap.gen, rev: 1, alg: 'AES-GCM-256', iv: 'AAAAAAAAAAAAAAAA', ct: 'AAAAAAAAAAAAAAAAAAAAAA==' }), uid); t.oncomplete = () => { db.close(); res(); }; t.onerror = rej; }; r.onerror = rej; });
+  });
   await p.reload(); await p.click('#welcomeBtn'); await p.click('.tabs [data-tab=body]'); await p.click('[data-go=cycle]'); await p.waitForTimeout(700);
   const stuck = await p.isVisible('#cyUnavailable') && await p.isVisible('[data-act=resetStorage]');
   await cy('[data-act=resetStorage]', 800);
   check('unreadable data: a reset button is offered and returns to the consent screen', stuck && await p.isVisible('#cyConsent'));
 
+
+  // Purge in the real UI (issue 3 reproduced in 0f26696): a mood pattern reminder and its text disappear from the
+  // reminders list, the due list and the export when mood history is purged.
+  await p.check('#cyAgree'); await cy('[data-act=consent]', 600);
+  await p.evaluate(async (d) => {
+    const S = await import('/js/cycle/store.js'), M = await import('/js/cycle/model.js'), R = await import('/js/cycle/reminders.js');
+    const uid = localStorage.getItem('shred_cycle_uid');
+    const repo = await S.openCycleRepo({ storage: S.indexedDbStorage(), keys: S.indexedDbKeys(), userId: uid });
+    await repo.update(s => { s.settings.quietHours = { start: '00:00', end: '00:00' }; // no quiet hours, so the 00:00 reminder is due now
+      M.setCategory(s, 'mood', true); M.setScopeConsent(s, 'reminders', true); M.logPeriodStart(s, d.start, { today: d.today });
+      M.logDay(s, d.yday, { mood: 'irritable' }, { today: d.today });
+      R.addReminder(s, { kind: 'pattern', time: '00:00', cycleDay: 3, category: 'mood', origin: 'You logged low, anxious or irritable mood around cycle days 2–4 in 3 of your last 3 recorded cycles.' }); });
+  }, { start: dayStr(-2), yday: dayStr(-1), today: dayStr(0) });
+  await p.reload(); await p.click('#welcomeBtn'); await p.click('.tabs [data-tab=body]'); await p.click('[data-go=cycle]'); await p.waitForTimeout(800);
+  const seeded = /one of your patterns/.test(await p.textContent('#cyReminders')) && await p.isVisible('#cyDue');
+  if (!(await p.$('#cySettings[open]'))) await tap('#cySettings summary');
+  await cy('#cySettings [data-cat=mood]', 900); // untick → confirm (accepted) = stop and delete
+  const remText = await p.textContent('#cyReminders');
+  const [pdl] = await Promise.all([p.waitForEvent('download'), tap('[data-act=export]')]);
+  const pexp = fs.readFileSync(await pdl.path(), 'utf8');
+  check('purge (browser): mood pattern reminder shown before purge, gone from reminders, due list and export after',
+    seeded && !/one of your patterns/.test(remText) && !(await p.$('#cyDue')) && !/irritable/.test(pexp) && !/"category":\s*"mood"/.test(pexp), JSON.stringify({ seeded }));
+
+  // Fresh contexts for concurrency tests (synthetic data only)
+  const newCtx = async ({ noLocks = false } = {}) => {
+    const c = await b.newContext({ viewport: { width: 400, height: 860 }, acceptDownloads: true, serviceWorkers: 'block' });
+    await c.route('https://shred.local/**', serve);
+    await c.addInitScript(() => localStorage.setItem('shred_flags_v1', JSON.stringify({ cycleTracking: true })));
+    if (noLocks) await c.addInitScript(() => Object.defineProperty(Navigator.prototype, 'locks', { get: () => undefined, configurable: true }));
+    return c;
+  };
+  const openCycle = async c => { const pg = await c.newPage(); pg.on('dialog', d => d.accept()); pg.on('pageerror', e => errs.push('ctx: ' + e.message));
+    await pg.goto('https://shred.local/'); await pg.click('#welcomeBtn'); await pg.click('.tabs [data-tab=body]'); await pg.click('[data-go=cycle]'); await pg.waitForTimeout(500); return pg; };
+  const starts = pg => pg.evaluate(async () => { const S = await import('/js/cycle/store.js'); const uid = localStorage.getItem('shred_cycle_uid');
+    const r = await S.openCycleRepo({ storage: S.indexedDbStorage(), keys: S.indexedDbKeys(), userId: uid }); return r.read().periods.map(x => x.start).sort(); });
+
+  // Simultaneous first opens (issue 2 reproduced in 0f26696): two tabs open cycle tracking for the first time at once
+  for (const noLocks of [false, true]) {
+    const tag = noLocks ? '(Web Locks removed)' : '(Web Locks available)';
+    const c = await newCtx({ noLocks });
+    const [A, B] = await Promise.all([openCycle(c), openCycle(c)]);
+    const ids = await Promise.all([A, B].map(pg => pg.evaluate(() => localStorage.getItem('shred_cycle_uid'))));
+    await A.check('#cyAgree'); await A.click('[data-act=consent]'); await A.waitForTimeout(700);
+    await B.waitForSelector('#cyLog', { timeout: 5000 }).catch(() => {});
+    await B.fill('#cyDate', dayStr(-20)); await B.click('[data-act=logStart]'); await B.waitForTimeout(600);
+    await A.reload(); await A.click('#welcomeBtn'); await A.click('.tabs [data-tab=body]'); await A.click('[data-go=cycle]'); await A.waitForTimeout(700);
+    check(`simultaneous first opens ${tag}: one user ID, one key; a save from the second tab decrypts after reload`,
+      ids[0] === ids[1] && !(await A.$('#cyUnavailable')) && JSON.stringify(await starts(A)) === JSON.stringify([dayStr(-20)]), JSON.stringify(ids));
+    // Simultaneous saves (issue 1): both tabs press "Period started" at the same moment
+    await A.fill('#cyDate', dayStr(-80)); await B.fill('#cyDate', dayStr(-50));
+    await Promise.all([A.click('[data-act=logStart]'), B.click('[data-act=logStart]')]); await A.waitForTimeout(900);
+    const got = await starts(A);
+    check(`simultaneous saves ${tag}: neither period is lost`, JSON.stringify(got) === JSON.stringify([dayStr(-80), dayStr(-50), dayStr(-20)].sort()), JSON.stringify(got));
+    // A redraw caused by the other tab must not change what this tab has typed but not saved (defect found here)
+    await B.fill('#cyDate', dayStr(-95)); await A.fill('#cyDate', dayStr(-3)); await A.click('[data-act=logSpotting]'); await B.waitForTimeout(900);
+    check(`other tab saves while this tab is typing ${tag}: the typed date is kept`, (await B.inputValue('#cyDate')) === dayStr(-95), await B.inputValue('#cyDate'));
+    // Simultaneous save + delete: deletion wins, nothing written back
+    await B.fill('#cyDate', dayStr(-110));
+    if (!(await A.$('#cySettings[open]'))) { await A.$eval('#cySettings summary', e => e.scrollIntoView({ block: 'center' })); await A.click('#cySettings summary'); }
+    await Promise.all([A.click('[data-act=deleteAll]'), B.click('[data-act=logStart]')]); await A.waitForTimeout(900);
+    const rec2 = await rawRecord(A);
+    await B.reload(); await B.click('#welcomeBtn'); await B.click('.tabs [data-tab=body]'); await B.click('[data-go=cycle]'); await B.waitForTimeout(700);
+    check(`simultaneous save + delete ${tag}: nothing survives, both tabs ask for consent again`, rec2.text === null && await B.isVisible('#cyConsent') && !(await B.$('#cyUnavailable')));
+    await c.close();
+  }
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();
   console.log(fails ? `${fails} FAILED` : 'ALL PASS'); process.exit(fails ? 1 : 0);
