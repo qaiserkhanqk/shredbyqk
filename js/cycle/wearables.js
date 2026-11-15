@@ -16,7 +16,14 @@
 //     { deviceId, model, firmware, metric: 'skin_temp'|'heart_rate'|'hrv_rmssd'|'breathing_rate',
 //       value, unit: 'degC'|'degF'|'bpm'|'ms'|'brpm', tStart, tEnd (epoch ms, UTC),
 //       tzOffsetMin (device's UTC offset when recorded), kind: 'raw'|'vendor_derived',
+//       sleepSessionId (the source's identifier of the sleep period the reading belongs to),
+//       sleepMain (true only when the SOURCE classifies that period as the person's main sleep),
 //       vendorQuality?: 'good'|'poor'|'off_wrist', seq? }
+//   Overnight extraction contract (issue 2 reproduced in 29780c5): a nightly summary is built ONLY from readings
+//   the source attributes to a verified main-sleep session. There is no built-in sleep window: readings without
+//   sleep information are quarantined (`no_sleep_context`), naps are not used (`not_main_sleep`), and a
+//   shift worker's daytime main sleep counts like any other. Whether a vendor's sleep classification is reliable
+//   must be verified per device (docs/wearable-sdk-requirements.md). Until a real SDK provides it, no night exists.
 import { CycleError } from './model.js';
 
 export const METRICS = {
@@ -29,6 +36,12 @@ export const METRICS = {
 // (docs/wearable-sdk-requirements.md). EARLIEST only rejects obviously wrong clocks (e.g. epoch 0).
 export const NIGHT_PARAMS = Object.freeze({ minCoverageMin: 180, minSamples: 6, maxSampleMin: 60 });
 const EARLIEST = Date.UTC(2015, 0, 1);
+/* Time-zone offsets (issue 3 reproduced in 29780c5): a whole number of minutes, a multiple of 15, within
+   UTC−12:00…UTC+14:00 — the range of real civil time zones (not a physiological threshold). Anything else is
+   quarantined as `tz_invalid` and never used to compute a date. */
+export const validTzOffset = x => typeof x === 'number' && Number.isInteger(x) && x >= -720 && x <= 840 && x % 15 === 0;
+const KINDS = ['raw', 'vendor_derived'];
+const kindOf = p => (KINDS.includes(p.kind) ? p.kind : 'unknown'); // never defaults to raw (issue 1)
 
 /** Why a packet's timestamps can't be trusted, or null (issue 6 reproduced in 0f26696: tEnd = Infinity was accepted). */
 function timestampProblem(p, now, params = NIGHT_PARAMS) {
@@ -53,8 +66,8 @@ function unionMinutes(rs) {
 export function normalise(packets, { now = Date.now() } = {}) {
   const seen = new Map(), out = [];
   const stats = { received: packets.length, duplicates: 0, conflicts: 0, invalid: 0, outOfRange: 0, badTimestamp: 0, offWrist: 0, unknownMetric: 0 };
-  for (const p of packets) {
-    const m = METRICS[p.metric];
+  for (const p of packets) { try { // one malformed packet must never stop the batch (issue 3)
+    const m = METRICS[p?.metric];
     if (!m) { stats.unknownMetric++; continue; }
     const key = `${p.deviceId}|${p.metric}|${p.tStart}`;
     if (seen.has(key)) {
@@ -62,7 +75,7 @@ export function normalise(packets, { now = Date.now() } = {}) {
       // the worse quality (conservative, either arrival order). Any other change is a conflict and is excluded.
       const prev = seen.get(key), q = p.vendorQuality || null;
       const sameCore = Object.is(prev.originalValue, p.value) && prev.originalUnit === p.unit && Object.is(prev.tEnd, p.tEnd) && prev.firmware === p.firmware &&
-        prev.model === p.model && (prev.tzOffsetMin ?? null) === (p.tzOffsetMin ?? null) && prev.kind === (p.kind === 'vendor_derived' ? 'vendor_derived' : 'raw');
+        prev.model === p.model && Object.is(prev.originalTz ?? null, p.tzOffsetMin ?? null) && prev.kind === kindOf(p) && prev.sleepSessionId === (p.sleepSessionId ?? null) && prev.sleepMain === (p.sleepMain === true);
       if (sameCore && q === prev.vendorQuality) { stats.duplicates++; continue; }
       if (sameCore) {
         if (q === 'off_wrist' && !prev.flags.includes('off_wrist')) { prev.flags.push('off_wrist'); stats.offWrist++; }
@@ -84,16 +97,23 @@ export function normalise(packets, { now = Date.now() } = {}) {
     if (p.vendorQuality === 'off_wrist') { flags.push('off_wrist'); stats.offWrist++; }
     if (p.vendorQuality === 'poor') flags.push('vendor_poor');
     if (p.tzOffsetMin == null) flags.push('tz_unknown'); // audit 3.3: without the device's offset the night can't be assigned; never assumed UTC
+    else if (!validTzOffset(p.tzOffsetMin)) { flags.push('tz_invalid'); stats.tzInvalid = (stats.tzInvalid || 0) + 1; }
+    const kind = kindOf(p); if (kind === 'unknown') flags.push('kind_unknown');
+    if (typeof p.sleepSessionId !== 'string' || !p.sleepSessionId) flags.push('no_sleep_context');
+    else if (p.sleepMain !== true) flags.push('not_main_sleep');
     const r = { deviceId: p.deviceId, model: p.model, firmware: p.firmware, metric: p.metric, value, unit, originalValue: p.value, originalUnit: p.unit,
-      tStart: p.tStart, tEnd: p.tEnd, tzOffsetMin: p.tzOffsetMin ?? null, kind: p.kind === 'vendor_derived' ? 'vendor_derived' : 'raw', vendorQuality: p.vendorQuality || null, flags };
+      tStart: p.tStart, tEnd: p.tEnd, tzOffsetMin: validTzOffset(p.tzOffsetMin) ? p.tzOffsetMin : null, originalTz: p.tzOffsetMin ?? null, kind, originalKind: p.kind ?? null,
+      sleepSessionId: typeof p.sleepSessionId === 'string' ? p.sleepSessionId : null, sleepMain: p.sleepMain === true, vendorQuality: p.vendorQuality || null, flags };
     seen.set(key, r); out.push(r);
-  }
+  } catch { stats.malformed = (stats.malformed || 0) + 1; } }
   return { readings: out, stats };
 }
 // Flags that exclude a reading from every inference. 'vendor_poor' is excluded (issue 1 reproduced in 80ea40f): we
 // have no clinically validated policy for using readings the device itself marks as poor quality, so they are
 // never used. Using them would need device-specific validation against a reference (docs/wearable-sdk-requirements.md).
-export const EXCLUDING = ['invalid', 'out_of_range', 'bad_timestamp', 'bad_duration', 'off_wrist', 'vendor_poor', 'conflict', 'unit_unknown', 'quality_changed', 'tz_unknown'];
+export const EXCLUDING = ['invalid', 'out_of_range', 'bad_timestamp', 'bad_duration', 'off_wrist', 'vendor_poor', 'conflict', 'unit_unknown', 'quality_changed', 'tz_unknown', 'tz_invalid', 'kind_unknown', 'no_sleep_context', 'not_main_sleep'];
+// Readings that can't be placed in a verified sleep session or a valid local date are quarantined before grouping.
+const UNGROUPABLE = ['bad_timestamp', 'bad_duration', 'tz_unknown', 'tz_invalid', 'no_sleep_context', 'not_main_sleep'];
 export const isUsable = r => r.value != null && !r.flags.some(f => EXCLUDING.includes(f));
 const rejectionReasons = rs => {
   const out = {};
@@ -101,45 +121,53 @@ const rejectionReasons = rs => {
   return out;
 };
 
-/** The "night" a reading belongs to: the local date of the evening it started (local time − 12 h). */
+/** Label for a sleep session: the local date of its first reading minus 12 h (a labelling convention so a session
+ *  starting after midnight is filed with the evening before; it is not a sleep window). Null if the offset is invalid. */
 export function nightOf(r) {
-  const local = r.tStart + (r.tzOffsetMin ?? 0) * 60e3 - 12 * 3600e3;
+  if (!validTzOffset(r.tzOffsetMin) || !Number.isFinite(r.tStart)) return null;
+  const local = r.tStart + r.tzOffsetMin * 60e3 - 12 * 3600e3;
   return new Date(local).toISOString().slice(0, 10);
 }
 
-/** One summary per night × device × metric. Never fills gaps. */
+/** One summary per verified main-sleep session × source identity (device, model, firmware) × metric × measurement
+ *  kind. Incompatible kinds and sources are never pooled (issue 1 reproduced in 29780c5). Never fills gaps.
+ *  The returned array has a `quarantined` property: readings that could not be placed, by reason. */
 export function summariseNights(readings, params = NIGHT_PARAMS) {
-  const groups = new Map();
+  const groups = new Map(), quarantined = {};
   for (const r of readings) {
-    if (r.flags.includes('bad_timestamp') || r.flags.includes('bad_duration')) continue;
-    const k = `${nightOf(r)}|${r.deviceId}|${r.firmware}|${r.metric}`;
+    const bad = r.flags.filter(f => UNGROUPABLE.includes(f));
+    if (bad.length) { for (const f of bad) quarantined[f] = (quarantined[f] || 0) + 1; continue; }
+    const k = JSON.stringify([r.sleepSessionId, r.deviceId, r.model, r.firmware, r.metric, r.kind]);
     if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r);
   }
   const out = [];
   for (const [k, rs] of groups) {
-    const [night, deviceId, firmware, metric] = k.split('|');
+    const [sleepSessionId, deviceId, model, firmware, metric, kind] = JSON.parse(k);
+    const night = nightOf([...rs].sort((a, b) => a.tStart - b.tStart)[0]);
     const good = rs.filter(isUsable).sort((a, b) => a.tStart - b.tStart);
     const coverageMin = unionMinutes(good);
     const tzs = [...new Set(rs.map(r => r.tzOffsetMin))];
     const vals = good.map(r => r.value).sort((a, b) => a - b);
     const enough = good.length >= params.minSamples && coverageMin >= params.minCoverageMin;
     const med = vals.length ? (vals.length % 2 ? vals[vals.length >> 1] : (vals[vals.length / 2 - 1] + vals[vals.length / 2]) / 2) : null;
-    out.push({ night, deviceId, model: rs[0].model, firmware, metric, unit: METRICS[metric].unit, kind: rs[0].kind,
+    out.push({ night, sleepSessionId, deviceId, model, firmware, metric, unit: METRICS[metric].unit, kind,
       status: enough ? 'ok' : good.length ? 'insufficient_wear' : 'no_usable_data',
       value: enough ? +med.toFixed(3) : null, samples: good.length, rejected: rs.length - good.length, rejectedBy: rejectionReasons(rs), coverageMin,
       firstAt: good[0]?.tStart ?? rs[0].tStart, lastAt: good.at(-1)?.tEnd ?? rs.at(-1).tEnd, tzOffsetMin: tzs.length === 1 ? tzs[0] : tzs,
       flags: [...new Set(rs.flatMap(r => r.flags))] });
   }
-  return markTravel(out.sort((a, b) => a.night.localeCompare(b.night) || a.metric.localeCompare(b.metric)));
+  const result = markTravel(out.sort((a, b) => a.night.localeCompare(b.night) || a.metric.localeCompare(b.metric)));
+  result.quarantined = quarantined;
+  return result;
 }
 function markTravel(nights) {
-  let prev = null, prevDev = null, prevFw = null, first = true;
+  let prev = null, prevDev = null, prevModel = null, prevFw = null, first = true;
   for (const n of nights.filter(x => x.metric === 'skin_temp')) {
     const tz = Array.isArray(n.tzOffsetMin) ? null : n.tzOffsetMin;
     if (Array.isArray(n.tzOffsetMin) || (prev != null && tz !== prev)) n.flags.push('tz_change');
-    if (!first && n.deviceId !== prevDev) n.flags.push('device_change');
-    if (!first && n.deviceId === prevDev && n.firmware !== prevFw) n.flags.push('firmware_change');
-    prev = tz ?? prev; prevDev = n.deviceId; prevFw = n.firmware; first = false;
+    if (!first && (n.deviceId !== prevDev || n.model !== prevModel)) n.flags.push('device_change');
+    if (!first && n.deviceId === prevDev && n.model === prevModel && n.firmware !== prevFw) n.flags.push('firmware_change');
+    prev = tz ?? prev; prevDev = n.deviceId; prevModel = n.model; prevFw = n.firmware; first = false;
   }
   return nights;
 }
@@ -152,7 +180,7 @@ const sortKeys = v => (Array.isArray(v) ? v.map(sortKeys) : v && typeof v === 'o
 const material = ({ syncedAt, prior, ...rest }) => JSON.stringify(sortKeys(rest));
 const withoutPrior = ({ prior, ...rest }) => rest;
 export function mergeNights(stored, fresh, { at = new Date().toISOString() } = {}) {
-  const k = n => `${n.night}|${n.deviceId}|${n.firmware}|${n.metric}`;
+  const k = n => JSON.stringify([n.night, n.sleepSessionId ?? null, n.deviceId, n.model, n.firmware, n.metric, n.kind]);
   const m = new Map(stored.map(n => [k(n), n]));
   for (const n of fresh) {
     const old = m.get(k(n));
@@ -173,11 +201,11 @@ export function nightTable(nights, from, to, metric = 'skin_temp') {
   return out;
 }
 
-/** Continuous segments of one device + firmware. Analyses never mix segments. */
+/** Continuous segments of one source identity (device, model, firmware) and measurement kind. Analyses never mix segments. */
 export function segments(nights, metric = 'skin_temp') {
   const out = []; let cur = null;
   for (const n of nights.filter(x => x.metric === metric)) {
-    const id = `${n.deviceId}|${n.firmware}`;
+    const id = `${n.deviceId}|${n.model}|${n.firmware}|${n.kind}`;
     if (!cur || cur.id !== id) { cur = { id, deviceId: n.deviceId, model: n.model, firmware: n.firmware, nights: [] }; out.push(cur); }
     cur.nights.push(n);
   }
@@ -241,7 +269,10 @@ export class MockWearable extends WearableAdapter {
         const tStart = startLocal + i * 600e3 - tz * 60e3;
         let v = level + gauss(r) * this.o.noise; if (r() < this.o.pGlitch) v = r() < 0.5 ? 18 + r() * 3 : NaN;
         const unit = dev.unit ?? this.o.unit, value = unit === 'degF' && Number.isFinite(v) ? +(v * 9 / 5 + 32).toFixed(2) : Number.isFinite(v) ? +v.toFixed(3) : v;
-        const pk = { deviceId: dev.deviceId ?? this.o.deviceId, model: dev.model ?? this.o.model, firmware: dev.firmware ?? this.o.firmware, metric: 'skin_temp', value, unit, tStart, tEnd: tStart + 600e3, tzOffsetMin: tz, kind: 'raw', seq: out.length };
+        // Synthetic sleep-session labels: the mock declares every night as one main-sleep session. A real SDK must
+        // supply and verify these (docs/wearable-sdk-requirements.md); nothing here validates sleep detection.
+        const pk = { deviceId: dev.deviceId ?? this.o.deviceId, model: dev.model ?? this.o.model, firmware: dev.firmware ?? this.o.firmware, metric: 'skin_temp', value, unit, tStart, tEnd: tStart + 600e3, tzOffsetMin: tz, kind: 'raw',
+          sleepSessionId: `${dev.deviceId ?? this.o.deviceId}-${night}`, sleepMain: true, seq: out.length };
         out.push(pk); if (r() < this.o.pDuplicate) out.push({ ...pk });
         if (i % 6 === 0) out.push({ ...pk, metric: 'heart_rate', value: Math.round(58 + gauss(r) * 4), unit: 'bpm' });
         if (i % 12 === 0) out.push({ ...pk, metric: 'hrv_rmssd', value: Math.round(45 + gauss(r) * 8), unit: 'ms', kind: 'vendor_derived' });

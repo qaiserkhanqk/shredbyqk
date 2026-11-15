@@ -116,7 +116,7 @@ function moodUser(valuesPerCycle) {
 /* ---------- 6. Timestamp validation ---------- */
 {
   const base = Date.parse('2026-11-01T23:00:00Z'), now = Date.parse('2026-11-14T00:00:00Z');
-  const pk = o => ({ deviceId: 'd', model: 'm', firmware: 'f', metric: 'skin_temp', value: 33.9, unit: 'degC', tzOffsetMin: 0, kind: 'raw', ...o });
+  const pk = o => ({ deviceId: 'd', model: 'm', firmware: 'f', metric: 'skin_temp', value: 33.9, unit: 'degC', tzOffsetMin: 0, kind: 'raw', sleepSessionId: 's1', sleepMain: true, ...o }); // with a synthetic sleep session so the timestamp rule is what's tested
   const inf = Array.from({ length: 6 }, (_, i) => pk({ tStart: base + i * 600e3, tEnd: Infinity }));
   const n = summariseNights(normalise(inf, { now }).readings)[0];
   check('6 tEnd = Infinity: never an "ok" night, coverage stays finite', !n || (n.status !== 'ok' && Number.isFinite(n.coverageMin)), JSON.stringify(n && { status: n.status, coverageMin: n.coverageMin }));
@@ -127,7 +127,7 @@ function moodUser(valuesPerCycle) {
 /* ---------- 7. Duplicates with changed metadata ---------- */
 {
   const now = Date.parse('2026-11-14T00:00:00Z'), t0 = Date.parse('2026-11-01T23:00:00Z');
-  const pk = o => ({ deviceId: 'd', model: 'm', firmware: 'f', metric: 'skin_temp', value: 33.9, unit: 'degC', tStart: t0, tEnd: t0 + 600e3, tzOffsetMin: 0, kind: 'raw', ...o });
+  const pk = o => ({ deviceId: 'd', model: 'm', firmware: 'f', metric: 'skin_temp', value: 33.9, unit: 'degC', tStart: t0, tEnd: t0 + 600e3, tzOffsetMin: 0, kind: 'raw', sleepSessionId: 's1', sleepMain: true, ...o });
   for (const [label, pair] of Object.entries({ 'clean then off-wrist': [pk({}), pk({ vendorQuality: 'off_wrist' })], 'off-wrist then clean': [pk({ vendorQuality: 'off_wrist' }), pk({})] })) {
     const rs = normalise(pair, { now }).readings;
     check(`7 same value, new off-wrist warning (${label}): the reading is not usable`, rs.length >= 1 && rs.every(r => !isUsable(r)));

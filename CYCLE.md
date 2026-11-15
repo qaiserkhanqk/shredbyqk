@@ -20,7 +20,7 @@
 13. [Limitations](#limitations)
 14. [Open items and blockers](#open-items-and-blockers)
 
-Related: [fixes for issues reproduced in 80ea40f, and open-item status](docs/cycle-fixes-80ea40f.md) · [fixes for issues reproduced in 0f26696](docs/cycle-fixes-0f26696.md) · [audit and fix status](docs/cycle-audit-9f87b83.md) · [validation plan](docs/cycle-validation-plan.md) · [evidence register](docs/cycle-evidence-register.md) · [wearable SDK requirements](docs/wearable-sdk-requirements.md) · [synthetic evaluation report](docs/cycle-eval-synthetic.md)
+Related: [fixes for issues reproduced in 29780c5](docs/cycle-fixes-29780c5.md) · Related: [fixes for issues reproduced in 80ea40f, and open-item status](docs/cycle-fixes-80ea40f.md) · [fixes for issues reproduced in 0f26696](docs/cycle-fixes-0f26696.md) · [audit and fix status](docs/cycle-audit-9f87b83.md) · [validation plan](docs/cycle-validation-plan.md) · [evidence register](docs/cycle-evidence-register.md) · [wearable SDK requirements](docs/wearable-sdk-requirements.md) · [synthetic evaluation report](docs/cycle-eval-synthetic.md)
 
 ## What was built
 
@@ -58,6 +58,7 @@ Existing features were not changed. Changes to shared files are small:
 | `phaseEducation` | off | Phase card (settings inside the Cycle screen) |
 | `symptomForecast` | off | Experimental "you may want to check in about X" suggestions |
 | `temperatureResearch` | off | Retrospective temperature-rise display. Never feeds the period estimate. |
+| `patternInsights` | off | Symptom-pattern findings and the "around now" insight. **Research, unvalidated.** Synthetic false-pattern rates range from 1.5% to 94.5% depending on logging (`docs/cycle-fixes-29780c5.md`) |
 | `quickSuggestions` | off | Low-effort mode: one-tap pre-filled answers from the person's own patterns. **Logic only, no screen yet.** |
 | `sensorPrompts` | off | Low-effort mode: wearable-timed questions. **Logic only, no screen yet.** |
 
@@ -259,13 +260,13 @@ the coach voice / TTS endpoint, analytics (none exist), AI prompts (none exist) 
 npm test
 ```
 
-This runs all suites (366 checks in total, including `tests/cycle-regressions-80ea40f.test.mjs`: 28), including `tests/cycle.test.mjs` (103), `tests/cycle-integration.test.mjs` (46, deletion and multi-tab regressions with and without a cross-tab lock), `tests/cycle-nudges.test.mjs` (33) and `tests/cycle-regressions.test.mjs` (41: the 10 issues reproduced in 0f26696, written failing-first).
+This runs all suites (392 checks in total, including `tests/cycle-regressions-80ea40f.test.mjs` and `tests/cycle-regressions-29780c5.test.mjs`), including `tests/cycle.test.mjs` (103), `tests/cycle-integration.test.mjs` (46, deletion and multi-tab regressions with and without a cross-tab lock), `tests/cycle-nudges.test.mjs` (33) and `tests/cycle-regressions.test.mjs` (41: the 10 issues reproduced in 0f26696, written failing-first).
 
 ```bash
 npm run test:e2e
 ```
 
-This runs the browser flow (64 checks) in Chromium, including the cycle checks with two real tabs, simultaneous first opens, saves and save-vs-delete **with and without Web Locks**, and purge through the UI.
+This runs the browser flow (69 checks across `tests/e2e.cjs` and `tests/cycle-ui-regressions.cjs`) in Chromium, including the cycle checks with two real tabs, simultaneous first opens, saves and save-vs-delete **with and without Web Locks**, and purge through the UI.
 
 ```bash
 npm run eval:cycle

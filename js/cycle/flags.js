@@ -5,6 +5,7 @@
 export const FLAG_DEFS = {
   cycleTracking: { default: false, label: 'Cycle tracking (prototype)', desc: 'Prototype only. Use synthetic or demo data, not real client data, until a privacy and clinical review is done.' },
   phaseEducation: { default: false, label: 'Phase education', desc: 'Shows simplified phase information only when it can be supported, with a "not enough data" state otherwise.' },
+  patternInsights: { default: false, label: 'Symptom pattern findings (research)', desc: 'Unvalidated. In synthetic tests, about 1 in 4 people with no real pattern still got one. Off until prospective testing shows it helps more than it misleads.' },
   symptomForecast: { default: false, label: 'Symptom forecast (experimental)', desc: 'Off until prospective testing shows it beats each person\'s own simple baseline.' },
   quickSuggestions: { default: false, label: 'One-tap suggestions', desc: 'Pre-fills answers from your own past patterns ("Same as usual around now?"). Nothing is saved unless you tap Yes.' },
   sensorPrompts: { default: false, label: 'Wearable-timed questions', desc: 'Uses your wearable only to decide WHEN to ask "has your period started?" or "how are you feeling?". It never records anything for you.' },

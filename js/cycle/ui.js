@@ -86,8 +86,8 @@ function render() {
   const unsaved = unsavedInputs(); // a redraw (e.g. another tab saved) must never change what the person typed
   const est = estimateNext(s, today);
   const tempShift = f.temperatureResearch && est.lastStart ? retrospectiveShift(s, est.lastStart, addDays(today, 1)) : null;
-  root.innerHTML = [banner(), promptsHTML(s, est, today), dueHTML(s, est, today, nowMin), estimateHTML(s, est), logHTML(s, today), insightHTML(s, today),
-    f.phaseEducation ? phaseHTML(s, today, tempShift, est) : '', historyHTML(s), patternsHTML(s, today, f), remindersHTML(s, est, today, nowMin),
+  root.innerHTML = [banner(), promptsHTML(s, est, today), dueHTML(s, est, today, nowMin), estimateHTML(s, est), logHTML(s, today), f.patternInsights ? insightHTML(s, today) : '',
+    f.phaseEducation ? phaseHTML(s, today, tempShift, est) : '', historyHTML(s), f.patternInsights ? patternsHTML(s, today, f) : '', remindersHTML(s, est, today, nowMin),
     wearableHTML(s, today, f, tempShift), situationHTML(s), settingsHTML(s, f)].join('');
   for (const id of open) { const d = root.querySelector('#' + id); if (d) d.open = true; }
   restoreInputs(unsaved);
@@ -209,8 +209,8 @@ function patternsHTML(s, today, f) {
   const rows = st.map(x => x.status === 'found' ? x.patterns.map(p => `<div class="row cy-row"><div><b>${esc(p.text)}</b><p class="muted small">${esc(evidenceText(p))}</p>${s.dismissed[p.key] ? '<span class="muted small">Dismissed</span>' : `<div class="btn-row"><button class="linkbtn" type="button" data-act="patternReminder" data-key="${esc(p.key)}">Remind me</button><button class="linkbtn" type="button" data-act="dismissInsight" data-key="${esc(p.key)}">Dismiss</button></div>`}</div></div>`).join('')
     : `<div class="row cy-row"><div><b>${esc(M.CATEGORIES[x.category].label)}: ${x.status === 'insufficient' ? 'not enough data' : 'no consistent pattern'}</b><p class="muted small">${esc(x.why)}</p></div><button class="linkbtn" type="button" data-act="checkinReminder">Daily check-in</button></div>`).join('');
   const fc = f.symptomForecast ? forecastCheckins(s, today) : [];
-  return `<div class="card" id="cyPatterns"><span class="eyebrow">Your patterns</span><div class="list">${rows}</div>
-    <p class="muted small">Observations from your own complete cycles only, never a prediction of how you will feel.</p>
+  return `<div class="card" id="cyPatterns"><span class="eyebrow">Your patterns · research, unvalidated</span><div class="list">${rows}</div>
+    <p class="muted small">Observations from your own complete cycles only, never a prediction of how you will feel. This is an unvalidated research feature: in synthetic tests, about 1 in 4 people with no real pattern still got one, so a finding may be chance.</p>
     ${f.symptomForecast ? `<p class="small"><b>Experimental:</b> ${fc.length ? esc(`past logs suggest a check-in about ${[...new Set(fc.map(x => M.CATEGORIES[x.category].label.toLowerCase()))].join(', ')} around ${human(fc[0].date)}.`) : 'nothing to suggest this week.'}</p>` : ''}</div>`;
 }
 
@@ -247,7 +247,8 @@ function wearableHTML(s, today, f, tempShift) {
 function situationHTML(s) {
   return `<details class="card" id="cySituation"><summary><span class="eyebrow">Situations that change how cycles work</span></summary><div class="stack" style="margin-top:10px">
     <p class="muted small">Optional. Used only to add caveats, pause estimates in pregnancy and hide phase information.</p>
-    ${Object.entries(M.SITUATIONS).map(([k, v]) => `<label class="check"><input type="checkbox" data-sit="${k}" ${s.situation[k] ? 'checked' : ''}> ${esc(v.label)}</label>`).join('')}</div></details>`;
+    ${Object.entries(M.SITUATIONS).map(([k, v]) => `<div class="btn-row" style="align-items:center"><label class="check"><input type="checkbox" data-sit="${k}" ${s.situation[k] ? 'checked' : ''}> ${esc(v.label)}</label>${(s.situationLog || []).some(e => e.key === k) ? `<button class="linkbtn" type="button" data-act="eraseSit" data-key="${k}">Delete (entered by mistake)</button>` : ''}</div>`).join('')}
+    <p class="muted small">Unticking records a change from that day. "Delete" removes the entry and its history, as if it was never entered.</p></div></details>`;
 }
 
 function settingsHTML(s, f) {
@@ -256,7 +257,7 @@ function settingsHTML(s, f) {
     ${Object.entries(M.CATEGORIES).map(([k, c]) => `<label class="check"><input type="checkbox" data-cat="${k}" ${M.categoryOn(s, k) ? 'checked' : ''}> <span><b>${c.label}</b> <span class="muted small">${esc(c.why)}</span></span></label>`).join('')}
     <p class="muted small">Turning a category off stops collecting it. You'll be asked whether to delete what you logged.</p>
     <b class="small">Optional features</b>
-    ${['phaseEducation', 'symptomForecast', 'temperatureResearch'].map(k => `<label class="check"><input type="checkbox" data-flag="${k}" ${f[k] ? 'checked' : ''}> <span><b>${esc(FLAG_DEFS[k].label)}</b> <span class="muted small">${esc(FLAG_DEFS[k].desc)}</span></span></label>`).join('')}
+    ${['phaseEducation', 'patternInsights', 'symptomForecast', 'temperatureResearch'].map(k => `<label class="check"><input type="checkbox" data-flag="${k}" ${f[k] ? 'checked' : ''}> <span><b>${esc(FLAG_DEFS[k].label)}</b> <span class="muted small">${esc(FLAG_DEFS[k].desc)}</span></span></label>`).join('')}
     <div class="btn-row"><button class="ghost" type="button" data-act="export">Export my data</button><button class="stop" type="button" data-act="deleteAll">Delete all cycle data</button></div>
     <p class="muted small">Deleting removes your records and destroys the encryption key on this device. It can't reach files you exported or device backups made earlier (they hold encrypted data, but may also hold the key).</p>
     <details><summary class="linkbtn">Consent record</summary><ul class="issues">${s.consent.log.map(l => `<li>${esc(l.at.slice(0, 10))}: ${esc(l.change)}</li>`).join('')}</ul></details></div></details>`;
@@ -302,6 +303,7 @@ async function onClick(e) {
       M.logDay(s, date(), f, { today: t });
     }, 'Saved'),
     deletePeriod: () => act(s => M.deletePeriod(s, b.closest('[data-pid]').dataset.pid), 'Period deleted'),
+    eraseSit: () => act(s => M.eraseSituation(s, b.dataset.key), 'Deleted'),
     dismissInsight: () => act((s, t) => { s.dismissed[b.dataset.key] = t; }, 'Dismissed'),
     patternReminder: () => act(s => { if (!s.consent.reminders) M.setScopeConsent(s, 'reminders', true); const p = findPatterns(s).find(x => x.key === b.dataset.key); addReminder(s, { kind: 'pattern', time: '09:00', cycleDay: p.from, category: p.category, origin: p.text }); }, 'Reminder set for next cycle'),
     checkinReminder: () => act(s => { if (!s.consent.reminders) M.setScopeConsent(s, 'reminders', true); addReminder(s, { kind: 'dailyLog', time: '20:00' }); }, 'Daily check-in set for 20:00'),
@@ -341,7 +343,7 @@ async function onChange(e) {
     const purge = confirm(`Stop logging ${M.CATEGORIES[k].label.toLowerCase()}. Also delete what you already logged?`);
     return act(s => M.setCategory(s, k, false, { purge }), purge ? 'Turned off and deleted' : 'Turned off');
   }
-  if (t.dataset.sit) return act(s => { if (t.checked) s.situation[t.dataset.sit] = true; else delete s.situation[t.dataset.sit]; });
+  if (t.dataset.sit) return act(s => M.setSituation(s, t.dataset.sit, t.checked)); // versioned (issue 4)
   if (t.dataset.flag) { setFlag(t.dataset.flag, t.checked); return render(); }
   if (t.dataset.rtime != null) return act(s => updateReminder(s, t.closest('[data-rid]').dataset.rid, { time: t.value }), 'Time changed');
   if (t.id === 'cyQs' || t.id === 'cyQe') return act(s => { s.settings.quietHours = { start: val('#cyQs'), end: val('#cyQe') }; }, 'Quiet hours saved');

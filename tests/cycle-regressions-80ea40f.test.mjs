@@ -15,7 +15,7 @@ const T = '2026-11-15';
 /* ---------- 1. Poor-quality readings ---------- */
 {
   const now = Date.parse('2026-11-14T00:00:00Z'), t0 = Date.parse('2026-11-01T23:00:00Z');
-  const pk = (i, o = {}) => ({ deviceId: 'd', model: 'm', firmware: 'f', metric: 'skin_temp', value: 33.9, unit: 'degC', tzOffsetMin: 0, kind: 'raw', tStart: t0 + i * 1800e3, tEnd: t0 + (i + 1) * 1800e3, ...o });
+  const pk = (i, o = {}) => ({ deviceId: 'd', model: 'm', firmware: 'f', metric: 'skin_temp', value: 33.9, unit: 'degC', tzOffsetMin: 0, kind: 'raw', sleepSessionId: 's1', sleepMain: true, tStart: t0 + i * 1800e3, tEnd: t0 + (i + 1) * 1800e3, ...o });
   const allPoor = summariseNights(normalise(Array.from({ length: 6 }, (_, i) => pk(i, { vendorQuality: 'poor' })), { now }).readings)[0];
   check('1 six contiguous 30-min readings all marked poor: not an "ok" night, all 6 rejected', allPoor.status !== 'ok' && allPoor.value === null && allPoor.rejected === 6, JSON.stringify({ status: allPoor.status, rejected: allPoor.rejected }));
   check('1 rejection reasons are recorded per reason', allPoor.rejectedBy?.vendor_poor === 6, JSON.stringify(allPoor.rejectedBy));
@@ -26,7 +26,7 @@ const T = '2026-11-15';
   const packets = [];
   for (let d = 0; d < 12; d++) {
     const night0 = Date.parse(addDays('2026-10-01', d) + 'T23:00:00Z');
-    for (let i = 0; i < 8; i++) packets.push({ deviceId: 'd', model: 'm', firmware: 'f', metric: 'skin_temp', unit: 'degC', tzOffsetMin: 0, kind: 'raw', tStart: night0 + i * 1800e3, tEnd: night0 + (i + 1) * 1800e3,
+    for (let i = 0; i < 8; i++) packets.push({ deviceId: 'd', model: 'm', firmware: 'f', metric: 'skin_temp', unit: 'degC', tzOffsetMin: 0, kind: 'raw', sleepSessionId: 's1', sleepMain: true, tStart: night0 + i * 1800e3, tEnd: night0 + (i + 1) * 1800e3,
       value: d >= 8 ? 34.4 : 33.8, ...(d >= 8 ? { vendorQuality: 'poor' } : {}) });
   }
   s.wearable.nights = summariseNights(normalise(packets, { now }).readings);
@@ -130,9 +130,10 @@ function tempUser(start, values, { periods = [start] } = {}) {
 /* ---------- Additional coverage for open audit items fixed alongside (item 7); added with the fixes ---------- */
 { // audit 3.3: a reading without a time-zone offset is flagged and never used (never assumed to be UTC)
   const now = Date.parse('2026-11-14T00:00:00Z'), t0 = Date.parse('2026-11-01T23:00:00Z');
-  const rs = normalise(Array.from({ length: 8 }, (_, i) => ({ deviceId: 'd', model: 'm', firmware: 'f', metric: 'skin_temp', value: 33.9, unit: 'degC', kind: 'raw', tStart: t0 + i * 1800e3, tEnd: t0 + (i + 1) * 1800e3 })), { now }).readings;
-  const n = summariseNights(rs)[0];
-  check('7 (audit 3.3) missing time-zone offset: flagged tz_unknown, night not "ok", reason recorded', rs.every(r => r.flags.includes('tz_unknown')) && n.status !== 'ok' && n.rejectedBy.tz_unknown === 8);
+  const rs = normalise(Array.from({ length: 8 }, (_, i) => ({ deviceId: 'd', model: 'm', firmware: 'f', metric: 'skin_temp', value: 33.9, unit: 'degC', kind: 'raw', sleepSessionId: 's1', sleepMain: true, tStart: t0 + i * 1800e3, tEnd: t0 + (i + 1) * 1800e3 })), { now }).readings;
+  const ns = summariseNights(rs);
+  // Since 29780c5: readings without an offset can't be placed in a night at all, so they are quarantined before grouping.
+  check('7 (audit 3.3) missing time-zone offset: flagged tz_unknown, no night built, reason counted', rs.every(r => r.flags.includes('tz_unknown')) && ns.length === 0 && ns.quarantined.tz_unknown === 8);
 }
 { // audit 2.4 and 2.2: overdue state, and check-ins continue while overdue with a correct reason
   const { addReminder, nextFire } = await import('../js/cycle/reminders.js');

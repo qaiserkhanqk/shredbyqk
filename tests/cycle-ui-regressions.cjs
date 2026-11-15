@@ -37,7 +37,9 @@ const dayStr = n => { const d = new Date(); d.setDate(d.getDate() + n); return `
   const off = await run({ cycleTracking: true });
   check('5 cycle tracking on, research flag off: no symptom-pattern finding is displayed', !/You logged lower energy around/.test(off) && !/id="cyPatterns"/.test(off) && !/id="cyInsight"/.test(off));
   const on = await run({ cycleTracking: true, patternInsights: true });
-  check('5 research flag on: the pattern card is shown, marked as unvalidated research', /id="cyPatterns"/.test(on) && /You logged lower energy around/.test(on) && /research/i.test(on));
+  // Tightened with the fix: on 29780c5 this control passed only because "research" appeared elsewhere on the page.
+  const card = (on.match(/<div class="card" id="cyPatterns">[\s\S]*?<\/div>\s*<\/div>/) || [''])[0];
+  check('5 research flag on: the pattern card is shown, and the card itself says it is unvalidated research', /You logged lower energy around/.test(card) && /unvalidated/i.test(card), card.slice(0, 160));
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();
   console.log(fails ? `${fails} FAILED` : 'ALL PASS'); process.exit(fails ? 1 : 0);

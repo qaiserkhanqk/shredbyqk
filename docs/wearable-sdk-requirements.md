@@ -19,6 +19,16 @@ timestamps, units, firmware reporting and data access are all **unknown**.
 | **Licensing / terms** allowing health-data use, with **no vendor cloud upload** required (or one covered by a DPA) | Privacy, GDPR Art. 9 | Legal review |
 | A platform route: a Web Bluetooth GATT profile, or a native SDK (which would need a native wrapper; a pure PWA can't use most native SDKs) | Feasibility in this static PWA | Prototype connection |
 
+## Overnight extraction contract (required since 29780c5)
+The app builds a nightly summary **only** from readings the source attributes to a **verified main-sleep session**:
+- **`sleepSessionId`:** the source's identifier for the sleep period the reading belongs to.
+- **`sleepMain: true`:** only when the source classifies that period as the person's main sleep. Naps are not used.
+- **No built-in window.** The app has **no built-in sleep window** (no "23:00–07:00"). A shift worker's daytime main sleep is treated like any other, and readings without sleep information are quarantined.
+- **Verification needed:** before relying on a vendor's sleep classification, verify it per device against a reference (e.g. a sleep diary and/or actigraphy) for main-sleep detection, start and end times, and naps.
+- **Other required fields:**
+  - the measurement **`kind`** exactly `raw` or `vendor_derived`; anything else is excluded and never defaulted to raw;
+  - a **time-zone offset** in whole minutes, a multiple of 15, within UTC−12:00…UTC+14:00; anything else is quarantined.
+
 ## Acceptance checks before setting `verified = true`
 1. 10 consecutive nights on 3+ people: ≥ 90% of worn nights produce `ok` summaries, and timestamps align to the reference clock within 2 minutes.
 2. Off-wrist periods are flagged and produce no values.

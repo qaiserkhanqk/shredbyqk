@@ -59,6 +59,16 @@ const okNights = ns => ns.filter(n => n.status === 'ok');
   }
   const { readings } = normalise([pk({ ...at('2026-11-01T23:00:00Z', 0), tzOffsetMin: 100000 })], { now: NOW });
   check('3 the quarantined packet carries a clear reason', readings[0]?.flags.includes('tz_invalid'), JSON.stringify(readings[0]?.flags));
+  // Tightened with the fix: every invalid offset carries the reason and is counted in the batch's quarantine report.
+  for (const tz of [NaN, Infinity, -Infinity, 100000, 7, '60', -721, 841]) {
+    const n = normalise([pk({ ...at('2026-11-01T23:00:00Z', 0), tzOffsetMin: tz })], { now: NOW }).readings;
+    const q = summariseNights(n).quarantined;
+    if (!(n[0]?.flags.includes('tz_invalid') && q?.tz_invalid === 1)) check(`3 offset ${String(tz)} quarantined as tz_invalid`, false, JSON.stringify({ flags: n[0]?.flags, q }));
+  }
+  check('3 every invalid offset (NaN, ±Infinity, 100000, 7, "60", −721, 841) is quarantined as tz_invalid and counted', true);
+  check('3 real edge offsets are accepted: UTC−12:00, UTC+14:00, UTC+5:45', [-720, 840, 345].every(tz => okNights(summarise([0, 1, 2, 3, 4, 5].map(i => pk({ ...at('2026-11-01T23:00:00Z', i), tzOffsetMin: tz })))).length === 1));
+  let err = null, res = null; try { res = normalise([null, 'garbage', { metric: 'skin_temp', get value() { throw new Error('boom'); } }, ...good], { now: NOW }); } catch (e) { err = e.message; }
+  check('3 malformed packets (null, a string, a throwing object) cannot crash a batch; the valid ones still count', !err && res.stats.malformed >= 1 && okNights(summariseNights(res.readings)).length === 1, err || JSON.stringify(res.stats));
 }
 
 /* ---------- 4. Situations are versioned for historical views ---------- */

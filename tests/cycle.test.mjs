@@ -233,7 +233,7 @@ check('experimental forecast: produces check-in suggestions only from found patt
 }
 
 /* ---------- Wearable data ---------- */
-const P = (o = {}) => ({ deviceId: 'd1', model: 'Mock', firmware: 'f1', metric: 'skin_temp', value: 33.9, unit: 'degC', tStart: Date.parse('2026-11-01T23:00:00Z'), tEnd: Date.parse('2026-11-01T23:10:00Z'), tzOffsetMin: 0, kind: 'raw', ...o });
+const P = (o = {}) => ({ deviceId: 'd1', model: 'Mock', firmware: 'f1', metric: 'skin_temp', value: 33.9, unit: 'degC', tStart: Date.parse('2026-11-01T23:00:00Z'), tEnd: Date.parse('2026-11-01T23:10:00Z'), tzOffsetMin: 0, kind: 'raw', sleepSessionId: 's1', sleepMain: true, ...o }); // synthetic verified main-sleep session (contract since 29780c5)
 {
   const now = Date.parse('2026-11-14T00:00:00Z');
   const { readings, stats } = normalise([P(), P(), P({ value: 34.5 }), P({ tStart: P().tStart + 6e5, tEnd: P().tStart + 12e5, value: 93.2, unit: 'degF' }), P({ tStart: P().tStart + 12e5, tEnd: P().tStart + 18e5, value: NaN }), P({ tStart: P().tStart + 18e5, tEnd: P().tStart + 24e5, value: 12 }), P({ tStart: now + 864e5, tEnd: now + 864e5 + 6e5 }), P({ metric: 'glucose' })], { now });
@@ -287,7 +287,7 @@ check('SWL DS07: unverified adapter refuses to connect', await new SwlDs07Adapte
 /* ---------- Flags ---------- */
 {
   const mem = new Map(), st = { getItem: k => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
-  check('flags: everything off by default', Object.values(readFlags(st)).every(v => v === false) && Object.keys(FLAG_DEFS).length === 6);
+  check('flags: everything off by default', Object.values(readFlags(st)).every(v => v === false) && Object.keys(FLAG_DEFS).length === 7);
   setFlag('cycleTracking', true, st);
   check('flags: can be turned on; others stay off', readFlags(st).cycleTracking && !readFlags(st).symptomForecast);
 }

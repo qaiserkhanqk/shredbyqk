@@ -40,7 +40,8 @@ export const blankState = owner => ({
   consent: { version: null, core: null, categories: {}, wearable: null, reminders: null, log: [] },
   periods: [],           // [{id, start, end|null, missedBefore, createdAt, updatedAt}]
   days: {},              // {'YYYY-MM-DD': {bleeding?, pain?, energy?, mood?, cravings?, sleep?, unwell?, travel?}}
-  situation: {},         // keys of SITUATIONS → true
+  situation: {},         // keys of SITUATIONS → true (current)
+  situationLog: [],      // [{key, on, at}] every change, for historical views (issue 4 reproduced in 29780c5)
   settings: { lockScreenDetail: false, quietHours: { start: '22:00', end: '07:00' }, remindersPausedUntil: null },
   reminders: [],
   delivered: {},         // reminderId → last date it was shown
@@ -93,6 +94,25 @@ export function setScopeConsent(s, scope, on, at = new Date().toISOString()) {
   s.consent[scope] = on ? at : null; stamp(s, `${scope}:${on ? 'on' : 'off'}`, at);
   if (!on && scope === 'wearable') s.wearable = { devices: [], nights: [] }; // withdrawing deletes the data
   if (!on && scope === 'reminders') { s.reminders = []; s.delivered = {}; }
+  return s;
+}
+
+/* ---------- Situations (pregnancy, contraception, …) ----------
+   Versioned (issue 4 reproduced in 29780c5): every change is logged with its time, so a historical view shows the
+   situation as it was known then, while the CURRENT view applies it immediately (e.g. pregnancy pauses estimates
+   now). Unticking is a later change; history keeps the earlier state. eraseSituation() is for an entry made by
+   mistake: it removes the situation and its whole history, so deletion is honoured in every view. */
+export function setSituation(s, key, on, { at = new Date().toISOString() } = {}) {
+  requireConsent(s);
+  if (!(key in SITUATIONS)) throw new CycleError('INVALID_INPUT');
+  if (on) s.situation[key] = true; else delete s.situation[key];
+  (s.situationLog ||= []).push({ key, on: !!on, at });
+  return s;
+}
+export function eraseSituation(s, key) {
+  requireConsent(s);
+  delete s.situation[key];
+  s.situationLog = (s.situationLog || []).filter(e => e.key !== key);
   return s;
 }
 
@@ -280,6 +300,11 @@ export function stateAsOf(s, asOf, { knownAt = `${asOf}T00:00:00.000Z` } = {}) {
     const { prior, ...cur } = n, known = [...(prior || []), cur].filter(x => !x.syncedAt || x.syncedAt < knownAt).at(-1);
     return known || null;
   }).filter(Boolean);
+  // Situations as known at knownAt. Keys set by older versions without a log entry have an unknown time: kept, counted.
+  const log = c.situationLog || [], logged = new Set(log.map(e => e.key)), sit = {};
+  for (const e of [...log].sort((a, b) => a.at.localeCompare(b.at))) if (e.at < knownAt) { if (e.on) sit[e.key] = true; else delete sit[e.key]; }
+  for (const k of Object.keys(c.situation || {})) if (!logged.has(k) && c.situation[k]) { sit[k] = true; unknownTime++; }
+  c.situation = sit;
   c.recordTimeUnknown = unknownTime;
   return c;
 }

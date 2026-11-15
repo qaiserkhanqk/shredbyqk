@@ -153,7 +153,10 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('cycle: correcting the latest start updates the estimate', /between 25 and 31 days/.test(await p.textContent('#cyDetail')), await p.textContent('#cyDetail'));
   await tap('#cySettings summary'); await cy('#cySettings [data-cat=energy]', 500);
   await p.selectOption('#cyLog [data-sym=energy]', 'low'); await cy('[data-act=saveDay]');
-  check('cycle: optional symptom (energy) logged after switching it on', /\(current\)[\s\S]*energy low/.test(await p.textContent('#cyHistory')) && /Energy: not enough data/.test(await p.textContent('#cyPatterns')));
+  check('cycle: optional symptom (energy) logged after switching it on', /\(current\)[\s\S]*energy low/.test(await p.textContent('#cyHistory')));
+  check('cycle: symptom-pattern findings hidden by default (research flag off)', !(await p.$('#cyPatterns')) && !(await p.$('#cyInsight')));
+  await cy('#cySettings [data-flag=patternInsights]', 500);
+  check('cycle: research flag on → pattern card shown, labelled unvalidated', /Energy: not enough data/.test(await p.textContent('#cyPatterns')) && /unvalidated/.test(await p.textContent('#cyPatterns')));
   await cy('[data-act=remindersOn]', 500); await cy('[data-act=addRem]', 500);
   check('cycle: reminder added with its next time and reason', (await p.$$('#cyReminders [data-rid]')).length === 1 && /You asked for a daily reminder/.test(await p.textContent('#cyReminders')));
   await cy('#cyReminders [data-act=pauseRem]', 500);
