@@ -83,13 +83,23 @@ export function normalise(packets, { now = Date.now() } = {}) {
     if (tsProblem) { flags.push(tsProblem); stats.badTimestamp++; }
     if (p.vendorQuality === 'off_wrist') { flags.push('off_wrist'); stats.offWrist++; }
     if (p.vendorQuality === 'poor') flags.push('vendor_poor');
+    if (p.tzOffsetMin == null) flags.push('tz_unknown'); // audit 3.3: without the device's offset the night can't be assigned; never assumed UTC
     const r = { deviceId: p.deviceId, model: p.model, firmware: p.firmware, metric: p.metric, value, unit, originalValue: p.value, originalUnit: p.unit,
       tStart: p.tStart, tEnd: p.tEnd, tzOffsetMin: p.tzOffsetMin ?? null, kind: p.kind === 'vendor_derived' ? 'vendor_derived' : 'raw', vendorQuality: p.vendorQuality || null, flags };
     seen.set(key, r); out.push(r);
   }
   return { readings: out, stats };
 }
-export const isUsable = r => r.value != null && !r.flags.some(f => ['invalid', 'out_of_range', 'bad_timestamp', 'bad_duration', 'off_wrist', 'conflict', 'unit_unknown', 'quality_changed'].includes(f));
+// Flags that exclude a reading from every inference. 'vendor_poor' is excluded (issue 1 reproduced in 80ea40f): we
+// have no clinically validated policy for using readings the device itself marks as poor quality, so they are
+// never used. Using them would need device-specific validation against a reference (docs/wearable-sdk-requirements.md).
+export const EXCLUDING = ['invalid', 'out_of_range', 'bad_timestamp', 'bad_duration', 'off_wrist', 'vendor_poor', 'conflict', 'unit_unknown', 'quality_changed', 'tz_unknown'];
+export const isUsable = r => r.value != null && !r.flags.some(f => EXCLUDING.includes(f));
+const rejectionReasons = rs => {
+  const out = {};
+  for (const r of rs) { if (isUsable(r)) continue; const why = r.value == null && !r.flags.some(f => EXCLUDING.includes(f)) ? ['no_value'] : r.flags.filter(f => EXCLUDING.includes(f)); for (const f of why) out[f] = (out[f] || 0) + 1; }
+  return out;
+};
 
 /** The "night" a reading belongs to: the local date of the evening it started (local time − 12 h). */
 export function nightOf(r) {
@@ -116,7 +126,7 @@ export function summariseNights(readings, params = NIGHT_PARAMS) {
     const med = vals.length ? (vals.length % 2 ? vals[vals.length >> 1] : (vals[vals.length / 2 - 1] + vals[vals.length / 2]) / 2) : null;
     out.push({ night, deviceId, model: rs[0].model, firmware, metric, unit: METRICS[metric].unit, kind: rs[0].kind,
       status: enough ? 'ok' : good.length ? 'insufficient_wear' : 'no_usable_data',
-      value: enough ? +med.toFixed(3) : null, samples: good.length, rejected: rs.length - good.length, coverageMin,
+      value: enough ? +med.toFixed(3) : null, samples: good.length, rejected: rs.length - good.length, rejectedBy: rejectionReasons(rs), coverageMin,
       firstAt: good[0]?.tStart ?? rs[0].tStart, lastAt: good.at(-1)?.tEnd ?? rs.at(-1).tEnd, tzOffsetMin: tzs.length === 1 ? tzs[0] : tzs,
       flags: [...new Set(rs.flatMap(r => r.flags))] });
   }
@@ -134,10 +144,22 @@ function markTravel(nights) {
   return nights;
 }
 
-/** Merge new summaries into stored ones (re-syncing a night replaces it, never duplicates it). */
+/* Merge new summaries into stored ones (issue 5 reproduced in 80ea40f):
+   • an IDENTICAL resync keeps the night as it is, including its first-known `syncedAt`;
+   • a MATERIAL change becomes the current version, and the earlier one is kept in `prior` (with its own syncedAt),
+     so a historical view can still show what was known then. Withdrawing wearable consent deletes all of it. */
+const sortKeys = v => (Array.isArray(v) ? v.map(sortKeys) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map(k => [k, sortKeys(v[k])])) : v);
+const material = ({ syncedAt, prior, ...rest }) => JSON.stringify(sortKeys(rest));
+const withoutPrior = ({ prior, ...rest }) => rest;
 export function mergeNights(stored, fresh, { at = new Date().toISOString() } = {}) {
   const k = n => `${n.night}|${n.deviceId}|${n.firmware}|${n.metric}`;
-  const m = new Map(stored.map(n => [k(n), n])); for (const n of fresh) m.set(k(n), { ...n, syncedAt: n.syncedAt || at }); // when it became known
+  const m = new Map(stored.map(n => [k(n), n]));
+  for (const n of fresh) {
+    const old = m.get(k(n));
+    if (!old) { m.set(k(n), { ...withoutPrior(n), syncedAt: n.syncedAt || at }); continue; }
+    if (material(old) === material(n)) continue; // identical resync: keep the first-known time
+    m.set(k(n), { ...withoutPrior(n), syncedAt: at, prior: [...(old.prior || []), withoutPrior(old)] });
+  }
   return [...m.values()].sort((a, b) => a.night.localeCompare(b.night) || a.metric.localeCompare(b.metric));
 }
 

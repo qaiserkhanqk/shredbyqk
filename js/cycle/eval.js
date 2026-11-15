@@ -122,11 +122,15 @@ export const MODELS = { baseline: baselineModel, sensor: sensorModel };
 
 /* ---------- Period-start evaluation (walk-forward) ---------- */
 export function evaluatePeriods(cohort, { models = MODELS } = {}) {
-  const rows = [];
+  const rows = []; rows.meta = { cyclesScored: { development: 0, test: 0 }, excludedMissedLog: { development: 0, test: 0 } };
   for (const p of cohort) {
-    const s = participantState(p), logged = s.periods.map(x => x.start);
+    const s = participantState(p), logged = s.periods.map(x => x.start), split = splitOf(p.id);
     for (let k = 1; k + 1 <= logged.length - 1; k++) {
       const prev = logged[k], actual = logged[k + 1];
+      // Audit 6.2: if a true start between these two logged starts was never logged, the "next logged start" is not
+      // the real outcome. Such cycles are excluded and counted, not scored against the wrong date.
+      if (p.truth.some(t => t.start > prev && t.start < actual && !t.logged)) { rows.meta.excludedMissedLog[split]++; continue; }
+      rows.meta.cyclesScored[split]++;
       for (let d = 1; addDays(prev, d) < actual; d++) {
         const asOf = addDays(prev, d), view = stateAsOf(s, asOf), lead = diffDays(asOf, actual);
         for (const [name, fn] of Object.entries(models)) {
@@ -233,14 +237,29 @@ export function evaluateSensorPrompt(cohort, split = 'test') {
     medianLagDays: x.lags.length ? median(x.lags) : null, falsePromptsPerCycle: x.cycles ? +(x.falsePrompts / x.cycles).toFixed(2) : null }]));
 }
 
-/* ---------- Leakage self-check ---------- */
-export function leakageCheck(p, model = baselineModel) {
-  const s = participantState(p), asOf = s.periods[4].start, a = model(stateAsOf(s, asOf), asOf);
-  const t = structuredClone(s); // scramble everything on or after asOf
-  for (const x of t.periods) if (x.start >= asOf) x.start = addDays(x.start, 3);
-  for (const n of t.wearable.nights) if (n.night >= asOf && n.value) n.value += 5;
-  const b = model(stateAsOf(t, asOf), asOf);
-  return JSON.stringify(a) === JSON.stringify(b);
+/* ---------- Leakage self-check (audit 6.3: every participant, several dates, more fields scrambled) ---------- */
+export function leakageCheck(p, model = baselineModel, at = [2, 4, 7]) {
+  const s = participantState(p);
+  for (const i of at) {
+    if (!s.periods[i]) continue;
+    const asOf = addDays(s.periods[i].start, 5), a = model(stateAsOf(s, asOf), asOf);
+    const t = structuredClone(s); // scramble everything dated on or after asOf, or entered after it
+    for (const x of t.periods) { if (x.start >= asOf) x.start = addDays(x.start, 3); if (x.end && x.end >= asOf) x.end = addDays(x.end, 2); x.missedBefore = x.start >= asOf ? !x.missedBefore : x.missedBefore; }
+    for (const x of t.periods) for (const v of x.versions || []) if (v.at >= `${asOf}T00:00`) { v.start = addDays(v.start, 3); v.end = v.end && addDays(v.end, 2); }
+    for (const [d, day] of Object.entries(t.days)) if (d >= asOf) day.energy = day.energy === 'low' ? 'usual' : 'low';
+    for (const n of t.wearable.nights) if (n.night >= asOf && n.value) n.value += 5;
+    if (JSON.stringify(a) !== JSON.stringify(model(stateAsOf(t, asOf), asOf))) return false;
+  }
+  return true;
+}
+/** Audit 6.4: what was excluded from the data, by reason (test participants). */
+export function dataExclusions(cohort, split = 'test') {
+  const out = { nights: 0, byStatus: {}, rejectedReadingsByReason: {} };
+  for (const p of cohort.filter(x => splitOf(x.id) === split)) for (const n of participantState(p).wearable.nights) {
+    out.nights++; out.byStatus[n.status] = (out.byStatus[n.status] || 0) + 1;
+    for (const [r, c] of Object.entries(n.rejectedBy || {})) out.rejectedReadingsByReason[r] = (out.rejectedReadingsByReason[r] || 0) + c;
+  }
+  return out;
 }
 
 export function runEvaluation({ participants = FROZEN.participants, seed = FROZEN.seed } = {}) {
@@ -248,7 +267,8 @@ export function runEvaluation({ participants = FROZEN.participants, seed = FROZE
   const rows = evaluatePeriods(cohort);
   return { banner: SYNTHETIC_BANNER, frozen: { ...FROZEN, participants, seed },
     splits: { development: cohort.filter(p => splitOf(p.id) === 'development').length, test: cohort.filter(p => splitOf(p.id) === 'test').length },
-    leakageFree: leakageCheck(cohort[1], baselineModel) && leakageCheck(cohort[1], sensorModel),
+    leakageFree: cohort.filter(p => splitOf(p.id) === 'test').every(p => leakageCheck(p, baselineModel) && leakageCheck(p, sensorModel)),
+    cyclesScored: rows.meta.cyclesScored.test, excludedMissedLog: rows.meta.excludedMissedLog.test, dataExclusions: dataExclusions(cohort, 'test'),
     periodStart: periodReport(rows, 'test'), ovulationEndpoint: evaluateShift(cohort, 'test'), symptomForecast: evaluateSymptoms(cohort, 'test'), periodPrompt: evaluateSensorPrompt(cohort, 'test') };
 }
 
@@ -256,9 +276,12 @@ export function runEvaluation({ participants = FROZEN.participants, seed = FROZE
 export function toMarkdown(rep) {
   const L = [`# Cycle estimate evaluation (synthetic)`, '', `> **${rep.banner}**`, '',
     `Frozen config: cohort \`${rep.frozen.cohortVersion}\`, seed ${rep.frozen.seed}, device \`${rep.frozen.device.model}\` firmware \`${rep.frozen.device.firmware}\`, baseline \`${rep.frozen.algorithms.baseline}\`, sensor candidate \`${rep.frozen.algorithms.sensor}\`.`,
-    `Participants: ${rep.splits.development} development (not scored), ${rep.splits.test} held-out test. Leakage self-check: **${rep.leakageFree ? 'passed' : 'FAILED'}**.`, '',
+    `Participants: ${rep.splits.development} development (not scored), ${rep.splits.test} held-out test. Leakage self-check (every test participant, 3 dates each, both models): **${rep.leakageFree ? 'passed' : 'FAILED'}**.`, '',
+    `Cycles scored: ${rep.cyclesScored}. Excluded because a period in between was never logged (the true outcome is unknown to the app): ${rep.excludedMissedLog}.`,
+    `Wearable nights: ${rep.dataExclusions.nights}; by status ${JSON.stringify(rep.dataExclusions.byStatus)}; rejected readings by reason ${JSON.stringify(rep.dataExclusions.rejectedReadingsByReason)}.`, '',
+    '"Window coverage" below is how often the true start fell inside the past-cycle window. The app does NOT present that window as a prediction interval: an interval would be derived from held-out data like this, but from a real study, not synthetic data.', '',
     '## Period-start estimate (held-out test participants, every day of every scored cycle)', ''];
-  const head = '| Model | Slice | Opportunities | No prediction | MAE (days) | ±1 d | ±2 d | ±3 d | Range coverage | Mean width | Mean lead time | Sensor used |', sep = '|' + '---|'.repeat(12);
+  const head = '| Model | Slice | Opportunities | No prediction | MAE (days) | ±1 d | ±2 d | ±3 d | Window coverage | Mean window width | Mean lead time | Sensor used |', sep = '|' + '---|'.repeat(12);
   L.push(head, sep);
   const row = (m, label, x) => L.push(`| ${m} | ${label} | ${x.opportunities} | ${x.noPredictionPct ?? '–'}% | ${x.mae ?? '–'} | ${x.within1 ?? '–'}% | ${x.within2 ?? '–'}% | ${x.within3 ?? '–'}% | ${x.rangeCoverage ?? '–'}% | ${x.meanRangeWidth ?? '–'} d | ${x.meanLeadTime ?? '–'} d | ${x.sensorUsedPct ?? '–'}% |`);
   for (const [m, r] of Object.entries(rep.periodStart)) {

@@ -20,7 +20,7 @@
 13. [Limitations](#limitations)
 14. [Open items and blockers](#open-items-and-blockers)
 
-Related: [fixes for issues reproduced in 0f26696](docs/cycle-fixes-0f26696.md) · [audit and fix status](docs/cycle-audit-9f87b83.md) · [validation plan](docs/cycle-validation-plan.md) · [evidence register](docs/cycle-evidence-register.md) · [wearable SDK requirements](docs/wearable-sdk-requirements.md) · [synthetic evaluation report](docs/cycle-eval-synthetic.md)
+Related: [fixes for issues reproduced in 80ea40f, and open-item status](docs/cycle-fixes-80ea40f.md) · [fixes for issues reproduced in 0f26696](docs/cycle-fixes-0f26696.md) · [audit and fix status](docs/cycle-audit-9f87b83.md) · [validation plan](docs/cycle-validation-plan.md) · [evidence register](docs/cycle-evidence-register.md) · [wearable SDK requirements](docs/wearable-sdk-requirements.md) · [synthetic evaluation report](docs/cycle-eval-synthetic.md)
 
 ## What was built
 
@@ -78,6 +78,14 @@ Flags live in `localStorage['shred_flags_v1']` because they are not health data.
 - **History.** You can see and edit periods, cycle lengths (marked as used or not used), and day logs per cycle, including the current one.
 
 ## Next-period estimate: the algorithm
+
+> **Since 80ea40f (`dates-only-1.1.0`):**
+> - The dates come from past cycles only, with **no padding**. With 1–2 cycles there is no ±2 days.
+> - The result is labelled `calibrated: false` and `intervalSource: 'past-cycles-only'`. It is never called a range or interval.
+> - It always says the period may come earlier or later.
+> - There is an `overdue` flag.
+> - Where this section says "range", read "the dates past cycles would point to". It is not a prediction interval.
+
 
 `predict.js`, version `dates-only-1.0.0`. It uses **only the user's own confirmed period starts**.
 
@@ -251,13 +259,13 @@ the coach voice / TTS endpoint, analytics (none exist), AI prompts (none exist) 
 npm test
 ```
 
-This runs all suites (337 checks in total), including `tests/cycle.test.mjs` (103), `tests/cycle-integration.test.mjs` (46, deletion and multi-tab regressions with and without a cross-tab lock), `tests/cycle-nudges.test.mjs` (33) and `tests/cycle-regressions.test.mjs` (41: the 10 issues reproduced in 0f26696, written failing-first).
+This runs all suites (366 checks in total, including `tests/cycle-regressions-80ea40f.test.mjs`: 28), including `tests/cycle.test.mjs` (103), `tests/cycle-integration.test.mjs` (46, deletion and multi-tab regressions with and without a cross-tab lock), `tests/cycle-nudges.test.mjs` (33) and `tests/cycle-regressions.test.mjs` (41: the 10 issues reproduced in 0f26696, written failing-first).
 
 ```bash
 npm run test:e2e
 ```
 
-This runs the browser flow (63 checks) in Chromium, including the cycle checks with two real tabs, simultaneous first opens, saves and save-vs-delete **with and without Web Locks**, and purge through the UI.
+This runs the browser flow (64 checks) in Chromium, including the cycle checks with two real tabs, simultaneous first opens, saves and save-vs-delete **with and without Web Locks**, and purge through the UI.
 
 ```bash
 npm run eval:cycle

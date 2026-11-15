@@ -144,7 +144,8 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('cycle: no history → "not enough data", no range', /Not enough data/.test(await p.textContent('#cyHeadline')) && !(await p.$('.cy-range')));
   for (const n of [-161, -132, -101, -71, -41, -10]) { await p.fill('#cyDate', dayStr(n)); await cy('[data-act=logStart]'); }
   const detail = await p.textContent('#cyDetail');
-  check('cycle: 5 cycles → estimated range with the cycles explained', /Estimated range/.test(await p.textContent('#cyHeadline')) && /between 29 and 31 days/.test(detail) && await p.isVisible('.cy-range'), detail);
+  check('cycle: 5 cycles → dates from past cycles, explained, never called a prediction interval', /From your past cycles/.test(await p.textContent('#cyHeadline')) && /between 29 and 31 days/.test(detail) && await p.isVisible('.cy-range') && !/Estimated range/.test(await p.textContent('#cyEstimate')), detail);
+  check('cycle: "may come earlier or later" is visible without opening any section', await p.isVisible('#cyOutside') && /earlier or later/.test(await p.textContent('#cyOutside')));
   await p.fill('#cyDate', dayStr(-3)); await cy('[data-act=logSpotting]');
   check('cycle: spotting logged without changing the estimate', (await p.textContent('#cyDetail')) === detail);
   await tap('#cyHistory summary');

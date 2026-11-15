@@ -188,14 +188,20 @@ export function logDay(s, date, fields, { today: t, source, at = new Date().toIS
       if (!categoryOn(s, k)) throw new CycleError('CATEGORY_OFF');
       if (v != null && !CATEGORIES[k].options.some(([o]) => o === v)) throw new CycleError('INVALID_INPUT');
     } else throw new CycleError('INVALID_INPUT');
-    if (v == null || v === false) { delete d[k]; if (d.src) delete d.src[k]; if (d.rec) delete d.rec[k]; }
-    else { d[k] = v; if (k in CATEGORIES || k === 'bleeding') (d.src ||= {})[k] = src(source); (d.rec ||= {})[k] = at; } // rec = when this value was entered
+    if (v == null || v === false) { delete d[k]; if (d.src) delete d.src[k]; if (d.rec) delete d.rec[k]; if (d.hist) delete d.hist[k]; } // deletion removes history too
+    else {
+      // Version history (issue 6 reproduced in 80ea40f): a correction appends; earlier values stay available to
+      // historical views. A value written before history existed is seeded from its entry time.
+      const h = ((d.hist ||= {})[k] ||= (d[k] != null && d.rec?.[k] ? [{ v: d[k], at: d.rec[k] }] : []));
+      if (!h.length || h.at(-1).v !== v) h.push({ v, at });
+      d[k] = v; if (k in CATEGORIES || k === 'bleeding') (d.src ||= {})[k] = src(source); (d.rec ||= {})[k] = at;
+    }
   }
   s.days[date] = d; pruneDays(s); return d;
 }
 function pruneDays(s) {
   for (const [k, v] of Object.entries(s.days)) {
-    for (const meta of ['src', 'rec']) if (v[meta]) { for (const f of Object.keys(v[meta])) if (!(f in v)) delete v[meta][f]; if (!Object.keys(v[meta]).length) delete v[meta]; }
+    for (const meta of ['src', 'rec', 'hist']) if (v[meta]) { for (const f of Object.keys(v[meta])) if (!(f in v)) delete v[meta][f]; if (!Object.keys(v[meta]).length) delete v[meta]; }
     if (!Object.keys(v).length) delete s.days[k];
   }
 }
@@ -260,7 +266,9 @@ export function stateAsOf(s, asOf, { knownAt = `${asOf}T00:00:00.000Z` } = {}) {
     if (d >= asOf) continue;
     const kept = {};
     for (const [k, v] of Object.entries(day)) {
-      if (k === 'src' || k === 'rec') continue;
+      if (k === 'src' || k === 'rec' || k === 'hist') continue;
+      const hist = day.hist?.[k];
+      if (hist?.length) { const known = hist.filter(x => x.at < knownAt).at(-1); if (known) kept[k] = known.v; continue; } // value as known then
       const at = day.rec?.[k];
       if (at == null) { if (k in CATEGORIES || k === 'bleeding') unknownTime++; kept[k] = v; }
       else if (at < knownAt) kept[k] = v;
@@ -268,7 +276,10 @@ export function stateAsOf(s, asOf, { knownAt = `${asOf}T00:00:00.000Z` } = {}) {
     if (Object.keys(kept).length) days[d] = kept;
   }
   c.days = days;
-  c.wearable.nights = c.wearable.nights.filter(n => n.night < asOf && (!n.syncedAt || n.syncedAt < knownAt));
+  c.wearable.nights = c.wearable.nights.filter(n => n.night < asOf).map(n => { // the version known at knownAt (issue 5)
+    const { prior, ...cur } = n, known = [...(prior || []), cur].filter(x => !x.syncedAt || x.syncedAt < knownAt).at(-1);
+    return known || null;
+  }).filter(Boolean);
   c.recordTimeUnknown = unknownTime;
   return c;
 }

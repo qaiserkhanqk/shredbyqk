@@ -127,4 +127,35 @@ function tempUser(start, values, { periods = [start] } = {}) {
   check('6 purge (consent withdrawal for mood) removes the value and its history everywhere', !JSON.stringify(s).includes('anxious') && !JSON.stringify(s).includes('"low"') && !M.stateAsOf(s, '2026-01-15').days['2026-01-12']);
 }
 
+/* ---------- Additional coverage for open audit items fixed alongside (item 7); added with the fixes ---------- */
+{ // audit 3.3: a reading without a time-zone offset is flagged and never used (never assumed to be UTC)
+  const now = Date.parse('2026-11-14T00:00:00Z'), t0 = Date.parse('2026-11-01T23:00:00Z');
+  const rs = normalise(Array.from({ length: 8 }, (_, i) => ({ deviceId: 'd', model: 'm', firmware: 'f', metric: 'skin_temp', value: 33.9, unit: 'degC', kind: 'raw', tStart: t0 + i * 1800e3, tEnd: t0 + (i + 1) * 1800e3 })), { now }).readings;
+  const n = summariseNights(rs)[0];
+  check('7 (audit 3.3) missing time-zone offset: flagged tz_unknown, night not "ok", reason recorded', rs.every(r => r.flags.includes('tz_unknown')) && n.status !== 'ok' && n.rejectedBy.tz_unknown === 8);
+}
+{ // audit 2.4 and 2.2: overdue state, and check-ins continue while overdue with a correct reason
+  const { addReminder, nextFire } = await import('../js/cycle/reminders.js');
+  const starts = Array.from({ length: 6 }, (_, i) => addDays('2026-04-01', i * 30));
+  const s = M.blankState('u'); M.giveConsent(s); for (const d of starts) M.logPeriodStart(s, d, { today: T }); M.setScopeConsent(s, 'reminders', true);
+  const today = addDays(starts.at(-1), 35), e = estimateNext(s, today), r = addReminder(s, { kind: 'periodCheck', time: '09:00' });
+  check('7 (audit 2.4) overdue: flagged and headline says later than recent cycles', e.overdue && /Later than your recent cycles/.test(e.headline) && /hasn't been logged yet/.test(e.detail));
+  const nf = nextFire(r, s, { today, nowMin: 0, estimate: e });
+  check('7 (audit 2.2) overdue: period check-ins keep going, with the true reason (not "Paused.")', nf.next?.date === today && /later than your recent cycles/.test(nf.why), JSON.stringify(nf));
+}
+{ // audit 6.2: cycles spanning an unlogged period are excluded from scoring and counted
+  const { evaluatePeriods, makeParticipant } = await import('../js/cycle/eval.js');
+  const p = makeParticipant(5); // generator marks one start as never logged for this participant
+  const rows = evaluatePeriods([p], { models: { baseline: (await import('../js/cycle/eval.js')).baselineModel } });
+  const ex = rows.meta.excludedMissedLog.development + rows.meta.excludedMissedLog.test;
+  check('7 (audit 6.2) evaluation excludes and counts cycles whose true outcome was never logged', p.truth.some(t => !t.logged) ? ex >= 1 : ex === 0, String(ex));
+}
+{ // audit 5.3/5.4: wording shows observed and missing cycles; single day not "24–24"
+  const starts = Array.from({ length: 7 }, (_, i) => addDays('2026-03-01', i * 30));
+  const s = M.blankState('u'); M.giveConsent(s); M.setCategory(s, 'energy', true); for (const d of starts) M.logPeriodStart(s, d, { today: T });
+  starts.slice(0, 6).forEach((st, i) => { for (let d = 1; d <= 30; d++) { if (i >= 3 && d >= 22 && d <= 26) continue; M.logDay(s, addDays(st, d - 1), { energy: d === 24 && i < 3 ? 'low' : 'usual' }, { today: T }); } });
+  const p = findPatterns(s)[0];
+  check('7 (audit 5.3/5.4) text states cycles without logs and uses "cycle day 24"', !!p && /cycle day 24 /.test(p.text) && /3 of your 6 complete cycles had no logs then/.test(p.text), p?.text);
+}
+
 console.log(fails ? `${fails} FAILED` : 'ALL PASS'); process.exit(fails ? 1 : 0);

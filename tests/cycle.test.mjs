@@ -74,8 +74,8 @@ check('sparse: no data → insufficient-data state, no range', estimateNext(user
 check('sparse: one start → still no estimate', estimateNext(user(['2026-11-01']), T).status === 'none');
 {
   const e = estimateNext(user(['2026-09-20', '2026-10-30']), T); // one cycle of 40 days
-  check('no 28-day default: one 40-day cycle → early estimate around day 40', e.status === 'early' && e.rangeStart === addDays('2026-10-30', 38) && e.rangeEnd === addDays('2026-10-30', 42), `${e.rangeStart}–${e.rangeEnd}`);
-  check('early estimate explains why the range is padded', /can't show how much yours varies/.test(e.detail));
+  check('no 28-day default: one 40-day cycle → early, day 40 only (no invented padding since 80ea40f issue 4)', e.status === 'early' && e.rangeStart === addDays('2026-10-30', 40) && e.rangeEnd === addDays('2026-10-30', 40), `${e.rangeStart}–${e.rangeEnd}`);
+  check('early estimate says one cycle can\'t show variation, and that the period may come earlier or later', /can't show how much yours varies/.test(e.detail) && /earlier or later/.test(e.detail));
 }
 {
   const e = estimateNext(user(series('2026-04-10', [29, 31, 30, 30, 32, 29])), T);
@@ -156,7 +156,7 @@ function symptomUser({ lowDays = [24, 25], cyclesN = 4, logEvery = 1, alwaysLow 
   const s = symptomUser(), pats = findPatterns(s);
   const p = pats.find(x => x.category === 'energy');
   check('pattern: found from 4 complete cycles of logs, range = the days actually logged', !!p && p.from === 24 && p.to === 25, JSON.stringify(pats.map(x => [x.from, x.to, x.notable, x.observed])));
-  check('pattern: text is past tense with the counts', /^You logged lower energy around cycle days \d+–\d+ in 4 of your last 4 recorded cycles/.test(p.text) && !/ will /.test(p.text), p.text);
+  check('pattern: text is past tense with the counts', /^You logged lower energy around cycle days \d+–\d+ in 4 of the 4 cycles with energy logs then/.test(p.text) && !/ will /.test(p.text), p.text);
   check('pattern: evidence lists every cycle', p.evidence.length === 4 && p.evidence.every(e => e.observed));
   const today = addDays(s.periods.at(-1).start, 23);
   check('insight: shown when today falls in the pattern window', insightForToday(s, today)?.key === p.key);
@@ -182,7 +182,8 @@ check('experimental forecast: produces check-in suggestions only from found patt
   check('phase: menstruation shown as observed during a logged period', phaseInfo(s, '2026-10-31').status === 'observed' && /follicular/.test(phaseInfo(s, '2026-10-31').text));
   const mid = phaseInfo(s, '2026-11-13');
   check('phase: otherwise "not enough data", no day-14 assumption', mid.status === 'not_enough_data' && !/14/.test(mid.text));
-  check('phase: an estimate only with a retrospective temperature rise', phaseInfo(s, '2026-11-13', { tempShift: { detected: true, firstHighNight: '2026-11-10' } }).status === 'estimate');
+  check('phase: an estimate only with a retrospective temperature rise that is still present last night', phaseInfo(s, '2026-11-13', { tempShift: { detected: true, firstHighNight: '2026-11-10', stillElevated: true, lastValidNight: '2026-11-12' } }).status === 'estimate');
+  check('phase: a rise with no evidence that it lasted or is current → abstains (80ea40f issue 2)', phaseInfo(s, '2026-11-13', { tempShift: { detected: true, firstHighNight: '2026-11-10' } }).status === 'not_enough_data');
   s.situation = { hormonalContraception: true };
   check('phase: not shown on hormonal contraception', phaseInfo(s, '2026-10-31').status === 'unsupported');
   for (const k of ['postpartum', 'perimenopause', 'pregnant']) { s.situation = { [k]: true }; if (phaseInfo(s, '2026-11-13').status !== 'unsupported') check(`phase unsupported: ${k}`, false); }

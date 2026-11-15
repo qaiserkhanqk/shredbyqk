@@ -2,31 +2,36 @@
 
 > **SYNTHETIC DATA. These results test the software only. They are not real-world or clinical performance and must not be quoted as accuracy.**
 
-Frozen config: cohort `synthetic-cohort-1`, seed 20261114, device `Mock Band (synthetic)` firmware `mock-1.0`, baseline `dates-only-1.0.0`, sensor candidate `sensor-candidate-0.1.0+three-over-six-skin-0.1.0-research`.
-Participants: 9 development (not scored), 31 held-out test. Leakage self-check: **passed**.
+Frozen config: cohort `synthetic-cohort-1`, seed 20261114, device `Mock Band (synthetic)` firmware `mock-1.0`, baseline `dates-only-1.1.0`, sensor candidate `sensor-candidate-0.1.0+three-over-six-skin-0.1.0-research`.
+Participants: 9 development (not scored), 31 held-out test. Leakage self-check (every test participant, 3 dates each, both models): **passed**.
+
+Cycles scored: 335. Excluded because a period in between was never logged (the true outcome is unknown to the app): 3.
+Wearable nights: 11000; by status {"ok":10232,"insufficient_wear":768}; rejected readings by reason {"out_of_range":7437,"invalid":7522}.
+
+"Window coverage" below is how often the true start fell inside the past-cycle window. The app does NOT present that window as a prediction interval: an interval would be derived from held-out data like this, but from a real study, not synthetic data.
 
 ## Period-start estimate (held-out test participants, every day of every scored cycle)
 
-| Model | Slice | Opportunities | No prediction | MAE (days) | ±1 d | ±2 d | ±3 d | Range coverage | Mean width | Mean lead time | Sensor used |
+| Model | Slice | Opportunities | No prediction | MAE (days) | ±1 d | ±2 d | ±3 d | Window coverage | Mean window width | Mean lead time | Sensor used |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| baseline | all | 10590 | 2.9% | 3.17 | 42.2% | 62.9% | 74.8% | 71.5% | 7.4 d | 16.8 d | 0% |
-| baseline | cycle day 2 | 338 | 3% | 2.83 | 44.5% | 64.9% | 76.2% | 72.9% | 7.3 d | 31.4 d | 0% |
-| baseline | 1–3 days ahead | 1014 | 3% | 2.83 | 44.5% | 64.9% | 76.2% | 72.9% | 7.3 d | 2 d | 0% |
-| baseline | 4–7 days ahead | 1352 | 3% | 2.83 | 44.5% | 64.9% | 76.2% | 72.9% | 7.3 d | 5.5 d | 0% |
-| baseline | 8–14 days ahead | 2366 | 3% | 2.83 | 44.5% | 64.9% | 76.2% | 72.9% | 7.3 d | 11 d | 0% |
-| baseline | 15+ days ahead | 5858 | 2.9% | 3.45 | 40.4% | 61.3% | 73.7% | 70.4% | 7.5 d | 24.3 d | 0% |
-| baseline | regular cycles | 4308 | 4.1% | 1.84 | 71.1% | 90.6% | 96% | 79% | 4.2 d | 14.9 d | 0% |
-| baseline | variable cycles | 2612 | 5% | 4.56 | 19.2% | 38% | 52.3% | 64.3% | 12 d | 15.7 d | 0% |
-| baseline | long cycles | 3670 | 0% | 3.74 | 25.3% | 48.6% | 66.3% | 68% | 7.9 d | 19.6 d | 0% |
-| sensor | all | 10590 | 2% | 2.94 | 43.9% | 65.9% | 78.3% | 71.4% | 6.9 d | 16.7 d | 27.4% |
-| sensor | cycle day 2 | 338 | 3% | 2.83 | 44.5% | 64.9% | 76.2% | 72.9% | 7.3 d | 31.4 d | 0% |
-| sensor | 1–3 days ahead | 1014 | 0% | 2.09 | 50.6% | 74.3% | 87.6% | 72.5% | 5.9 d | 2 d | 83.7% |
-| sensor | 4–7 days ahead | 1352 | 0.1% | 2.08 | 50.9% | 74.6% | 87.9% | 73.2% | 5.9 d | 5.5 d | 83% |
-| sensor | 8–14 days ahead | 2366 | 1.9% | 2.57 | 45.8% | 68.4% | 80.2% | 72.6% | 6.8 d | 11 d | 33.7% |
-| sensor | 15+ days ahead | 5858 | 2.9% | 3.44 | 40.3% | 61.3% | 73.7% | 70.4% | 7.5 d | 24.3 d | 1.5% |
-| sensor | regular cycles | 4308 | 2.7% | 1.99 | 64.2% | 86.4% | 94.5% | 77.2% | 4.9 d | 14.8 d | 30.7% |
-| sensor | variable cycles | 2612 | 3.7% | 3.74 | 30% | 49.3% | 62.6% | 66.7% | 10.1 d | 15.6 d | 26% |
-| sensor | long cycles | 3670 | 0% | 3.47 | 30.3% | 53.9% | 70.7% | 68.1% | 7.2 d | 19.6 d | 24.6% |
+| baseline | all | 10395 | 3% | 2.58 | 43% | 64.1% | 76.3% | 66.8% | 6.7 d | 16.5 d | 0% |
+| baseline | cycle day 2 | 335 | 3% | 2.55 | 44.9% | 65.5% | 76.9% | 67.1% | 6.6 d | 31 d | 0% |
+| baseline | 1–3 days ahead | 1005 | 3% | 2.55 | 44.9% | 65.5% | 76.9% | 67.1% | 6.6 d | 2 d | 0% |
+| baseline | 4–7 days ahead | 1340 | 3% | 2.55 | 44.9% | 65.5% | 76.9% | 67.1% | 6.6 d | 5.5 d | 0% |
+| baseline | 8–14 days ahead | 2345 | 3% | 2.55 | 44.9% | 65.5% | 76.9% | 67.1% | 6.6 d | 11 d | 0% |
+| baseline | 15+ days ahead | 5705 | 2.9% | 2.61 | 41.5% | 63% | 75.7% | 66.6% | 6.8 d | 23.8 d | 0% |
+| baseline | regular cycles | 4191 | 4.2% | 1.03 | 73.2% | 93.3% | 98.8% | 70.1% | 3.4 d | 14.5 d | 0% |
+| baseline | variable cycles | 2612 | 5% | 4.56 | 19.2% | 38% | 52.3% | 62.1% | 11.2 d | 15.7 d | 0% |
+| baseline | long cycles | 3592 | 0% | 2.95 | 25.8% | 49.6% | 67.7% | 66.4% | 7.2 d | 19.2 d | 0% |
+| sensor | all | 10395 | 2% | 2.36 | 44.8% | 67.1% | 79.8% | 67.5% | 6.3 d | 16.4 d | 26.7% |
+| sensor | cycle day 2 | 335 | 3% | 2.55 | 44.9% | 65.5% | 76.9% | 67.1% | 6.6 d | 31 d | 0% |
+| sensor | 1–3 days ahead | 1005 | 0% | 1.82 | 51% | 74.9% | 88.4% | 69% | 5.5 d | 2 d | 83.6% |
+| sensor | 4–7 days ahead | 1340 | 0.1% | 1.81 | 51.4% | 75.3% | 88.6% | 69.6% | 5.5 d | 5.5 d | 82.9% |
+| sensor | 8–14 days ahead | 2345 | 1.9% | 2.29 | 46.2% | 69% | 81% | 67.9% | 6.2 d | 11 d | 33.1% |
+| sensor | 15+ days ahead | 5705 | 2.9% | 2.61 | 41.5% | 63% | 75.7% | 66.6% | 6.8 d | 23.8 d | 0% |
+| sensor | regular cycles | 4191 | 2.8% | 1.21 | 66.1% | 88.8% | 97.2% | 69.8% | 4.2 d | 14.4 d | 29.6% |
+| sensor | variable cycles | 2612 | 3.7% | 3.74 | 30% | 49.3% | 62.6% | 64.9% | 9.5 d | 15.6 d | 26% |
+| sensor | long cycles | 3592 | 0% | 2.69 | 31% | 55% | 72.2% | 66.7% | 6.6 d | 19.2 d | 23.7% |
 
 ## Separate endpoint: retrospective temperature rise vs the generator's synthetic ovulation label
 
@@ -47,7 +52,7 @@ This only checks that the detector behaves as designed on data built to contain 
 | Prompt | Cycles | Hit (−1…+2 days) | Median lag (days) | False prompts per cycle |
 |---|---|---|---|---|
 | wearable-timed | 338 | 85.8% | 1 | 0.03 |
-| dates-only range | 338 | 91.7% | -1 | 2.83 |
+| dates-only range | 338 | 90.2% | -1 | 2.6 |
 
 Neither prompt records anything: a hit saves the person a tap, a false prompt costs one "Not yet". The wearable-timed prompt looks good here by construction (the synthetic generator puts a temperature step before each period).
 

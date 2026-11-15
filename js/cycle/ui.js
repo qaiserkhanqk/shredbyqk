@@ -87,7 +87,7 @@ function render() {
   const est = estimateNext(s, today);
   const tempShift = f.temperatureResearch && est.lastStart ? retrospectiveShift(s, est.lastStart, addDays(today, 1)) : null;
   root.innerHTML = [banner(), promptsHTML(s, est, today), dueHTML(s, est, today, nowMin), estimateHTML(s, est), logHTML(s, today), insightHTML(s, today),
-    f.phaseEducation ? phaseHTML(s, today, tempShift) : '', historyHTML(s), patternsHTML(s, today, f), remindersHTML(s, est, today, nowMin),
+    f.phaseEducation ? phaseHTML(s, today, tempShift, est) : '', historyHTML(s), patternsHTML(s, today, f), remindersHTML(s, est, today, nowMin),
     wearableHTML(s, today, f, tempShift), situationHTML(s), settingsHTML(s, f)].join('');
   for (const id of open) { const d = root.querySelector('#' + id); if (d) d.open = true; }
   restoreInputs(unsaved);
@@ -148,16 +148,16 @@ function dueHTML(s, est, today, nowMin) {
 }
 
 function estimateHTML(s, est) {
-  const range = est.rangeStart ? `<div class="num cy-range">${human(est.rangeStart)} – ${human(est.rangeEnd)}</div><p class="muted small">A date range, not a date.${est.beyondRange ? ' This range has passed.' : ''}</p>` : '';
+  const range = est.rangeStart ? `<div class="num cy-range">${est.singleDate ? human(est.rangeStart) : `${human(est.rangeStart)} – ${human(est.rangeEnd)}`}</div><p class="small" id="cyOutside"><b>From your past cycles only. Your period may come earlier or later.</b></p>` : '';
   const pl = typicalPeriodLength(s);
-  return `<div class="card stack" id="cyEstimate"><div><span class="eyebrow">Next period · ${esc(est.status === 'estimate' ? 'estimate' : est.status.replace('_', ' '))}</span><h2 class="display h2" id="cyHeadline">${esc(est.headline)}</h2></div>
+  return `<div class="card stack" id="cyEstimate"><div><span class="eyebrow">Next period · ${esc(est.overdue ? 'overdue' : est.status === 'estimate' ? 'past cycles' : est.status.replace('_', ' '))}</span><h2 class="display h2" id="cyHeadline">${esc(est.headline)}</h2></div>
     ${range}<p class="small" id="cyDetail">${esc(est.detail)}</p>
     ${est.cycleDay ? `<p class="muted small">Today is day ${est.cycleDay} since your last logged start (${human(est.lastStart)}).${pl ? ` Your logged periods usually last ${pl} days.` : ''}</p>` : ''}
     ${est.notes.map(n => `<p class="muted small">${esc(n)}</p>`).join('')}
     <details><summary class="linkbtn">Why this estimate?</summary><div class="stack small" style="margin-top:8px">
       <p>Used: ${est.lengths?.length ? est.lengths.map(l => `${l} days`).join(', ') : 'nothing yet'}.</p>
       ${est.excluded.length ? `<p>Left out:</p><ul class="issues">${est.excluded.map(c => `<li>${human(c.start)} – ${human(c.nextStart)} (${c.length} d): ${esc(c.reason)}</li>`).join('')}</ul>` : ''}
-      <p class="muted">Method: shortest to longest of your last 6 usable cycles, counted from your last start. No 28-day default and no assumed ovulation day. Wearable data is not used.</p>
+      <p class="muted">Method: shortest to longest of your last 6 usable cycles, counted from your last start. No padding, no 28-day default and no assumed ovulation day. Wearable data is not used. It is not a prediction interval: an interval would need validation on held-out data first.</p>
       <p class="muted">${esc(DISCLAIMER)}</p></div></details></div>`;
 }
 
@@ -179,8 +179,8 @@ function insightHTML(s, today) {
     <div class="btn-row"><button class="ghost" type="button" data-act="patternReminder" data-key="${esc(p.key)}">Remind me next cycle</button><button class="ghost" type="button" data-act="dismissInsight" data-key="${esc(p.key)}">Dismiss</button></div></div>`;
 }
 
-function phaseHTML(s, today, tempShift) {
-  const p = phaseInfo(s, today, { tempShift });
+function phaseHTML(s, today, tempShift, est) {
+  const p = phaseInfo(s, today, { tempShift, estimate: est });
   return `<div class="card" id="cyPhase"><span class="eyebrow">Phase · ${esc(p.status.replace(/_/g, ' '))}</span><h2 class="display h2">${esc(p.label)}</h2><p class="small">${esc(p.text)}</p><p class="muted small">${esc(PHASE_EDUCATION)}</p></div>`;
 }
 

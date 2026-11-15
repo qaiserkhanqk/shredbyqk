@@ -47,7 +47,9 @@ function occurrence(r, s, date, est) {
     case 'weeklyLog': return weekday(date) === r.weekday ? t : null;
     case 'periodCheck': {
       if (!est?.rangeStart || s.situation?.pregnant) return null;
-      return date >= addDays(est.rangeStart, -r.offsetDays) && date <= est.rangeEnd ? t : null;
+      // Keeps going while the period is overdue (audit 2.2): it stops when a period is logged (the estimate moves on)
+      // or when the estimate becomes 'stale' (no rangeStart). No new threshold.
+      return date >= addDays(est.rangeStart, -r.offsetDays) ? t : null;
     }
     case 'pattern': {
       if (!est?.lastStart) return null;
@@ -85,7 +87,8 @@ export function nextFire(r, s, { today, nowMin, estimate }) {
   const occ = schedule(r, s, today, addDays(today, 62), estimate).find(o => (o.date > today || o.mins >= nowMin) && s.delivered[r.id] !== o.date);
   if (occ) return { next: occ, why: reasonFor(r, estimate) };
   const why = r.kind === 'periodCheck' && !estimate?.rangeStart ? 'Waiting: there is no estimated range yet.'
-    : r.kind === 'pattern' ? 'Waiting for your next logged period start.' : 'Paused.';
+    : r.kind === 'pattern' ? 'Waiting for your next logged period start.'
+    : (r.pausedUntil && r.pausedUntil >= today) || (s.settings.remindersPausedUntil && s.settings.remindersPausedUntil >= today) ? 'Paused.' : 'Nothing scheduled in the next two months.';
   return { next: null, why };
 }
 
@@ -101,7 +104,8 @@ export function reasonFor(r, est) {
   switch (r.kind) {
     case 'dailyLog': return `You asked for a daily reminder at ${r.time}.`;
     case 'weeklyLog': return `You asked for a check-in every ${DAYS[r.weekday]} at ${r.time}.`;
-    case 'periodCheck': return est?.rangeStart ? `Your estimated range starts on ${human(est.rangeStart)}. You asked for a check-in ${r.offsetDays ? `${r.offsetDays} day${r.offsetDays > 1 ? 's' : ''} before` : 'from that day'} until you log a period.` : 'You asked for a check-in when your estimated range begins.';
+    case 'periodCheck': if (est?.overdue) return 'Your period hasn\'t been logged and it is later than your recent cycles. You asked for check-ins until you log one.';
+      return est?.rangeStart ? `Your estimated range starts on ${human(est.rangeStart)}. You asked for a check-in ${r.offsetDays ? `${r.offsetDays} day${r.offsetDays > 1 ? 's' : ''} before` : 'from that day'} until you log a period.` : 'You asked for a check-in when your estimated range begins.';
     case 'pattern': return `You set this from a pattern in your own logs (${CATEGORIES[r.category].label.toLowerCase()} around cycle day ${r.cycleDay}).${r.origin ? ' ' + r.origin : ''}`;
   }
   return '';

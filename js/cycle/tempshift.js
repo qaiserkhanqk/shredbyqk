@@ -48,8 +48,13 @@ export function retrospectiveShift(s, cycleStart, asOf, params = SHIFT_PARAMS) {
     judged++;
     const bMax = Math.max(...base.map(n => n.value)), bMean = base.reduce((a, n) => a + n.value, 0) / B, hMean = high.reduce((a, n) => a + n.value, 0) / C;
     if (high.every(n => n.value > bMax) && hMean - bMean >= DELTA) {
+      // What happened AFTER the rise (issue 2 reproduced in 80ea40f). This is reported, not judged here: whether the
+      // event can describe TODAY is decided by phase.js. "Back to baseline" uses the rule's own definition of
+      // high (above the baseline maximum); no new physiological threshold is introduced.
+      const after = valid.filter(n => n.night > high.at(-1).night), back = after.find(n => n.value <= bMax);
       return { ...res, detected: true, firstHighNight: high[0].night, confirmedNight: high.at(-1).night, baselineMean: +bMean.toFixed(2), highMean: +hMean.toFixed(2), rise: +(hMean - bMean).toFixed(2),
-        cycleDayOfRise: diffDays(cycleStart, high[0].night) + 1, why: 'A sustained rise was seen. This may be consistent with a past ovulation. It is not proof.' };
+        cycleDayOfRise: diffDays(cycleStart, high[0].night) + 1, nightsAfter: after.length, stillElevated: !back, returnedOn: back?.night || null, lastValidNight: valid.at(-1).night,
+        why: back ? `A rise was seen from ${high[0].night}, but it did not last: back to the earlier level on ${back.night}.` : 'A rise was seen. This may be consistent with a past ovulation. It is not proof.' };
     }
   }
   if (!judged) return { ...res, abstained: true, why: 'Not judged: there are gaps in the nightly data, so there is not enough continuous data to compare nights.' };

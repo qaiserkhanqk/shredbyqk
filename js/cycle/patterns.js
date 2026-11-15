@@ -28,7 +28,7 @@ export const evaluateWindow = (s, cat, centre, p = PATTERN_PARAMS) => evaluateRa
 export function evaluateRange(s, cat, from, to, p = PATTERN_PARAMS) {
   const def = CATEGORIES[cat];
   const complete = cycles(s).filter(c => c.usable).slice(-p.RECENT);
-  let observed = 0, notable = 0, outN = 0, outNotable = 0, daysLogged = 0, fromSuggestions = 0; const evidence = [];
+  let observed = 0, notable = 0, outN = 0, outNotable = 0, daysLogged = 0, fromSuggestions = 0, comparedCycles = 0; const evidence = [];
   for (const c of complete) {
     const logs = cycleLogs(s, c, cat); daysLogged += logs.length;
     fromSuggestions += logs.filter(l => l.source === 'suggestion').length;
@@ -36,16 +36,24 @@ export function evaluateRange(s, cat, from, to, p = PATTERN_PARAMS) {
     outN += outWin.length; outNotable += outWin.filter(l => def.notable.includes(l.value)).length;
     if (!inWin.length) { evidence.push({ cycleStart: c.start, observed: false, entries: [] }); continue; }
     observed++; const hit = inWin.some(l => def.notable.includes(l.value)); if (hit) notable++;
-    evidence.push({ cycleStart: c.start, observed: true, notable: hit, entries: inWin });
+    if (outWin.length) comparedCycles++;
+    evidence.push({ cycleStart: c.start, observed: true, notable: hit, entries: inWin, outsideLogs: outWin.length });
   }
-  const outsideRate = outN ? outNotable / outN : 0;
-  const found = observed >= p.MIN_OBSERVED && notable >= p.MIN_OBSERVED && notable / observed >= p.MIN_SHARE && outsideRate < p.MAX_OUTSIDE;
+  // Comparative evidence (issue 3 reproduced in 80ea40f): with no logs at other times the outside rate is UNKNOWN
+  // (null), never 0%. A pattern needs logs outside the window in at least MIN_OBSERVED of the observed cycles (the
+  // existing minimum; no new number), so "these days stand out" is something the records can actually show.
+  const outsideRate = outN ? outNotable / outN : null;
+  const repeated = observed >= p.MIN_OBSERVED && notable >= p.MIN_OBSERVED && notable / observed >= p.MIN_SHARE;
+  const comparable = outsideRate !== null && comparedCycles >= p.MIN_OBSERVED;
+  const found = repeated && comparable && outsideRate < p.MAX_OUTSIDE;
+  const blockedByComparison = repeated && !comparable;
   let why;
   if (complete.length < p.MIN_OBSERVED) why = `Only ${complete.length} complete ${complete.length === 1 ? 'cycle' : 'cycles'} logged so far (we need ${p.MIN_OBSERVED}).`;
   else if (observed < p.MIN_OBSERVED) why = `${def.label} was logged around these days in only ${observed} of ${complete.length} complete cycles.`;
-  else if (!found && outsideRate >= p.MAX_OUTSIDE && notable / observed >= p.MIN_SHARE) why = `You logged ${def.notableLabel} on many days at other times too, so these days don't stand out.`;
+  else if (blockedByComparison) why = `You logged ${def.label.toLowerCase()} at other times in only ${comparedCycles} of these cycles, so we can't compare these days with the rest of your cycle.`;
+  else if (!found && outsideRate !== null && outsideRate >= p.MAX_OUTSIDE && notable / observed >= p.MIN_SHARE) why = `You logged ${def.notableLabel} on many days at other times too, so these days don't stand out.`;
   else if (!found) why = `Not consistent: ${def.notableLabel} in ${notable} of ${observed} cycles with logs here.`;
-  return { category: cat, from, to, found, observed, notable, completeCycles: complete.length, daysLogged, fromSuggestions, outsideRate, evidence, why };
+  return { category: cat, from, to, found, observed, notable, completeCycles: complete.length, daysLogged, fromSuggestions, outsideRate, outsideLogs: outN, comparedCycles, blockedByComparison, evidence, why };
 }
 
 /** All patterns for enabled categories, merged into day ranges, with plain-language text. */
@@ -76,12 +84,18 @@ function trim(s, w, p) {
   return t.found ? t : w;
 }
 
+const daysLabel = w => (w.from === w.to ? `cycle day ${w.from}` : `cycle days ${w.from}–${w.to}`);
+/** Observed AND missing cycles are both stated (audit 5.3): the denominator never hides cycles without logs. */
 export function patternText(w) {
-  const def = CATEGORIES[w.category];
-  return `You logged ${def.notableLabel} around cycle days ${w.from}–${w.to} in ${w.notable} of your last ${w.observed} recorded cycles with ${def.label.toLowerCase()} logs there.`;
+  const def = CATEGORIES[w.category], missing = w.completeCycles - w.observed;
+  return `You logged ${def.notableLabel} around ${daysLabel(w)} in ${w.notable} of the ${w.observed} cycles with ${def.label.toLowerCase()} logs then${missing ? ` (${missing} of your ${w.completeCycles} complete cycles had no logs then)` : ''}.`;
 }
 export function evidenceText(w) {
-  return `Based on ${w.completeCycles} complete cycles and ${w.daysLogged} days with ${CATEGORIES[w.category].label.toLowerCase()} logs. ${w.observed} cycles had a log in this window. ${Math.round(w.outsideRate * 100)}% of your logs at other times were ${CATEGORIES[w.category].notableLabel}.${w.fromSuggestions ? ` ${w.fromSuggestions} of these logs were one-tap suggestions you accepted.` : ''}`;
+  const label = CATEGORIES[w.category].label.toLowerCase(), missing = w.completeCycles - w.observed;
+  const outside = w.outsideRate == null
+    ? `There are no ${label} logs at other times, so these days can't be compared with the rest of your cycle.`
+    : `${Math.round(w.outsideRate * 100)}% of your ${w.outsideLogs ?? ''} logs at other times${w.comparedCycles != null ? ` (in ${w.comparedCycles} cycles)` : ''} were ${CATEGORIES[w.category].notableLabel}.`.replace('your  logs', 'your logs');
+  return `Based on ${w.completeCycles} complete cycles and ${w.daysLogged} days with ${label} logs. ${w.observed} cycles had a log around these days; ${missing} had none. ${outside}${w.fromSuggestions ? ` ${w.fromSuggestions} of these logs were one-tap suggestions you accepted.` : ''}`;
 }
 
 /** The insight for "around now": a found, non-dismissed pattern whose window covers today's cycle day. */
@@ -97,6 +111,7 @@ export function patternStatus(s) {
   return Object.keys(CATEGORIES).filter(c => categoryOn(s, c)).map(cat => {
     const mine = found.filter(p => p.category === cat);
     if (mine.length) return { category: cat, status: 'found', patterns: mine };
+    for (let d = 1; d <= 35; d++) { const w = evaluateWindow(s, cat, d); if (w.blockedByComparison) return { category: cat, status: 'insufficient', why: w.why }; }
     const withLogs = complete.filter(c => cycleLogs(s, c, cat).length).length; // cycles with no logs of this category don't count
     if (withLogs < PATTERN_PARAMS.MIN_OBSERVED) return { category: cat, status: 'insufficient', why: `We need ${PATTERN_PARAMS.MIN_OBSERVED} complete cycles with ${CATEGORIES[cat].label.toLowerCase()} logs; you have ${withLogs}.` };
     return { category: cat, status: 'none', why: 'No consistent pattern in your logs. A daily check-in reminder may help you keep a record.' };
