@@ -16,7 +16,7 @@ Reproductive health data is treated as **highly sensitive**. This document descr
 | Network exposure | Binds to `127.0.0.1` by default. Other addresses are refused unless `RESEARCH_ALLOW_NON_LOCAL=1` (unsupported). No TLS of its own. | A real deployment needs TLS termination, a reviewed host, a firewall and monitoring. |
 | Account takeover | scrypt password hashing (N=2¹⁴), minimum 12 characters, 15-minute lockout after 5 failures, login rate limit, the same reply for an unknown user or a wrong password | No MFA. No password-reuse checks. Lockout can be used to annoy a user. |
 | Session theft / CSRF / clickjacking | 256-bit random session token, stored hashed. Cookie `HttpOnly; SameSite=Strict; Secure` (on by default). 30-minute idle and 8-hour absolute expiry. CSRF token on every change plus an Origin check. CSP `default-src 'self'`, `frame-ancestors 'none'`, `X-Frame-Options: DENY` | No session-revocation UI. Sessions live in the same database. |
-| Broken access control | Server-side checks on every route. Researchers see only participants assigned to them. Participant accounts see only their own data. Admins manage accounts and **cannot read participant data**. A denied record gives the same 404 as a missing one. | Assignment is manual. There is no study-level role model yet. |
+| Broken access control | Server-side checks on every route. Participants never receive experimental outputs or quarantined cells: `/runs` and `/quarantine` are researcher-only, participant exports omit both, and a central filter strips them from every participant response. Researchers see only participants assigned to them. Participant accounts see only their own data. Admins manage accounts and **cannot read participant data**. A denied record gives the same 404 as a missing one. | Assignment is manual. There is no study-level role model yet. |
 | Injection | Parameterised SQL only. A strict CSV parser with no evaluation. Identifier-like formats for every free-text field. HTML-escaped rendering. CSV export neutralises formulas. | |
 | Oversized or malicious uploads | 5 MB file limit (7.5 MB body), row, column and cell limits, NUL rejection, JSON-only bodies, upload rate limit | Single process. No antivirus (files are text only). |
 | Path traversal | Static files served only from `research/web` with an allow-list of file types | |
@@ -38,7 +38,9 @@ Reproductive health data is treated as **highly sensitive**. This document descr
 - **Granular consent.**
   - `core_research`, `lh_tests` and `hormonal_context` are separate scopes, each with time-stamped grant and withdrawal records.
   - A researcher can record consent only by confirming a signed form.
-  - Withdrawal currently stops new imports for that scope. What happens to data already collected must be set by the study protocol, and full deletion is available.
+  - Any withdrawal invalidates pending import previews, and the commit transaction rechecks consent.
+  - Withdrawing `lh_tests` or `hormonal_context` deletes the stored data of that type, including quarantined rows. Rows submitted without that consent are never retained.
+  - Withdrawing core consent stops new imports. What happens to data already collected must be set by the study protocol, and full deletion is available.
 - **Adults only.** Participant creation requires an adult confirmation; minors are not supported.
 - **Experimental features** are off by default and enabled per participant by a researcher. Each change is audited.
 - **No contraceptive features** in the UI, API, exports or feature flags.

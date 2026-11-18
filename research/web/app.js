@@ -88,11 +88,11 @@ function timelineHTML(a) {
   if (!nights.length) return `<div class="card" id="timeline"><h2>Temperature timeline</h2><p class="muted small">No nightly data yet.</p></div>`;
   const dates = [...new Set([...nights.map(r => r.night), ...ann.map(x => x.date)])].sort(), d0 = Date.parse(dates[0]), d1 = Date.parse(dates.at(-1)) + 864e5;
   const W = 1000, H = 300, L = 46, Rr = 10, T = 14, plotH = 190, x = d => L + (Date.parse(d) - d0) / (d1 - d0) * (W - L - Rr);
-  const streams = [...new Set(nights.map(r => `${r.stream.serial}|${r.stream.firmware}|${r.stream.site}|${r.stream.kind}|${r.stream.derivation}`))];
+  const streams = [...new Set(nights.map(r => r.streamKey))];
   const kinds = [...new Set(nights.map(r => r.stream.kind))];
   const vals = nights.map(r => r.features.median), lo = Math.min(...vals) - 0.1, hi = Math.max(...vals) + 0.1, y = v => T + (hi - v) / (hi - lo) * plotH;
-  const lines = streams.map(s => { const pts = nights.filter(r => `${r.stream.serial}|${r.stream.firmware}|${r.stream.site}|${r.stream.kind}|${r.stream.derivation}` === s); const k = kinds.indexOf(pts[0].stream.kind) % 2;
-    return `<polyline class="obs${k}" points="${pts.map(r => `${x(r.night).toFixed(1)},${y(r.features.median).toFixed(1)}`).join(' ')}"><title>${esc(s.split('|').slice(2).join(' · '))}</title></polyline>${pts.map(r => `<circle class="dot${k}" r="2" cx="${x(r.night).toFixed(1)}" cy="${y(r.features.median).toFixed(1)}"><title>${esc(r.night)}: ${r.features.median.toFixed(2)} °C (${esc(r.dataQuality.level)})</title></circle>`).join('')}`; }).join('');
+  const lines = streams.map(s => { const pts = nights.filter(r => r.streamKey === s); const k = kinds.indexOf(pts[0].stream.kind) % 2;
+    return `<polyline class="obs${k}" points="${pts.map(r => `${x(r.night).toFixed(1)},${y(r.features.median).toFixed(1)}`).join(' ')}"><title>${esc(s.split('|').slice(1).join(' · '))}</title></polyline>${pts.map(r => `<circle class="dot${k}" r="2" cx="${x(r.night).toFixed(1)}" cy="${y(r.features.median).toFixed(1)}"><title>${esc(r.night)}: ${r.features.median.toFixed(2)} °C (${esc(r.dataQuality.level)})</title></circle>`).join('')}`; }).join('');
   const dev = nights.filter(r => r.flags.some(f => /device_change|firmware_change/.test(f))).map(r => `<line class="device" x1="${x(r.night)}" x2="${x(r.night)}" y1="${T}" y2="${T + plotH}"><title>${esc(r.flags.join(', '))}</title></line><text x="${x(r.night) + 3}" y="${T + 10}">device/firmware change</text>`).join('');
   const bleedY = T + plotH + 14;
   const bleed = ann.filter(x => x.type === 'bleeding' && (x.value === 'period' || x.value === 'period_start')).map(b => `<rect class="bleed" x="${x(b.date)}" y="${bleedY}" width="${Math.max(2, (W - L - Rr) / ((d1 - d0) / 864e5) - 1)}" height="8"><title>Recorded bleeding ${esc(b.date)}</title></rect>`).join('')

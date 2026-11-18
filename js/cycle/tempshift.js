@@ -25,14 +25,25 @@ export function retrospectiveShift(s, cycleStart, asOf, params = SHIFT_PARAMS) {
   const seg = segs.at(-1);
   const res = { version: SHIFT_VERSION, detected: false, segment: seg ? { model: seg.model, firmware: seg.firmware } : null, deviceChangedThisCycle: segs.length > 1, excluded: { notOk: 0, flagged: 0, userFlagged: 0 }, nightsUsed: 0 };
   if (!seg) return { ...res, why: 'No skin-temperature nights in this cycle.' };
-  const valid = [];
+  // One eligible observation per biological night (issue 4 reported against b3d9589): several sleep sessions can
+  // carry the same night label (split sleep, a nap misclassified as main sleep, a corrected re-send). They must not
+  // count as separate nights in the baseline or the confirmation window. The night's observation is its eligible
+  // session with the most coverage (then the earliest start, then the session ID, so the choice is deterministic);
+  // the others are counted in `excluded.sameNightSessions`. This is a data rule, not a physiological one.
+  const byNight = new Map();
+  res.excluded.sameNightSessions = 0;
   for (const n of seg.nights) {
     if (n.status !== 'ok' || n.value == null) { res.excluded.notOk++; continue; }
     if (n.flags.includes('tz_change')) { res.excluded.flagged++; continue; }
     if (s.days[n.night]?.unwell || s.days[n.night]?.travel) { res.excluded.userFlagged++; continue; }
-    valid.push(n);
+    const cur = byNight.get(n.night);
+    if (!cur) { byNight.set(n.night, n); continue; }
+    res.excluded.sameNightSessions++;
+    const better = (n.coverageMin ?? 0) - (cur.coverageMin ?? 0) || (cur.firstAt ?? 0) - (n.firstAt ?? 0) || String(cur.sleepSessionId).localeCompare(String(n.sleepSessionId));
+    if (better > 0) byNight.set(n.night, n);
   }
-  res.nightsUsed = valid.length;
+  const valid = [...byNight.values()].sort((a, b) => a.night.localeCompare(b.night));
+  res.nightsUsed = valid.length; // distinct biological nights
   const { BASELINE: B, CONFIRM: C, DELTA, MAX_BASELINE_SPAN, MAX_CONFIRM_SPAN } = params;
   if (valid.length < B + C) return { ...res, why: `Only ${valid.length} usable nights${res.deviceChangedThisCycle ? ' since the device changed' : ''}; ${B + C} are needed.` };
   // Continuity (issue 8 reproduced in 0f26696): the baseline and the high nights must be close together, not

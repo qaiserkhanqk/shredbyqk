@@ -104,6 +104,7 @@ export function validateAnnotation(r, { participantRef, consents = {} } = {}) {
   const rec = isoMs(r.recorded_at);
   if (rec == null || Number.isNaN(rec)) reject.push('recorded_at_missing_or_invalid');
   if (corrects && !REF.test(corrects)) reject.push('corrects_invalid');
+  if (corrects && corrects === entryId) reject.push('self_correction'); // issue 8 reported against b3d9589
   if (type === 'hormonal_medication' && !consents.hormonal_context) reject.push('hormonal_context_not_consented');
   if (type === 'lh_test' && !consents.lh_tests) reject.push('lh_tests_not_consented');
   if (reject.length) return { reject };
@@ -114,7 +115,7 @@ export const annotationHash = a => hashJSON({ e: a.entryId, t: a.type, v: a.valu
 
 /**
  * Preview an import without storing anything.
- * existing: { batchHashes:Set, obsRowHash:Map(obsKey→rowHash), entryHash:Map(entryId→hash of the entry) }
+ * existing: { batchHashes:Set, obsRowHash:Map(obsKey→rowHash), entryHash:Map(entryId→hash), entryCorrects:Map(entryId→corrects) }
  */
 export function preview(text, { format, recordType, participantRef, filename = '', existing = {}, consents = {}, config = CONFIG } = {}) {
   const sourceHash = sha256(String(text ?? ''));
@@ -126,7 +127,7 @@ export function preview(text, { format, recordType, participantRef, filename = '
   let rows;
   try { rows = format === 'csv' ? parseCSV(text, config.limits) : parseJSONRecords(text, config.limits); }
   catch (e) { if (e instanceof ParseError) return { ...base, ok: false, error: e.code, line: e.line }; throw e; }
-  const accepted = [], quarantined = [], seen = new Map(); let duplicates = 0, rejected = 0;
+  let accepted = []; const quarantined = [], seen = new Map(); let duplicates = 0, rejected = 0;
   for (const row of rows) {
     const raw = row.record ?? null;
     if (row.error) { quarantined.push({ line: row.line, reasons: [row.error], rejected: true, raw }); rejected++; continue; }
@@ -142,11 +143,27 @@ export function preview(text, { format, recordType, participantRef, filename = '
       seen.set(o.obsKey, o.rowHash); accepted.push({ line: row.line, ...o });
     } else {
       const v = validateAnnotation(raw, { participantRef, consents });
-      if (v.reject) { quarantined.push({ line: row.line, reasons: v.reject, rejected: true, raw }); rejected++; continue; }
+      // Issue 2 reported against b3d9589: a row whose content needs a consent the participant has not given is kept
+      // only as a line number and reason codes. Its cells are NOT retained anywhere (saved preview, quarantine,
+      // database or export).
+      const unconsented = v.reject?.some(r => r === 'lh_tests_not_consented' || r === 'hormonal_context_not_consented');
+      if (v.reject) { quarantined.push({ line: row.line, reasons: v.reject, rejected: true, raw: unconsented ? null : raw, ...(unconsented ? { redacted: 'content_not_retained_without_consent' } : {}) }); rejected++; continue; }
       const h = annotationHash(v.ann), prior = seen.get(v.ann.entryId) ?? existing.entryHash?.get(v.ann.entryId);
       if (prior != null) { if (prior === h) duplicates++; else quarantined.push({ line: row.line, reasons: ['entry_id_reused_with_different_content'], raw }); continue; }
-      seen.set(v.ann.entryId, h); accepted.push({ line: row.line, ...v.ann });
+      seen.set(v.ann.entryId, h); accepted.push({ line: row.line, ...v.ann, _raw: raw });
     }
+  }
+  if (recordType === 'annotations') {
+    // Circular corrections (issue 8): follow `corrects` links through this file's entries and the stored ones
+    // (existing.entryCorrects: entry_id → corrects). An entry whose chain returns to an entry already visited is
+    // part of, or leads into, a loop; it is quarantined instead of stored.
+    const links = new Map(existing.entryCorrects || []);
+    for (const a of accepted) links.set(a.entryId, a.corrects);
+    const loops = id => { const seenIds = new Set(); let cur = id; while (cur) { if (seenIds.has(cur)) return true; seenIds.add(cur); cur = links.get(cur); } return false; };
+    const bad = new Set(accepted.filter(a => loops(a.entryId)).map(a => a.entryId));
+    for (const a of accepted.filter(x => bad.has(x.entryId))) quarantined.push({ line: a.line, reasons: ['circular_correction'], raw: a._raw });
+    accepted = accepted.filter(a => !bad.has(a.entryId));
+    for (const a of accepted) delete a._raw;
   }
   return { ...base, ok: true, duplicateBatch: false, counts: { rows: rows.length, accepted: accepted.length, duplicates, quarantined: quarantined.length - rejected, rejected }, accepted, quarantined };
 }

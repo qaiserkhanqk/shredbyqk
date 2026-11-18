@@ -32,9 +32,10 @@
 - **Accounts and consent:**
   - No MFA, password change, session list or account removal for researchers.
   - Assignments are made through the API only; there is no UI for them.
-  - Withdrawing consent blocks new imports for that scope but does not delete existing data. Full deletion is separate; the study protocol must define retention after withdrawal.
+  - Withdrawing core consent blocks new imports and clears pending previews but does not delete existing data; the study protocol must define retention after withdrawal. (Withdrawing LH or hormonal consent does delete that data.)
+  - Concurrent consent withdrawal and commit from two processes on one database file is untested (single-process tests only).
 - **Imports and exports:**
-  - A preview is stored for up to 15 minutes (it is participant-scoped and deleted on commit, expiry or participant deletion).
+  - A preview is stored for up to 15 minutes (it is participant-scoped and deleted on commit, expiry, any consent withdrawal or participant deletion).
   - The CSV export's label line comes before the header; strict CSV readers need to skip the first line.
   - Observation `timestamp_after_ingestion` exclusion uses a 5-minute tolerance (an assumption).
 - **Analysis:** an unannotated multi-night fever can trigger the shift rule, as the tests document.

@@ -9,7 +9,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname, normalize, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
-import { openStore, CONSENT_SCOPES, FEATURES } from './store.js';
+import { openStore, CONSENT_SCOPES, FEATURES, ConsentError } from './store.js';
 import { preview, annotationHash } from '../lib/ingest.js';
 import { analyse } from '../lib/pipeline.js';
 import { CONFIG } from '../lib/config.js';
@@ -49,7 +49,7 @@ export function createApp({ store, settings, log = line => process.stderr.write(
   const securityHeaders = { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY', 'Cross-Origin-Opener-Policy': 'same-origin',
     'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'", 'Permissions-Policy': 'camera=(), microphone=(), geolocation=()' };
   const ok = (res, payload, status = 200) => {
-    let out; try { out = policy.apply(payload); } catch (e) { if (e instanceof policy.PolicyViolation) { store.audit(null, 'policy_violation_blocked', null, 'blocked', { code: e.code }); fail(500, 'output_blocked_by_policy'); } throw e; }
+    let out; try { out = policy.apply(res.viewerRole === 'participant' ? forParticipant(payload) : payload); } catch (e) { if (e instanceof policy.PolicyViolation) { store.audit(null, 'policy_violation_blocked', null, 'blocked', { code: e.code }); fail(500, 'output_blocked_by_policy'); } throw e; }
     send(res, status, out);
   };
   const cookie = (req, name) => (req.headers.cookie || '').split(';').map(s => s.trim()).find(s => s.startsWith(name + '='))?.slice(name.length + 1);
@@ -69,9 +69,9 @@ export function createApp({ store, settings, log = line => process.stderr.write(
     return p;
   }
   const needRole = (s, ...roles) => { if (!roles.includes(s.role)) { store.audit(s.userId, 'role_denied', null, 'denied'); fail(403, 'forbidden'); } };
-  function analysisFor(p, asOf) {
+  function analysisFor(p, asOf, role) {
     const out = analyse({ observations: store.observations(p.id), annotations: store.annotations(p.id), asOf, features: store.features(p.id) });
-    for (const r of [...(Array.isArray(out.estimates) ? out.estimates : []), ...(out.forecasts?.layer ? [out.forecasts] : [])]) store.saveRun(p.id, r); // versioned; identical runs are not duplicated
+    if (role === 'researcher') for (const r of [...(Array.isArray(out.estimates) ? out.estimates : []), ...(out.forecasts?.layer ? [out.forecasts] : [])]) store.saveRun(p.id, r); // versioned; identical runs are not duplicated
     return out;
   }
 
@@ -112,7 +112,7 @@ export function createApp({ store, settings, log = line => process.stderr.write(
       needRole(s, 'researcher', 'participant'); const p = participantFor(s, m[1]), b = await body(req, 4096);
       if (!CONSENT_SCOPES.includes(b.scope)) fail(400, 'scope_invalid');
       if (s.role === 'researcher' && b.granted) fail(403, 'use_record_signed_consent'); // a researcher records consent only from a signed form
-      store.setConsent(p.id, b.scope, !!b.granted, s.userId); store.audit(s.userId, `consent_${b.granted ? 'granted' : 'withdrawn'}`, p.id, 'ok', { scope: b.scope }); ok(res, { consents: store.consents(p.id) });
+      const removed = store.setConsent(p.id, b.scope, !!b.granted, s.userId); store.audit(s.userId, `consent_${b.granted ? 'granted' : 'withdrawn'}`, p.id, 'ok', { scope: b.scope, removed }); ok(res, { consents: store.consents(p.id), removed });
     }],
     ['POST', /^\/api\/participants\/([^/]+)\/consents\/record-signed$/, async (req, res, m, ip, s) => {
       needRole(s, 'researcher'); const p = participantFor(s, m[1]), b = await body(req, 4096);
@@ -139,21 +139,24 @@ export function createApp({ store, settings, log = line => process.stderr.write(
     ['POST', /^\/api\/participants\/([^/]+)\/imports\/commit$/, async (req, res, m, ip, s) => {
       needRole(s, 'researcher'); const p = participantFor(s, m[1]), b = await body(req, 4096);
       const pv = store.takePreview(b.previewId, p.id, s.userId); if (!pv) fail(404, 'preview_not_found_or_expired');
-      const r = store.commitImport(p.id, pv, s.userId, annotationHash); store.audit(s.userId, 'import_committed', p.id, 'ok', { counts: pv.counts, duplicateBatch: r.duplicateBatch });
+      let r; try { r = store.commitImport(p.id, pv, s.userId, annotationHash); } catch (e) { if (e instanceof ConsentError) { store.audit(s.userId, 'import_commit_refused', p.id, 'denied', { code: e.code }); fail(409, e.code); } throw e; }
+      store.audit(s.userId, 'import_committed', p.id, 'ok', { counts: pv.counts, duplicateBatch: r.duplicateBatch });
       ok(res, { ok: true, ...r, counts: pv.counts });
     }],
     ['GET', /^\/api\/participants\/([^/]+)\/analysis$/, (req, res, m, ip, s, url) => {
       const p = participantFor(s, m[1]), asOfQ = url.searchParams.get('asOf');
       const asOf = asOfQ ? Date.parse(asOfQ) : now(); if (!Number.isFinite(asOf)) fail(400, 'asOf_invalid');
       store.audit(s.userId, 'analysis_viewed', p.id);
-      const a = analysisFor(p, asOf);
+      const a = analysisFor(p, asOf, s.role);
       // Participant-facing view: recorded observations and descriptive summaries only. Experimental estimates and
       // forecasts are for researchers, and no timing derived from temperature is shown to participants.
       if (s.role === 'participant') { a.estimates = { status: 'not_shown_to_participants', reasons: ['research_only_layer'] }; a.forecasts = { status: 'not_shown_to_participants', reasons: ['research_only_layer'] }; }
       ok(res, a);
     }],
     ['GET', /^\/api\/participants\/([^/]+)\/quarantine$/, (req, res, m, ip, s) => { needRole(s, 'researcher'); const p = participantFor(s, m[1]); ok(res, { quarantine: store.quarantine(p.id) }); }],
-    ['GET', /^\/api\/participants\/([^/]+)\/runs$/, (req, res, m, ip, s) => { const p = participantFor(s, m[1]); ok(res, { runs: store.runs(p.id) }); }],
+    // Stored runs are experimental outputs (historical versions): researchers only, like the experimental layers of
+    // /analysis (issue 1 reported against b3d9589).
+    ['GET', /^\/api\/participants\/([^/]+)\/runs$/, (req, res, m, ip, s) => { needRole(s, 'researcher'); const p = participantFor(s, m[1]); ok(res, { runs: store.runs(p.id) }); }],
     ['POST', /^\/api\/participants\/([^/]+)\/corrections$/, async (req, res, m, ip, s) => {
       needRole(s, 'researcher'); const p = participantFor(s, m[1]), b = await body(req, 4096);
       if (!['exclude', 'restore'].includes(b.action) || !/^[a-z_]{3,40}$/.test(String(b.reason))) fail(400, 'correction_invalid');
@@ -171,7 +174,9 @@ export function createApp({ store, settings, log = line => process.stderr.write(
         res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="export-${p.ref}.csv"`, 'Cache-Control': 'no-store', ...securityHeaders });
         return res.end(`# ${policy.LABEL}\r\n` + toCSV(cols, rows));
       }
-      ok(res, { format: 'research-export-1', participantRef: p.ref, exportedAt: new Date(now()).toISOString(), consents: store.consentLog(p.id), features: store.features(p.id), batches: store.batches(p.id), observations: obs, annotations: store.annotations(p.id), quarantine: store.quarantine(p.id), corrections: store.corrections(p.id), derivedRuns: store.runs(p.id),
+      const researcher = s.role === 'researcher'; // participant exports follow the same rules as /quarantine and /runs (issue 1)
+      ok(res, { format: 'research-export-1', participantRef: p.ref, exportedAt: new Date(now()).toISOString(), consents: store.consentLog(p.id), features: store.features(p.id), batches: store.batches(p.id), observations: obs, annotations: store.annotations(p.id),
+        ...(researcher ? { quarantine: store.quarantine(p.id), derivedRuns: store.runs(p.id) } : { notIncluded: ['quarantined rows (researcher review)', 'experimental research outputs'] }), corrections: store.corrections(p.id),
         note: 'Contains sensitive health data. Not encrypted. Synthetic data only in this prototype.' });
     }],
     ['DELETE', /^\/api\/participants\/([^/]+)$/, async (req, res, m, ip, s) => {
@@ -196,6 +201,7 @@ export function createApp({ store, settings, log = line => process.stderr.write(
       let session = null;
       if (!opt?.public) {
         session = store.getSession(cookie(req, 'rs_session'), settings); if (!session) fail(401, 'not_signed_in');
+        res.viewerRole = session.role;
       }
       if (req.method !== 'GET') { // CSRF: same-origin only, and the session's token on every change
         const origin = req.headers.origin; if (origin && new URL(origin).host !== req.headers.host) fail(403, 'cross_origin');
@@ -210,6 +216,16 @@ export function createApp({ store, settings, log = line => process.stderr.write(
       log(JSON.stringify({ t: new Date().toISOString(), reqId, method: req.method, route: route.replace(/\\\//g, '/'), status, ms: Date.now() - t0 }));
     }
   };
+}
+
+/* Defence in depth for participant sessions (issue 1): whatever an endpoint returns, experimental outputs (objects with
+   layer 'estimate' or 'forecast') and verbatim quarantined cells never reach a participant. Endpoints already omit
+   them; this catches any alternate path. */
+export function forParticipant(v) {
+  if (Array.isArray(v)) return v.map(forParticipant);
+  if (!v || typeof v !== 'object') return v;
+  if (v.layer === 'estimate' || v.layer === 'forecast') return { status: 'not_shown_to_participants', reasons: ['research_only_layer'] };
+  return Object.fromEntries(Object.entries(v).filter(([k]) => k !== 'verbatimSource').map(([k, x]) => [k, forParticipant(x)]));
 }
 
 function serveStatic(path, res, headers, setStatus) {

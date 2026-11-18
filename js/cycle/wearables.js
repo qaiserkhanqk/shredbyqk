@@ -179,8 +179,13 @@ function markTravel(nights) {
 const sortKeys = v => (Array.isArray(v) ? v.map(sortKeys) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map(k => [k, sortKeys(v[k])])) : v);
 const material = ({ syncedAt, prior, ...rest }) => JSON.stringify(sortKeys(rest));
 const withoutPrior = ({ prior, ...rest }) => rest;
+/* Records are matched by the SOURCE identity of the sleep session (issue 3 reported against b3d9589): the session ID
+   plus device, model, firmware, metric and kind. The night label is derived from the session's first reading, so a
+   corrected session can move to another label; matching on the label would have created a second record instead of
+   a new version. Only records without a session ID (stored before sessions were required) fall back to the label. */
+export const sessionKey = n => JSON.stringify([n.sleepSessionId ? `session:${n.sleepSessionId}` : `night:${n.night}`, n.deviceId, n.model, n.firmware, n.metric, n.kind]);
 export function mergeNights(stored, fresh, { at = new Date().toISOString() } = {}) {
-  const k = n => JSON.stringify([n.night, n.sleepSessionId ?? null, n.deviceId, n.model, n.firmware, n.metric, n.kind]);
+  const k = sessionKey;
   const m = new Map(stored.map(n => [k(n), n]));
   for (const n of fresh) {
     const old = m.get(k(n));

@@ -1,16 +1,20 @@
 // Nightly quality reports and feature extraction. Pure functions over accepted observations.
-//  • A "stream" is one device × firmware × site × kind × derivation × aggregation. Different streams are NEVER pooled:
-//    no averaging across sensors, sites, raw/derived data or device and firmware transitions.
+//  • A "stream" is one device serial × MODEL × firmware × site × kind × derivation × aggregation. `streamId` is the
+//    ONE canonical identity used by quality control, inference and provenance (issue 6 reported against b3d9589), so
+//    a change of any part, including the model, is a transition and is never pooled or compared across.
 //  • Only quality signals the source actually provides are used. Unknown source flags are reported verbatim and not
 //    interpreted; nothing is inferred about wear or contact.
 //  • Data-quality confidence describes the measurements only. It says nothing about any biological inference.
 import { CONFIG, configHash } from './config.js';
 
-export const QUALITY_VERSION = 'nightly-quality-1.0.0';
+export const QUALITY_VERSION = 'nightly-quality-1.1.0';
 export const FEATURE_METHOD = 'median-mad-iqr-1.0.0';
 const MIN = 60e3;
 
-export const streamKey = o => [o.device.serial, o.device.model, o.device.firmware ?? 'fw?', o.site, o.kind, o.derivation, o.aggregation].join('|');
+/** Canonical stream identity from a stream description {serial, model, firmware, site, kind, derivation, aggregation}. */
+export const streamId = st => [st.serial, st.model, st.firmware ?? 'fw?', st.site, st.kind, st.derivation, st.aggregation].join('|');
+export const streamOf = o => ({ serial: o.device.serial, model: o.device.model, firmware: o.device.firmware, site: o.site, kind: o.kind, derivation: o.derivation, aggregation: o.aggregation });
+export const streamKey = o => streamId(streamOf(o));
 const localDate = ms => new Date(ms).toISOString().slice(0, 10);
 const hhmm = s => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
 function inWindow(localMs, w) {
@@ -22,13 +26,31 @@ export const median = xs => quantile([...xs].sort((a, b) => a - b), 0.5);
 export const mad = xs => { const m = median(xs); return median(xs.map(x => Math.abs(x - m))); };
 const r3 = x => (x == null ? null : Math.round(x * 1000) / 1000);
 
+/* Night labels (issue 5 reported against b3d9589).
+   • A sample with a source sleep session takes the label of its WHOLE SESSION: the local date of (session start −
+     labelShiftHours), where the session start is its earliest sample and "local" uses the UTC offset recorded with
+     that first sample. Every sample of the session gets the same label, so a daytime sleep crossing noon, or a
+     session during which the person changes time zone, is never split. Later offset changes inside the session do
+     not move the label; they are flagged (utc_offset_changed_within_night).
+   • A sample without a session uses its own local time and the configured fallback window.
+   Session identity is the source session ID within one device serial. */
+const sessionId = o => `${o.device?.serial ?? ""}|${o.sleepSessionId}`; // placeNight may be called on a bare reading
+export function sessionLabels(observations, config = CONFIG) {
+  const first = new Map();
+  for (const o of observations) {
+    if (!o.sleepSessionId || o.aggregation === 'nightly_value' || o.tsUtc == null || o.offsetMin == null) continue;
+    const k = sessionId(o), cur = first.get(k);
+    if (!cur || o.tsUtc < cur.tsUtc) first.set(k, o);
+  }
+  return new Map([...first].map(([k, o]) => [k, localDate(o.tsUtc + o.offsetMin * MIN - config.night.labelShiftHours * 36e5)]));
+}
 /** Assign each observation to a night label, or give the reason it can't be placed. */
-export function placeNight(o, config = CONFIG) {
+export function placeNight(o, config = CONFIG, labels = null) {
   if (o.aggregation === 'nightly_value') return o.nightLabel ? { night: o.nightLabel, windowSource: 'vendor_night_label' } : { reason: 'no_night_label' };
   if (o.tsUtc == null) return { reason: 'no_timestamp' };
   if (o.offsetMin == null) return { reason: 'no_utc_offset' };
   const local = o.tsUtc + o.offsetMin * MIN, label = localDate(local - config.night.labelShiftHours * 36e5);
-  if (o.sleepSessionId) return { night: label, windowSource: 'sleep_session', session: o.sleepSessionId };
+  if (o.sleepSessionId) return { night: (labels || sessionLabels([o], config)).get(sessionId(o)) ?? label, windowSource: 'sleep_session', session: o.sleepSessionId };
   if (!inWindow(local, config.night.fallbackWindow)) return { reason: 'outside_fallback_window' };
   return { night: label, windowSource: 'config_fallback_window' };
 }
@@ -38,9 +60,9 @@ export function placeNight(o, config = CONFIG) {
  * (a researcher correction) and `ingestedAt`. annotations: effective annotations (see cycles.effectiveAnnotations).
  */
 export function nightlyReports(observations, annotations = [], config = CONFIG) {
-  const groups = new Map(), unplaced = {};
+  const groups = new Map(), unplaced = {}, labels = sessionLabels(observations, config);
   for (const o of observations) {
-    const p = placeNight(o, config);
+    const p = placeNight(o, config, labels);
     if (!p.night) { unplaced[p.reason] = (unplaced[p.reason] || 0) + 1; continue; }
     const k = `${p.night}#${streamKey(o)}`;
     if (!groups.has(k)) groups.set(k, { night: p.night, key: streamKey(o), windowSource: p.windowSource, obs: [] });
@@ -53,7 +75,7 @@ export function nightlyReports(observations, annotations = [], config = CONFIG) 
   const last = new Map();
   for (const r of reports) {
     const fam = `${r.stream.site}|${r.stream.kind}`, prev = last.get(fam);
-    if (prev && prev.stream.serial !== r.stream.serial) r.flags.push('device_change_since_previous_night');
+    if (prev && (prev.stream.serial !== r.stream.serial || prev.stream.model !== r.stream.model)) r.flags.push('device_change_since_previous_night');
     else if (prev && prev.stream.firmware !== r.stream.firmware) r.flags.push('firmware_change_since_previous_night');
     if (prev && prev.streamKey !== r.streamKey) r.dataQuality.reasons.push('stream_transition'), r.dataQuality.level = r.dataQuality.level === 'good' ? 'limited' : r.dataQuality.level;
     last.set(fam, r);
@@ -119,7 +141,7 @@ function report(g, confounders, config) {
   const times = candidates.filter(o => o.tsUtc != null).map(o => o.tsUtc);
   return {
     night: g.night, streamKey: g.key,
-    stream: { serial: o0.device.serial, model: o0.device.model, firmware: o0.device.firmware, site: o0.site, kind: o0.kind, derivation: o0.derivation, aggregation: o0.aggregation },
+    stream: streamOf(o0),
     window: { source: g.windowSource, startUtc: times.length ? new Date(Math.min(...times)).toISOString() : null, endUtc: times.length ? new Date(Math.max(...iv.map(x => x[1] ?? x[0]))).toISOString() : null, utcOffsetsMin: offsets, tzNames },
     counts: { total: g.obs.length, valid: vals.length, excluded, outOfOrder, implausibleJumps: jumps },
     coverageMinutes: coverage, maxGapMinutes: maxGap == null ? null : Math.round(maxGap), flags, confounders: [...new Set(confounders)], unrecognisedSourceFlags: [...unrecognised],

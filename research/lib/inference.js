@@ -8,16 +8,18 @@
 // exactly the inputs used, so a run can be reproduced and a later revision never overwrites an earlier one.
 import { CONFIG, configHash } from './config.js';
 import { hashJSON } from './hash.js';
-import { median, mad } from './quality.js';
+import { median, mad, streamId } from './quality.js';
 import { addDays, diffDays } from './cycles.js';
 import { NO_SHIFT_TEXT } from './policy.js';
 
-export const TREND_VERSION = 'descriptive-trend-1.0.0';
-export const SHIFT_VERSION = 'sustained-shift-rule-1.0.0';
+export const TREND_VERSION = 'descriptive-trend-1.1.0';
+export const SHIFT_VERSION = 'sustained-shift-rule-1.1.0';
 export const FORECAST_VERSION = 'cycle-length-empirical-1.0.0';
 const CONFOUNDERS = ['illness', 'fever', 'disrupted_sleep', 'travel'];
 const r3 = x => (x == null ? null : Math.round(x * 1000) / 1000);
-const segKey = r => [r.stream.serial, r.stream.firmware, r.stream.site, r.stream.kind, r.stream.derivation, r.stream.aggregation].join('|');
+// The canonical stream identity from quality.js (serial, model, firmware, site, kind, derivation, aggregation): a change
+// of any part, including the device model, starts a new segment (issue 6 reported against b3d9589).
+const segKey = r => streamId(r.stream);
 
 /** Usable nights of one segment within [from, to): data quality not insufficient and no confounder annotation. */
 function nightsFor(reports, from, to) {

@@ -20,8 +20,10 @@ Participants never see the experimental layers.
 
 ## Methods
 **Nightly features:**
-- Samples are grouped per **stream**: device serial × model × firmware × site × kind × derivation × aggregation. Streams are never pooled.
-- Night: the source's sleep session if one is given, otherwise a configured local window (21:00–09:00). Each sample's own UTC offset handles daylight-saving changes and travel.
+- Samples are grouped per **stream**: device serial × model × firmware × site × kind × derivation × aggregation. This one canonical identity (`streamId`) is used by quality control, inference segments, the dashboard and provenance. Streams are never pooled, and a change of any part, including the model, is a transition.
+- Night: the source's sleep session if one is given, otherwise a configured local window (21:00–09:00).
+  - **A whole session gets one label:** the local date of (session start − 12 h), using the UTC offset of the session's first sample. Daytime sleep crossing noon, or a time-zone change during a session, never splits it. An offset change inside a session is flagged.
+  - **Without a session**, each sample's own UTC offset handles daylight-saving changes and travel.
 - Exclusions: researcher corrections, documented source flags, duplicate timestamps, timestamps after ingestion, and isolated outliers (more than 5 × the scaled median absolute deviation (MAD) from the night's median, with both neighbours not outlying).
 - Features: median, MAD, interquartile range (IQR), counts, coverage (union of measurement intervals, or **unknown** if the source gives neither end times nor a sampling interval), largest gap.
 - Data-quality level: good / limited / insufficient, with reasons. It describes the measurements only.
@@ -53,6 +55,7 @@ Participants never see the experimental layers.
 
 **Reproducibility:**
 - Every output records its algorithm version, configuration version and hash, data cutoff, and a SHA-256 of exactly the inputs used.
+- An as-of analysis uses only what was known at the cutoff: observations ingested before it, annotations recorded **and** ingested before it, and researcher corrections made before it. The provenance lists the stream identities and the effective corrections, and its hash covers them.
 - Runs are stored as new versions and never overwrite earlier ones.
 - The same inputs give byte-identical outputs (tested).
 

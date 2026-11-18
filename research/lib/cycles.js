@@ -1,26 +1,50 @@
 // Annotation history and cycle segmentation from LOGGED bleeding only. Nothing here uses temperature.
-// Annotations are append-only. A later entry with `corrects: X` replaces X; a value of `retracted` removes X.
-// `asOf` (an epoch ms) restricts everything to what had been recorded before that moment, so evaluations and
-// retrospective analyses never use later information.
+// Annotations are append-only. A later entry with `corrects: X` replaces X (and anything X had replaced); a value of
+// `retracted` removes it.
+//
+// Knowledge time (issue 7 reported against b3d9589): with `asOf` (epoch ms), an entry is used only if it was both
+// RECORDED (`recordedAt`, the participant's entry time) and INGESTED into this system (`ingestedAt`, the commit time
+// of its import batch) before asOf. An entry typed earlier but imported later was not known at the cutoff.
+//
+// Malformed corrections (issue 8): ingestion rejects self-referencing and circular corrections, but stored data could
+// still be malformed (older imports, manual edits). Following `corrects` links uses a visited set, so a loop cannot
+// hang analysis; entries in a loop, and entries whose correction chain leads into one, are left out and listed in the
+// result's `malformed` property.
 import { CONFIG } from './config.js';
 
-export const SEGMENT_VERSION = 'segmentation-1.0.0';
+export const SEGMENT_VERSION = 'segmentation-1.1.0';
 const DAY = 864e5;
 export const addDays = (d, n) => new Date(Date.parse(`${d}T00:00:00Z`) + n * DAY).toISOString().slice(0, 10);
 export const diffDays = (a, b) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / DAY);
 
-export function effectiveAnnotations(anns, { asOf = Infinity } = {}) {
-  const known = anns.filter(a => a.recordedAt < asOf).sort((a, b) => a.recordedAt - b.recordedAt || a.entryId.localeCompare(b.entryId));
-  const live = new Map();
-  for (const a of known) {
-    if (a.corrects) { const root = [...live.entries()].find(([, v]) => v.chain.includes(a.corrects)); if (root) live.delete(root[0]); }
-    if (a.value === 'retracted') continue;
-    const chain = [a.entryId, ...(a.corrects ? (known.find(x => x.entryId === a.corrects) ? chainOf(known, a.corrects) : [a.corrects]) : [])];
-    live.set(a.entryId, { ...a, chain });
+export const knownAt = (a, asOf) => a.recordedAt < asOf && (a.ingestedAt == null || a.ingestedAt < asOf);
+
+/** Walk `corrects` links from `id`. Returns { root, cyclic }: root is the oldest ancestor reached (or an unknown ID). */
+export function correctionRoot(byId, id) {
+  const seen = new Set(); let cur = id;
+  for (;;) {
+    if (seen.has(cur)) return { root: null, cyclic: true };
+    seen.add(cur);
+    const next = byId.get(cur)?.corrects;
+    if (!next) return { root: cur, cyclic: false };
+    cur = next;
   }
-  return [...live.values()].map(({ chain, ...a }) => a).sort((a, b) => a.date.localeCompare(b.date) || a.entryId.localeCompare(b.entryId));
 }
-function chainOf(known, id) { const out = []; let cur = known.find(x => x.entryId === id); while (cur) { out.push(cur.entryId); cur = cur.corrects ? known.find(x => x.entryId === cur.corrects) : null; } return out; }
+
+export function effectiveAnnotations(anns, { asOf = Infinity } = {}) {
+  const known = anns.filter(a => knownAt(a, asOf)).sort((a, b) => a.recordedAt - b.recordedAt || a.entryId.localeCompare(b.entryId));
+  const byId = new Map(known.map(a => [a.entryId, a]));
+  const live = new Map(), malformed = [];
+  for (const a of known) {
+    const { root, cyclic } = correctionRoot(byId, a.entryId);
+    if (cyclic) { malformed.push(a.entryId); continue; }
+    if (a.value === 'retracted') { live.delete(root); continue; }
+    live.set(root, a);
+  }
+  const out = [...live.values()].sort((a, b) => a.date.localeCompare(b.date) || a.entryId.localeCompare(b.entryId));
+  out.malformed = malformed;
+  return out;
+}
 
 /**
  * Cycle starts: a logged `period_start`, or the first `period` day of a run with no period-type bleeding in the

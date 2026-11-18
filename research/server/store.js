@@ -35,6 +35,9 @@ CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY, at INTEGER NOT NULL, a
 `;
 export const CONSENT_SCOPES = ['core_research', 'lh_tests', 'hormonal_context'];
 export const FEATURES = ['experimental_shift', 'experimental_forecast'];
+/** Annotation types that may be stored only while their optional consent scope is granted. */
+export const SCOPE_DATA = { lh_tests: 'lh_test', hormonal_context: 'hormonal_medication' };
+export class ConsentError extends Error { constructor(code) { super(code); this.code = code; } }
 const PARTICIPANT_TABLES = ['previews', 'derived_runs', 'corrections', 'quarantine', 'annotations', 'observations', 'batches', 'features', 'consents', 'assignments'];
 
 const hashPw = (pw, salt) => scryptSync(String(pw), salt, 32, { N: 16384, r: 8, p: 1 });
@@ -99,7 +102,26 @@ export function openStore(path = ':memory:', { now = () => Date.now() } = {}) {
     listParticipants: session => session.role === 'researcher' ? q('SELECT p.id, p.ref, p.created_at FROM participants p JOIN assignments a ON a.participant_id = p.id WHERE a.user_id = ? ORDER BY p.ref').all(session.userId)
       : session.role === 'participant' ? q('SELECT id, ref, created_at FROM participants WHERE id = ?').all(session.participantId) : [],
     /* ---- consent & features ---- */
-    setConsent(pid, scope, granted, by) { q('INSERT INTO consents (participant_id, scope, granted, at, by_user) VALUES (?, ?, ?, ?, ?)').run(pid, scope, granted ? 1 : 0, now(), by ?? null); },
+    /* Consent changes (issue 2 reported against b3d9589). Any withdrawal invalidates every pending import preview for
+       the participant. Withdrawing an OPTIONAL scope also deletes the data that only that scope allowed: LH results
+       (lh_tests) or hormonal-medication context (hormonal_context), including quarantined rows of that type.
+       Withdrawing core consent stops new imports; what happens to data already collected is for the study protocol
+       (full deletion is available separately). One transaction, so no import can slip in between. */
+    setConsent(pid, scope, granted, by) {
+      return tx(() => {
+        q('INSERT INTO consents (participant_id, scope, granted, at, by_user) VALUES (?, ?, ?, ?, ?)').run(pid, scope, granted ? 1 : 0, now(), by ?? null);
+        const removed = {};
+        if (!granted) {
+          removed.previews = Number(q('DELETE FROM previews WHERE participant_id = ?').run(pid).changes);
+          const type = SCOPE_DATA[scope];
+          if (type) {
+            removed.annotations = Number(q("DELETE FROM annotations WHERE participant_id = ? AND json_extract(data_json, '$.type') = ?").run(pid, type).changes);
+            removed.quarantine = Number(q("DELETE FROM quarantine WHERE participant_id = ? AND json_extract(raw_json, '$.type') = ?").run(pid, type).changes);
+          }
+        }
+        return removed;
+      });
+    },
     consents(pid) { const out = {}; for (const r of q('SELECT scope, granted FROM consents WHERE participant_id = ? ORDER BY id').all(pid)) out[r.scope] = !!r.granted; return out; },
     consentLog: pid => q('SELECT scope, granted, at FROM consents WHERE participant_id = ? ORDER BY id').all(pid),
     setFeature(pid, name, enabled, by) { q('INSERT INTO features (participant_id, name, enabled, by_user, at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (participant_id, name) DO UPDATE SET enabled = excluded.enabled, by_user = excluded.by_user, at = excluded.at').run(pid, name, enabled ? 1 : 0, by ?? null, now()); },
@@ -110,12 +132,18 @@ export function openStore(path = ':memory:', { now = () => Date.now() } = {}) {
         batchHashes: new Set(q('SELECT source_hash FROM batches WHERE participant_id = ?').all(pid).map(r => r.source_hash)),
         obsRowHash: new Map(q('SELECT obs_key, row_hash FROM observations WHERE participant_id = ?').all(pid).map(r => [r.obs_key, r.row_hash])),
         entryHash: new Map(q('SELECT entry_id, entry_hash FROM annotations WHERE participant_id = ?').all(pid).map(r => [r.entry_id, r.entry_hash])),
+        entryCorrects: new Map(q("SELECT entry_id, json_extract(data_json, '$.corrects') AS c FROM annotations WHERE participant_id = ?").all(pid).filter(r => r.c).map(r => [r.entry_id, r.c])),
       };
     },
     savePreview(pid, userId, payload) { const id = randomBytes(18).toString('base64url'); q('DELETE FROM previews WHERE created_at < ?').run(now() - 15 * 60e3); q('INSERT INTO previews (id, participant_id, user_id, payload_json, created_at) VALUES (?, ?, ?, ?, ?)').run(id, pid, userId, JSON.stringify(payload), now()); return id; },
     takePreview(id, pid, userId) { const r = q('SELECT * FROM previews WHERE id = ? AND participant_id = ? AND user_id = ? AND created_at >= ?').get(String(id), pid, userId, now() - 15 * 60e3); if (r) q('DELETE FROM previews WHERE id = ?').run(r.id); return r ? JSON.parse(r.payload_json) : null; },
     commitImport(pid, p, userId, annotationHash) {
       return tx(() => {
+        // Consent is rechecked INSIDE the transaction (issue 2): a preview made under consent that has since been
+        // withdrawn cannot be committed, whatever happened to the preview itself.
+        const c = this.consents(pid);
+        if (!c.core_research) throw new ConsentError('core_research_consent_missing');
+        for (const [scope, type] of Object.entries(SCOPE_DATA)) if (!c[scope] && p.recordType === 'annotations' && p.accepted.some(a => a.type === type)) throw new ConsentError(`${scope}_consent_missing`);
         if (q('SELECT 1 FROM batches WHERE participant_id = ? AND record_type = ? AND source_hash = ?').get(pid, p.recordType, p.sourceHash)) return { duplicateBatch: true, batchId: null };
         const batchId = Number(q('INSERT INTO batches (participant_id, record_type, format, source_hash, filename_hash, extension, ingest_version, config_version, config_hash, counts_json, created_at, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
           .run(pid, p.recordType, p.format, p.sourceHash, p.sourceFilenameHash, p.sourceExtension, p.ingestVersion, p.configVersion, p.configHash, JSON.stringify(p.counts), now(), userId).lastInsertRowid);
@@ -123,16 +151,25 @@ export function openStore(path = ':memory:', { now = () => Date.now() } = {}) {
         if (p.recordType === 'observations') { const ins = q('INSERT OR IGNORE INTO observations (participant_id, batch_id, obs_key, row_hash, data_json, ingested_at) VALUES (?,?,?,?,?,?)'); for (const o of p.accepted) { const { line, ...d } = o; ins.run(pid, batchId, o.obsKey, o.rowHash, JSON.stringify(d), t); } }
         else { const ins = q('INSERT OR IGNORE INTO annotations (participant_id, batch_id, entry_id, entry_hash, data_json) VALUES (?,?,?,?,?)'); for (const a of p.accepted) { const { line, ...d } = a; ins.run(pid, batchId, a.entryId, annotationHash(a), JSON.stringify(d)); } }
         const qi = q('INSERT INTO quarantine (participant_id, batch_id, line, reasons_json, raw_json, rejected) VALUES (?,?,?,?,?,?)');
-        for (const x of p.quarantined) qi.run(pid, batchId, x.line, JSON.stringify(x.reasons), JSON.stringify(x.raw ?? null), x.rejected ? 1 : 0);
+        for (const x of p.quarantined) {
+          const unconsented = Object.entries(SCOPE_DATA).some(([scope, type]) => !c[scope] && x.raw?.type === type); // never store their cells
+          qi.run(pid, batchId, x.line, JSON.stringify(x.reasons), JSON.stringify(unconsented ? null : (x.raw ?? null)), x.rejected ? 1 : 0);
+        }
         return { duplicateBatch: false, batchId };
       });
     },
     batches: pid => q('SELECT id, record_type, format, source_hash, extension, ingest_version, config_version, config_hash, counts_json, created_at FROM batches WHERE participant_id = ? ORDER BY id').all(pid).map(b => ({ ...b, counts: JSON.parse(b.counts_json), counts_json: undefined })),
+    /** Observations with their ingestion time and full correction history (issue 7): `corrections` lists every
+     *  exclude/restore with its time, so an analysis can apply only those made before its cutoff. `excludedBy` is the
+     *  CURRENT state, for current views and exports. */
     observations(pid) {
-      const ex = new Map(); for (const c of q('SELECT observation_id, action FROM corrections WHERE participant_id = ? ORDER BY id').all(pid)) ex.set(c.observation_id, c.action === 'exclude');
-      return q('SELECT id, data_json, ingested_at FROM observations WHERE participant_id = ? ORDER BY id').all(pid).map(r => ({ ...JSON.parse(r.data_json), id: r.id, seq: r.id, ingestedAt: r.ingested_at, excludedBy: ex.get(r.id) ? 'correction' : null }));
+      const hist = new Map();
+      for (const c of q('SELECT observation_id, action, reason, at FROM corrections WHERE participant_id = ? ORDER BY at, id').all(pid)) (hist.get(c.observation_id) || hist.set(c.observation_id, []).get(c.observation_id)).push({ action: c.action, reason: c.reason, at: c.at });
+      return q('SELECT id, data_json, ingested_at FROM observations WHERE participant_id = ? ORDER BY id').all(pid).map(r => { const h = hist.get(r.id) || [];
+        return { ...JSON.parse(r.data_json), id: r.id, seq: r.id, ingestedAt: r.ingested_at, corrections: h, excludedBy: h.at(-1)?.action === 'exclude' ? 'correction' : null }; });
     },
-    annotations: pid => q('SELECT data_json FROM annotations WHERE participant_id = ? ORDER BY id').all(pid).map(r => JSON.parse(r.data_json)),
+    /** Annotations with `ingestedAt` = the commit time of their import batch (issue 7). */
+    annotations: pid => q('SELECT a.data_json, b.created_at FROM annotations a JOIN batches b ON b.id = a.batch_id WHERE a.participant_id = ? ORDER BY a.id').all(pid).map(r => ({ ...JSON.parse(r.data_json), ingestedAt: r.created_at })),
     quarantine: pid => q('SELECT id, batch_id, line, reasons_json, raw_json, rejected FROM quarantine WHERE participant_id = ? ORDER BY id').all(pid).map(r => ({ id: r.id, batchId: r.batch_id, line: r.line, reasons: JSON.parse(r.reasons_json), rejected: !!r.rejected, verbatimSource: JSON.parse(r.raw_json) })),
     addCorrection(pid, obsId, action, reason, by) {
       if (!q('SELECT 1 FROM observations WHERE id = ? AND participant_id = ?').get(obsId, pid)) return false;

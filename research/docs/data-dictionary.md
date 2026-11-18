@@ -50,11 +50,14 @@
 | `corrects` | no | the `entry_id` this entry replaces |
 
 **History and reuse:**
-- Annotations are **append-only**. A correction is a new entry, and the history is kept for "as known at time T" views.
+- Annotations are **append-only**. A correction is a new entry, and the history is kept for "as known at time T" views. An entry counts as known at T only if it was both recorded (`recorded_at`) and ingested (its batch's commit time) before T.
+- A correction that names itself (`self_correction`), or that closes a loop of corrections within the file or with stored entries (`circular_correction`), is quarantined.
 - Re-using an `entry_id` with different content is quarantined.
 
 ## Quarantine reason codes
-`participant_ref_invalid`, `participant_mismatch`, `sensor_site_invalid`, `measurement_kind_invalid`, `site_kind_mismatch`, `derivation_missing_or_invalid`, `aggregation_invalid`, `nightly_value_must_be_vendor_derived`, `device_model_missing`, `device_serial_pseudonym_invalid`, `value_not_numeric`, `precision_invalid`, `sampling_interval_invalid`, `field_format_invalid:<field>`, `timestamp_missing`, `timestamp_invalid`, `end_timestamp_invalid`, `end_not_after_start`, `utc_offset_missing`, `utc_offset_invalid`, `night_label_missing_or_invalid`, `unit_missing`, `unit_unrecognised`, `out_of_bounds_for_kind`, `conflicting_duplicate`, `entry_id_invalid`, `type_invalid`, `value_invalid`, `retraction_needs_corrects`, `date_invalid`, `recorded_at_missing_or_invalid`, `corrects_invalid`, `lh_tests_not_consented`, `hormonal_context_not_consented`, `entry_id_reused_with_different_content`, `column_count`, `not_an_object`.
+`participant_ref_invalid`, `participant_mismatch`, `sensor_site_invalid`, `measurement_kind_invalid`, `site_kind_mismatch`, `derivation_missing_or_invalid`, `aggregation_invalid`, `nightly_value_must_be_vendor_derived`, `device_model_missing`, `device_serial_pseudonym_invalid`, `value_not_numeric`, `precision_invalid`, `sampling_interval_invalid`, `field_format_invalid:<field>`, `timestamp_missing`, `timestamp_invalid`, `end_timestamp_invalid`, `end_not_after_start`, `utc_offset_missing`, `utc_offset_invalid`, `night_label_missing_or_invalid`, `unit_missing`, `unit_unrecognised`, `out_of_bounds_for_kind`, `conflicting_duplicate`, `entry_id_invalid`, `type_invalid`, `value_invalid`, `retraction_needs_corrects`, `date_invalid`, `recorded_at_missing_or_invalid`, `corrects_invalid`, `self_correction`, `circular_correction`, `lh_tests_not_consented`, `hormonal_context_not_consented`, `entry_id_reused_with_different_content`, `column_count`, `not_an_object`.
+
+**Rows without the needed consent:** a row rejected with `lh_tests_not_consented` or `hormonal_context_not_consented` keeps only its line number and reasons. Its cells are not retained in the saved preview, quarantine, database or exports.
 
 **File-level errors:** `empty`, `too_large`, `too_many_rows`, `too_many_columns`, `cell_too_long`, `binary_content`, `unterminated_quote`, `stray_quote`, `duplicate_header`, `invalid_json`, `no_records_array`.
 

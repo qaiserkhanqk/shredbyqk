@@ -48,6 +48,10 @@ async function importText(ref, recordType, content) {
 const pid = ref => store.participantByRef(ref).id;
 const previewsFor = ref => store.db.prepare('SELECT payload_json FROM previews WHERE participant_id = ?').all(pid(ref));
 const ANN_HEAD = 'participant_ref,entry_id,type,value,date,recorded_at,corrects';
+// LH / hormonal CONTENT = the stored type values. Corrected after the first failing run (stated in the fix report): the
+// original unquoted /lh_test/ also matched the reason code "lh_tests_not_consented" (which these tests require to be
+// kept) and the consent-log scope name "lh_tests", so it could never pass. The quoted form matches the data itself.
+const LH_OR_HORMONAL = /"(lh_test|hormonal_medication)"/;
 
 /* ---------- 1. Participant permissions are consistent across /analysis, /runs and /export ---------- */
 {
@@ -88,12 +92,12 @@ const ANN_HEAD = 'participant_ref,entry_id,type,value,date,recorded_at,corrects'
   const rows = [ANN_HEAD, 'P-R2-0002,P-R2-0002-b1,bleeding,period_start,2026-01-05,2026-01-05T09:00:00Z,', 'P-R2-0002,P-R2-0002-l1,lh_test,positive,2026-01-18,2026-01-18T09:00:00Z,', 'P-R2-0002,P-R2-0002-h1,hormonal_medication,yes,2026-01-18,2026-01-18T09:00:00Z,'].join('\n');
   const pv = await call('POST', '/api/participants/P-R2-0002/imports/preview', { as: R, body: { recordType: 'annotations', format: 'csv', content: rows } });
   const saved = previewsFor('P-R2-0002').map(r => r.payload_json).join('');
-  check('2 a saved preview holds no unconsented LH or hormonal content', saved.length > 0 && !/lh_test|hormonal_medication/.test(saved), saved.match(/.{40}(lh_test|hormonal_medication).{20}/)?.[0]);
+  check('2 a saved preview holds no unconsented LH or hormonal content', saved.length > 0 && !LH_OR_HORMONAL.test(saved) && !/"positive"/.test(saved), saved.match(/.{40}"(lh_test|hormonal_medication)".{20}/)?.[0]);
   await call('POST', '/api/participants/P-R2-0002/imports/commit', { as: R, body: { previewId: pv.json.previewId } });
   const q = JSON.stringify(store.quarantine(pid('P-R2-0002')));
   check('2 quarantine keeps the reason but not the unconsented LH/hormonal cells', /lh_tests_not_consented/.test(q) && /hormonal_context_not_consented/.test(q) && !/"lh_test"|"hormonal_medication"|"positive"/.test(q), q.slice(0, 300));
   const ex = await call('GET', '/api/participants/P-R2-0002/export', { as: R });
-  check('2 exports contain no unconsented LH or hormonal data', !/lh_test|hormonal_medication/.test(ex.text));
+  check('2 exports contain no unconsented LH or hormonal data', ex.status === 200 && !LH_OR_HORMONAL.test(ex.text) && !/"positive"/.test(ex.text));
 }
 {
   await newParticipant('P-R2-0003', ['core_research', 'lh_tests']);
@@ -106,7 +110,7 @@ const ANN_HEAD = 'participant_ref,entry_id,type,value,date,recorded_at,corrects'
   check('2 an LH import previewed before LH consent was withdrawn cannot be committed', cm.status >= 400 && !store.annotations(pid('P-R2-0003')).some(a => a.entryId === 'P-R2-0003-l2'));
   check('2 withdrawing LH consent removes stored LH results from the database', !store.annotations(pid('P-R2-0003')).some(a => a.type === 'lh_test'));
   const ex = await call('GET', '/api/participants/P-R2-0003/export', { as: R });
-  check('2 ... and from exports', !/lh_test/.test(ex.text));
+  check('2 ... and from exports', ex.status === 200 && !LH_OR_HORMONAL.test(ex.text) && !ex.json.annotations.some(a => a.type === 'lh_test'));
 }
 {
   // Commit-time recheck inside the transaction, independent of preview invalidation (e.g. a race).
