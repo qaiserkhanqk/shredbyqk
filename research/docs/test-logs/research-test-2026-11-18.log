@@ -1,0 +1,196 @@
+ok   policy: label is attached to every payload
+ok   policy: refuses "Today is a safe day"
+ok   policy: refuses "You are infertile now"
+ok   policy: refuses "You are protected"
+ok   policy: refuses "green day"
+ok   policy: refuses "This is not a safe day"
+ok   policy: refuses "unprotected sex is fine today"
+ok   policy: refuses "You did not ovulate"
+ok   policy: refuses "anovulatory cycle"
+ok   policy: refuses "You ovulated on 3 May"
+ok   policy: refuses "possible PCOS"
+ok   policy: refuses "progesterone level estimate"
+ok   policy: refuses "no need for contraception"
+ok   policy: the sanctioned no-shift sentence passes
+ok   policy: a forbidden word in a key is caught too
+ok   policy: an estimate without experimental marking is refused
+ok   policy: an estimate without reasons is refused
+ok   policy: an estimate without uncertainty is refused
+ok   policy: an uncalibrated interval described as a probability is refused
+ok   policy: "calibrated: true" without evidence is refused
+ok   policy: an ovulation date field is refused
+ok   policy: feature "contraception" cannot be enabled
+ok   policy: feature "Contraceptive-Mode" cannot be enabled
+ok   policy: feature "fertile_window" cannot be enabled
+ok   policy: feature "safeDays" cannot be enabled
+ok   policy: feature "safe days" cannot be enabled
+ok   policy: feature "conception timing" cannot be enabled
+ok   policy: feature "pregnancy_detection" cannot be enabled
+ok   policy: an ordinary research feature name is allowed
+ok   units: C/F spellings recognised; missing or unknown unit is null (never guessed)
+ok   units: 98.6 °F → 37 °C; 0.018 °F precision → 0.01 °C
+ok   units: offsets validated as whole minutes, multiples of 15, UTC−12…+14
+ok   csv: quoted commas, quotes and newlines parse
+ok   csv: unterminated quote, binary content, duplicate headers and oversize input are refused
+ok   csv: row and column limits enforced
+ok   csv export: formula-like cell neutralised ("=HYPERLINK(\"x\")")
+ok   csv export: formula-like cell neutralised ("+SUM(A1)")
+ok   csv export: formula-like cell neutralised ("-2+3")
+ok   csv export: formula-like cell neutralised ("@cmd")
+ok   csv export: formula-like cell neutralised ("\tx")
+ok   csv export: formula-like cell neutralised ("|calc")
+ok   csv export: plain negative numbers are left as numbers
+ok   csv export: round trip keeps the text
+ok   ingest 1: 144 overnight samples accepted, nothing quarantined
+ok   ingest 1: source value and unit preserved alongside °C
+ok   ingest 1: nothing is stored by preview; versions and hashes recorded
+ok   ingest 1: the filename is kept only as a hash and an extension
+ok   ingest 5: uploading the same file again is idempotent (recognised duplicate batch, 0 rows)
+ok   ingest 5: an overlapping row identical to a stored one is a duplicate; a changed value is quarantined as a conflict
+ok   ingest: rows for another participant are rejected (identity never taken from the file name)
+ok   ingest 2: one vendor-derived nightly value accepted as vendor_derived / nightly_value
+ok   ingest 2: a nightly value labelled "raw" is rejected (a vendor average is not raw data)
+ok   ingest 2: missing derivation is rejected, never defaulted to raw
+ok   ingest 3: 1 valid row accepted; 4 suspicious rows quarantined (kept), not dropped
+ok   ingest 3: reasons are specific
+ok   ingest 4: mixed °C/°F rows all accepted and normalised to the same scale
+ok   ingest 4: °F rows convert back to the original °C values (±0.001)
+ok   ingest 6: device replacement and time-zone change rows accepted with their own device and offset
+ok   ingest: a corrupted file fails with a clear code and no rows
+ok   ingest: empty input fails clearly
+ok   ingest: JSON without a records array fails clearly
+ok   ingest: input over the 5 MB limit is refused before parsing
+ok   ingest: an out-of-bounds wrist value is quarantined (kept), not deleted
+ok   ingest: wrist skin temperature cannot be labelled as oral basal temperature
+ok   annotations: entries, a correction and a retraction accepted
+ok   annotations: LH results need their own consent
+ok   annotations: hormonal-medication context needs its own specific consent
+ok   annotations: an entry ID reused with different content is quarantined, not overwritten
+ok   fixtures: manifest marks every file synthetic and names the generator
+ok   fixtures: every fixture matches its manifest hash
+ok   fixtures: regenerating from the seeded generator gives byte-identical files
+ALL PASS (71)
+ok   night: 23:30 and 02:30 local belong to the same night (midnight crossing)
+ok   night: a sample before and after a DST change, each with its own source offset, share a night
+ok   night: after flying to UTC+9 the local clock decides the night
+ok   night: without a sleep session, a daytime sample is outside the fallback window
+ok   night: a sample with a sleep session is used whatever the clock time (shift work)
+ok   night: no UTC offset → cannot be placed (never assumed to be UTC)
+ok   quality: an isolated spike is excluded with a reason and not averaged in
+ok   quality: a documented off-body flag excludes that sample
+ok   quality: an unknown source flag is reported verbatim and not interpreted
+ok   quality: out-of-order arrival is detected
+ok   quality: coverage in minutes from measurement intervals; window and offsets reported
+ok   quality: robust features (median, MAD, IQR) with method and config versions
+ok   quality: a sparse night is "insufficient" with reasons
+ok   quality: a long gap is reported and limits quality
+ok   quality: with no end time or sampling interval, coverage is unknown, not guessed
+ok   quality: empty input gives no reports and no crash
+ok   quality: device replacement creates a separate stream; never pooled
+ok   quality: the first night on the new device is flagged as a transition
+ok   quality: a firmware change is flagged and kept as a separate stream
+ok   quality: wrist skin and oral readings on the same night stay separate (no cross-site averaging)
+ok   segment: spotting never starts a cycle; a bleeding run without an explicit start does
+ok   segment: a correction replaces the earlier entry (start moved to 3 Feb)
+ok   segment: the view as known on 5 Feb still has the uncorrected start (history kept)
+ok   segment: a 55-day cycle is within the 15–90 day range and used
+ok   segment: a 122-day cycle is marked "check entries" and not used
+ok   segment: a retraction removes the entry
+ok   shift: a clear synthetic rise is detected in every complete cycle
+ok   shift: the reported night is within 2 nights of the synthetic rise night
+ok   shift: output is experimental, has reasons, uncalibrated uncertainty, versions, hashes and passes the policy
+ok   shift: no ovulation date is produced
+ok   shift: a flat signal gives "No clear temperature shift detected…" (never "did not ovulate")
+ok   shift: very noisy signal — results recorded, all policy-clean (behaviour reported in the evaluation, not asserted as accuracy)
+ok   shift: a small gradual rise below the configured minimum is not reported as a shift
+ok   shift: a fever-associated elevation that was annotated is excluded, so no shift is reported
+ok   shift: an UNannotated transient spike (4 nights) is not sustained to the next period, but the rule can still fire — documented limitation
+ok   shift: a device change with a level offset is NOT reported as a shift (segments analysed separately)
+ok   shift: the device-change cycle is marked in the output
+ok   shift: sparse nights → insufficient_data with explanation codes, not a reassuring answer
+ok   shift: no data at all → insufficient_data
+ok   reproducibility: same inputs give identical results and input hashes
+ok   trend: descriptive layer relative to own first nights, separate from estimates
+ok   forecast: too little history → insufficient_data with codes
+ok   forecast: with enough history, a point and an EMPIRICAL range marked uncalibrated
+ok   forecast: irregular, long cycles → a wide range flagged as varying widely
+ok   forecast: no recent period logged → insufficient_data (not a confident date)
+ok   leakage: a forecast made at time T is identical whether or not later entries exist
+ok   leakage: the evaluation harness finds no future information in any forecast
+ok   pipeline: as-of analysis is reproducible and hides later data
+ok   pipeline: experimental layers are off unless a researcher enables them
+ok   pipeline: the whole analysis passes the output policy
+ok   evaluation: shift report separates cycles with/without events, abstentions and false detections, with denominators
+ALL PASS (51)
+ok   adapters: the documented file adapter previews a file
+ok   adapters: SWL DS07 is a stub, unverified, claims no capability
+ok   adapters: a vendor stub refuses to import and returns the integration questions
+ok   adapters: generic vendor stub behaves the same
+ok   ml: a complete model card passes validation
+ok   ml: participant-overlapping splits are refused
+ok   ml: no temporal evaluation is refused
+ok   ml: possible test-set tuning is refused
+ok   ml: labels generated by the model itself are refused
+ok   ml: LH labels must be described as an imperfect reference
+ok   ml: online self-training must be disabled
+ok   ml: contraceptive or diagnostic intended use is refused
+ok   ml: an unfrozen model (no artifact hash) is refused
+ok   ml: the registry refuses an invalid card and stores a valid one frozen
+ok   ml: there is no trained model; prediction is unavailable
+ALL PASS (15)
+(node:4880) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ok   server: refuses to bind to a non-local address
+ok   auth: unauthenticated API request → 401, still labelled
+ok   static: dashboard served with CSP, nosniff, frame-deny and no-store
+ok   static: path traversal refused
+ok   auth: session cookie is HttpOnly and SameSite=Strict
+ok   auth: 5 failed logins lock the account temporarily (even the right password fails)
+ok   auth: unknown user and wrong password give the same answer
+ok   participants: creation requires adult confirmation (no minors in this prototype)
+ok   participants: researcher creates a pseudonymous participant
+ok   csrf: a change without the CSRF token is refused
+ok   csrf: a cross-origin request is refused
+ok   isolation: researcher B cannot see researcher A's participant (404, same as not existing)
+ok   isolation: an admin manages accounts but cannot read participant data
+ok   roles: a researcher cannot create accounts
+ok   consent: import refused without core research consent
+ok   consent: a researcher cannot simply grant consent
+ok   consent: a researcher records consent from a signed form (explicit confirmation)
+ok   import: preview reports counts and stores nothing yet
+ok   import: a filename that looks like a name is never stored or echoed
+ok   import: only the researcher who made a preview can commit it
+ok   import: commit stores the observations
+ok   import: re-uploading the same file is recognised as a duplicate batch
+ok   import: suspicious rows are reported for quarantine with reasons
+ok   import: quarantined rows are kept with their original cells (researcher view)
+ok   import: corrupted file → clear error
+ok   import: oversized body refused (413) and non-JSON refused (415)
+ok   features: "contraception" cannot be enabled through the API
+ok   features: "fertile_window" cannot be enabled through the API
+ok   features: "safe_days" cannot be enabled through the API
+ok   features: "conception_timing" cannot be enabled through the API
+ok   analysis: experimental layers are off by default
+ok   analysis: once enabled, estimates are experimental with reasons and uncertainty
+ok   analysis: observed, descriptive, estimate and forecast layers are separate
+ok   provenance: identical analysis is not duplicated; a different cutoff adds versions without overwriting
+ok   corrections: exclusion is a reversible correction; the raw row is unchanged
+ok   corrections: restore reverses it
+ok   corrections: cannot target another participant's observation
+ok   participant: sees own observations but no experimental estimates or forecasts
+ok   participant: cannot import, cannot see quarantine, cannot see another participant
+ok   export: JSON export carries the label and source values
+ok   export: CSV starts with the label line
+ok   export: a formula-like cell is neutralised in the CSV export
+ok   policy: no forbidden phrase in any of 65 API responses or exports
+ok   policy: every JSON response carries the persistent label
+ok   logs: no participant references, values, filenames, tokens or bodies in application logs
+ok   delete: requires typing the reference to confirm
+ok   delete: another researcher cannot delete it
+ok   delete: the participant can delete their own data
+ok   delete: raw AND derived records are gone (observations, annotations, quarantine, corrections, runs, previews, consents, features)
+ok   delete: the participant account and its sessions are gone
+ok   delete: the audit trail records the deletion without health content or the reference
+ok   delete: the researcher no longer sees it
+ALL PASS (52)
+exit 0
