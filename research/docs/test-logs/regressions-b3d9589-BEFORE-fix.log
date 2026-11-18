@@ -1,0 +1,36 @@
+ok   1 control: the researcher sees experimental estimates and stored runs
+FAIL 1 /runs: a participant cannot read stored experimental runs (historical outputs)  — 200 {"runs":[{"id":1,"kind":"retrospective_sustained_temperature_shift","algorithm_version":"sustained-shift-rule-1.0.0","co
+FAIL 1 /export: a participant export contains no experimental estimates or forecasts  — "layer":"estimate"
+FAIL 1 /export: a participant export contains no quarantine records (researcher-only, as on /quarantine)
+ok   1 /analysis (historical as-of): still no experimental layers for a participant
+ok   1 control: the researcher export still has derived runs and quarantine
+FAIL 2 withdrawing consent invalidates pending previews for that participant  — 1 previews left
+FAIL 2 a commit after core consent was withdrawn is refused and stores nothing  — 200 stored=18
+FAIL 2 a saved preview holds no unconsented LH or hormonal content  — }],"quarantined":[{"line":3,"reasons":["lh_tests_not_consented"],"r
+FAIL 2 quarantine keeps the reason but not the unconsented LH/hormonal cells  — [{"id":2,"batchId":5,"line":3,"reasons":["lh_tests_not_consented"],"rejected":true,"verbatimSource":{"participant_ref":"P-R2-0002","entry_id":"P-R2-0002-l1","type":"lh_test","value":"positive","date":"2026-01-18","recorded_at":"2026-01-18T09:00:00Z","corrects":""}},{"id":3,"batchId":5,"line":4,"reas
+FAIL 2 exports contain no unconsented LH or hormonal data
+ok   2 control: with LH consent the LH result is stored
+FAIL 2 an LH import previewed before LH consent was withdrawn cannot be committed
+FAIL 2 withdrawing LH consent removes stored LH results from the database
+FAIL 2 ... and from exports
+FAIL 2 the commit transaction itself rechecks optional consent (no LH stored when it was withdrawn)  — threw=null
+FAIL 2 the commit transaction itself rechecks core consent  — threw=null
+FAIL 5 a daytime sleep session crossing noon gets ONE night label (not split at noon)  — 2026-02-09:8 2026-02-10:8
+FAIL 5 a session whose UTC offset changes part-way keeps one label (taken from the session start, documented)  — 2026-02-10:14 2026-02-11:2
+FAIL 6 quality: a model change (same serial and firmware) is flagged as a device transition  — []
+FAIL 6 inference: a model change with a level offset is not reported as a shift (separate segments)  — shift_detected segments=1
+FAIL 6 provenance lists the canonical stream identities, including model
+FAIL 7 a correction made AFTER the cutoff does not change the as-of analysis (reproducible)  — 3aaa8707 vs 3aaa8707
+FAIL 7 ... the excluded sample is still counted as valid at the earlier cutoff  — {"total":12,"valid":11,"excluded":{"researcher_excluded":1},"outOfOrder":0,"implausibleJumps":0}
+ok   7 a cutoff after the correction applies it
+FAIL 7 the provenance input hash includes effective corrections (differs once a correction applies)
+FAIL 7 an entry ingested after the cutoff is not used, even if its recorded_at is earlier  — ["2026-01-05","2026-02-04","2026-03-06","2026-03-12"]
+ok   7 control: after ingestion it is used
+FAIL 8 a self-referencing correction is rejected  — {"ann":{"participantRef":"P-R8-0001","entryId":"P-R8-0001-a","type":"bleeding","value":"period","date":"2026-01-05","recordedAt":1767603600000,"corrects":"P-R8-0001-a"}}
+FAIL 8 a circular correction within one file is rejected  — []
+FAIL 8 a circular correction across imports (existing x corrects y, new y corrects x) is rejected  — []
+FAIL 8 malformed circular data in storage cannot hang analysis (finishes within 5 s)  — file:///home/user/shredbyqk/research/lib/cycles.js:23
+function chainOf(known, id) { const out = []; let cur = known.find(x => x.entryId === id); while (cur) { out.push(cur.entryId); cur = cur.corrects
+FAIL 8 ... and the circular/self-referencing entries are dropped, valid ones kept
+27 FAILED of 33
+exit 1
