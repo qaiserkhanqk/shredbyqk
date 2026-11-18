@@ -1,0 +1,20 @@
+{
+  "records": [
+    {
+      "participant_ref": "P-SYN-0001",
+      "device_manufacturer": "SyntheticCo",
+      "device_model": "SYN-1",
+      "device_serial_pseudonym": "P-SYN-0001-dev1",
+      "firmware": "1.4.2",
+      "sensor_site": "wrist",
+      "measurement_kind": "skin_temperature",
+      "derivation": "vendor_derived",
+      "aggregation": "nightly_value",
+      "night_label": "2026-01-08",
+      "value": 33.91,
+      "unit": "C",
+      "precision": 0.01,
+      "source_quality_flags": ""
+    }
+  ]
+}

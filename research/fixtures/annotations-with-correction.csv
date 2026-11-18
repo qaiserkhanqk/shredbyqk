@@ -1,0 +1,7 @@
+participant_ref,entry_id,type,value,date,recorded_at,corrects
+P-SYN-0001,P-SYN-0001-a1,bleeding,period_start,2026-01-05,2026-01-05T09:00:00Z,
+P-SYN-0001,P-SYN-0001-a2,bleeding,period_start,2026-02-04,2026-02-04T09:00:00Z,
+P-SYN-0001,P-SYN-0001-a3,bleeding,period_start,2026-02-03,2026-02-06T09:00:00Z,P-SYN-0001-a2
+P-SYN-0001,P-SYN-0001-a4,bleeding,spotting,2026-01-20,2026-01-20T09:00:00Z,
+P-SYN-0001,P-SYN-0001-a5,bleeding,retracted,2026-01-20,2026-01-21T09:00:00Z,P-SYN-0001-a4
+P-SYN-0001,P-SYN-0001-a6,illness,yes,2026-01-12,2026-01-13T09:00:00Z,
