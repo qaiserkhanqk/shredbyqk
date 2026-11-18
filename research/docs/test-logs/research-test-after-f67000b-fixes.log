@@ -138,7 +138,7 @@ ok   ml: an unfrozen model (no artifact hash) is refused
 ok   ml: the registry refuses an invalid card and stores a valid one frozen
 ok   ml: there is no trained model; prediction is unavailable
 ALL PASS (15)
-(node:2866) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:4190) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
 ok   server: refuses to bind to a non-local address
 ok   auth: unauthenticated API request → 401, still labelled
@@ -193,7 +193,7 @@ ok   delete: the participant account and its sessions are gone
 ok   delete: the audit trail records the deletion without health content or the reference
 ok   delete: the researcher no longer sees it
 ALL PASS (52)
-(node:2873) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:4197) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
 ok   1 control: the researcher sees experimental estimates and stored runs
 ok   1 /runs: a participant cannot read stored experimental runs (historical outputs)
@@ -229,7 +229,7 @@ ok   8 a circular correction across imports (existing x corrects y, new y correc
 ok   8 malformed circular data in storage cannot hang analysis (finishes within 5 s)
 ok   8 ... and the circular/self-referencing entries are dropped, valid ones kept
 ALL PASS (33)
-(node:2888) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:4211) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
 ok   1 setup: LH/hormonal content with odd type formatting is present while consent is given
 ok   1 withdrawing LH consent removes every LH record, whatever its type formatting (quarantine, annotations, previews)
@@ -255,6 +255,7 @@ ok   2 ... only an explicit reimport brings it back
 ok   2 a participant account cannot trigger a reimport
 ok   2 reimporting when nothing is missing adds nothing (all duplicates)
 ALL PASS (23)
+ok   setup: the frozen fixture is the f67000b store byte for byte (apart from its 2-line header)
 ok   setup: the schema-1 database holds a batch, 2 annotations and a quarantined LH row typed " lh_test "
 ok   migration: schema version recorded as 2
 ok   migration: batches gained attempt and reimport_reason; IDs unchanged
@@ -263,4 +264,5 @@ ok   migration: canonical_type filled for old annotation and quarantine rows
 ok   after migration: withdrawing LH consent removes the old " lh_test " quarantine row and the LH annotation
 ok   after migration: an explicit reimport of the same file is stored as attempt 1
 ok   opening an already-migrated database again changes nothing
-ALL PASS (8)
+ALL PASS (9)
+exit 0

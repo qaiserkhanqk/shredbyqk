@@ -1,21 +1,27 @@
 // Upgrading a database created by the previous version (schema 1, commit f67000b) to schema 2: batches become one row
 // per attempt (explicit reimports), and annotations/quarantine gain `canonical_type`, filled from the stored type.
 // Synthetic data only. Run: node research/tests/migration.test.mjs
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { join } from 'node:path';
 import { openStore, SCHEMA_VERSION } from '../server/store.js';
 import { preview, annotationHash } from '../lib/ingest.js';
 import { check, done } from './harness.mjs';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const dir = mkdtempSync(join(tmpdir(), 'rs-migrate-')), db = join(dir, 'v1.sqlite');
-// The schema-1 store exactly as committed in f67000b (it imports only Node built-ins).
-writeFileSync(join(dir, 'store-v1.mjs'), execFileSync('git', ['-C', ROOT, 'show', 'f67000b:research/server/store.js']));
-const { openStore: openV1 } = await import(pathToFileURL(join(dir, 'store-v1.mjs')).href);
+// The schema-1 store exactly as committed in f67000b, kept as a frozen fixture so this test also runs outside a git
+// checkout (e.g. from the review ZIP). It imports only Node built-ins.
+const { openStore: openV1 } = await import('./fixtures/store-v1-f67000b.mjs');
 
+// Guard: the fixture must still equal f67000b's store when a git checkout is available (skipped, and said so, without one).
+import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+let fixtureMatches = true;
+try {
+  const orig = execFileSync('git', ['-C', fileURLToPath(new URL('../..', import.meta.url)), 'show', 'f67000b:research/server/store.js'], { stdio: ['ignore', 'pipe', 'ignore'] }).toString();
+  fixtureMatches = readFileSync(fileURLToPath(new URL('./fixtures/store-v1-f67000b.mjs', import.meta.url)), 'utf8').split('\n').slice(2).join('\n') === orig;
+} catch { console.log('note: no git checkout here, so the fixture-vs-f67000b comparison is skipped'); }
 const ref = 'P-MIG-0001', HEAD = 'participant_ref,entry_id,type,value,date,recorded_at,corrects';
 const old = openV1(db);
 const pid = old.createParticipant({ ref, adultConfirmed: true }, null);
@@ -25,6 +31,7 @@ const pv = preview(text, { format: 'csv', recordType: 'annotations', participant
 old.commitImport(pid, pv, null, annotationHash);
 const before = { batches: old.db.prepare('SELECT id FROM batches').all().map(r => r.id), ann: old.db.prepare('SELECT id, batch_id FROM annotations').all().length, q: old.db.prepare('SELECT raw_json FROM quarantine').all() };
 old.close();
+check('setup: the frozen fixture is the f67000b store byte for byte (apart from its 2-line header)', fixtureMatches);
 check('setup: the schema-1 database holds a batch, 2 annotations and a quarantined LH row typed " lh_test "', before.batches.length === 1 && before.ann === 2 && before.q.some(r => JSON.parse(r.raw_json)?.type === ' lh_test '));
 
 const s = openStore(db);

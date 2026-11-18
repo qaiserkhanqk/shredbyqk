@@ -126,7 +126,7 @@ research/
 | `research/tests/api.test.mjs`: real HTTP server; auth, lockout, CSRF, isolation, roles, consent, import preview and commit, duplicates, quarantine, size limits, prohibited features, experimental gating, versioned runs, corrections, participant view, exports, CSV injection, forbidden-phrase scan of every response, log content, deletion of raw and derived data | 52 | **all pass** |
 | `research/tests/regressions-b3d9589.test.mjs`: participant permissions on /runs and /export, consent rechecked at commit and on withdrawal, no unconsented LH or hormonal data retained, session night labels, canonical stream identity including model, reproducible as-of history, self and circular corrections (see `docs/fixes-b3d9589.md`) | 33 | **all pass** |
 | `research/tests/regressions-f67000b.test.mjs`: canonical annotation types in consent checks and withdrawal purges (LH and hormonal, any spelling; previews, quarantine, exports); explicit, audited reimport under current consent; no automatic restoration (see `docs/fixes-f67000b.md`) | 23 | **all pass** |
-| `research/tests/migration.test.mjs`: upgrading a database made by the previous version (schema 1 → 2) | 8 | **all pass** |
+| `research/tests/migration.test.mjs`: upgrading a database made by the previous version (schema 1 → 2) | 9 | **all pass** |
 | `research/tests/e2e.cjs`: dashboard in headless Chromium with Secure cookies; label, can/cannot panel, timeline, experimental separation, device-change marker, UI import, duplicate detection, explicit reimport, CSV export, participant self-view and API refusal, UI deletion, no external requests, clean logs, no script or CSP errors | 26 | **all pass** |
 
 **What these results do and don't show:**

@@ -5,7 +5,7 @@
   - `research/tests/regressions-f67000b.test.mjs`: **16 of 23 checks failed** (`research/docs/test-logs/regressions-f67000b-BEFORE-fix.log`).
   - `tests/cycle-regressions-f67000b.test.mjs`: **2 checks failed** (`docs/test-logs/cycle-regressions-f67000b-BEFORE-fix.log`).
 - **No test was weakened or changed after the failing run.** Two tests were **added** for code introduced by the fixes:
-  - `research/tests/migration.test.mjs` (8 checks): upgrading a database made by `f67000b`;
+  - `research/tests/migration.test.mjs` (9 checks): upgrading a database made by `f67000b`. It uses a frozen copy of the `f67000b` store (`research/tests/fixtures/store-v1-f67000b.mjs`), so it also runs outside a git checkout; the first version read it with `git show` and failed when run from the review ZIP;
   - two checks in `research/tests/e2e.cjs` for the new reimport control.
 - **Constraints kept.** The research prototype stays separate from the phone app. Synthetic data only. No clinical validation claimed. Nothing merged or deployed.
 
@@ -21,9 +21,9 @@
 |---|---|
 | `node research/tests/regressions-f67000b.test.mjs` | before: 16 of 23 FAILED → after: **ALL PASS (23)** |
 | `node tests/cycle-regressions-f67000b.test.mjs` | before: 2 FAILED → after: **ALL PASS** |
-| `node research/tests/migration.test.mjs` (new) | **ALL PASS (8)** |
+| `node research/tests/migration.test.mjs` (new) | **ALL PASS (9)** |
 | `npm test` (18 app suites, including every earlier cycle regression suite) | **exit 0, 452 ok, 0 FAIL** |
-| `npm run research:test` (ingest 71, analysis 51, extensions 15, API 52, b3d9589 regressions 33, f67000b regressions 23, migration 8) | **exit 0, 253 checks, 0 FAIL** |
+| `npm run research:test` (ingest 71, analysis 51, extensions 15, API 52, b3d9589 regressions 33, f67000b regressions 23, migration 9) | **exit 0, 254 checks, 0 FAIL** |
 | `npm run test:e2e` (app browser suites) | **exit 0, 86 ok** |
 | `npm run research:e2e` (research dashboard, including the reimport control) | **exit 0, 26 ok** |
 | `npm run eval:cycle` | Regenerated; version line only, results identical |
