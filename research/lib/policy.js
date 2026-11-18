@@ -49,7 +49,9 @@ export function checkText(text, path = '') {
 export function checkValue(v, path = '$') {
   if (typeof v === 'string') return checkText(v, path);
   if (Array.isArray(v)) return v.forEach((x, i) => checkValue(x, `${path}[${i}]`));
-  if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) { checkText(k, `${path}.${k}`); checkValue(x, `${path}.${k}`); }
+  // `verbatimSource` holds a participant's original cells (quarantine, export). It is data, never rendered as product
+  // text, so it is exempt; everything else, including keys, is checked.
+  if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) { checkText(k, `${path}.${k}`); if (k !== 'verbatimSource') checkValue(x, `${path}.${k}`); }
 }
 
 /** Structural rules for inference outputs (any object with `layer: 'estimate' | 'forecast'`). */

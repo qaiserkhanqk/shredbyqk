@@ -21,6 +21,10 @@ export const ANNOTATION_TYPES = {
   hormonal_medication: ['yes', 'no'], // only with the separate `hormonal_context` consent
 };
 const REF = /^[A-Za-z0-9_-]{4,64}$/;
+// Free-text fields are restricted to identifier-like formats, so imported data can never carry sentences into the UI.
+const FORMATS = { device_manufacturer: /^[A-Za-z0-9 ._:+\/-]{1,64}$/, device_model: /^[A-Za-z0-9 ._:+\/-]{1,64}$/, firmware: /^[A-Za-z0-9 ._:+\/-]{1,64}$/, sampling_config: /^[A-Za-z0-9 ._:+=\/-]{1,64}$/,
+  tz_name: /^[A-Za-z]+(?:[\/_+-][A-Za-z0-9]+)*$/, sleep_session_id: /^[A-Za-z0-9_.:-]{1,80}$/ };
+const FLAG = /^[a-z0-9_]{1,40}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}:\d{2})$/;
 
@@ -41,6 +45,8 @@ export function validateObservation(r, { participantRef, config = CONFIG } = {})
   if (!DERIVATIONS.includes(derivation)) reject.push('derivation_missing_or_invalid'); // never defaulted to raw
   if (!AGGREGATIONS.includes(aggregation)) reject.push('aggregation_invalid');
   if (aggregation === 'nightly_value' && derivation === 'raw') reject.push('nightly_value_must_be_vendor_derived');
+  for (const [f, re] of Object.entries(FORMATS)) if (str(r[f]) && !re.test(str(r[f]))) reject.push(`field_format_invalid:${f}`);
+  if (str(r.source_quality_flags) && !str(r.source_quality_flags).split(';').map(x => x.trim()).filter(Boolean).every(x => FLAG.test(x))) reject.push('field_format_invalid:source_quality_flags');
   const model = str(r.device_model), serial = str(r.device_serial_pseudonym);
   if (!model) reject.push('device_model_missing');
   if (!REF.test(serial)) reject.push('device_serial_pseudonym_invalid');
