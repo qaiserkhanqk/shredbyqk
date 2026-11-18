@@ -69,12 +69,16 @@ const has = async (p, sel) => (await p.$(sel)) !== null;
       await p.click('[data-act=lhOn]'); await p.waitForTimeout(400);
       check('L3 after opting in, the log form has an LH result field', await has(p, '#cyLh'));
       if (await has(p, '#cyLh')) {
+        // Changed after the first run (stated in docs): the page already says "no assumed ovulation day" (a negation, in
+        // the estimate's method note), so the check compares fertility/ovulation wording before and after a positive result.
+        const CLAIM = /fertile|safe day|ovulation day|you (have )?ovulated|ovulating/gi;
+        const claimsBefore = ((await p.textContent('#cycle')).match(CLAIM) || []).length;
         await p.selectOption('#cyLh', 'positive'); await p.click('[data-act=saveDay]'); await p.waitForTimeout(400);
         const stored = await p.evaluate(async (t) => { const S = await import('/js/cycle/store.js');
           const repo = await S.openCycleRepo({ storage: S.indexedDbStorage(), keys: S.indexedDbKeys(), userId: localStorage.getItem('shred_cycle_uid') }); return repo.read().days[t]?.lh; }, dayStr(0));
         check('L3 the result is saved in the encrypted store', stored === 'positive', String(stored));
         const page = await p.textContent('#cycle');
-        check('L4 the page makes no fertility or ovulation claim after a positive result', !/fertile|safe day|ovulation day|you (have )?ovulated|ovulating/i.test(page));
+        check('L4 a positive result adds no fertility or ovulation wording to the page', (page.match(CLAIM) || []).length === claimsBefore && !/fertile|safe day|you (have )?ovulated|ovulating/i.test(page), `${claimsBefore} → ${(page.match(CLAIM) || []).length}`);
         await go(); await p.click('#cySettings summary'); await p.click('[data-act=summary]'); await p.waitForTimeout(300);
         const card = (await p.$('#cySummary')) ? await p.textContent('#cySummary') : '';
         check('L5 the doctor summary lists the LH result as recorded, not interpreted', /positive/i.test(card) && /not interpreted/i.test(card), card.slice(-200));

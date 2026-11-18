@@ -10,6 +10,7 @@ import { retrospectiveShift } from './tempshift.js';
 import { openCycleRepo, indexedDbKeys, indexedDbStorage, migrateLegacyLocalStorage, webLock, resetCycleStorage } from './store.js';
 import { today as localToday, localMinutes, addDays, diffDays, human, deviceTimeZone } from './dates.js';
 import { readFlags, setFlag, FLAG_DEFS } from './flags.js';
+import { clinicianSummary, summaryText, SUMMARY_MONTHS } from './summary.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const MSG = {
@@ -18,9 +19,11 @@ const MSG = {
   NOT_VERIFIED: 'This device isn\'t available: its integration is not verified.', CRYPTO_UNAVAILABLE: 'This browser can\'t encrypt data, so cycle tracking is unavailable here.',
   DECRYPT_FAILED: 'Your saved cycle data could not be unlocked on this device.', CORRUPT: 'Your saved cycle data is damaged.',
   CONFLICT: 'Another tab kept saving at the same moment, so this change was not saved. Please try again.', STORAGE_NOT_ATOMIC: 'This browser can\'t store cycle data safely.',
+  LH_OFF: 'Turn on ovulation test logging in settings first.',
   STALE_SESSION: 'Your cycle data was changed or deleted in another tab. The screen has been refreshed; nothing was saved.', KEYSTORE_UNAVAILABLE: 'Secure storage is blocked in this browser (private mode?).',
 };
 let repo = null, root = null, toast = () => {}, openErr = null, notified = new Set(), timer = null;
+let summaryMonths = null; // the doctor summary is shown only after the person asks; it is rebuilt on each render and never stored
 const flags = () => readFlags();
 const now = () => ({ today: localToday(), nowMin: localMinutes(Date.now(), deviceTimeZone()) });
 
@@ -86,7 +89,7 @@ function render() {
   const unsaved = unsavedInputs(); // a redraw (e.g. another tab saved) must never change what the person typed
   const est = estimateNext(s, today);
   const tempShift = f.temperatureResearch && est.lastStart ? retrospectiveShift(s, est.lastStart, addDays(today, 1)) : null;
-  root.innerHTML = [banner(), promptsHTML(s, est, today), dueHTML(s, est, today, nowMin), estimateHTML(s, est), logHTML(s, today), f.patternInsights ? insightHTML(s, today) : '',
+  root.innerHTML = [banner(), summaryMonths ? summaryHTML(s, today) : '', promptsHTML(s, est, today), dueHTML(s, est, today, nowMin), estimateHTML(s, est), logHTML(s, today), f.patternInsights ? insightHTML(s, today) : '',
     f.phaseEducation ? phaseHTML(s, today, tempShift, est) : '', historyHTML(s), f.patternInsights ? patternsHTML(s, today, f) : '', remindersHTML(s, est, today, nowMin),
     wearableHTML(s, today, f, tempShift), situationHTML(s), settingsHTML(s, f)].join('');
   for (const id of open) { const d = root.querySelector('#' + id); if (d) d.open = true; }
@@ -96,7 +99,7 @@ function render() {
 
 /* Unsaved form input survives redraws (defect found by the simultaneous-save browser test on this fix: a redraw
    triggered by another tab reset the date field to today, so the person's click saved today instead of their date). */
-const FORM = '#cyDate, #cyUnwell, #cyTravel, #cyRemKind, #cyRemTime, [data-sym]';
+const FORM = '#cyDate, #cyUnwell, #cyTravel, #cyRemKind, #cyRemTime, #cyLh, #cySumMonths, [data-sym]';
 const inputKey = el => el.id || `sym:${el.dataset.sym}`;
 function unsavedInputs() {
   const out = {};
@@ -168,9 +171,21 @@ function logHTML(s, today) {
     <label class="field">Date<input type="date" id="cyDate" max="${today}" value="${today}"></label>
     <div class="btn-row"><button class="ghost" type="button" data-act="logStart">Period started</button><button class="ghost" type="button" data-act="logEnd">Period ended</button><button class="ghost" type="button" data-act="logSpotting">Spotting</button></div>
     ${cats.length ? `<div class="grid2">${cats.map(([k, c]) => `<label class="field">${c.label}<select data-sym="${k}"><option value="">Not logged</option>${c.options.map(([v, l]) => `<option value="${v}" ${d[k] === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`).join('')}</div>` : '<p class="muted small">Symptom logging is off. You can switch categories on in settings below.</p>'}
+    ${lhOn(s) ? `<label class="field">Ovulation test (LH), as you read it<select id="cyLh"><option value="">Not logged</option>${Object.entries(M.LH_RESULTS).map(([v, l]) => `<option value="${v}" ${d.lh === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>` : ''}
     <div class="btn-row"><label class="check"><input type="checkbox" id="cyUnwell" ${d.unwell ? 'checked' : ''}> Unwell</label><label class="check"><input type="checkbox" id="cyTravel" ${d.travel ? 'checked' : ''}> Travelling</label></div>
     <button class="cta" type="button" data-act="saveDay">Save this day</button>
     <p class="muted small">Days you don't log stay blank. Blank never means "no bleeding" or "no symptoms".</p></div>`;
+}
+
+const lhOn = s => flags().lhTests && !!s.consent.lhTests;
+
+/* Summary for a doctor: built from the person's own entries on request (js/cycle/summary.js). Shown here, printable,
+   or saved as a local text file. Nothing is sent or stored; a printed or saved copy is not encrypted. */
+function summaryHTML(s, today) {
+  const txt = summaryText(clinicianSummary(s, { today, months: summaryMonths }));
+  return `<div class="card stack" id="cySummary"><span class="eyebrow">Summary for a doctor</span><pre class="cy-summary">${esc(txt)}</pre>
+    <div class="btn-row cy-noprint"><button class="ghost" type="button" data-act="printSummary">Print</button><button class="ghost" type="button" data-act="downloadSummary">Save as text file</button><button class="ghost" type="button" data-act="closeSummary">Close</button></div>
+    <p class="muted small cy-noprint">Made only because you asked. It isn't saved or sent anywhere. A printed or saved copy isn't encrypted, so keep it private.</p></div>`;
 }
 
 function insightHTML(s, today) {
@@ -195,7 +210,7 @@ function historyHTML(s) {
   const lastStart = s.periods.at(-1)?.start, t = localToday();
   const current = lastStart && (!cs.length || cs.at(-1).nextStart === lastStart) ? [{ start: lastStart, length: diffDays(lastStart, t) + 1, current: true }] : [];
   const syms = [...cs.slice(-4), ...current].reverse().map(c => {
-    const e = []; for (let i = 0; i < c.length; i++) { const day = s.days[addDays(c.start, i)]; if (!day) continue; const parts = Object.entries(day).filter(([k]) => k in M.CATEGORIES || k === 'bleeding').map(([k, v]) => `${k === 'bleeding' ? v : M.CATEGORIES[k].label.toLowerCase() + ' ' + v}`); if (parts.length) e.push(`d${i + 1}: ${parts.join(', ')}`); }
+    const e = []; for (let i = 0; i < c.length; i++) { const day = s.days[addDays(c.start, i)]; if (!day) continue; const parts = Object.entries(day).filter(([k]) => k in M.CATEGORIES || k === 'bleeding' || (k === 'lh' && flags().lhTests)).map(([k, v]) => `${k === 'bleeding' ? v : k === 'lh' ? `LH test ${M.LH_RESULTS[v].toLowerCase()}` : M.CATEGORIES[k].label.toLowerCase() + ' ' + v}`); if (parts.length) e.push(`d${i + 1}: ${parts.join(', ')}`); }
     return `<div class="row"><div><b>${human(c.start)}${c.current ? ' (current)' : ''}</b><div class="muted small">${e.length ? esc(e.join(' · ')) : 'No day logs in this cycle'}</div></div></div>`;
   }).join('');
   return `<details class="card" id="cyHistory"><summary><span class="eyebrow">Your history</span></summary><div class="stack" style="margin-top:10px">
@@ -257,7 +272,12 @@ function settingsHTML(s, f) {
     ${Object.entries(M.CATEGORIES).map(([k, c]) => `<label class="check"><input type="checkbox" data-cat="${k}" ${M.categoryOn(s, k) ? 'checked' : ''}> <span><b>${c.label}</b> <span class="muted small">${esc(c.why)}</span></span></label>`).join('')}
     <p class="muted small">Turning a category off stops collecting it. You'll be asked whether to delete what you logged.</p>
     <b class="small">Optional features</b>
-    ${['phaseEducation', 'patternInsights', 'symptomForecast', 'temperatureResearch'].map(k => `<label class="check"><input type="checkbox" data-flag="${k}" ${f[k] ? 'checked' : ''}> <span><b>${esc(FLAG_DEFS[k].label)}</b> <span class="muted small">${esc(FLAG_DEFS[k].desc)}</span></span></label>`).join('')}
+    ${['phaseEducation', 'patternInsights', 'symptomForecast', 'temperatureResearch', 'lhTests'].map(k => `<label class="check"><input type="checkbox" data-flag="${k}" ${f[k] ? 'checked' : ''}> <span><b>${esc(FLAG_DEFS[k].label)}</b> <span class="muted small">${esc(FLAG_DEFS[k].desc)}</span></span></label>`).join('')}
+    ${f.lhTests && !s.consent.lhTests ? `<div class="stack" id="cyLhConsent"><b class="small">Ovulation test (LH) results · research</b><p class="muted small">Optional. Record home ovulation test results exactly as you read them. The app doesn't interpret them, doesn't use them for your estimate and doesn't give fertility advice. Not contraception.</p><button class="ghost" type="button" data-act="lhOn">Turn on ovulation test logging</button></div>` : ''}
+    ${s.consent.lhTests ? '<button class="ghost" type="button" data-act="lhOff">Turn off &amp; delete ovulation test results</button>' : ''}
+    <b class="small">Summary for a doctor</b>
+    <p class="muted small">Your logged periods, cycle lengths and the symptoms you switched on, as plain figures. No estimates. Made only when you ask; nothing is sent.</p>
+    <div class="btn-row"><label class="field">Covering<select id="cySumMonths">${SUMMARY_MONTHS.map(m => `<option value="${m}" ${m === 12 ? 'selected' : ''}>Last ${m} months</option>`).join('')}</select></label><button class="ghost" type="button" data-act="summary">Make summary</button></div>
     <div class="btn-row"><button class="ghost" type="button" data-act="export">Export my data</button><button class="stop" type="button" data-act="deleteAll">Delete all cycle data</button></div>
     <p class="muted small">Deleting removes your records and destroys the encryption key on this device. It can't reach files you exported or device backups made earlier (they hold encrypted data, but may also hold the key).</p>
     <details><summary class="linkbtn">Consent record</summary><ul class="issues">${s.consent.log.map(l => `<li>${esc(l.at.slice(0, 10))}: ${esc(l.change)}</li>`).join('')}</ul></details></div></details>`;
@@ -300,6 +320,7 @@ async function onClick(e) {
     saveDay: () => act((s, t) => {
       const f = { unwell: root.querySelector('#cyUnwell').checked, travel: root.querySelector('#cyTravel').checked };
       root.querySelectorAll('[data-sym]').forEach(x => { f[x.dataset.sym] = x.value || null; });
+      const lh = root.querySelector('#cyLh'); if (lh) f.lh = lh.value || null;
       M.logDay(s, date(), f, { today: t });
     }, 'Saved'),
     deletePeriod: () => act(s => M.deletePeriod(s, b.closest('[data-pid]').dataset.pid), 'Period deleted'),
@@ -315,11 +336,17 @@ async function onClick(e) {
     pauseAll: () => act((s, t) => { s.settings.remindersPausedUntil = s.settings.remindersPausedUntil && s.settings.remindersPausedUntil >= t ? null : addDays(t, 6); }),
     ackDue: () => act((s, t) => markDelivered(s, b.dataset.id, t)),
     notifPerm: async () => { if (typeof Notification === 'undefined') return toast('Notifications aren\'t supported here.'); toast((await Notification.requestPermission()) === 'granted' ? 'Notifications allowed' : 'Notifications not allowed'); },
+    lhOn: () => act(s => M.setScopeConsent(s, 'lhTests', true), 'Ovulation test logging on'),
+    lhOff: () => { if (!confirm('Turn off ovulation test logging and delete the results you recorded?')) return; return act(s => M.setScopeConsent(s, 'lhTests', false), 'Ovulation test results deleted'); },
+    summary: () => { summaryMonths = Number(val('#cySumMonths')) || 12; render(); root.querySelector('#cySummary')?.scrollIntoView?.({ block: 'start' }); },
+    closeSummary: () => { summaryMonths = null; render(); },
+    printSummary: () => { document.body.classList.add('cy-printing'); const done = () => { document.body.classList.remove('cy-printing'); window.removeEventListener('afterprint', done); }; window.addEventListener('afterprint', done); window.print(); },
+    downloadSummary: () => { const t = now().today, txt = summaryText(clinicianSummary(repo.read(), { today: t, months: summaryMonths || 12 })); const url = URL.createObjectURL(new Blob([txt], { type: 'text/plain' })); const l = document.createElement('a'); l.href = url; l.download = `cycle-summary-${t}.txt`; document.body.appendChild(l); l.click(); setTimeout(() => { URL.revokeObjectURL(url); l.remove(); }, 1000); },
     wearableOn: async () => { await act(s => M.setScopeConsent(s, 'wearable', true)); await sync(); },
     syncWearable: () => sync(),
     wearableOff: () => act(s => M.setScopeConsent(s, 'wearable', false), 'Wearable data deleted'),
     export: () => { const data = repo.exportData(); const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); const l = document.createElement('a'); l.href = url; l.download = `shred-cycle-export-${now().today}.json`; document.body.appendChild(l); l.click(); setTimeout(() => { URL.revokeObjectURL(url); l.remove(); }, 1000); },
-    deleteAll: async () => { if (!confirm('Delete all cycle data on this device? This can\'t be undone.')) return; const r = await repo.deleteAll(); toast(`Deleted. Not reachable: ${r.notReached.length} items (see settings).`); render(); },
+    deleteAll: async () => { if (!confirm('Delete all cycle data on this device? This can\'t be undone.')) return; const r = await repo.deleteAll(); summaryMonths = null; toast(`Deleted. Not reachable: ${r.notReached.length} items (see settings).`); render(); },
   }[a];
   if (run) await run();
 }

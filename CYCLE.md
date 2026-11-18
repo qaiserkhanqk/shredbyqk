@@ -61,6 +61,7 @@ Existing features were not changed. Changes to shared files are small:
 | `patternInsights` | off | Symptom-pattern findings and the "around now" insight. **Research, unvalidated.** Synthetic false-pattern rates range from 1.5% to 94.5% depending on logging (`docs/cycle-fixes-29780c5.md`) |
 | `quickSuggestions` | off | Low-effort mode: one-tap pre-filled answers from the person's own patterns. **Logic only, no screen yet.** |
 | `sensorPrompts` | off | Low-effort mode: wearable-timed questions. **Logic only, no screen yet.** |
+| `lhTests` | off | Research: lets the person record home ovulation-test (LH) results as read, after a separate opt-in (consent scope `lhTests`). Not interpreted and not used by any estimate, pattern or phase code. Turning it off deletes the results. See `docs/cycle-summary-lh.md`. |
 
 Flags live in `localStorage['shred_flags_v1']` because they are not health data. `main` auto-deploys to GitHub Pages, and the default-off flag means a merge does not expose the feature to real users.
 
@@ -180,6 +181,9 @@ See [docs/wearable-sdk-requirements.md](docs/wearable-sdk-requirements.md).
   - Pattern evidence states how many entries were accepted suggestions, which guards against self-reinforcing patterns.
 - **Why it isn't switched on:** all thresholds are placeholders. The audit (`docs/cycle-audit-9f87b83.md`) found weaknesses these rules inherit: the night-coverage rule (3.1–3.2) and pattern false positives (5.1–5.3). Fix those first.
 - **The synthetic evaluation** compares this prompt with a dates-only range prompt. See `docs/cycle-eval-synthetic.md`; it is synthetic, so the wearable prompt looks good **by construction**.
+
+## Summary for a doctor
+Settings → "Summary for a doctor" builds a plain-text summary of the person's own entries **only when they ask** (`js/cycle/summary.js`). It can be printed or saved as a local text file. Nothing is stored or sent. It contains no estimates, patterns, wearable or fertility content. Details and tests: `docs/cycle-summary-lh.md`.
 
 ## Reminders
 

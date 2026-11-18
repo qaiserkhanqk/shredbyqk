@@ -21,6 +21,10 @@ export const CATEGORIES = {
   sleep: { label: 'Sleep', why: 'How you felt you slept. This is your rating, not a sensor reading.', options: [['poor', 'Poor'], ['ok', 'OK'], ['good', 'Good']], notable: ['poor'], notableLabel: 'poor sleep' },
 };
 export const BLEEDING = ['period', 'spotting', 'none'];
+/** Home ovulation-test (urinary LH) results, recorded exactly as the person read them. Research only, opt-in
+ *  (consent scope 'lhTests'). Deliberately NOT a symptom category, so pattern, suggestion and forecast code never
+ *  scan it, and nothing in the app interprets it: no fertile window, ovulation day or contraception advice. */
+export const LH_RESULTS = { positive: 'Positive', negative: 'Negative', invalid: 'Invalid or unclear' };
 
 /** Situations in which dates-based phase information is not shown, and estimates carry a caveat. */
 export const SITUATIONS = {
@@ -37,7 +41,7 @@ export class CycleError extends Error {
 
 export const blankState = owner => ({
   schema: SCHEMA, owner,
-  consent: { version: null, core: null, categories: {}, wearable: null, reminders: null, log: [] },
+  consent: { version: null, core: null, categories: {}, wearable: null, reminders: null, lhTests: null, log: [] },
   periods: [],           // [{id, start, end|null, missedBefore, createdAt, updatedAt}]
   days: {},              // {'YYYY-MM-DD': {bleeding?, pain?, energy?, mood?, cravings?, sleep?, unwell?, travel?}}
   situation: {},         // keys of SITUATIONS → true (current)
@@ -90,10 +94,11 @@ export const categoryOn = (s, cat) => !!s.consent.categories[cat];
 
 export function setScopeConsent(s, scope, on, at = new Date().toISOString()) {
   requireConsent(s);
-  if (!['wearable', 'reminders'].includes(scope)) throw new CycleError('INVALID_INPUT');
+  if (!['wearable', 'reminders', 'lhTests'].includes(scope)) throw new CycleError('INVALID_INPUT');
   s.consent[scope] = on ? at : null; stamp(s, `${scope}:${on ? 'on' : 'off'}`, at);
   if (!on && scope === 'wearable') s.wearable = { devices: [], nights: [] }; // withdrawing deletes the data
   if (!on && scope === 'reminders') { s.reminders = []; s.delivered = {}; }
+  if (!on && scope === 'lhTests') { for (const d of Object.values(s.days)) delete d.lh; pruneDays(s); } // and their history
   return s;
 }
 
@@ -203,6 +208,7 @@ export function logDay(s, date, fields, { today: t, source, at = new Date().toIS
   const d = s.days[date] || {};
   for (const [k, v] of Object.entries(fields)) {
     if (k === 'bleeding') { if (v != null && !BLEEDING.includes(v)) throw new CycleError('INVALID_INPUT'); }
+    else if (k === 'lh') { if (!s.consent.lhTests) throw new CycleError('LH_OFF'); if (v != null && !(v in LH_RESULTS)) throw new CycleError('INVALID_INPUT'); }
     else if (k === 'unwell' || k === 'travel') { if (v != null && typeof v !== 'boolean') throw new CycleError('INVALID_INPUT'); }
     else if (k in CATEGORIES) {
       if (!categoryOn(s, k)) throw new CycleError('CATEGORY_OFF');
@@ -214,7 +220,7 @@ export function logDay(s, date, fields, { today: t, source, at = new Date().toIS
       // historical views. A value written before history existed is seeded from its entry time.
       const h = ((d.hist ||= {})[k] ||= (d[k] != null && d.rec?.[k] ? [{ v: d[k], at: d.rec[k] }] : []));
       if (!h.length || h.at(-1).v !== v) h.push({ v, at });
-      d[k] = v; if (k in CATEGORIES || k === 'bleeding') (d.src ||= {})[k] = src(source); (d.rec ||= {})[k] = at;
+      d[k] = v; if (k in CATEGORIES || k === 'bleeding' || k === 'lh') (d.src ||= {})[k] = src(source); (d.rec ||= {})[k] = at;
     }
   }
   s.days[date] = d; pruneDays(s); return d;
@@ -290,7 +296,7 @@ export function stateAsOf(s, asOf, { knownAt = `${asOf}T00:00:00.000Z` } = {}) {
       const hist = day.hist?.[k];
       if (hist?.length) { const known = hist.filter(x => x.at < knownAt).at(-1); if (known) kept[k] = known.v; continue; } // value as known then
       const at = day.rec?.[k];
-      if (at == null) { if (k in CATEGORIES || k === 'bleeding') unknownTime++; kept[k] = v; }
+      if (at == null) { if (k in CATEGORIES || k === 'bleeding' || k === 'lh') unknownTime++; kept[k] = v; }
       else if (at < knownAt) kept[k] = v;
     }
     if (Object.keys(kept).length) days[d] = kept;

@@ -9,6 +9,7 @@ export const FLAG_DEFS = {
   symptomForecast: { default: false, label: 'Symptom forecast (experimental)', desc: 'Off until prospective testing shows it beats each person\'s own simple baseline.' },
   quickSuggestions: { default: false, label: 'One-tap suggestions', desc: 'Pre-fills answers from your own past patterns ("Same as usual around now?"). Nothing is saved unless you tap Yes.' },
   sensorPrompts: { default: false, label: 'Wearable-timed questions', desc: 'Uses your wearable only to decide WHEN to ask "has your period started?" or "how are you feeling?". It never records anything for you.' },
+  lhTests: { default: false, label: 'Ovulation test results (research)', desc: 'Lets you record home ovulation test results exactly as you read them, for research comparisons. The app does not interpret them or use them for estimates, and they are not for contraception.' },
   temperatureResearch: { default: false, label: 'Temperature analysis (research)', desc: 'Looks for a possible retrospective rise in wrist skin temperature. Not used for period estimates.' },
 };
 const KEY = 'shred_flags_v1';

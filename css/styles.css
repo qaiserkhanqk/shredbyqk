@@ -383,3 +383,12 @@ details[open] > summary::after { content: "–"; }
 #cycle .check { align-items: flex-start; }
 #cycle .check input { margin-top: 3px; flex: none; }
 #cyNights span:nth-child(even) { font-size: .8rem; }
+
+/* Doctor summary (js/cycle/summary.js): plain text, printable on its own */
+.cy-summary { white-space: pre-wrap; font: .8rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 0; padding: 10px; border: 1px solid var(--line, #333); border-radius: var(--r-sm); overflow-x: auto; }
+@media print {
+  body.cy-printing * { visibility: hidden !important; }
+  body.cy-printing #cySummary, body.cy-printing #cySummary * { visibility: visible !important; }
+  body.cy-printing #cySummary { position: absolute; inset: 0 auto auto 0; width: 100%; border: 0; background: #fff; color: #000; }
+  body.cy-printing .cy-noprint { display: none !important; }
+}
