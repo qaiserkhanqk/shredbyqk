@@ -1,0 +1,25 @@
+ok   1 setup: LH/hormonal content with odd type formatting is present while consent is given
+FAIL 1 withdrawing LH consent removes every LH record, whatever its type formatting (quarantine, annotations, previews)  — [" lh_test ","LH_TEST","\tlh_test\n"]
+ok   1 ... hormonal records are untouched by the LH withdrawal
+FAIL 1 ... and the export contains no LH record
+FAIL 1 withdrawing hormonal consent removes every hormonal-medication record, whatever its formatting  — [" hormonal_medication ","Hormonal_Medication"]
+FAIL 1 ... and the export contains no hormonal record
+ok   1 control: the bleeding entry is kept
+FAIL 1 the stored annotation and quarantine rows carry a canonical type
+FAIL 1 unconsented: a saved preview keeps no LH/hormonal cells, whatever the type formatting  — ["LH_TEST"," Lh-Test ","HORMONAL_MEDICATION"]
+FAIL 1 unconsented: the rows are reported with the consent reason (recognised as LH/hormonal)  — [{"line":2,"reasons":["type_invalid"],"rejected":true},{"line":3,"reasons":["type_invalid"],"rejected":true},{"line":4,"reasons":["type_invalid"],"rejected":true}]
+FAIL 1 unconsented: neither quarantine nor export holds LH/hormonal cells
+ok   2 setup: without LH consent the LH row is rejected and only the bleeding entry is stored
+FAIL 2 a plain re-upload is still recognised as a duplicate (nothing happens implicitly) and says a reimport is available  — {"ok":true,"previewId":null,"duplicateBatch":true,"counts":{"rows":0,"accepted":0,"duplicates":0,"quarantined":0,"rejected":0},"recordType":"annotations","quarantined":[],"ingestVersion":"ingest-1.0.0
+FAIL 2 a reimport needs a stated reason code  — 200
+FAIL 2 an explicit reimport is revalidated under CURRENT consent: the LH row is now accepted, the stored entry is a duplicate  — {"ok":true,"previewId":null,"duplicateBatch":true,"counts":{"rows":0,"accepted":0,"duplicates":0,"quarantined":0,"rejected":0},"recordType":"annotations","quarantined":[],"ingestVersion":"ingest-1.0.0
+FAIL 2 committing the reimport stores the LH result  — 404 {"error":"preview_not_found_or_expired","label":"Research prototype. Not for contraception, diagnosis or medical decisio
+FAIL 2 the reimport is audited (preview and commit, with the reason)  — participant_created  | consent_recorded_from_signed_form {"scope":"core_research"} | import_previewed {"counts":{"rows":2,"accepted":1,"duplicates":0,"quarantined":0,"rejected":1}} | import_committed {"counts":{"rows":2,"accepted":1,"duplicates":0,"quarantined":0,"rejected":1},"duplicateBatch":false} | consent_recorded_from_signed_form {"scope":"lh_tests"} | import_previewed {"counts":{"rows":0,"accepted":0,"duplicates":0,"quarantined":0,"rejected":0}} | import_previewed {"counts":{"rows":0,"accepted":0,"duplicates":0,"quarantined":0,"rejected":0}} | import_previewed {"counts":{"rows":0,"accepted":0,"duplicates":0,"quarantined":0,"rejected":0}}
+FAIL 2 the reimport is a separate, marked batch; the original batch is unchanged  — [[4,null]]
+ok   2 setup: withdrawing LH consent deleted the LH result
+ok   2 granting consent again does NOT restore deleted data
+FAIL 2 ... only an explicit reimport brings it back
+ok   2 a participant account cannot trigger a reimport
+FAIL 2 reimporting when nothing is missing adds nothing (all duplicates)
+16 FAILED of 23
+exit 1
