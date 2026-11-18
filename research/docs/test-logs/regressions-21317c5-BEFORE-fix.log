@@ -1,0 +1,113 @@
+FAIL 1b consent granted=missing (participant) is rejected with 400 and changes nothing  — 200 {"consents":{"core_research":true,"lh_tests":false},"removed":{"previews":0,"ann lh=false
+FAIL 1b consent granted=missing (researcher) is rejected with 400 and changes nothing  — 200 {"consents":{"core_research":true,"lh_tests":false},"removed":{"previews":0,"ann lh=false
+FAIL 1b consent granted=null (participant) is rejected with 400 and changes nothing  — 200 {"consents":{"core_research":true,"lh_tests":false},"removed":{"previews":0,"ann lh=false
+FAIL 1b consent granted=null (researcher) is rejected with 400 and changes nothing  — 200 {"consents":{"core_research":true,"lh_tests":false},"removed":{"previews":0,"ann lh=false
+FAIL 1b consent granted="false" (participant) is rejected with 400 and changes nothing  — 200 {"consents":{"core_research":true,"lh_tests":true},"removed":{},"label":"Researc lh=true
+FAIL 1b consent granted="false" (researcher) is rejected with 400 and changes nothing  — 403 {"error":"use_record_signed_consent","label":"Research prototype. Not for contra lh=true
+FAIL 1b consent granted="true" (participant) is rejected with 400 and changes nothing  — 200 {"consents":{"core_research":true,"lh_tests":true},"removed":{},"label":"Researc lh=true
+FAIL 1b consent granted="true" (researcher) is rejected with 400 and changes nothing  — 403 {"error":"use_record_signed_consent","label":"Research prototype. Not for contra lh=true
+FAIL 1b consent granted=0 (participant) is rejected with 400 and changes nothing  — 200 {"consents":{"core_research":true,"lh_tests":false},"removed":{"previews":0,"ann lh=false
+FAIL 1b consent granted=0 (researcher) is rejected with 400 and changes nothing  — 200 {"consents":{"core_research":true,"lh_tests":false},"removed":{"previews":0,"ann lh=false
+FAIL 1b consent granted=1 (participant) is rejected with 400 and changes nothing  — 200 {"consents":{"core_research":true,"lh_tests":true},"removed":{},"label":"Researc lh=true
+FAIL 1b consent granted=1 (researcher) is rejected with 400 and changes nothing  — 403 {"error":"use_record_signed_consent","label":"Research prototype. Not for contra lh=true
+FAIL 1b consent granted=[] (participant) is rejected with 400 and changes nothing  — 200 {"consents":{"core_research":true,"lh_tests":true},"removed":{},"label":"Researc lh=true
+FAIL 1b consent granted=[] (researcher) is rejected with 400 and changes nothing  — 403 {"error":"use_record_signed_consent","label":"Research prototype. Not for contra lh=true
+FAIL 1b consent granted={} (participant) is rejected with 400 and changes nothing  — 200 {"consents":{"core_research":true,"lh_tests":true},"removed":{},"label":"Researc lh=true
+FAIL 1b consent granted={} (researcher) is rejected with 400 and changes nothing  — 403 {"error":"use_record_signed_consent","label":"Research prototype. Not for contra lh=true
+ok   1b control: real Booleans still work (participant grants then withdraws)
+FAIL 1b feature enabled=missing is rejected with 400 and changes nothing  — 200 on=false
+FAIL 1b feature enabled=null is rejected with 400 and changes nothing  — 200 on=false
+FAIL 1b feature enabled="false" is rejected with 400 and changes nothing  — 200 on=true
+FAIL 1b feature enabled="true" is rejected with 400 and changes nothing  — 200 on=true
+FAIL 1b feature enabled=0 is rejected with 400 and changes nothing  — 200 on=false
+FAIL 1b feature enabled=1 is rejected with 400 and changes nothing  — 200 on=true
+FAIL 1b feature enabled=[] is rejected with 400 and changes nothing  — 200 on=true
+FAIL 1b feature enabled={} is rejected with 400 and changes nothing  — 200 on=true
+FAIL 1b a non-Boolean reimport flag is rejected
+ok   1d guard: participants still cannot read runs or quarantine, or import
+FAIL 2a the preview response identifies the previewed file and type (sourceHash, recordType)  — {"ok":true,"previewId":"GBmwhNSr9agtsiv7N0lQ0hyZ","duplicateBatch":false,"reimportAvailable":false,"reimport":false,"counts":{"rows":1,"accepted":1,"duplicates"
+FAIL 2a a commit naming a different type or file than the preview is refused (409) and stores nothing  — 200 404
+FAIL 2a control: a commit naming the previewed type and file succeeds  — 404 {"error":"preview_not_found_or_expired","label":"Research prototype. Not for contraception, diagnosi
+FAIL 4c the API accepts a timing exclusion as its own correction action  — 400 {"error":"correction_invalid","label":"Research prototype. Not for contraception, diagnosis or medic
+FAIL 3f annotation types "constructor", "__proto__", … are rejected as invalid types (no server error)  — 500 {"error":"internal_error","label":"Research prototype. Not for contraception, diagnosis or medical decisions."}
+FAIL 3f measurement kind or unit named "constructor"/"__proto__" is rejected or quarantined (no server error)  — 500 {"error":"internal_error","label":"Research prototype. Not for contraception, diagnosis or medical decisions."}
+FAIL 3f parseUnit never returns an inherited object property
+ok   1c setup: the old version left the " lh_test " / " hormonal_medication " quarantine rows after withdrawal
+FAIL 1c after upgrade: retained raw LH/hormonal rows of the participant who withdrew are removed  — [{"raw_json":"{\"participant_ref\":\"P-LEG-0001\",\"entry_id\":\"P-LEG-0001-l1\",\"type\":\" lh_test \",\"value\":\"negative\",\"date\":\"2026-13-40\",\"recorded_at\":\"2026-01-19T09:00:00Z\",\"corrects\":\"\"}","canonical_type":"lh_test"},{"raw_json":"{\"participant_ref\":\"P-LEG-0001\",\"entry_id\":\"P-LEG-0001-h1\",\"type\":\" hormonal_medication \",\"value\":\"yes\",\"date\":\"2026-13-40\",\"recorded_at\":\"2026-01-19T09:00:00Z\",\"corrects\":\"\"}","canonical_type":"hormonal_medication"}]
+ok   1c after upgrade: no LH/hormonal annotation remains for that participant
+FAIL 1c after upgrade: the affected preview is invalidated
+ok   1c the other participant (consent still given) keeps everything, including an unaffected preview
+FAIL 1c the purge is audited with counts only (no content, no reference)  — []
+ok   1c control: the bleeding entry of the withdrawn participant is kept
+ok   1c granting consent again after the upgrade restores nothing
+ok   3a control: an identical row is an exact duplicate
+FAIL 3a a changed sleep_session_id is not discarded as an exact duplicate (quarantined as a conflict, original kept)  — {"rows":1,"accepted":0,"duplicates":1,"quarantined":0,"rejected":0}
+FAIL 3a a changed device_model is not discarded as an exact duplicate (quarantined as a conflict, original kept)  — {"rows":1,"accepted":0,"duplicates":1,"quarantined":0,"rejected":0}
+FAIL 3a a changed sampling_interval_s is not discarded as an exact duplicate (quarantined as a conflict, original kept)  — {"rows":1,"accepted":0,"duplicates":1,"quarantined":0,"rejected":0}
+FAIL 3a a changed precision is not discarded as an exact duplicate (quarantined as a conflict, original kept)  — {"rows":1,"accepted":0,"duplicates":1,"quarantined":0,"rejected":0}
+FAIL 3a a changed tz_name is not discarded as an exact duplicate (quarantined as a conflict, original kept)  — {"rows":1,"accepted":0,"duplicates":1,"quarantined":0,"rejected":0}
+FAIL 3a a changed device_manufacturer is not discarded as an exact duplicate (quarantined as a conflict, original kept)  — {"rows":1,"accepted":0,"duplicates":1,"quarantined":0,"rejected":0}
+FAIL 3a a changed sampling_config is not discarded as an exact duplicate (quarantined as a conflict, original kept)  — {"rows":1,"accepted":0,"duplicates":1,"quarantined":0,"rejected":0}
+FAIL 3b a correction recorded at the same instant supersedes its ancestor (id order irrelevant)  — P-z-A@2026-01-05
+FAIL 3b a same-instant retraction removes its ancestor
+FAIL 3b a correction recorded EARLIER than its ancestor (clock skew) still supersedes it
+FAIL 3b a multi-level chain with tied times resolves to its last link
+FAIL 3b a multi-level chain ending in a retraction removes the entry
+ok   3b cycles are still rejected safely (valid entries kept)
+FAIL 3c impossible timestamp 2026-02-30T10:00:00Z is quarantined, not normalised  — accepted
+FAIL 3c impossible timestamp 2026-02-29T10:00:00Z is quarantined, not normalised  — accepted
+FAIL 3c impossible timestamp 2026-04-31T10:00:00Z is quarantined, not normalised  — accepted
+ok   3c impossible timestamp 2026-13-01T10:00:00Z is quarantined, not normalised
+FAIL 3c impossible timestamp 2026-01-01T24:00:00Z is quarantined, not normalised  — accepted
+ok   3c impossible timestamp 2026-01-01T23:60:00Z is quarantined, not normalised
+ok   3c impossible timestamp 2026-01-01T23:59:60Z is quarantined, not normalised
+FAIL 3c impossible timestamp 2026-01-01T10:00:00+14:30 is quarantined, not normalised  — accepted
+FAIL 3c impossible timestamp 2026-01-01T10:00:00-12:30 is quarantined, not normalised  — accepted
+ok   3c impossible timestamp 2026-01-01T10:00:00+05:61 is quarantined, not normalised
+ok   3c valid timestamp 2024-02-29T10:00:00Z is accepted
+ok   3c valid timestamp 2026-12-31T23:59:59Z is accepted
+ok   3c valid timestamp 2026-01-01T10:00:00+14:00 is accepted
+ok   3c valid timestamp 2026-01-01T10:00:00-12:00 is accepted
+ok   3c valid timestamp 2026-01-01T10:00:00+05:45 is accepted
+ok   3c valid timestamp 2026-01-01T10:00:00.123456Z is accepted
+FAIL 3c an impossible end timestamp is quarantined
+FAIL 3c an impossible recorded_at is rejected
+ok   3c annotation dates: 29 Feb only in leap years; 31 Apr never
+FAIL 3d at import, a vendor night that has not ended yet is quarantined, not accepted  — []
+ok   3d a historical vendor night imports normally
+FAIL 3d a future-dated vendor night does not appear in an earlier analysis  — ["2026-10-01","2026-12-01"]
+ok   3d it appears once its night has ended under the documented convention
+FAIL 3d the convention is documented in the configuration
+FAIL 3e sampling interval 1e308 s is rejected or quarantined (out of range / not finite)  — {"rows":1,"accepted":1,"duplicates":0,"quarantined":0,"rejected":0}
+FAIL 3e sampling interval 1e20 s is rejected or quarantined (out of range / not finite)  — {"rows":1,"accepted":1,"duplicates":0,"quarantined":0,"rejected":0}
+FAIL 3e sampling interval 86400000 s is rejected or quarantined (out of range / not finite)  — {"rows":1,"accepted":1,"duplicates":0,"quarantined":0,"rejected":0}
+FAIL 3e sampling interval 3601 s is rejected or quarantined (out of range / not finite)  — {"rows":1,"accepted":1,"duplicates":0,"quarantined":0,"rejected":0}
+ok   3e sampling interval Infinity s is rejected or quarantined (out of range / not finite)
+FAIL 3e an interval at the documented maximum (3600 s) is accepted
+FAIL 3e a single measurement interval longer than the maximum is quarantined  — []
+FAIL 3e malformed observations do not crash the whole analysis  — Invalid time value
+FAIL 3e calculated coverage is limited to the night window (≤ 12 h fallback window)
+FAIL 3e the full pipeline completes with malformed stored observations  — Invalid time value
+FAIL 3f CSV "33".5 is rejected, not read as 33.5
+ok   3f CSV x"y (quote inside an unquoted cell) is rejected
+ok   3f control: valid quoted CSV still parses
+FAIL 3f JSON records are limited to the same column count as CSV (41 fields rejected)  — {"line":1,"record":{"k0":"x","k1":"x","k2":"x","k3":"x","k4":"x","k5":"x","k6":"
+FAIL 3f JSON cells are limited to the same length as CSV (513 characters rejected)
+FAIL 3f JSON values must be plain values (objects and arrays rejected)
+FAIL 4a [33,33,33,33,34,34,34,34]: separate detection, confirmation and possible-onset fields  — {"shiftNight":"2026-01-15"}
+FAIL 4a ... the possible onset includes night 5 (the first observed high night), not only night 6
+FAIL 4a ... confirmation is the last night of the qualifying window
+FAIL 4a gradual rise: onset is an interval reaching back before the threshold crossing, or abstains  — {"st":"shift_detected","r":["sustained_rise_above_own_preceding_nights"]}
+FAIL 4a rise during baseline formation: not reported as "no clear shift"; onset left-censored or abstained  — {"st":"no_clear_shift","r":["rule_not_met_in_available_nights"]}
+FAIL 4a missing nights before the rise: the onset interval spans the unobserved nights
+FAIL 4a already-elevated readings from the first observed night (nothing near cycle start): not "no clear shift"  — {"st":"insufficient_data","r":["usable_nights_below_60_percent_of_cycle"]}
+FAIL 4b five low nights, 55 missing days, three high nights: no shift reported; labelled abstention  — {"st":"shift_detected","r":["sustained_rise_above_own_preceding_nights"]}
+FAIL 4b the gap policy is configurable and documented as an engineering assumption
+ok   4b control: a one-night gap still allows detection
+FAIL 4c a sample with a corrupted timestamp far from its session does not decide the session's night  — {"n":["2026-02-03:13"],"u":{}}
+ok   4c setup: an uncorrected near-session wrong time still labels the session from the earliest sample
+ok   4c excluding the VALUE keeps the sample's timing (label unchanged, value not used)
+FAIL 4c excluding the TIMING removes the sample from session labelling and placement; the session is re-labelled  — {"n":["2026-02-09:13"],"u":{}}
+FAIL 4c replay: before the timing correction the old label stands; after it, the corrected label (and provenance lists it)  — [["2026-02-09"],["2026-02-09"]]
+83 FAILED of 111
+exit 1

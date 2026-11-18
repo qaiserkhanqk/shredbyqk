@@ -1,0 +1,16 @@
+FAIL 1 reversed responses: B stays rendered after A's late response arrives  — rendered P-DEMO-A
+FAIL 1 a mutation made on the rendered page changes exactly that participant  — rendered=P-DEMO-A A:false→false B:false→true
+FAIL 2 navigating home during loading: the list stays; A's late response is discarded  — rendered P-DEMO-A
+FAIL 3 logging out during loading: the sign-in view stays, no participant data is rendered, and the late response raises no error  — h1=Sign in errors=Cannot read properties of null (reading 'role')
+ok   4 setup: a preview enables Commit
+FAIL 4 choosing another file after a preview disables Commit
+FAIL 4 a forced Commit after the file changed commits nothing  — obs 2880→2900, commit requests 1
+FAIL 4 changing the import type after a preview disables Commit
+FAIL 4 a forced Commit after the type changed commits nothing  — commit requests 2
+FAIL 4 a preview made for one participant cannot be committed from another participant's page  — commit requests http://127.0.0.1:40521/api/participants/P-DEMO-C/imports/commit http://127.0.0.1:40521/api/participants/P-DEMO-C/imports/commit http://127.0.0.1:40521/api/participants/P-DEMO-B/imports/commit
+FAIL 4 a slow preview response for an earlier file does not enable Commit for the newly chosen file
+FAIL 4 ... and a forced Commit then commits nothing  — commit requests 4
+FAIL 4 control: preview then commit of the same file still works  — commits=5 obs 2880→2960
+FAIL no JavaScript errors  — Cannot read properties of null (reading 'role')
+13 FAILED of 14
+exit 1

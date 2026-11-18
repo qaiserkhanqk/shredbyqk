@@ -1,0 +1,10 @@
+FAIL 4a detected rise reports a possible-onset interval separate from the first high night  — {"d":true}
+FAIL 4a ... the interval spans the unobserved nights before the first high night
+FAIL 4a control: with no missing nights the onset interval is the first high night itself
+FAIL 4a a rise that began while the 6-night baseline was forming is not reported as plain "no sustained rise"  — No sustained rise seen in this cycle so far.
+ok   4b guard: six low nights, 55 missing days, three high nights → abstains, no rise reported
+FAIL 4c one reading a week away from its session does not move the session's night  — ["2026-02-03:13"]
+FAIL 4c ... the outlying reading is excluded and reported, not used  — {"s":13,"r":{},"c":390}
+FAIL 4c the session-span limit is a documented, configurable parameter
+7 FAILED
+exit 1
