@@ -41,3 +41,11 @@
   - The CSV export's label line comes before the header; strict CSV readers need to skip the first line.
   - Observation `timestamp_after_ingestion` exclusion uses a 5-minute tolerance (an assumption).
 - **Analysis:** an unannotated multi-night fever can trigger the shift rule, as the tests document.
+- **Unvalidated engineering assumptions added with the 21317c5 fixes:**
+  - maximum sampling interval 3600 s;
+  - session-timing tolerance 18 h;
+  - vendor-night completion convention;
+  - shift-rule gap limits (2 / 12 nights);
+  - minDelta as the baseline-formation step;
+  - deterministic resolution of branched corrections.
+- **Not tested:** two server processes on one database file; migration of large databases.

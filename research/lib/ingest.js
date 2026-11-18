@@ -9,7 +9,7 @@ import { parseUnit, normalise } from './units.js';
 import { CONFIG, configHash } from './config.js';
 import { hashJSON, sha256 } from './hash.js';
 
-export const INGEST_VERSION = 'ingest-1.0.0';
+export const INGEST_VERSION = 'ingest-1.1.0';
 export const SITES = ['wrist', 'finger', 'oral', 'ambient', 'other'];
 export const KINDS = { skin_temperature: ['wrist', 'finger', 'other'], basal_body_temperature: ['oral', 'other'], ambient_temperature: ['ambient'] };
 export const DERIVATIONS = ['raw', 'vendor_derived'];
@@ -26,22 +26,49 @@ const FORMATS = { device_manufacturer: /^[A-Za-z0-9 ._:+\/-]{1,64}$/, device_mod
   tz_name: /^[A-Za-z]+(?:[\/_+-][A-Za-z0-9]+)*$/, sleep_session_id: /^[A-Za-z0-9_.:-]{1,80}$/ };
 const FLAG = /^[a-z0-9_]{1,40}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
-const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}:\d{2})$/;
+const ISO = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(\.\d{1,6})?)?(Z|([+-])(\d{2}):(\d{2}))$/;
+const own = (obj, k) => typeof k === 'string' && Object.prototype.hasOwnProperty.call(obj, k); // never an inherited name
 
 const str = v => (v == null ? '' : String(v).trim());
 const num = v => { const s = str(v); if (s === '') return null; if (!/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(s)) return NaN; return Number(s); };
-const isoMs = v => { const s = str(v); if (!s) return null; if (!ISO.test(s)) return NaN; const t = Date.parse(s); return Number.isFinite(t) ? t : NaN; };
-const validDate = s => DATE.test(s) && !Number.isNaN(Date.parse(`${s}T00:00:00Z`)) && new Date(`${s}T00:00:00Z`).toISOString().startsWith(s);
+const daysIn = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+/** Strict calendar timestamp → epoch ms, or NaN. Every field is range-checked BEFORE conversion, so 30 February,
+ *  24:00, minute 60, leap seconds and impossible offsets are rejected instead of being rolled into the next period.
+ *  Offsets must be real civil offsets: whole quarter hours within UTC−12:00…UTC+14:00. */
+export function parseTimestamp(v) {
+  const s = str(v); if (!s) return null;
+  const m = ISO.exec(s); if (!m) return NaN;
+  const [y, mo, d, h, mi, se = 0] = [m[1], m[2], m[3], m[4], m[5], m[6]].map(x => (x == null ? 0 : Number(x)));
+  if (mo < 1 || mo > 12 || d < 1 || d > daysIn(y, mo) || h > 23 || mi > 59 || se > 59) return NaN;
+  let off = 0;
+  if (m[8] !== 'Z') { const oh = Number(m[10]), om = Number(m[11]); if (om > 59) return NaN; off = (m[9] === '-' ? -1 : 1) * (oh * 60 + om); if (!validOffset(off)) return NaN; }
+  const ms = Date.UTC(y, mo - 1, d, h, mi, se) + Math.round(Number(m[7] || 0) * 1000) - off * 60e3;
+  return Number.isFinite(ms) ? ms : NaN;
+}
+const isoMs = parseTimestamp;
+const validDate = s => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s); if (!m) return false; const [y, mo, d] = m.slice(1).map(Number); return mo >= 1 && mo <= 12 && d >= 1 && d <= daysIn(y, mo); };
+/** Epoch ms at which a vendor night labelled `label` counts as complete (CONFIG.night.vendorNightCompleteRule). */
+export function vendorNightCompleteAt(label, offsetMin, config = CONFIG) {
+  const off = validOffset(offsetMin) ? offsetMin : config.night.vendorDefaultOffsetMin;
+  return Date.parse(`${label}T00:00:00Z`) + (24 + config.night.vendorNightCompleteLocalHour) * 36e5 - off * 60e3;
+}
 export const validOffset = m => Number.isInteger(m) && m % 15 === 0 && m >= -720 && m <= 840;
 
+/** Content fingerprint of an observation: EVERY analysis-relevant field beyond its identity (obsKey), so a re-sent
+ *  reading that differs in any of them (session, model, manufacturer, firmware, sampling interval or configuration,
+ *  precision, offset, time-zone name, flags, value or unit) is a CONFLICT, never a silent exact duplicate.
+ *  `rowhash-2`: earlier rows are re-fingerprinted by the schema-3 migration. */
+export const observationRowHash = o => hashJSON({ v: 'rowhash-2', k: o.obsKey, value: o.sourceValue, unit: o.sourceUnit, flags: o.sourceFlags, off: o.offsetMin, tz: o.tzName,
+  dev: { mf: o.device?.manufacturer ?? null, model: o.device?.model, fw: o.device?.firmware ?? null, si: o.device?.samplingIntervalS ?? null, sc: o.device?.samplingConfig ?? null }, prec: o.precisionC, sess: o.sleepSessionId });
+
 /** One observation row → { obs } | { quarantine: reasons[] } | { reject: reasons[] } */
-export function validateObservation(r, { participantRef, config = CONFIG } = {}) {
+export function validateObservation(r, { participantRef, config = CONFIG, now = null } = {}) {
   const reject = [], quarantine = [];
   const ref = str(r.participant_ref);
   if (!REF.test(ref)) reject.push('participant_ref_invalid'); else if (participantRef && ref !== participantRef) reject.push('participant_mismatch');
   const site = str(r.sensor_site), kind = str(r.measurement_kind), derivation = str(r.derivation), aggregation = str(r.aggregation);
   if (!SITES.includes(site)) reject.push('sensor_site_invalid');
-  if (!(kind in KINDS)) reject.push('measurement_kind_invalid'); else if (SITES.includes(site) && !KINDS[kind].includes(site)) reject.push('site_kind_mismatch');
+  if (!own(KINDS, kind)) reject.push('measurement_kind_invalid'); else if (SITES.includes(site) && !KINDS[kind].includes(site)) reject.push('site_kind_mismatch');
   if (!DERIVATIONS.includes(derivation)) reject.push('derivation_missing_or_invalid'); // never defaulted to raw
   if (!AGGREGATIONS.includes(aggregation)) reject.push('aggregation_invalid');
   if (aggregation === 'nightly_value' && derivation === 'raw') reject.push('nightly_value_must_be_vendor_derived');
@@ -55,7 +82,7 @@ export function validateObservation(r, { participantRef, config = CONFIG } = {})
   const precision = num(r.precision);
   if (Number.isNaN(precision) || (precision != null && precision <= 0)) reject.push('precision_invalid');
   const interval = num(r.sampling_interval_s);
-  if (Number.isNaN(interval) || (interval != null && interval <= 0)) reject.push('sampling_interval_invalid');
+  if (Number.isNaN(interval) || (interval != null && (!Number.isFinite(interval) || interval <= 0))) reject.push('sampling_interval_invalid');
   if (reject.length) return { reject };
 
   const ts = isoMs(r.timestamp_utc), end = isoMs(r.end_timestamp_utc);
@@ -65,12 +92,16 @@ export function validateObservation(r, { participantRef, config = CONFIG } = {})
   if (Number.isNaN(ts)) quarantine.push('timestamp_invalid');
   if (Number.isNaN(end)) quarantine.push('end_timestamp_invalid');
   if (Number.isFinite(ts) && Number.isFinite(end) && end <= ts) quarantine.push('end_not_after_start');
+  const maxS = config.limits.maxSamplingIntervalS;
+  if (interval != null && interval > maxS) quarantine.push('sampling_interval_out_of_range'); // finite but beyond the documented bound
+  if (Number.isFinite(ts) && Number.isFinite(end) && end - ts > maxS * 1000) quarantine.push('measurement_interval_too_long');
   const offStr = str(r.utc_offset_minutes), off = offStr === '' ? null : Number(offStr);
   if (off == null) { if (aggregation === 'sample') quarantine.push('utc_offset_missing'); }
   else if (!validOffset(off)) quarantine.push('utc_offset_invalid');
   const unitRaw = str(r.unit), unit = parseUnit(unitRaw);
   if (!unitRaw) quarantine.push('unit_missing'); else if (!unit) quarantine.push('unit_unrecognised'); // never guessed from the value
   let valueC = null, precisionC = null;
+  if (aggregation === 'nightly_value' && nightLabel && validDate(nightLabel) && now != null && vendorNightCompleteAt(nightLabel, off, config) > now) quarantine.push('night_not_yet_complete');
   if (unit) {
     ({ valueC, precisionC } = normalise(value, unit, precision));
     const b = config.bounds[kind];
@@ -86,7 +117,7 @@ export function validateObservation(r, { participantRef, config = CONFIG } = {})
     sleepSessionId: str(r.sleep_session_id) || null,
   };
   obs.obsKey = hashJSON({ p: ref, s: serial, site, kind, derivation, aggregation, ts: obs.tsUtc, end: obs.endUtc, n: nightLabel });
-  obs.rowHash = hashJSON({ k: obs.obsKey, v: value, u: unitRaw, f: obs.sourceFlags, fw: obs.device.firmware, off: obs.offsetMin });
+  obs.rowHash = observationRowHash(obs);
   return quarantine.length ? { quarantine, obs } : { obs };
 }
 
@@ -104,7 +135,7 @@ export function validateAnnotation(r, { participantRef, consents = {} } = {}) {
   if (!REF.test(ref)) reject.push('participant_ref_invalid'); else if (participantRef && ref !== participantRef) reject.push('participant_mismatch');
   const entryId = str(r.entry_id), type = canonicalType(r.type), value = str(r.value), date = str(r.date), corrects = str(r.corrects) || null;
   if (!REF.test(entryId)) reject.push('entry_id_invalid');
-  if (!(type in ANNOTATION_TYPES)) reject.push('type_invalid');
+  if (!own(ANNOTATION_TYPES, type)) reject.push('type_invalid');
   else if (value !== 'retracted' && !ANNOTATION_TYPES[type].includes(value)) reject.push('value_invalid');
   if (value === 'retracted' && !corrects) reject.push('retraction_needs_corrects');
   if (!validDate(date)) reject.push('date_invalid');
@@ -112,7 +143,7 @@ export function validateAnnotation(r, { participantRef, consents = {} } = {}) {
   if (rec == null || Number.isNaN(rec)) reject.push('recorded_at_missing_or_invalid');
   if (corrects && !REF.test(corrects)) reject.push('corrects_invalid');
   if (corrects && corrects === entryId) reject.push('self_correction'); // issue 8 reported against b3d9589
-  if (CONSENT_SCOPED_TYPES[type] && !consents[CONSENT_SCOPED_TYPES[type]]) reject.push(`${CONSENT_SCOPED_TYPES[type]}_not_consented`); // lh_tests_not_consented / hormonal_context_not_consented
+  if (own(CONSENT_SCOPED_TYPES, type) && !consents[CONSENT_SCOPED_TYPES[type]]) reject.push(`${CONSENT_SCOPED_TYPES[type]}_not_consented`); // lh_tests_not_consented / hormonal_context_not_consented
   if (reject.length) return { reject };
   return { ann: { participantRef: ref, entryId, type, value, date, recordedAt: rec, corrects } };
 }
@@ -123,7 +154,7 @@ export const annotationHash = a => hashJSON({ e: a.entryId, t: a.type, v: a.valu
  * Preview an import without storing anything.
  * existing: { batchHashes:Set, obsRowHash:Map(obsKey→rowHash), entryHash:Map(entryId→hash), entryCorrects:Map(entryId→corrects) }
  */
-export function preview(text, { format, recordType, participantRef, filename = '', existing = {}, consents = {}, config = CONFIG, reimport = false } = {}) {
+export function preview(text, { format, recordType, participantRef, filename = '', existing = {}, consents = {}, config = CONFIG, reimport = false, now = null } = {}) {
   const sourceHash = sha256(String(text ?? ''));
   const base = { ingestVersion: INGEST_VERSION, configVersion: config.version, configHash: configHash(config), recordType, format, sourceHash,
     sourceFilenameHash: filename ? sha256(filename) : null, sourceExtension: (/\.([a-z0-9]{1,8})$/i.exec(filename)?.[1] || '').toLowerCase() || null };
@@ -141,7 +172,7 @@ export function preview(text, { format, recordType, participantRef, filename = '
     const raw = row.record ?? null;
     if (row.error) { quarantined.push({ line: row.line, reasons: [row.error], rejected: true, raw }); rejected++; continue; }
     if (recordType === 'observations') {
-      const v = validateObservation(raw, { participantRef, config });
+      const v = validateObservation(raw, { participantRef, config, now });
       if (v.reject) { quarantined.push({ line: row.line, reasons: v.reject, rejected: true, raw }); rejected++; continue; }
       const o = v.obs, prior = seen.get(o.obsKey) ?? existing.obsRowHash?.get(o.obsKey);
       if (prior != null && !v.quarantine) {

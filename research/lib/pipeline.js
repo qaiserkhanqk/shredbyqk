@@ -12,19 +12,35 @@ import { nightlyReports } from './quality.js';
 import { effectiveAnnotations, segment, knownAt } from './cycles.js';
 import { descriptiveTrend, sustainedShift, nextPeriodForecast } from './inference.js';
 import { hashJSON } from './hash.js';
+import { vendorNightCompleteAt } from './ingest.js';
 
-export const PIPELINE_VERSION = 'pipeline-1.1.0';
+export const PIPELINE_VERSION = 'pipeline-1.2.0';
 
+/** Correction state from a correction history, replayed in order: "exclude" excludes the VALUE, "exclude_timing"
+ *  excludes the TIMESTAMP / session assignment (the sample is then not placed at all), "restore" clears both.
+ *  Shared by the pipeline (as of a cutoff) and the store (current state). */
+export function correctionState(corrections = []) {
+  let excludedBy = null, timingExcludedBy = null;
+  for (const c of corrections) { if (c.action === 'exclude') excludedBy = 'correction'; else if (c.action === 'exclude_timing') timingExcludedBy = 'correction'; else if (c.action === 'restore') { excludedBy = null; timingExcludedBy = null; } }
+  return { excludedBy, timingExcludedBy };
+}
 /** Exclusion state of one observation at a cutoff, replayed from its correction history (if it has one). */
 function asKnownAt(o, asOf) {
   if (!Array.isArray(o.corrections)) return o;
   const known = o.corrections.filter(c => c.at < asOf);
-  return { ...o, excludedBy: known.at(-1)?.action === 'exclude' ? 'correction' : null, corrections: known };
+  return { ...o, ...correctionState(known), corrections: known };
+}
+/** Known at the cutoff: ingested before it, and (by its own time) able to have happened before it. A vendor nightly
+ *  value has no timestamp, so its night label is used with the documented convention (CONFIG.night.vendorNightCompleteRule). */
+function knownObservation(o, asOf, config) {
+  if ((o.ingestedAt ?? 0) >= asOf) return false;
+  if (o.aggregation === 'nightly_value') return !!o.nightLabel && vendorNightCompleteAt(o.nightLabel, o.offsetMin, config) <= asOf;
+  return o.tsUtc == null || !(o.tsUtc >= asOf);
 }
 
 export function analyse({ observations, annotations, asOf = Date.now(), features = {}, config = CONFIG }) {
   const asOfDate = new Date(asOf).toISOString().slice(0, 10);
-  const obs = observations.filter(o => (o.ingestedAt ?? 0) < asOf && (o.tsUtc == null || o.tsUtc < asOf)).map(o => asKnownAt(o, asOf));
+  const obs = observations.filter(o => knownObservation(o, asOf, config)).map(o => asKnownAt(o, asOf));
   const eff = effectiveAnnotations(annotations, { asOf });
   const quality = nightlyReports(obs, eff, config);
   const seg = segment(eff, config);

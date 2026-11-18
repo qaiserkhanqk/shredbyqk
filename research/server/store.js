@@ -5,9 +5,10 @@
 // immutability); audit rows keep only an internal number and an action name.
 import { DatabaseSync } from 'node:sqlite';
 import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
-import { canonicalType, CONSENT_SCOPED_TYPES } from '../lib/ingest.js';
+import { canonicalType, CONSENT_SCOPED_TYPES, observationRowHash } from '../lib/ingest.js';
+import { correctionState } from '../lib/pipeline.js';
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 const SCHEMA = `
 PRAGMA foreign_keys = ON; PRAGMA secure_delete = ON; PRAGMA journal_mode = WAL;
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
@@ -28,7 +29,7 @@ CREATE TABLE IF NOT EXISTS annotations (id INTEGER PRIMARY KEY, participant_id I
 CREATE TABLE IF NOT EXISTS quarantine (id INTEGER PRIMARY KEY, participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE, batch_id INTEGER NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
   line INTEGER, reasons_json TEXT NOT NULL, raw_json TEXT, rejected INTEGER NOT NULL, canonical_type TEXT);
 CREATE TABLE IF NOT EXISTS corrections (id INTEGER PRIMARY KEY, participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE, observation_id INTEGER NOT NULL REFERENCES observations(id) ON DELETE CASCADE,
-  action TEXT NOT NULL CHECK (action IN ('exclude','restore')), reason TEXT NOT NULL, by_user INTEGER, at INTEGER NOT NULL);
+  action TEXT NOT NULL CHECK (action IN ('exclude','exclude_timing','restore')), reason TEXT NOT NULL, by_user INTEGER, at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS derived_runs (id INTEGER PRIMARY KEY, participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE, kind TEXT NOT NULL, algorithm_version TEXT NOT NULL,
   config_version TEXT NOT NULL, config_hash TEXT NOT NULL, input_hash TEXT NOT NULL, data_cutoff TEXT, scope TEXT NOT NULL, output_json TEXT NOT NULL, created_at INTEGER NOT NULL,
   UNIQUE (participant_id, kind, scope, algorithm_version, config_hash, input_hash, data_cutoff));
@@ -51,6 +52,7 @@ const sha = s => createHash('sha256').update(s).digest('hex');
    • annotations / quarantine: add `canonical_type` and fill it from the stored type (issue 1). */
 function migrate(db) {
   const cols = t => db.prepare(`SELECT name FROM pragma_table_info('${t}')`).all().map(r => r.name);
+  const from = Number(db.prepare("SELECT v FROM meta WHERE k = 'schema_version'").get()?.v ?? SCHEMA_VERSION);
   if (!cols('batches').includes('attempt')) {
     db.exec('PRAGMA foreign_keys = OFF');
     db.exec('BEGIN IMMEDIATE');
@@ -72,7 +74,52 @@ function migrate(db) {
       if (v && typeof v === 'object' && v.type != null) upd.run(canonicalType(v.type), r.id);
     }
   }
+  if (from < 3) migrateToV3(db, from);
   db.prepare("INSERT INTO meta (k, v) VALUES ('schema_version', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v").run(String(SCHEMA_VERSION));
+}
+
+/* Schema 3 (findings reported against 21317c5), one transaction:
+   • corrections may record "exclude_timing" (the table is rebuilt: SQLite cannot alter a CHECK constraint);
+   • observations are re-fingerprinted with rowhash-2, which covers every analysis-relevant field, so re-sending an
+     unchanged reading stays an exact duplicate and a changed one is a conflict;
+   • CONSENT RECONCILIATION: for every participant whose optional consent (lh_tests, hormonal_context) is not currently
+     granted (e.g. withdrawn before this upgrade, when the older purge matched raw types exactly), annotations and
+     quarantined rows of that canonical type are deleted, and saved previews containing such content are invalidated.
+     Only counts are audited (no types, values or references). Nothing deleted is ever restored. */
+function migrateToV3(db, from) {
+  const scopeOfType = CONSENT_SCOPED_TYPES; // canonical type → consent scope
+  db.exec('PRAGMA foreign_keys = OFF');
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const sql = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'corrections'").get()?.sql || '';
+    if (!sql.includes('exclude_timing')) {
+      db.exec(`CREATE TABLE corrections_v3 (id INTEGER PRIMARY KEY, participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE, observation_id INTEGER NOT NULL REFERENCES observations(id) ON DELETE CASCADE,
+          action TEXT NOT NULL CHECK (action IN ('exclude','exclude_timing','restore')), reason TEXT NOT NULL, by_user INTEGER, at INTEGER NOT NULL);
+        INSERT INTO corrections_v3 SELECT id, participant_id, observation_id, action, reason, by_user, at FROM corrections;
+        DROP TABLE corrections; ALTER TABLE corrections_v3 RENAME TO corrections;`);
+    }
+    const upd = db.prepare('UPDATE observations SET row_hash = ? WHERE id = ?');
+    for (const r of db.prepare('SELECT id, data_json FROM observations').all()) { try { upd.run(observationRowHash(JSON.parse(r.data_json)), r.id); } catch { /* leave as is */ } }
+    const now = Date.now();
+    for (const { id: pid } of db.prepare('SELECT id FROM participants').all()) {
+      const granted = {}; for (const c of db.prepare('SELECT scope, granted FROM consents WHERE participant_id = ? ORDER BY id').all(pid)) granted[c.scope] = !!c.granted;
+      const unauthorized = Object.keys(scopeOfType).filter(t => !granted[scopeOfType[t]]);
+      if (!unauthorized.length) continue;
+      const removed = { annotations: 0, quarantine: 0, previews: 0 };
+      for (const t of unauthorized) {
+        removed.annotations += Number(db.prepare('DELETE FROM annotations WHERE participant_id = ? AND canonical_type = ?').run(pid, t).changes);
+        removed.quarantine += Number(db.prepare('DELETE FROM quarantine WHERE participant_id = ? AND canonical_type = ?').run(pid, t).changes);
+      }
+      for (const pv of db.prepare('SELECT id, payload_json FROM previews WHERE participant_id = ?').all(pid)) {
+        let p = null; try { p = JSON.parse(pv.payload_json); } catch { /* unreadable: invalidate */ }
+        const types = p ? [...(p.accepted || []).map(a => a?.type), ...(p.quarantined || []).map(q => q?.raw?.type)] : [null];
+        if (!p || types.some(x => x != null && unauthorized.includes(canonicalType(x)))) { db.prepare('DELETE FROM previews WHERE id = ?').run(pv.id); removed.previews++; }
+      }
+      if (removed.annotations || removed.quarantine || removed.previews) db.prepare('INSERT INTO audit (at, actor, action, participant_id, outcome, detail_json) VALUES (?, NULL, ?, ?, ?, ?)')
+        .run(now, 'migration_consent_reconciled', pid, 'ok', JSON.stringify({ schemaFrom: from, schemaTo: 3, removed }));
+    }
+    db.exec('COMMIT');
+  } catch (e) { db.exec('ROLLBACK'); throw e; } finally { db.exec('PRAGMA foreign_keys = ON'); }
 }
 
 export function openStore(path = ':memory:', { now = () => Date.now() } = {}) {
@@ -169,7 +216,15 @@ export function openStore(path = ':memory:', { now = () => Date.now() } = {}) {
       };
     },
     savePreview(pid, userId, payload) { const id = randomBytes(18).toString('base64url'); q('DELETE FROM previews WHERE created_at < ?').run(now() - 15 * 60e3); q('INSERT INTO previews (id, participant_id, user_id, payload_json, created_at) VALUES (?, ?, ?, ?, ?)').run(id, pid, userId, JSON.stringify(payload), now()); return id; },
-    takePreview(id, pid, userId) { const r = q('SELECT * FROM previews WHERE id = ? AND participant_id = ? AND user_id = ? AND created_at >= ?').get(String(id), pid, userId, now() - 15 * 60e3); if (r) q('DELETE FROM previews WHERE id = ?').run(r.id); return r ? JSON.parse(r.payload_json) : null; },
+    /** Consume a preview. With `expect` ({recordType, sourceHash}, each optional), a preview that does not match is NOT
+     *  consumed and `{ mismatch: true }` is returned, so only an exact match can ever commit it. */
+    takePreview(id, pid, userId, expect = {}) {
+      const r = q('SELECT * FROM previews WHERE id = ? AND participant_id = ? AND user_id = ? AND created_at >= ?').get(String(id), pid, userId, now() - 15 * 60e3);
+      if (!r) return null;
+      const p = JSON.parse(r.payload_json);
+      if ((expect.recordType !== undefined && expect.recordType !== p.recordType) || (expect.sourceHash !== undefined && expect.sourceHash !== p.sourceHash)) return { mismatch: true };
+      q('DELETE FROM previews WHERE id = ?').run(r.id); return p;
+    },
     commitImport(pid, p, userId, annotationHash) {
       return tx(() => {
         // Consent is rechecked INSIDE the transaction (issue 2): a preview made under consent that has since been
@@ -205,7 +260,7 @@ export function openStore(path = ':memory:', { now = () => Date.now() } = {}) {
       const hist = new Map();
       for (const c of q('SELECT observation_id, action, reason, at FROM corrections WHERE participant_id = ? ORDER BY at, id').all(pid)) (hist.get(c.observation_id) || hist.set(c.observation_id, []).get(c.observation_id)).push({ action: c.action, reason: c.reason, at: c.at });
       return q('SELECT id, data_json, ingested_at FROM observations WHERE participant_id = ? ORDER BY id').all(pid).map(r => { const h = hist.get(r.id) || [];
-        return { ...JSON.parse(r.data_json), id: r.id, seq: r.id, ingestedAt: r.ingested_at, corrections: h, excludedBy: h.at(-1)?.action === 'exclude' ? 'correction' : null }; });
+        return { ...JSON.parse(r.data_json), id: r.id, seq: r.id, ingestedAt: r.ingested_at, corrections: h, ...correctionState(h) }; }); // current value AND timing state
     },
     /** Annotations with `ingestedAt` = the commit time of their import batch (issue 7). */
     annotations: pid => q('SELECT a.data_json, b.created_at FROM annotations a JOIN batches b ON b.id = a.batch_id WHERE a.participant_id = ? ORDER BY a.id').all(pid).map(r => ({ ...JSON.parse(r.data_json), ingestedAt: r.created_at })),

@@ -304,41 +304,42 @@ async function onClick(e) {
     await resetCycleStorage(await repoOpts()); channel?.postMessage('changed'); await reopen(); toast('Cycle data reset'); return renderCycle();
   }
   if (!repo) return;
-  const a = b.dataset.act, date = () => val('#cyDate');
+  // Snapshot EVERYTHING the action needs now, synchronously, when the person acts (finding 2b reported against 21317c5).
+  // The repository transaction may wait for another tab's lock or be retried after a conflict; it must never read the
+  // page again, because by then the person may have changed the date or the fields.
+  const a = b.dataset.act, ds = { ...b.dataset }, snapDate = val('#cyDate'), date = () => snapDate;
+  const pid = b.closest('[data-pid]')?.dataset.pid, rid = b.closest('[data-rid]')?.dataset.rid;
+  const endFor = ds.id && root.querySelector(`#endFor-${CSS.escape(ds.id)}`) ? val(`#endFor-${CSS.escape(ds.id)}`) : undefined;
+  const dayForm = a === 'saveDay' ? daySnapshot() : null, remKind = val('#cyRemKind'), remTime = val('#cyRemTime'), sumMonths = val('#cySumMonths');
   const run = {
     consent: () => { if (!root.querySelector('#cyAgree')?.checked) return toast('Tick the box to agree first.'); act(s => M.giveConsent(s), 'Cycle tracking is on'); },
     logStart: () => act((s, t) => M.logPeriodStart(s, date(), { today: t }), 'Period start saved'),
     logStartToday: () => act((s, t) => M.logPeriodStart(s, t, { today: t }), 'Period start saved'),
-    confirmStart: () => act((s, t) => M.logPeriodStart(s, b.dataset.date, { today: t }), 'Period start saved'),
-    wasSpotting: () => act((s, t) => M.logDay(s, b.dataset.date, { bleeding: 'spotting' }, { today: t }), 'Saved as spotting'),
+    confirmStart: () => act((s, t) => M.logPeriodStart(s, ds.date, { today: t }), 'Period start saved'),
+    wasSpotting: () => act((s, t) => M.logDay(s, ds.date, { bleeding: 'spotting' }, { today: t }), 'Saved as spotting'),
     logEnd: () => act((s, t) => { const p = [...s.periods].reverse().find(x => x.start <= date()); if (!p) throw new M.CycleError('NOT_FOUND'); M.logPeriodEnd(s, p.id, date(), { today: t }); }, 'Period end saved'),
-    endPeriod: () => act((s, t) => M.logPeriodEnd(s, b.dataset.id, val(`#endFor-${CSS.escape(b.dataset.id)}`), { today: t }), 'Period end saved'),
+    endPeriod: () => act((s, t) => M.logPeriodEnd(s, ds.id, endFor, { today: t }), 'Period end saved'),
     logSpotting: () => act((s, t) => M.logDay(s, date(), { bleeding: 'spotting' }, { today: t }), 'Spotting saved'),
     spottingToday: () => act((s, t) => M.logDay(s, t, { bleeding: 'spotting' }, { today: t }), 'Spotting saved'),
     notYet: () => act((s, t) => { M.logDay(s, t, { bleeding: 'none' }, { today: t }); M.dismissPrompt(s, `check:${t}`, t); }, 'Noted for today'),
-    dismissPrompt: () => act((s, t) => M.dismissPrompt(s, b.dataset.key, t)),
-    saveDay: () => act((s, t) => {
-      const f = { unwell: root.querySelector('#cyUnwell').checked, travel: root.querySelector('#cyTravel').checked };
-      root.querySelectorAll('[data-sym]').forEach(x => { f[x.dataset.sym] = x.value || null; });
-      const lh = root.querySelector('#cyLh'); if (lh) f.lh = lh.value || null;
-      M.logDay(s, date(), f, { today: t });
-    }, 'Saved'),
-    deletePeriod: () => act(s => M.deletePeriod(s, b.closest('[data-pid]').dataset.pid), 'Period deleted'),
-    eraseSit: () => act(s => M.eraseSituation(s, b.dataset.key), 'Deleted'),
-    dismissInsight: () => act((s, t) => { s.dismissed[b.dataset.key] = t; }, 'Dismissed'),
-    patternReminder: () => act(s => { if (!s.consent.reminders) M.setScopeConsent(s, 'reminders', true); const p = findPatterns(s).find(x => x.key === b.dataset.key); addReminder(s, { kind: 'pattern', time: '09:00', cycleDay: p.from, category: p.category, origin: p.text }); }, 'Reminder set for next cycle'),
+    dismissPrompt: () => act((s, t) => M.dismissPrompt(s, ds.key, t)),
+    saveDay: () => act((s, t) => M.logDay(s, snapDate, { ...dayForm }, { today: t }), 'Saved'),
+    deletePeriod: () => act(s => M.deletePeriod(s, pid), 'Period deleted'),
+    eraseSit: () => act(s => M.eraseSituation(s, ds.key), 'Deleted'),
+    dismissInsight: () => act((s, t) => { s.dismissed[ds.key] = t; }, 'Dismissed'),
+    patternReminder: () => act(s => { if (!s.consent.reminders) M.setScopeConsent(s, 'reminders', true); const p = findPatterns(s).find(x => x.key === ds.key); addReminder(s, { kind: 'pattern', time: '09:00', cycleDay: p.from, category: p.category, origin: p.text }); }, 'Reminder set for next cycle'),
     checkinReminder: () => act(s => { if (!s.consent.reminders) M.setScopeConsent(s, 'reminders', true); addReminder(s, { kind: 'dailyLog', time: '20:00' }); }, 'Daily check-in set for 20:00'),
     remindersOn: () => act(s => M.setScopeConsent(s, 'reminders', true)),
     remindersOff: () => act(s => M.setScopeConsent(s, 'reminders', false), 'Reminders deleted'),
-    addRem: () => act(s => addReminder(s, { kind: val('#cyRemKind'), time: val('#cyRemTime'), weekday: 1 }), 'Reminder added'),
-    delRem: () => act(s => deleteReminder(s, b.closest('[data-rid]').dataset.rid), 'Reminder deleted'),
-    pauseRem: () => act((s, t) => { const r = s.reminders.find(x => x.id === b.closest('[data-rid]').dataset.rid); updateReminder(s, r.id, { pausedUntil: r.pausedUntil && r.pausedUntil >= t ? null : addDays(t, 6) }); }),
+    addRem: () => act(s => addReminder(s, { kind: remKind, time: remTime, weekday: 1 }), 'Reminder added'),
+    delRem: () => act(s => deleteReminder(s, rid), 'Reminder deleted'),
+    pauseRem: () => act((s, t) => { const r = s.reminders.find(x => x.id === rid); updateReminder(s, r.id, { pausedUntil: r.pausedUntil && r.pausedUntil >= t ? null : addDays(t, 6) }); }),
     pauseAll: () => act((s, t) => { s.settings.remindersPausedUntil = s.settings.remindersPausedUntil && s.settings.remindersPausedUntil >= t ? null : addDays(t, 6); }),
-    ackDue: () => act((s, t) => markDelivered(s, b.dataset.id, t)),
+    ackDue: () => act((s, t) => markDelivered(s, ds.id, t)),
     notifPerm: async () => { if (typeof Notification === 'undefined') return toast('Notifications aren\'t supported here.'); toast((await Notification.requestPermission()) === 'granted' ? 'Notifications allowed' : 'Notifications not allowed'); },
     lhOn: () => act(s => M.setScopeConsent(s, 'lhTests', true), 'Ovulation test logging on'),
     lhOff: () => { if (!confirm('Turn off ovulation test logging and delete the results you recorded?')) return; return act(s => M.setScopeConsent(s, 'lhTests', false), 'Ovulation test results deleted'); },
-    summary: () => { summaryMonths = Number(val('#cySumMonths')) || 12; render(); root.querySelector('#cySummary')?.scrollIntoView?.({ block: 'start' }); },
+    summary: () => { summaryMonths = Number(sumMonths) || 12; render(); root.querySelector('#cySummary')?.scrollIntoView?.({ block: 'start' }); },
     closeSummary: () => { summaryMonths = null; render(); },
     printSummary: () => { document.body.classList.add('cy-printing'); const done = () => { document.body.classList.remove('cy-printing'); window.removeEventListener('afterprint', done); }; window.addEventListener('afterprint', done); window.print(); },
     downloadSummary: () => { const t = now().today, txt = summaryText(clinicianSummary(repo.read(), { today: t, months: summaryMonths || 12 })); const url = URL.createObjectURL(new Blob([txt], { type: 'text/plain' })); const l = document.createElement('a'); l.href = url; l.download = `cycle-summary-${t}.txt`; document.body.appendChild(l); l.click(); setTimeout(() => { URL.revokeObjectURL(url); l.remove(); }, 1000); },
@@ -357,8 +358,17 @@ async function sync() {
   const { readings } = normalise(await dev.fetchPackets({ from: addDays(today, -21), to: addDays(today, -1) }));
   await act(s => { if (!s.consent.wearable) throw new M.CycleError('NO_CONSENT'); s.wearable.devices = [{ ...info, adapter: dev.id, verified: dev.verified, connectedAt: today }]; s.wearable.nights = mergeNights(s.wearable.nights, summariseNights(readings)); }, 'Demo data synced (synthetic)');
 }
+/** The day form's values, read once when Save is pressed (finding 2b). */
+function daySnapshot() {
+  const f = { unwell: !!root.querySelector('#cyUnwell')?.checked, travel: !!root.querySelector('#cyTravel')?.checked };
+  root.querySelectorAll('[data-sym]').forEach(x => { f[x.dataset.sym] = x.value || null; });
+  const lh = root.querySelector('#cyLh'); if (lh) f.lh = lh.value || null;
+  return f;
+}
 async function onChange(e) {
   const t = e.target; if (!repo) return;
+  // As in onClick: read the changed control now, never inside the (possibly delayed or retried) transaction.
+  const checked = t.checked, value = t.value, data = { ...t.dataset }, rowRid = t.closest('[data-rid]')?.dataset.rid;
   if (t.dataset.edit) {
     const id = t.closest('[data-pid]').dataset.pid, k = t.dataset.edit;
     const patch = k === 'missedBefore' || k === 'lengthConfirmed' ? { [k]: t.checked } : { [k]: t.value || (k === 'end' ? null : undefined) };
@@ -370,9 +380,9 @@ async function onChange(e) {
     const purge = confirm(`Stop logging ${M.CATEGORIES[k].label.toLowerCase()}. Also delete what you already logged?`);
     return act(s => M.setCategory(s, k, false, { purge }), purge ? 'Turned off and deleted' : 'Turned off');
   }
-  if (t.dataset.sit) return act(s => M.setSituation(s, t.dataset.sit, t.checked)); // versioned (issue 4)
+  if (data.sit) return act(s => M.setSituation(s, data.sit, checked)); // versioned (issue 4)
   if (t.dataset.flag) { setFlag(t.dataset.flag, t.checked); return render(); }
-  if (t.dataset.rtime != null) return act(s => updateReminder(s, t.closest('[data-rid]').dataset.rid, { time: t.value }), 'Time changed');
-  if (t.id === 'cyQs' || t.id === 'cyQe') return act(s => { s.settings.quietHours = { start: val('#cyQs'), end: val('#cyQe') }; }, 'Quiet hours saved');
-  if (t.id === 'cyLockDetail') return act(s => { s.settings.lockScreenDetail = t.checked; });
+  if (data.rtime != null) return act(s => updateReminder(s, rowRid, { time: value }), 'Time changed');
+  if (t.id === 'cyQs' || t.id === 'cyQe') { const qh = { start: val('#cyQs'), end: val('#cyQe') }; return act(s => { s.settings.quietHours = qh; }, 'Quiet hours saved'); }
+  if (t.id === 'cyLockDetail') return act(s => { s.settings.lockScreenDetail = checked; });
 }

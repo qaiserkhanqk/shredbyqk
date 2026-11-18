@@ -36,7 +36,7 @@ check('setup: the schema-1 database holds a batch, 2 annotations and a quarantin
 
 const s = openStore(db);
 const cols = t => s.db.prepare(`SELECT name FROM pragma_table_info('${t}')`).all().map(r => r.name);
-check('migration: schema version recorded as 2', s.db.prepare("SELECT v FROM meta WHERE k = 'schema_version'").get().v === String(SCHEMA_VERSION) && SCHEMA_VERSION === 2);
+check('migration: schema version recorded as the current version (3 since the 21317c5 fixes; was 2)', s.db.prepare("SELECT v FROM meta WHERE k = 'schema_version'").get().v === String(SCHEMA_VERSION) && SCHEMA_VERSION === 3);
 check('migration: batches gained attempt and reimport_reason; IDs unchanged', cols('batches').includes('attempt') && cols('batches').includes('reimport_reason') && JSON.stringify(s.db.prepare('SELECT id FROM batches').all().map(r => r.id)) === JSON.stringify(before.batches));
 check('migration: foreign keys are intact', s.db.prepare('PRAGMA foreign_key_check').all().length === 0 && s.annotations(pid).length === 2);
 check('migration: canonical_type filled for old annotation and quarantine rows', s.db.prepare("SELECT COUNT(*) AS n FROM quarantine WHERE canonical_type = 'lh_test'").get().n === 1 && s.db.prepare("SELECT COUNT(*) AS n FROM annotations WHERE canonical_type = 'lh_test'").get().n === 1);

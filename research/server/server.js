@@ -111,6 +111,7 @@ export function createApp({ store, settings, log = line => process.stderr.write(
     ['POST', /^\/api\/participants\/([^/]+)\/consents$/, async (req, res, m, ip, s) => {
       needRole(s, 'researcher', 'participant'); const p = participantFor(s, m[1]), b = await body(req, 4096);
       if (!CONSENT_SCOPES.includes(b.scope)) fail(400, 'scope_invalid');
+      if (typeof b.granted !== 'boolean') fail(400, 'granted_must_be_boolean'); // "false", 0, null, [] … never change consent
       if (s.role === 'researcher' && b.granted) fail(403, 'use_record_signed_consent'); // a researcher records consent only from a signed form
       const removed = store.setConsent(p.id, b.scope, !!b.granted, s.userId); store.audit(s.userId, `consent_${b.granted ? 'granted' : 'withdrawn'}`, p.id, 'ok', { scope: b.scope, removed }); ok(res, { consents: store.consents(p.id), removed });
     }],
@@ -121,6 +122,7 @@ export function createApp({ store, settings, log = line => process.stderr.write(
     }],
     ['POST', /^\/api\/participants\/([^/]+)\/features$/, async (req, res, m, ip, s) => {
       needRole(s, 'researcher'); const p = participantFor(s, m[1]), b = await body(req, 4096);
+      if (typeof b.enabled !== 'boolean') fail(400, 'enabled_must_be_boolean');
       try { policy.assertFeatureAllowed(b.name); } catch { store.audit(s.userId, 'prohibited_feature_refused', p.id, 'denied'); fail(400, 'feature_prohibited'); }
       if (!FEATURES.includes(b.name)) fail(400, 'feature_unknown');
       store.setFeature(p.id, b.name, !!b.enabled, s.userId); store.audit(s.userId, `feature_${b.enabled ? 'enabled' : 'disabled'}`, p.id, 'ok', { name: b.name }); ok(res, { features: store.features(p.id) });
@@ -133,18 +135,22 @@ export function createApp({ store, settings, log = line => process.stderr.write(
       // Explicit, audited reimport (issue 2 reported against f67000b): revalidates a previously imported file under the
       // CURRENT consent. It needs a reason code. Rows already stored are skipped; deleted data is never restored
       // unless a file is reimported like this.
+      if (b.reimport !== undefined && typeof b.reimport !== 'boolean') fail(400, 'reimport_must_be_boolean');
       const reimport = b.reimport === true, reason = String(b.reason || '');
       if (reimport && !/^[a-z0-9_]{3,60}$/.test(reason)) fail(400, 'reimport_reason_required');
-      const pv = preview(String(b.content ?? ''), { format: b.format, recordType: b.recordType, participantRef: p.ref, filename: String(b.filename || ''), existing: store.existingFor(p.id), consents: c, reimport });
+      const pv = preview(String(b.content ?? ''), { format: b.format, recordType: b.recordType, participantRef: p.ref, filename: String(b.filename || ''), existing: store.existingFor(p.id), consents: c, reimport, now: now() });
       if (!pv.ok) { store.audit(s.userId, 'import_preview_failed', p.id, 'failed', { error: pv.error }); return ok(res, { ok: false, error: pv.error, line: pv.line ?? null }, 400); }
       if (reimport) Object.assign(pv, { reimport: true, reimportReason: reason });
       const id = pv.duplicateBatch ? null : store.savePreview(p.id, s.userId, pv);
       store.audit(s.userId, reimport ? 'import_reimport_previewed' : 'import_previewed', p.id, 'ok', { counts: pv.counts, ...(reimport ? { reason } : {}) });
-      ok(res, { ok: true, previewId: id, duplicateBatch: pv.duplicateBatch, reimportAvailable: !!pv.duplicateBatch, reimport, counts: pv.counts, recordType: pv.recordType, quarantined: pv.quarantined.slice(0, 200).map(q => ({ line: q.line, reasons: q.reasons, rejected: !!q.rejected })), ingestVersion: pv.ingestVersion, configVersion: pv.configVersion });
+      ok(res, { ok: true, previewId: id, sourceHash: pv.sourceHash, duplicateBatch: pv.duplicateBatch, reimportAvailable: !!pv.duplicateBatch, reimport, counts: pv.counts, recordType: pv.recordType, quarantined: pv.quarantined.slice(0, 200).map(q => ({ line: q.line, reasons: q.reasons, rejected: !!q.rejected })), ingestVersion: pv.ingestVersion, configVersion: pv.configVersion });
     }],
     ['POST', /^\/api\/participants\/([^/]+)\/imports\/commit$/, async (req, res, m, ip, s) => {
       needRole(s, 'researcher'); const p = participantFor(s, m[1]), b = await body(req, 4096);
-      const pv = store.takePreview(b.previewId, p.id, s.userId); if (!pv) fail(404, 'preview_not_found_or_expired');
+      // Binding (finding 2a reported against 21317c5): a preview is tied to its participant and user and, when the client
+      // names them (the dashboard always does), to its record type and source file. A mismatch commits nothing.
+      const pv = store.takePreview(b.previewId, p.id, s.userId, { recordType: b.recordType, sourceHash: b.sourceHash }); if (!pv) fail(404, 'preview_not_found_or_expired');
+      if (pv.mismatch) { store.audit(s.userId, 'import_commit_refused', p.id, 'denied', { code: 'preview_mismatch' }); fail(409, 'preview_mismatch'); }
       let r; try { r = store.commitImport(p.id, pv, s.userId, annotationHash); } catch (e) { if (e instanceof ConsentError) { store.audit(s.userId, 'import_commit_refused', p.id, 'denied', { code: e.code }); fail(409, e.code); } throw e; }
       store.audit(s.userId, 'import_committed', p.id, 'ok', { counts: pv.counts, duplicateBatch: r.duplicateBatch, ...(pv.reimport ? { reimport: true, reason: pv.reimportReason } : {}) });
       ok(res, { ok: true, ...r, counts: pv.counts });
@@ -165,7 +171,7 @@ export function createApp({ store, settings, log = line => process.stderr.write(
     ['GET', /^\/api\/participants\/([^/]+)\/runs$/, (req, res, m, ip, s) => { needRole(s, 'researcher'); const p = participantFor(s, m[1]); ok(res, { runs: store.runs(p.id) }); }],
     ['POST', /^\/api\/participants\/([^/]+)\/corrections$/, async (req, res, m, ip, s) => {
       needRole(s, 'researcher'); const p = participantFor(s, m[1]), b = await body(req, 4096);
-      if (!['exclude', 'restore'].includes(b.action) || !/^[a-z_]{3,40}$/.test(String(b.reason))) fail(400, 'correction_invalid');
+      if (!['exclude', 'exclude_timing', 'restore'].includes(b.action) || !/^[a-z_]{3,40}$/.test(String(b.reason))) fail(400, 'correction_invalid');
       if (!store.addCorrection(p.id, Number(b.observationId), b.action, b.reason, s.userId)) fail(404, 'not_found');
       store.audit(s.userId, `observation_${b.action}`, p.id); ok(res, { ok: true });
     }],

@@ -34,7 +34,10 @@ export const METRICS = {
 };
 // minCoverageMin, minSamples, maxSampleMin and EARLIEST are placeholders that need device evidence
 // (docs/wearable-sdk-requirements.md). EARLIEST only rejects obviously wrong clocks (e.g. epoch 0).
-export const NIGHT_PARAMS = Object.freeze({ minCoverageMin: 180, minSamples: 6, maxSampleMin: 60 });
+// maxSessionSpanHours: a reading more than this many hours from its session's median time is a timing outlier (finding 4c
+// reported against 21317c5): it does not label the session and is not used. An engineering assumption (a main sleep
+// session is assumed to last well under a day), not a physiological threshold.
+export const NIGHT_PARAMS = Object.freeze({ minCoverageMin: 180, minSamples: 6, maxSampleMin: 60, maxSessionSpanHours: 18 });
 const EARLIEST = Date.UTC(2015, 0, 1);
 /* Time-zone offsets (issue 3 reproduced in 29780c5): a whole number of minutes, a multiple of 15, within
    UTC−12:00…UTC+14:00 — the range of real civil time zones (not a physiological threshold). Anything else is
@@ -143,18 +146,22 @@ export function summariseNights(readings, params = NIGHT_PARAMS) {
   const out = [];
   for (const [k, rs] of groups) {
     const [sleepSessionId, deviceId, model, firmware, metric, kind] = JSON.parse(k);
-    const night = nightOf([...rs].sort((a, b) => a.tStart - b.tStart)[0]);
-    const good = rs.filter(isUsable).sort((a, b) => a.tStart - b.tStart);
+    // Timing outliers: readings far from the session's median time cannot decide its night (a corrupted clock would
+    // otherwise move the whole session) and are not used; they are counted in rejectedBy.session_timing_outlier.
+    const times = rs.map(r => r.tStart).sort((a, b) => a - b), mid = times[times.length >> 1], tol = params.maxSessionSpanHours * 36e5;
+    const inTime = rs.filter(r => Math.abs(r.tStart - mid) <= tol), outliers = rs.length - inTime.length;
+    const night = nightOf([...inTime].sort((a, b) => a.tStart - b.tStart)[0]);
+    const good = inTime.filter(isUsable).sort((a, b) => a.tStart - b.tStart);
     const coverageMin = unionMinutes(good);
-    const tzs = [...new Set(rs.map(r => r.tzOffsetMin))];
+    const tzs = [...new Set(inTime.map(r => r.tzOffsetMin))];
     const vals = good.map(r => r.value).sort((a, b) => a - b);
     const enough = good.length >= params.minSamples && coverageMin >= params.minCoverageMin;
     const med = vals.length ? (vals.length % 2 ? vals[vals.length >> 1] : (vals[vals.length / 2 - 1] + vals[vals.length / 2]) / 2) : null;
     out.push({ night, sleepSessionId, deviceId, model, firmware, metric, unit: METRICS[metric].unit, kind,
       status: enough ? 'ok' : good.length ? 'insufficient_wear' : 'no_usable_data',
-      value: enough ? +med.toFixed(3) : null, samples: good.length, rejected: rs.length - good.length, rejectedBy: rejectionReasons(rs), coverageMin,
-      firstAt: good[0]?.tStart ?? rs[0].tStart, lastAt: good.at(-1)?.tEnd ?? rs.at(-1).tEnd, tzOffsetMin: tzs.length === 1 ? tzs[0] : tzs,
-      flags: [...new Set(rs.flatMap(r => r.flags))] });
+      value: enough ? +med.toFixed(3) : null, samples: good.length, rejected: rs.length - good.length, rejectedBy: { ...rejectionReasons(inTime), ...(outliers ? { session_timing_outlier: outliers } : {}) }, coverageMin,
+      firstAt: good[0]?.tStart ?? inTime[0].tStart, lastAt: good.at(-1)?.tEnd ?? inTime.at(-1).tEnd, tzOffsetMin: tzs.length === 1 ? tzs[0] : tzs,
+      flags: [...new Set([...inTime.flatMap(r => r.flags), ...(outliers ? ["session_timing_outlier"] : [])])] });
   }
   const result = markTravel(out.sort((a, b) => a.night.localeCompare(b.night) || a.metric.localeCompare(b.metric)));
   result.quarantined = quarantined;

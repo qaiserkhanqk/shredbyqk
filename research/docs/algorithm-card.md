@@ -38,6 +38,12 @@ Participants never see the experimental layers.
 5. Uncertainty is the calendar range from the night after the last usable night before *c* up to *c*, labelled **uncalibrated**.
 
 **Abstention and wording:**
+- **Reported separately (since 21317c5):** `detectionNight` (first night of the first qualifying window), `confirmationNight` (last night of that window) and `possibleOnset`.
+  - **possibleOnset:** from the night after the last night at or below the baseline median, to the first observed elevated night. Missing nights are included. If no low night was observed, it is left-censored (`earliestNight` null).
+  - **None of these is an ovulation date.**
+- **Gap policy (configurable, unvalidated):** the baseline must lie within `maxBaselineSpanNights` (12), and the gap to the candidate night must be at most `maxJoinGapNights` (2). Otherwise the rule abstains (`gap_between_baseline_and_candidate`, `baseline_too_spread`).
+- **Further abstention reasons:** a step of at least minDelta inside the nights that form the first baseline (`rise_may_have_begun_during_baseline_formation`), or a first observation far from the cycle start (`no_observations_near_cycle_start`).
+- **Value vs timing exclusion:** a value exclusion keeps the sample's timing. A timing exclusion (`exclude_timing`) removes it from placement and session labelling. Samples more than 18 h from their session's median are timing outliers.
 - The rule abstains (`insufficient_data`) when:
   - there are too few usable nights;
   - fewer than 60% of the cycle's nights are usable;

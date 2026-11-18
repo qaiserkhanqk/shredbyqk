@@ -187,6 +187,13 @@ See [docs/wearable-sdk-requirements.md](docs/wearable-sdk-requirements.md).
 - **One observation per night.** The research temperature rule uses one eligible observation per biological night (the session with the most coverage). Several sessions on one night never count as several nights.
 - Details: `docs/fixes-b3d9589.md`. The rule's version is now `three-over-six-skin-0.2.0-night-aggregated-research` (0.1.0 counted every session), so results from the two can be told apart (`docs/fixes-f67000b.md`).
 
+## Input snapshots, onset interval and session timing (fixes against 21317c5)
+- **Input snapshots.** Every action captures its date and fields when the person taps. A save that waits for another tab's lock, or is retried, never reads the page again (browser-tested: delayed saves, two rapid saves, cross-tab contention).
+- **Onset interval.** The research temperature rule reports `possibleOnset`: from the night after the last baseline night to the first high night, including missing nights. When nothing is detected, it says it cannot see a rise that began while its baseline was forming. Version `three-over-six-skin-0.3.0-night-aggregated-onset-interval-research`.
+- **Session timing.** A reading more than 18 h from its session's median time cannot move the session to another night; it is excluded and counted (`session_timing_outlier`). This is an engineering assumption.
+- **Not affected.** The long-gap finding (5 low nights, 55 missing, 3 high) does not apply to the phone rule, which already abstains; a guard test covers it.
+- Details: `docs/fixes-21317c5.md`.
+
 ## Summary for a doctor
 Settings → "Summary for a doctor" builds a plain-text summary of the person's own entries **only when they ask** (`js/cycle/summary.js`). It can be printed or saved as a local text file. Nothing is stored or sent. It contains no estimates, patterns, wearable or fertility content. Details and tests: `docs/cycle-summary-lh.md`.
 

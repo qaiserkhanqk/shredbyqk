@@ -3,7 +3,16 @@
 // server enforces every permission.
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-let me = null, csrf = null, current = null, pendingPreview = null;
+let me = null, csrf = null, pendingPreview = null;
+/* Navigation guard (findings 1a/2a reported against 21317c5). Every navigation (sign-in view, list, participant page,
+   sign-out) takes a new generation number; a response that arrives for an older generation is discarded, so a slow
+   answer for participant A can never replace B's page, the list, or the sign-in view. Every action targets the
+   participant actually RENDERED (data-participant on the page), never a variable that a later click may have changed. */
+let navGen = 0, previewGen = 0;
+const nextNav = () => { navGen++; pendingPreview = null; previewGen++; return navGen; };
+const rendered = () => $('#app [data-participant]')?.dataset.participant || null;
+class Stale extends Error {}
+const guard = gen => { if (gen !== navGen) throw new Stale(); };
 
 async function api(method, path, body) {
   const r = await fetch(path, { method, credentials: 'same-origin', headers: { ...(body ? { 'content-type': 'application/json' } : {}), ...(csrf && method !== 'GET' ? { 'x-csrf-token': csrf } : {}) }, body: body ? JSON.stringify(body) : undefined });
@@ -15,17 +24,21 @@ const view = html => { $('#app').innerHTML = html; };
 const say = (sel, msg, err = false) => { const el = $(sel); if (el) { el.textContent = msg; el.className = err ? 'error small' : 'muted small'; } };
 
 async function boot() {
-  try { const r = await api('GET', '/api/me'); me = r.user; csrf = r.csrf; return home(); }
-  catch { return loginView(); }
+  const gen = nextNav();
+  try { const r = await api('GET', '/api/me'); guard(gen); me = r.user; csrf = r.csrf; return home(); }
+  catch (e) { if (!(e instanceof Stale)) return loginView(); }
 }
 function loginView(msg = '') {
+  nextNav();
   view(`<div class="card"><h1>Sign in</h1><form id="login" class="row"><input type="text" id="u" autocomplete="username" placeholder="Username" required>
     <input type="password" id="p" autocomplete="current-password" placeholder="Password" required><button type="submit">Sign in</button></form><p id="lmsg" class="small error">${esc(msg)}</p></div>${canCannot()}`);
 }
 async function home() {
-  if (me.role === 'admin') return view(`<div class="card"><h1>Administrator</h1><p class="small">Administrators manage accounts with the API or CLI and cannot view participant data.</p><button data-act="logout">Sign out</button></div>`);
+  const gen = nextNav(), role = me?.role;
+  if (role === 'admin') return view(`<div class="card"><h1>Administrator</h1><p class="small">Administrators manage accounts with the API or CLI and cannot view participant data.</p><button data-act="logout">Sign out</button></div>`);
   const { participants } = await api('GET', '/api/participants');
-  if (me.role === 'participant' && participants[0]) return openParticipant(participants[0].ref);
+  guard(gen);
+  if (role === 'participant' && participants[0]) return openParticipant(participants[0].ref);
   view(`<div class="row"><h1>Participants</h1><span class="muted small">Signed in as ${esc(me.username)} (${esc(me.role)})</span><button data-act="logout">Sign out</button></div>
     <div class="card"><h2>Your assigned participants</h2>${participants.length ? `<ul class="plain">${participants.map(p => `<li><button data-act="open" data-ref="${esc(p.ref)}">${esc(p.ref)}</button></li>`).join('')}</ul>` : '<p class="muted small">None yet.</p>'}
       <h3>Add a pseudonymous participant</h3><form id="newp" class="row"><input type="text" id="nref" placeholder="Pseudonymous reference, e.g. P-0001" pattern="[A-Za-z0-9_-]{4,64}" required>
@@ -41,10 +54,11 @@ function canCannot() {
 }
 
 async function openParticipant(ref, note = '') {
-  current = ref;
+  const gen = nextNav();
   const [info, a] = await Promise.all([api('GET', `/api/participants/${encodeURIComponent(ref)}`), api('GET', `/api/participants/${encodeURIComponent(ref)}/analysis`)]);
+  guard(gen); // a newer navigation happened while this page was loading: discard it
   const R = me.role === 'researcher';
-  view(`<div class="row"><h1>${esc(ref)}</h1>${R ? '<button data-act="home">← Participants</button>' : ''}<button data-act="logout">Sign out</button><span id="pmsg" class="muted small">${esc(note)}</span></div>
+  view(`<div class="row" data-participant="${esc(ref)}"><h1>${esc(ref)}</h1>${R ? '<button data-act="home">← Participants</button>' : ''}<button data-act="logout">Sign out</button><span id="pmsg" class="muted small">${esc(note)}</span></div>
     ${canCannot()}
     <div class="grid">
       <div class="card" id="consents"><h2>Consent</h2>${Object.entries({ core_research: 'Core research data', lh_tests: 'LH test results', hormonal_context: 'Hormonal medication context' }).map(([k, l]) => `<div class="row small"><b>${l}:</b> ${info.consents[k] ? 'given' : 'not given'}
@@ -110,12 +124,12 @@ function timelineHTML(a) {
 
 function experimentalHTML(a) {
   if (!Array.isArray(a.estimates) && !a.forecasts?.layer) return `<div class="card muted small" id="experimental">Experimental estimates: ${esc(a.estimates.status.replace(/_/g, ' '))} (${esc(a.estimates.reasons.join(', ').replace(/_/g, ' '))}).</div>`;
-  const rows = (Array.isArray(a.estimates) ? a.estimates : []).map(e => `<tr><td>${esc(e.cycleStart)}</td><td>${esc(e.status.replace(/_/g, ' '))}</td><td>${e.status === 'shift_detected' ? `${esc(e.shiftNight)}<div class="muted">possible range ${esc(e.uncertainty.earliestNight)} to ${esc(e.uncertainty.latestNight)} (uncalibrated)</div>` : esc(e.text || '')}</td>
+  const rows = (Array.isArray(a.estimates) ? a.estimates : []).map(e => `<tr><td>${esc(e.cycleStart)}</td><td>${esc(e.status.replace(/_/g, ' '))}</td><td>${e.status === 'shift_detected' ? `first qualifying night ${esc(e.detectionNight || e.shiftNight)}<div class="muted">confirmed by ${esc(e.confirmationNight || '—')}; change could have begun ${e.possibleOnset?.leftCensored || !e.possibleOnset?.earliestNight ? `on or before ${esc(e.possibleOnset?.latestNight || e.shiftNight)} (earlier start unknown: left-censored)` : `between ${esc(e.possibleOnset.earliestNight)} and ${esc(e.possibleOnset.latestNight)}`} (uncalibrated)</div>` : esc(e.text || '')}</td>
     <td class="muted">${esc(e.reasons.join(', '))}</td></tr>`).join('');
   const f = a.forecasts;
   return `<div class="card experimental" id="experimental"><span class="tag">Experimental research estimates · not observations · not clinical</span><h2>Retrospective sustained-shift rule</h2>
     <p class="small">A sustained shift is a change in the temperature pattern. It does not confirm or date ovulation, and absence of a shift says nothing about health.</p>
-    <div class="scroll"><table><thead><tr><th>Cycle start</th><th>Result</th><th>First elevated night</th><th>Reasons</th></tr></thead><tbody>${rows || '<tr><td colspan="4" class="muted">Not enabled.</td></tr>'}</tbody></table></div>
+    <div class="scroll"><table><thead><tr><th>Cycle start</th><th>Result</th><th>Detection, confirmation and possible onset</th><th>Reasons</th></tr></thead><tbody>${rows || '<tr><td colspan="4" class="muted">Not enabled.</td></tr>'}</tbody></table></div>
     <h2>Next-period forecast</h2>${f?.layer ? (f.status === 'estimate' ? `<p class="small">Point: <b>${esc(f.pointDate)}</b>. Empirical range of recent cycle lengths: ${esc(f.uncertainty.rangeStart)} to ${esc(f.uncertainty.rangeEnd)}. This range is <b>not calibrated</b> and is not a likelihood statement.</p>` : `<p class="small">Insufficient data.</p>`)
       + `<p class="muted small">Reasons: ${esc(f.reasons.join(', '))}. Uses only entries recorded before ${esc(f.asOfDate)}.</p>` : '<p class="muted small">Not enabled.</p>'}</div>`;
 }
@@ -140,29 +154,36 @@ document.addEventListener('submit', async e => {
   }
 });
 document.addEventListener('change', async e => {
+  // Changing the file or the import type invalidates any preview (finding 2a): Commit is disabled until a new preview.
+  if (e.target.id === 'file' || e.target.id === 'rtype') { pendingPreview = null; previewGen++; const c = $('#commitBtn'); if (c) c.disabled = true; const pv = $('#pview'); if (pv) pv.textContent = ''; return; }
   const f = e.target.dataset?.feature; if (!f) return;
-  try { await api('POST', `/api/participants/${encodeURIComponent(current)}/features`, { name: f, enabled: e.target.checked }); openParticipant(current, `${f.replace(/_/g, ' ')} ${e.target.checked ? 'on' : 'off'}`); }
-  catch (err) { say('#pmsg', err.message, true); }
+  const ref = rendered(), enabled = e.target.checked; if (!ref) return;
+  try { await api('POST', `/api/participants/${encodeURIComponent(ref)}/features`, { name: f, enabled }); if (rendered() === ref) openParticipant(ref, `${f.replace(/_/g, ' ')} ${enabled ? 'on' : 'off'}`); }
+  catch (err) { if (!(err instanceof Stale)) say('#pmsg', err.message, true); }
 });
+const fileId = f => (f ? `${f.name}|${f.size}|${f.lastModified}` : null);
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
-  const P = `/api/participants/${encodeURIComponent(current || '')}`;
+  const ref = rendered(), P = `/api/participants/${encodeURIComponent(ref || '')}`; // the participant on screen
   try {
     switch (b.dataset.act) {
-      case 'logout': await api('POST', '/api/logout'); me = csrf = null; return loginView();
+      case 'logout': { nextNav(); me = null; const c = csrf; csrf = null; loginView(); try { csrf = c; await api('POST', '/api/logout'); } finally { csrf = null; } return; }
       case 'home': return home();
       case 'open': return openParticipant(b.dataset.ref);
-      case 'signed': if (!confirm('Record that a signed consent form exists for this scope?')) return; await api('POST', `${P}/consents/record-signed`, { scope: b.dataset.scope, signedFormReference: true }); return openParticipant(current, 'Consent recorded');
-      case 'withdraw': if (!confirm('Record withdrawal of this consent?')) return; await api('POST', `${P}/consents`, { scope: b.dataset.scope, granted: false }); return openParticipant(current, 'Withdrawal recorded');
+      case 'signed': if (!confirm('Record that a signed consent form exists for this scope?')) return; await api('POST', `${P}/consents/record-signed`, { scope: b.dataset.scope, signedFormReference: true }); return rendered() === ref && openParticipant(ref, 'Consent recorded');
+      case 'withdraw': if (!confirm('Record withdrawal of this consent?')) return; await api('POST', `${P}/consents`, { scope: b.dataset.scope, granted: false }); return rendered() === ref && openParticipant(ref, 'Withdrawal recorded');
       case 'preview': case 'reimport': {
         const file = $('#file').files[0]; if (!file) return say('#pview', 'Choose a file first.', true);
         if (file.size > 5 * 1024 * 1024) return say('#pview', 'File is over the 5 MB limit.', true);
         const format = /\.json$/i.test(file.name) ? 'json' : 'csv';
         // A reimport is explicit and needs a reason; the server revalidates every row under the current consent and audits it.
         const extra = b.dataset.act === 'reimport' ? { reimport: true, reason: $('#reimportReason')?.value } : {};
-        const r = await api('POST', `${P}/imports/preview`, { recordType: $('#rtype').value, format, filename: file.name, content: await file.text(), ...extra }).catch(err => ({ ok: false, error: err.body?.error || err.message }));
-        if (!r.ok) { pendingPreview = null; $('#commitBtn').disabled = true; return say('#pview', `Not importable: ${r.error}`, true); }
-        pendingPreview = r.previewId; $('#commitBtn').disabled = !r.previewId;
+        // Bind this preview to what was previewed: participant, record type and the exact file (finding 2a).
+        const gen = ++previewGen, recordType = $('#rtype').value, fid = fileId(file); pendingPreview = null; $('#commitBtn').disabled = true;
+        const r = await api('POST', `${P}/imports/preview`, { recordType, format, filename: file.name, content: await file.text(), ...extra }).catch(err => ({ ok: false, error: err.body?.error || err.message }));
+        if (gen !== previewGen || rendered() !== ref || fileId($('#file')?.files[0]) !== fid || $('#rtype')?.value !== recordType) return; // stale: something changed meanwhile
+        if (!r.ok) { $('#commitBtn').disabled = true; return say('#pview', `Not importable: ${r.error}`, true); }
+        pendingPreview = r.previewId ? { id: r.previewId, ref, recordType, sourceHash: r.sourceHash, fid } : null; $('#commitBtn').disabled = !pendingPreview;
         const reasons = {}; for (const q of r.quarantined) for (const x of q.reasons) reasons[x] = (reasons[x] || 0) + 1;
         $('#pview').innerHTML = r.duplicateBatch
           ? `<p>This exact file was already imported. Nothing to add.</p>${r.reimportAvailable ? `<div class="row small"><span>If consent has changed since, or records were deleted, you can explicitly reimport it. Every row is checked again under the current consent; rows already stored are skipped. This is recorded in the audit trail.</span>
@@ -170,14 +191,23 @@ document.addEventListener('click', async e => {
           : `${r.reimport ? '<p><b>Reimport</b> under current consent.</p>' : ''}<p>${r.counts.rows} rows: <b>${r.counts.accepted}</b> to add, ${r.counts.duplicates} duplicates, ${r.counts.quarantined} to quarantine, ${r.counts.rejected} rejected.</p>${Object.keys(reasons).length ? `<ul class="plain">${Object.entries(reasons).map(([k, v]) => `<li>${esc(k)}: ${v}</li>`).join('')}</ul>` : ''}`;
         return;
       }
-      case 'commit': if (!pendingPreview) return; { const r = await api('POST', `${P}/imports/commit`, { previewId: pendingPreview }); pendingPreview = null; return openParticipant(current, r.duplicateBatch ? 'Already imported' : 'Import committed'); }
+      case 'commit': {
+        const pv = pendingPreview;
+        // Commit only the preview made for THIS participant, THIS file and THIS type; the server checks type and file too.
+        if (!pv || pv.ref !== ref || pv.fid !== fileId($('#file')?.files[0]) || pv.recordType !== $('#rtype')?.value) { pendingPreview = null; $('#commitBtn').disabled = true; return say('#pview', 'The file, type or participant changed after the preview. Preview again.', true); }
+        pendingPreview = null; $('#commitBtn').disabled = true;
+        const r = await api('POST', `${P}/imports/commit`, { previewId: pv.id, recordType: pv.recordType, sourceHash: pv.sourceHash });
+        return rendered() === ref && openParticipant(ref, r.duplicateBatch ? 'Already imported' : 'Import committed');
+      }
       case 'delete': {
-        if ($('#delconfirm').value !== current) return say('#pmsg', 'Type the reference exactly to confirm deletion.', true);
+        if (!ref || $('#delconfirm').value !== ref) return say('#pmsg', 'Type the reference exactly to confirm deletion.', true);
         if (!confirm('Delete all raw and derived data for this participant? This cannot be undone.')) return;
-        await api('DELETE', P, { confirmRef: current }); current = null;
+        await api('DELETE', P, { confirmRef: ref });
         return me.role === 'participant' ? loginView('Your data was deleted.') : home();
       }
     }
-  } catch (err) { say('#pmsg', `That didn't work: ${err.message}`, true); }
+  } catch (err) { if (!(err instanceof Stale)) say('#pmsg', `That didn't work: ${err.message}`, true); }
 });
+// A late response for a page the person already left is not an error.
+window.addEventListener('unhandledrejection', e => { if (e.reason instanceof Stale) e.preventDefault(); });
 boot();

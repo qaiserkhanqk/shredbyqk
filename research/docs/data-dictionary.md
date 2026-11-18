@@ -54,6 +54,16 @@
 - A correction that names itself (`self_correction`), or that closes a loop of corrections within the file or with stored entries (`circular_correction`), is quarantined.
 - Re-using an `entry_id` with different content is quarantined.
 
+## Strictness rules (since the 21317c5 fixes)
+- **Timestamps.** `timestamp_utc`, `end_timestamp_utc` and `recorded_at` are checked field by field before conversion. 30 February, 29 February in a non-leap year, 31 April, `24:00`, minute 60 and leap seconds are **rejected**, never rolled into the next day. Offsets must be whole quarter hours within UTC−12:00…UTC+14:00.
+- **Sampling intervals.** `sampling_interval_s` must be finite and positive. Above `limits.maxSamplingIntervalS` (3600 s) a row is quarantined (`sampling_interval_out_of_range`); so is a single measurement longer than that (`measurement_interval_too_long`).
+- **Vendor nightly values.** A `nightly_value` for night D counts as complete at 12:00 local on D+1 (UTC−12 if no offset, i.e. D+2 00:00 UTC). A night not yet complete at import is quarantined (`night_not_yet_complete`), and an analysis never uses a night before it is complete. Historical nights import normally.
+- **Duplicates.** The content fingerprint (`rowhash-2`) covers value, unit, flags, offset, time-zone name, manufacturer, model, firmware, sampling interval and configuration, precision and sleep-session ID. A change in any of them is a `conflicting_duplicate` (quarantined; the original kept), not a silent duplicate.
+- **CSV.** After a closing quote only a delimiter or line end may follow (`text_after_closing_quote`): `"33".5` is rejected, not read as 33.5.
+- **JSON.** The same per-record limits as CSV (40 fields, 512 characters per cell); nested objects or arrays are refused (`nested_value_not_allowed`).
+- **Names.** Types, kinds and units are looked up as own properties only: `constructor`, `__proto__` etc. are invalid values, never inherited ones.
+- **Corrections.** Supersession follows the correction structure, not recorded times. A same-instant (or earlier-clocked) correction still replaces its target.
+
 ## Quarantine reason codes
 `participant_ref_invalid`, `participant_mismatch`, `sensor_site_invalid`, `measurement_kind_invalid`, `site_kind_mismatch`, `derivation_missing_or_invalid`, `aggregation_invalid`, `nightly_value_must_be_vendor_derived`, `device_model_missing`, `device_serial_pseudonym_invalid`, `value_not_numeric`, `precision_invalid`, `sampling_interval_invalid`, `field_format_invalid:<field>`, `timestamp_missing`, `timestamp_invalid`, `end_timestamp_invalid`, `end_not_after_start`, `utc_offset_missing`, `utc_offset_invalid`, `night_label_missing_or_invalid`, `unit_missing`, `unit_unrecognised`, `out_of_bounds_for_kind`, `conflicting_duplicate`, `entry_id_invalid`, `type_invalid`, `value_invalid`, `retraction_needs_corrects`, `date_invalid`, `recorded_at_missing_or_invalid`, `corrects_invalid`, `self_correction`, `circular_correction`, `lh_tests_not_consented`, `hormonal_context_not_consented`, `entry_id_reused_with_different_content`, `column_count`, `not_an_object`.
 

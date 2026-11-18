@@ -14,13 +14,16 @@
 //
 // Data rules: only 'ok' nights, from ONE device + firmware segment (a device change restarts the baseline),
 // excluding nights with a time-zone change and days the user marked as unwell or travelling.
-import { diffDays } from './dates.js';
+import { diffDays, addDays } from './dates.js';
 import { segments } from './wearables.js';
 
 export const SHIFT_PARAMS = Object.freeze({ BASELINE: 6, CONFIRM: 3, DELTA: 0.15, MAX_BASELINE_SPAN: 12, MAX_CONFIRM_SPAN: 5 });
 // 0.2.0 (f67000b fix, issue 4 reported against b3d9589): one eligible observation per biological night; several sessions on
 // one night no longer count as several nights. 0.1.0 counted every session summary. (Version bumped: issue 3 reported against f67000b.)
-export const SHIFT_VERSION = 'three-over-six-skin-0.2.0-night-aggregated-research';
+// 0.3.0 (findings reported against 21317c5): reports a possible-onset interval, and says when a rise may have begun while
+// the baseline was forming. The detection rule itself is unchanged from 0.2.0.
+export const SHIFT_VERSION = 'three-over-six-skin-0.3.0-night-aggregated-onset-interval-research';
+const BASELINE_LIMIT = 'This rule cannot see a rise that begins while its 6-night baseline is still forming.';
 
 export function retrospectiveShift(s, cycleStart, asOf, params = SHIFT_PARAMS) {
   const segs = segments(s.wearable.nights.filter(n => n.night >= cycleStart && n.night < asOf));
@@ -65,12 +68,16 @@ export function retrospectiveShift(s, cycleStart, asOf, params = SHIFT_PARAMS) {
       // event can describe TODAY is decided by phase.js. "Back to baseline" uses the rule's own definition of
       // high (above the baseline maximum); no new physiological threshold is introduced.
       const after = valid.filter(n => n.night > high.at(-1).night), back = after.find(n => n.value <= bMax);
-      return { ...res, detected: true, firstHighNight: high[0].night, confirmedNight: high.at(-1).night, baselineMean: +bMean.toFixed(2), highMean: +hMean.toFixed(2), rise: +(hMean - bMean).toFixed(2),
+      // Possible onset (finding 4a): the change began after the last baseline night (all of which are at or below the
+      // baseline maximum) and by the first high night. Missing nights in between are part of the interval. It is a range
+      // of nights in the temperature data, not a biological date, and it is not calibrated.
+      const possibleOnset = { earliestNight: addDays(base.at(-1).night, 1), latestNight: high[0].night, leftCensored: false, basis: 'after the last baseline night, up to the first high night' };
+      return { ...res, detected: true, firstHighNight: high[0].night, confirmedNight: high.at(-1).night, possibleOnset, baselineMean: +bMean.toFixed(2), highMean: +hMean.toFixed(2), rise: +(hMean - bMean).toFixed(2),
         cycleDayOfRise: diffDays(cycleStart, high[0].night) + 1, nightsAfter: after.length, stillElevated: !back, returnedOn: back?.night || null, lastValidNight: valid.at(-1).night,
         why: back ? `A rise was seen from ${high[0].night}, but it did not last: back to the earlier level on ${back.night}.` : 'A rise was seen. This may be consistent with a past ovulation. It is not proof.' };
     }
   }
   if (!judged) return { ...res, abstained: true, why: 'Not judged: there are gaps in the nightly data, so there is not enough continuous data to compare nights.' };
-  if (gapBlocked) return { ...res, why: 'No sustained rise seen in the continuous stretches of data; some gaps could not be judged.' };
-  return { ...res, why: 'No sustained rise seen in this cycle so far.' };
+  if (gapBlocked) return { ...res, why: `No sustained rise seen in the continuous stretches of data; some gaps could not be judged. ${BASELINE_LIMIT}` };
+  return { ...res, why: `No sustained rise seen in this cycle so far. ${BASELINE_LIMIT}` };
 }

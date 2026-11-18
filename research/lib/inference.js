@@ -13,7 +13,7 @@ import { addDays, diffDays } from './cycles.js';
 import { NO_SHIFT_TEXT } from './policy.js';
 
 export const TREND_VERSION = 'descriptive-trend-1.1.0';
-export const SHIFT_VERSION = 'sustained-shift-rule-1.1.0';
+export const SHIFT_VERSION = 'sustained-shift-rule-1.2.0';
 export const FORECAST_VERSION = 'cycle-length-empirical-1.0.0';
 const CONFOUNDERS = ['illness', 'fever', 'disrupted_sleep', 'travel'];
 const r3 = x => (x == null ? null : Math.round(x * 1000) / 1000);
@@ -50,8 +50,21 @@ export function descriptiveTrend(reports, cycle, config = CONFIG) {
  * Experimental retrospective sustained-shift rule, per cycle and per device segment. A candidate night c qualifies when
  * the `sustainNights` usable nights starting at c (no calendar gap above `maxGapNights`) are ALL at least
  * max(minDelta, madK × scaled MAD) above the median of the `baselineNights` usable nights before c (≥ minBaselineNights).
- * The reported night is the earliest qualifying c. Its uncertainty is the calendar range in which the change could
- * have begun (after the last usable night below the threshold, up to c), given gaps in the data.
+ * Three things are reported separately (issue 4a reported against 21317c5):
+ *  • detectionNight (= shiftNight): the first night of the first window that meets the rule;
+ *  • confirmationNight: the last night of that window, the earliest point at which the rule can be satisfied;
+ *  • possibleOnset: derived from the observations only. latestNight = the first observed night of the elevated run
+ *    (walking back from the detection night over nights at or above baseline + threshold); earliestNight = the night
+ *    after the last observed night AT OR BELOW the baseline median before it (partially raised nights in between widen
+ *    the interval: rise_may_have_begun_before_threshold_crossing). Missing nights inside the interval are included.
+ *    If no such low night was observed, the onset is left-censored (earliestNight null).
+ * Gaps (issue 4b): a candidate is evaluated only if its baseline lies within maxBaselineSpanNights and the gap between
+ * the last baseline night and the candidate is at most maxJoinGapNights; otherwise the rule abstains
+ * (gap_between_baseline_and_candidate / baseline_too_spread) rather than compare nights weeks apart.
+ * No-detection is reported as "no clear shift" only when the data could have shown one: it abstains if the nights
+ * before the first evaluable baseline already show a step of at least minDelta (rise_may_have_begun_during_baseline_
+ * formation), if the first observation is far from the cycle start (no_observations_near_cycle_start), or if gaps
+ * blocked any candidate. All limits are engineering assumptions (config.js), not physiological thresholds.
  */
 export function sustainedShift(reports, cycle, { dataCutoff, config = CONFIG } = {}) {
   const base = { layer: 'estimate', experimental: true, kind: 'retrospective_sustained_temperature_shift', cycleStart: cycle.start, dataCutoff: dataCutoff ?? null, algorithmVersion: SHIFT_VERSION, configVersion: config.version, configHash: configHash(config),
@@ -66,25 +79,46 @@ export function sustainedShift(reports, cycle, { dataCutoff, config = CONFIG } =
     if (!p) { results.push({ seg, status: 'insufficient_data', reasons: ['no_shift_rule_for_measurement_kind'], inputHash }); continue; }
     const excluded = rs.filter(r => !usable(r)).map(r => ({ night: r.night, reason: r.dataQuality.level === 'insufficient' ? 'data_quality_insufficient' : 'confounder_annotated' }));
     const ok = rs.filter(usable);
-    let found = null; const candidates = [];
+    let found = null, gapBlocked = 0, spreadBlocked = 0; const candidates = [];
     for (let i = p.minBaselineNights; i + p.sustainNights <= ok.length; i++) {
       const before = ok.slice(Math.max(0, i - p.baselineNights), i), after = ok.slice(i, i + p.sustainNights);
       if (before.length < p.minBaselineNights) continue;
       if (after.some((r, k) => k && diffDays(after[k - 1].night, r.night) > p.maxGapNights + 1)) continue;
+      if (diffDays(before.at(-1).night, ok[i].night) - 1 > p.maxJoinGapNights) { gapBlocked++; continue; }
+      if (diffDays(before[0].night, before.at(-1).night) + 1 > p.maxBaselineSpanNights) { spreadBlocked++; continue; }
       const vals = before.map(r => r.features.median), b = median(vals), thr = Math.max(p.minDelta, p.madK * 1.4826 * mad(vals));
-      if (after.every(r => r.features.median >= b + thr)) { candidates.push({ night: ok[i].night, baseline: r3(b), threshold: r3(thr), prevUsable: ok[i - 1].night }); if (!found) found = candidates.at(-1); }
+      if (after.every(r => r.features.median >= b + thr)) {
+        candidates.push({ i, night: ok[i].night, confirmation: after.at(-1).night, b, thr, baselineElevated: before.some(r => r.features.median >= b + thr) });
+        if (!found) found = candidates.at(-1);
+      }
     }
     const cycleNights = end ? diffDays(cycle.start, end) : null, usableShare = cycleNights ? ok.length / cycleNights : null;
     if (found) {
-      results.push({ seg, status: 'shift_detected', shiftNight: found.night, reasons: ['sustained_rise_above_own_preceding_nights', ...(multiSeg ? ['device_segments_analysed_separately'] : []), ...(excluded.length ? ['some_nights_excluded'] : [])],
-        evidence: { baseline: found.baseline, threshold: found.threshold, sustainNights: p.sustainNights, usableNights: ok.length, excludedNights: excluded },
-        uncertainty: { earliestNight: addDays(found.prevUsable, 1), latestNight: found.night, calibrated: false, meaning: 'calendar range in which the change could have begun, given gaps in the data (uncalibrated)' }, inputHash });
+      // Possible onset from the observations (see above).
+      let j = found.i - 1, firstElevated = ok[found.i];
+      while (j >= 0 && ok[j].features.median >= found.b + found.thr) { firstElevated = ok[j]; j--; }
+      let k = j, partial = false;
+      while (k >= 0 && ok[k].features.median > found.b) { partial = true; k--; }
+      const lastLow = k >= 0 ? ok[k] : null, leftCensored = !lastLow;
+      const possibleOnset = { earliestNight: lastLow ? addDays(lastLow.night, 1) : null, latestNight: firstElevated.night, leftCensored,
+        basis: 'observed nights relative to this cycle\'s own baseline median and threshold; not a biological date' };
+      const reasons = ['sustained_rise_above_own_preceding_nights', ...(partial ? ['rise_may_have_begun_before_threshold_crossing'] : []), ...(leftCensored ? ['onset_left_censored'] : []),
+        ...(found.baselineElevated ? ['baseline_includes_elevated_nights'] : []), ...(multiSeg ? ['device_segments_analysed_separately'] : []), ...(excluded.length ? ['some_nights_excluded'] : [])];
+      results.push({ seg, status: 'shift_detected', shiftNight: found.night, detectionNight: found.night, confirmationNight: found.confirmation, possibleOnset, reasons,
+        evidence: { baseline: r3(found.b), threshold: r3(found.thr), sustainNights: p.sustainNights, usableNights: ok.length, excludedNights: excluded },
+        uncertainty: { earliestNight: possibleOnset.earliestNight, latestNight: possibleOnset.latestNight, leftCensored, calibrated: false, meaning: 'range of nights in which the change could have begun, from the observed nights and gaps (uncalibrated)' }, inputHash });
     } else {
       const reasons = [];
       if (ok.length < p.minBaselineNights + p.sustainNights) reasons.push('too_few_usable_nights');
       if (!cycle.complete && !dataCutoff) reasons.push('cycle_in_progress_without_cutoff');
       if (usableShare != null && usableShare < 0.6) reasons.push('usable_nights_below_60_percent_of_cycle');
       if (multiSeg) reasons.push('device_change_within_cycle');
+      if (gapBlocked) reasons.push('gap_between_baseline_and_candidate');
+      if (spreadBlocked) reasons.push('baseline_too_spread');
+      if (ok.length && diffDays(cycle.start, ok[0].night) > p.maxGapNights + 1) reasons.push('no_observations_near_cycle_start');
+      // A step inside the nights that form the first baseline means the rule could not have seen the rise.
+      const early = ok.slice(0, p.minBaselineNights + 1);
+      for (let split = 2; split <= early.length - 2; split++) if (median(early.slice(split).map(r => r.features.median)) - median(early.slice(0, split).map(r => r.features.median)) >= p.minDelta) { reasons.push('rise_may_have_begun_during_baseline_formation'); break; }
       if (reasons.length) results.push({ seg, status: 'insufficient_data', reasons, evidence: { usableNights: ok.length, excludedNights: excluded }, inputHash });
       else results.push({ seg, status: 'no_clear_shift', text: NO_SHIFT_TEXT, reasons: ['rule_not_met_in_available_nights'], evidence: { usableNights: ok.length, excludedNights: excluded }, uncertainty: { calibrated: false, meaning: 'absence of a detected pattern under this rule; says nothing about biology' }, inputHash });
     }

@@ -7,7 +7,7 @@
 //  • Data-quality confidence describes the measurements only. It says nothing about any biological inference.
 import { CONFIG, configHash } from './config.js';
 
-export const QUALITY_VERSION = 'nightly-quality-1.1.0';
+export const QUALITY_VERSION = 'nightly-quality-1.2.0';
 export const FEATURE_METHOD = 'median-mad-iqr-1.0.0';
 const MIN = 60e3;
 
@@ -33,24 +33,48 @@ const r3 = x => (x == null ? null : Math.round(x * 1000) / 1000);
      session during which the person changes time zone, is never split. Later offset changes inside the session do
      not move the label; they are flagged (utc_offset_changed_within_night).
    • A sample without a session uses its own local time and the configured fallback window.
-   Session identity is the source session ID within one device serial. */
+   Session identity is the source session ID within one device serial.
+
+   VALUE vs TIMING exclusion (issue 4c reported against 21317c5):
+   • `excludedBy` (correction action "exclude"): the VALUE is not used; the sample's timing is still trusted, so it is
+     still placed in its night and still counts for the session's start.
+   • `timingExcludedBy` (correction action "exclude_timing"): the TIMESTAMP or session assignment is wrong; the sample is
+     not placed at all (unplaced: timing_excluded_by_correction) and cannot influence any session's label.
+   • Automatic guard: a sample more than night.sessionTimingToleranceHours from its session's median time is a timing
+     outlier (unplaced: session_timing_outlier). Session start = earliest NON-outlier sample. */
 const sessionId = o => `${o.device?.serial ?? ""}|${o.sleepSessionId}`; // placeNight may be called on a bare reading
+const timingUsable = o => Number.isFinite(o.tsUtc) && Number.isInteger(o.offsetMin) && !o.timingExcludedBy;
 export function sessionLabels(observations, config = CONFIG) {
-  const first = new Map();
+  const bySession = new Map();
   for (const o of observations) {
-    if (!o.sleepSessionId || o.aggregation === 'nightly_value' || o.tsUtc == null || o.offsetMin == null) continue;
-    const k = sessionId(o), cur = first.get(k);
-    if (!cur || o.tsUtc < cur.tsUtc) first.set(k, o);
+    if (!o.sleepSessionId || o.aggregation === 'nightly_value' || !timingUsable(o)) continue;
+    const k = sessionId(o); (bySession.get(k) || bySession.set(k, []).get(k)).push(o);
   }
-  return new Map([...first].map(([k, o]) => [k, localDate(o.tsUtc + o.offsetMin * MIN - config.night.labelShiftHours * 36e5)]));
+  const labels = new Map(), outliers = new Set(), tol = config.night.sessionTimingToleranceHours * 36e5;
+  for (const [k, os] of bySession) {
+    const mid = median(os.map(o => o.tsUtc));
+    const inSession = os.filter(o => Math.abs(o.tsUtc - mid) <= tol);
+    for (const o of os) if (!inSession.includes(o)) outliers.add(o);
+    const first = inSession.reduce((a, o) => (o.tsUtc < a.tsUtc ? o : a), inSession[0]);
+    if (first) labels.set(k, localDate(first.tsUtc + first.offsetMin * MIN - config.night.labelShiftHours * 36e5));
+  }
+  labels.outliers = outliers;
+  return labels;
 }
 /** Assign each observation to a night label, or give the reason it can't be placed. */
 export function placeNight(o, config = CONFIG, labels = null) {
   if (o.aggregation === 'nightly_value') return o.nightLabel ? { night: o.nightLabel, windowSource: 'vendor_night_label' } : { reason: 'no_night_label' };
+  if (o.timingExcludedBy) return { reason: 'timing_excluded_by_correction' };
   if (o.tsUtc == null) return { reason: 'no_timestamp' };
+  if (!Number.isFinite(o.tsUtc)) return { reason: 'timestamp_invalid' };
   if (o.offsetMin == null) return { reason: 'no_utc_offset' };
+  if (!Number.isInteger(o.offsetMin)) return { reason: 'utc_offset_invalid' };
   const local = o.tsUtc + o.offsetMin * MIN, label = localDate(local - config.night.labelShiftHours * 36e5);
-  if (o.sleepSessionId) return { night: (labels || sessionLabels([o], config)).get(sessionId(o)) ?? label, windowSource: 'sleep_session', session: o.sleepSessionId };
+  if (o.sleepSessionId) {
+    const ls = labels || sessionLabels([o], config);
+    if (ls.outliers?.has(o)) return { reason: 'session_timing_outlier' };
+    return { night: ls.get(sessionId(o)) ?? label, windowSource: 'sleep_session', session: o.sleepSessionId };
+  }
   if (!inWindow(local, config.night.fallbackWindow)) return { reason: 'outside_fallback_window' };
   return { night: label, windowSource: 'config_fallback_window' };
 }
@@ -70,7 +94,14 @@ export function nightlyReports(observations, annotations = [], config = CONFIG) 
   }
   const confByDate = new Map();
   for (const a of annotations) if (['illness', 'fever', 'disrupted_sleep', 'travel', 'device_change'].includes(a.type) && a.value === 'yes') (confByDate.get(a.date) || confByDate.set(a.date, []).get(a.date)).push(a.type);
-  const reports = [...groups.values()].map(g => report(g, confByDate.get(g.night) || [], config)).sort((a, b) => a.night.localeCompare(b.night) || a.streamKey.localeCompare(b.streamKey));
+  // One malformed group must not take down the whole analysis: it is reported as unusable with a reason.
+  const safeReport = g => { try { return report(g, confByDate.get(g.night) || [], config); } catch {
+    const o0 = g.obs[0];
+    return { night: g.night, streamKey: g.key, stream: streamOf(o0), window: { source: g.windowSource, startUtc: null, endUtc: null, utcOffsetsMin: [], tzNames: [] },
+      counts: { total: g.obs.length, valid: 0, excluded: { processing_error: g.obs.length }, outOfOrder: 0, implausibleJumps: 0 }, coverageMinutes: null, maxGapMinutes: null,
+      flags: ['processing_error'], confounders: [], unrecognisedSourceFlags: [], features: null, method: FEATURE_METHOD, dataQuality: { level: 'insufficient', reasons: ['processing_error'], about: 'measurement quality only, not biological inference' } };
+  } };
+  const reports = [...groups.values()].map(safeReport).sort((a, b) => a.night.localeCompare(b.night) || a.streamKey.localeCompare(b.streamKey));
   // Device / firmware transitions between consecutive nights of the same site and kind.
   const last = new Map();
   for (const r of reports) {
@@ -119,7 +150,21 @@ function report(g, confounders, config) {
   if (jumps) flags.push('implausible_jump');
   // Coverage: union of measurement intervals. Unknown if the source gives neither an end time nor a sampling interval.
   let coverage = null, maxGap = null;
-  const iv = candidates.filter(o => o.tsUtc != null).map(o => [o.tsUtc, o.endUtc ?? (o.device.samplingIntervalS ? o.tsUtc + o.device.samplingIntervalS * 1e3 : null)]);
+  // Each sample covers [start, end): its explicit end if valid and within the maximum interval, otherwise start + its
+  // sampling interval capped at the maximum (issue 3e reported against 21317c5). For fallback-window nights the union
+  // is clipped to that night's window, so coverage can never exceed the window.
+  const maxMs = config.limits.maxSamplingIntervalS * 1e3;
+  const iv = candidates.filter(o => Number.isFinite(o.tsUtc)).map(o => {
+    const si = Number(o.device?.samplingIntervalS);
+    const end = Number.isFinite(o.endUtc) && o.endUtc > o.tsUtc && o.endUtc - o.tsUtc <= maxMs ? o.endUtc : Number.isFinite(si) && si > 0 ? o.tsUtc + Math.min(si * 1e3, maxMs) : null;
+    return [o.tsUtc, end];
+  });
+  if (g.windowSource === 'config_fallback_window' && iv.length) {
+    const off = o0.offsetMin * MIN, w = config.night.fallbackWindow, wStart = Date.parse(`${g.night}T${w.start}:00Z`) - off;
+    const wEnd = Date.parse(`${g.night}T${w.end}:00Z`) - off + (hhmm(w.end) <= hhmm(w.start) ? 864e5 : 0);
+    for (const x of iv) { x[0] = Math.max(x[0], wStart); if (x[1] != null) x[1] = Math.min(x[1], wEnd); }
+    for (let k = iv.length - 1; k >= 0; k--) if (iv[k][1] != null && iv[k][1] <= iv[k][0]) iv.splice(k, 1);
+  }
   if (iv.length && iv.every(([, e]) => e != null)) {
     iv.sort((a, b) => a[0] - b[0]); let tot = 0, [cs, ce] = iv[0]; maxGap = 0;
     for (const [s, e] of iv.slice(1)) { if (s > ce) { tot += ce - cs; maxGap = Math.max(maxGap, (s - ce) / MIN); cs = s; ce = e; } else ce = Math.max(ce, e); }

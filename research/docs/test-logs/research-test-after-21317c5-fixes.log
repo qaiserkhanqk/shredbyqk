@@ -1,0 +1,382 @@
+ok   policy: label is attached to every payload
+ok   policy: refuses "Today is a safe day"
+ok   policy: refuses "You are infertile now"
+ok   policy: refuses "You are protected"
+ok   policy: refuses "green day"
+ok   policy: refuses "This is not a safe day"
+ok   policy: refuses "unprotected sex is fine today"
+ok   policy: refuses "You did not ovulate"
+ok   policy: refuses "anovulatory cycle"
+ok   policy: refuses "You ovulated on 3 May"
+ok   policy: refuses "possible PCOS"
+ok   policy: refuses "progesterone level estimate"
+ok   policy: refuses "no need for contraception"
+ok   policy: the sanctioned no-shift sentence passes
+ok   policy: a forbidden word in a key is caught too
+ok   policy: an estimate without experimental marking is refused
+ok   policy: an estimate without reasons is refused
+ok   policy: an estimate without uncertainty is refused
+ok   policy: an uncalibrated interval described as a probability is refused
+ok   policy: "calibrated: true" without evidence is refused
+ok   policy: an ovulation date field is refused
+ok   policy: feature "contraception" cannot be enabled
+ok   policy: feature "Contraceptive-Mode" cannot be enabled
+ok   policy: feature "fertile_window" cannot be enabled
+ok   policy: feature "safeDays" cannot be enabled
+ok   policy: feature "safe days" cannot be enabled
+ok   policy: feature "conception timing" cannot be enabled
+ok   policy: feature "pregnancy_detection" cannot be enabled
+ok   policy: an ordinary research feature name is allowed
+ok   units: C/F spellings recognised; missing or unknown unit is null (never guessed)
+ok   units: 98.6 °F → 37 °C; 0.018 °F precision → 0.01 °C
+ok   units: offsets validated as whole minutes, multiples of 15, UTC−12…+14
+ok   csv: quoted commas, quotes and newlines parse
+ok   csv: unterminated quote, binary content, duplicate headers and oversize input are refused
+ok   csv: row and column limits enforced
+ok   csv export: formula-like cell neutralised ("=HYPERLINK(\"x\")")
+ok   csv export: formula-like cell neutralised ("+SUM(A1)")
+ok   csv export: formula-like cell neutralised ("-2+3")
+ok   csv export: formula-like cell neutralised ("@cmd")
+ok   csv export: formula-like cell neutralised ("\tx")
+ok   csv export: formula-like cell neutralised ("|calc")
+ok   csv export: plain negative numbers are left as numbers
+ok   csv export: round trip keeps the text
+ok   ingest 1: 144 overnight samples accepted, nothing quarantined
+ok   ingest 1: source value and unit preserved alongside °C
+ok   ingest 1: nothing is stored by preview; versions and hashes recorded
+ok   ingest 1: the filename is kept only as a hash and an extension
+ok   ingest 5: uploading the same file again is idempotent (recognised duplicate batch, 0 rows)
+ok   ingest 5: an overlapping row identical to a stored one is a duplicate; a changed value is quarantined as a conflict
+ok   ingest: rows for another participant are rejected (identity never taken from the file name)
+ok   ingest 2: one vendor-derived nightly value accepted as vendor_derived / nightly_value
+ok   ingest 2: a nightly value labelled "raw" is rejected (a vendor average is not raw data)
+ok   ingest 2: missing derivation is rejected, never defaulted to raw
+ok   ingest 3: 1 valid row accepted; 4 suspicious rows quarantined (kept), not dropped
+ok   ingest 3: reasons are specific
+ok   ingest 4: mixed °C/°F rows all accepted and normalised to the same scale
+ok   ingest 4: °F rows convert back to the original °C values (±0.001)
+ok   ingest 6: device replacement and time-zone change rows accepted with their own device and offset
+ok   ingest: a corrupted file fails with a clear code and no rows
+ok   ingest: empty input fails clearly
+ok   ingest: JSON without a records array fails clearly
+ok   ingest: input over the 5 MB limit is refused before parsing
+ok   ingest: an out-of-bounds wrist value is quarantined (kept), not deleted
+ok   ingest: wrist skin temperature cannot be labelled as oral basal temperature
+ok   annotations: entries, a correction and a retraction accepted
+ok   annotations: LH results need their own consent
+ok   annotations: hormonal-medication context needs its own specific consent
+ok   annotations: an entry ID reused with different content is quarantined, not overwritten
+ok   fixtures: manifest marks every file synthetic and names the generator
+ok   fixtures: every fixture matches its manifest hash
+ok   fixtures: regenerating from the seeded generator gives byte-identical files
+ALL PASS (71)
+ok   night: 23:30 and 02:30 local belong to the same night (midnight crossing)
+ok   night: a sample before and after a DST change, each with its own source offset, share a night
+ok   night: after flying to UTC+9 the local clock decides the night
+ok   night: without a sleep session, a daytime sample is outside the fallback window
+ok   night: a sample with a sleep session is used whatever the clock time (shift work)
+ok   night: no UTC offset → cannot be placed (never assumed to be UTC)
+ok   quality: an isolated spike is excluded with a reason and not averaged in
+ok   quality: a documented off-body flag excludes that sample
+ok   quality: an unknown source flag is reported verbatim and not interpreted
+ok   quality: out-of-order arrival is detected
+ok   quality: coverage in minutes from measurement intervals; window and offsets reported
+ok   quality: robust features (median, MAD, IQR) with method and config versions
+ok   quality: a sparse night is "insufficient" with reasons
+ok   quality: a long gap is reported and limits quality
+ok   quality: with no end time or sampling interval, coverage is unknown, not guessed
+ok   quality: empty input gives no reports and no crash
+ok   quality: device replacement creates a separate stream; never pooled
+ok   quality: the first night on the new device is flagged as a transition
+ok   quality: a firmware change is flagged and kept as a separate stream
+ok   quality: wrist skin and oral readings on the same night stay separate (no cross-site averaging)
+ok   segment: spotting never starts a cycle; a bleeding run without an explicit start does
+ok   segment: a correction replaces the earlier entry (start moved to 3 Feb)
+ok   segment: the view as known on 5 Feb still has the uncorrected start (history kept)
+ok   segment: a 55-day cycle is within the 15–90 day range and used
+ok   segment: a 122-day cycle is marked "check entries" and not used
+ok   segment: a retraction removes the entry
+ok   shift: a clear synthetic rise is detected in every complete cycle
+ok   shift: the reported night is within 2 nights of the synthetic rise night
+ok   shift: output is experimental, has reasons, uncalibrated uncertainty, versions, hashes and passes the policy
+ok   shift: no ovulation date is produced
+ok   shift: a flat signal gives "No clear temperature shift detected…" (never "did not ovulate")
+ok   shift: very noisy signal — results recorded, all policy-clean (behaviour reported in the evaluation, not asserted as accuracy)
+ok   shift: a small gradual rise below the configured minimum is not reported as a shift
+ok   shift: a fever-associated elevation that was annotated is excluded, so no shift is reported
+ok   shift: an UNannotated transient spike (4 nights) is not sustained to the next period, but the rule can still fire — documented limitation
+ok   shift: a device change with a level offset is NOT reported as a shift (segments analysed separately)
+ok   shift: the device-change cycle is marked in the output
+ok   shift: sparse nights → insufficient_data with explanation codes, not a reassuring answer
+ok   shift: no data at all → insufficient_data
+ok   reproducibility: same inputs give identical results and input hashes
+ok   trend: descriptive layer relative to own first nights, separate from estimates
+ok   forecast: too little history → insufficient_data with codes
+ok   forecast: with enough history, a point and an EMPIRICAL range marked uncalibrated
+ok   forecast: irregular, long cycles → a wide range flagged as varying widely
+ok   forecast: no recent period logged → insufficient_data (not a confident date)
+ok   leakage: a forecast made at time T is identical whether or not later entries exist
+ok   leakage: the evaluation harness finds no future information in any forecast
+ok   pipeline: as-of analysis is reproducible and hides later data
+ok   pipeline: experimental layers are off unless a researcher enables them
+ok   pipeline: the whole analysis passes the output policy
+ok   evaluation: shift report separates cycles with/without events, abstentions and false detections, with denominators
+ALL PASS (51)
+ok   adapters: the documented file adapter previews a file
+ok   adapters: SWL DS07 is a stub, unverified, claims no capability
+ok   adapters: a vendor stub refuses to import and returns the integration questions
+ok   adapters: generic vendor stub behaves the same
+ok   ml: a complete model card passes validation
+ok   ml: participant-overlapping splits are refused
+ok   ml: no temporal evaluation is refused
+ok   ml: possible test-set tuning is refused
+ok   ml: labels generated by the model itself are refused
+ok   ml: LH labels must be described as an imperfect reference
+ok   ml: online self-training must be disabled
+ok   ml: contraceptive or diagnostic intended use is refused
+ok   ml: an unfrozen model (no artifact hash) is refused
+ok   ml: the registry refuses an invalid card and stores a valid one frozen
+ok   ml: there is no trained model; prediction is unavailable
+ALL PASS (15)
+(node:2360) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ok   server: refuses to bind to a non-local address
+ok   auth: unauthenticated API request → 401, still labelled
+ok   static: dashboard served with CSP, nosniff, frame-deny and no-store
+ok   static: path traversal refused
+ok   auth: session cookie is HttpOnly and SameSite=Strict
+ok   auth: 5 failed logins lock the account temporarily (even the right password fails)
+ok   auth: unknown user and wrong password give the same answer
+ok   participants: creation requires adult confirmation (no minors in this prototype)
+ok   participants: researcher creates a pseudonymous participant
+ok   csrf: a change without the CSRF token is refused
+ok   csrf: a cross-origin request is refused
+ok   isolation: researcher B cannot see researcher A's participant (404, same as not existing)
+ok   isolation: an admin manages accounts but cannot read participant data
+ok   roles: a researcher cannot create accounts
+ok   consent: import refused without core research consent
+ok   consent: a researcher cannot simply grant consent
+ok   consent: a researcher records consent from a signed form (explicit confirmation)
+ok   import: preview reports counts and stores nothing yet
+ok   import: a filename that looks like a name is never stored or echoed
+ok   import: only the researcher who made a preview can commit it
+ok   import: commit stores the observations
+ok   import: re-uploading the same file is recognised as a duplicate batch
+ok   import: suspicious rows are reported for quarantine with reasons
+ok   import: quarantined rows are kept with their original cells (researcher view)
+ok   import: corrupted file → clear error
+ok   import: oversized body refused (413) and non-JSON refused (415)
+ok   features: "contraception" cannot be enabled through the API
+ok   features: "fertile_window" cannot be enabled through the API
+ok   features: "safe_days" cannot be enabled through the API
+ok   features: "conception_timing" cannot be enabled through the API
+ok   analysis: experimental layers are off by default
+ok   analysis: once enabled, estimates are experimental with reasons and uncertainty
+ok   analysis: observed, descriptive, estimate and forecast layers are separate
+ok   provenance: identical analysis is not duplicated; a different cutoff adds versions without overwriting
+ok   corrections: exclusion is a reversible correction; the raw row is unchanged
+ok   corrections: restore reverses it
+ok   corrections: cannot target another participant's observation
+ok   participant: sees own observations but no experimental estimates or forecasts
+ok   participant: cannot import, cannot see quarantine, cannot see another participant
+ok   export: JSON export carries the label and source values
+ok   export: CSV starts with the label line
+ok   export: a formula-like cell is neutralised in the CSV export
+ok   policy: no forbidden phrase in any of 65 API responses or exports
+ok   policy: every JSON response carries the persistent label
+ok   logs: no participant references, values, filenames, tokens or bodies in application logs
+ok   delete: requires typing the reference to confirm
+ok   delete: another researcher cannot delete it
+ok   delete: the participant can delete their own data
+ok   delete: raw AND derived records are gone (observations, annotations, quarantine, corrections, runs, previews, consents, features)
+ok   delete: the participant account and its sessions are gone
+ok   delete: the audit trail records the deletion without health content or the reference
+ok   delete: the researcher no longer sees it
+ALL PASS (52)
+(node:2367) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ok   1 control: the researcher sees experimental estimates and stored runs
+ok   1 /runs: a participant cannot read stored experimental runs (historical outputs)
+ok   1 /export: a participant export contains no experimental estimates or forecasts
+ok   1 /export: a participant export contains no quarantine records (researcher-only, as on /quarantine)
+ok   1 /analysis (historical as-of): still no experimental layers for a participant
+ok   1 control: the researcher export still has derived runs and quarantine
+ok   2 withdrawing consent invalidates pending previews for that participant
+ok   2 a commit after core consent was withdrawn is refused and stores nothing
+ok   2 a saved preview holds no unconsented LH or hormonal content
+ok   2 quarantine keeps the reason but not the unconsented LH/hormonal cells
+ok   2 exports contain no unconsented LH or hormonal data
+ok   2 control: with LH consent the LH result is stored
+ok   2 an LH import previewed before LH consent was withdrawn cannot be committed
+ok   2 withdrawing LH consent removes stored LH results from the database
+ok   2 ... and from exports
+ok   2 the commit transaction itself rechecks optional consent (no LH stored when it was withdrawn)
+ok   2 the commit transaction itself rechecks core consent
+ok   5 a daytime sleep session crossing noon gets ONE night label (not split at noon)
+ok   5 a session whose UTC offset changes part-way keeps one label (taken from the session start, documented)
+ok   6 quality: a model change (same serial and firmware) is flagged as a device transition
+ok   6 inference: a model change with a level offset is not reported as a shift (separate segments)
+ok   6 provenance lists the canonical stream identities, including model
+ok   7 a correction made AFTER the cutoff does not change the as-of analysis (reproducible)
+ok   7 ... the excluded sample is still counted as valid at the earlier cutoff
+ok   7 a cutoff after the correction applies it
+ok   7 the provenance input hash includes effective corrections (differs once a correction applies)
+ok   7 an entry ingested after the cutoff is not used, even if its recorded_at is earlier
+ok   7 control: after ingestion it is used
+ok   8 a self-referencing correction is rejected
+ok   8 a circular correction within one file is rejected
+ok   8 a circular correction across imports (existing x corrects y, new y corrects x) is rejected
+ok   8 malformed circular data in storage cannot hang analysis (finishes within 5 s)
+ok   8 ... and the circular/self-referencing entries are dropped, valid ones kept
+ALL PASS (33)
+(node:2381) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ok   1 setup: LH/hormonal content with odd type formatting is present while consent is given
+ok   1 withdrawing LH consent removes every LH record, whatever its type formatting (quarantine, annotations, previews)
+ok   1 ... hormonal records are untouched by the LH withdrawal
+ok   1 ... and the export contains no LH record
+ok   1 withdrawing hormonal consent removes every hormonal-medication record, whatever its formatting
+ok   1 ... and the export contains no hormonal record
+ok   1 control: the bleeding entry is kept
+ok   1 the stored annotation and quarantine rows carry a canonical type
+ok   1 unconsented: a saved preview keeps no LH/hormonal cells, whatever the type formatting
+ok   1 unconsented: the rows are reported with the consent reason (recognised as LH/hormonal)
+ok   1 unconsented: neither quarantine nor export holds LH/hormonal cells
+ok   2 setup: without LH consent the LH row is rejected and only the bleeding entry is stored
+ok   2 a plain re-upload is still recognised as a duplicate (nothing happens implicitly) and says a reimport is available
+ok   2 a reimport needs a stated reason code
+ok   2 an explicit reimport is revalidated under CURRENT consent: the LH row is now accepted, the stored entry is a duplicate
+ok   2 committing the reimport stores the LH result
+ok   2 the reimport is audited (preview and commit, with the reason)
+ok   2 the reimport is a separate, marked batch; the original batch is unchanged
+ok   2 setup: withdrawing LH consent deleted the LH result
+ok   2 granting consent again does NOT restore deleted data
+ok   2 ... only an explicit reimport brings it back
+ok   2 a participant account cannot trigger a reimport
+ok   2 reimporting when nothing is missing adds nothing (all duplicates)
+ALL PASS (23)
+ok   setup: the frozen fixture is the f67000b store byte for byte (apart from its 2-line header)
+ok   setup: the schema-1 database holds a batch, 2 annotations and a quarantined LH row typed " lh_test "
+ok   migration: schema version recorded as the current version (3 since the 21317c5 fixes; was 2)
+ok   migration: batches gained attempt and reimport_reason; IDs unchanged
+ok   migration: foreign keys are intact
+ok   migration: canonical_type filled for old annotation and quarantine rows
+ok   after migration: withdrawing LH consent removes the old " lh_test " quarantine row and the LH annotation
+ok   after migration: an explicit reimport of the same file is stored as attempt 1
+ok   opening an already-migrated database again changes nothing
+ALL PASS (9)
+(node:2396) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ok   1b consent granted=missing (participant) is rejected with 400 and changes nothing
+ok   1b consent granted=missing (researcher) is rejected with 400 and changes nothing
+ok   1b consent granted=null (participant) is rejected with 400 and changes nothing
+ok   1b consent granted=null (researcher) is rejected with 400 and changes nothing
+ok   1b consent granted="false" (participant) is rejected with 400 and changes nothing
+ok   1b consent granted="false" (researcher) is rejected with 400 and changes nothing
+ok   1b consent granted="true" (participant) is rejected with 400 and changes nothing
+ok   1b consent granted="true" (researcher) is rejected with 400 and changes nothing
+ok   1b consent granted=0 (participant) is rejected with 400 and changes nothing
+ok   1b consent granted=0 (researcher) is rejected with 400 and changes nothing
+ok   1b consent granted=1 (participant) is rejected with 400 and changes nothing
+ok   1b consent granted=1 (researcher) is rejected with 400 and changes nothing
+ok   1b consent granted=[] (participant) is rejected with 400 and changes nothing
+ok   1b consent granted=[] (researcher) is rejected with 400 and changes nothing
+ok   1b consent granted={} (participant) is rejected with 400 and changes nothing
+ok   1b consent granted={} (researcher) is rejected with 400 and changes nothing
+ok   1b control: real Booleans still work (participant grants then withdraws)
+ok   1b feature enabled=missing is rejected with 400 and changes nothing
+ok   1b feature enabled=null is rejected with 400 and changes nothing
+ok   1b feature enabled="false" is rejected with 400 and changes nothing
+ok   1b feature enabled="true" is rejected with 400 and changes nothing
+ok   1b feature enabled=0 is rejected with 400 and changes nothing
+ok   1b feature enabled=1 is rejected with 400 and changes nothing
+ok   1b feature enabled=[] is rejected with 400 and changes nothing
+ok   1b feature enabled={} is rejected with 400 and changes nothing
+ok   1b a non-Boolean reimport flag is rejected
+ok   1d guard: participants still cannot read runs or quarantine, or import
+ok   2a the preview response identifies the previewed file and type (sourceHash, recordType)
+ok   2a a commit naming a different type or file than the preview is refused (409) and stores nothing
+ok   2a control: a commit naming the previewed type and file succeeds
+ok   4c the API accepts a timing exclusion as its own correction action
+ok   3f annotation types "constructor", "__proto__", … are rejected as invalid types (no server error)
+ok   3f measurement kind or unit named "constructor"/"__proto__" is rejected or quarantined (no server error)
+ok   3f parseUnit never returns an inherited object property
+ok   1c setup: the old version left the " lh_test " / " hormonal_medication " quarantine rows after withdrawal
+ok   1c after upgrade: retained raw LH/hormonal rows of the participant who withdrew are removed
+ok   1c after upgrade: no LH/hormonal annotation remains for that participant
+ok   1c after upgrade: the affected preview is invalidated
+ok   1c the other participant (consent still given) keeps everything, including an unaffected preview
+ok   1c the purge is audited with counts only (no content, no reference)
+ok   1c control: the bleeding entry of the withdrawn participant is kept
+ok   1c granting consent again after the upgrade restores nothing
+ok   3a control: an identical row is an exact duplicate
+ok   3a a changed sleep_session_id is not discarded as an exact duplicate (quarantined as a conflict, original kept)
+ok   3a a changed device_model is not discarded as an exact duplicate (quarantined as a conflict, original kept)
+ok   3a a changed sampling_interval_s is not discarded as an exact duplicate (quarantined as a conflict, original kept)
+ok   3a a changed precision is not discarded as an exact duplicate (quarantined as a conflict, original kept)
+ok   3a a changed tz_name is not discarded as an exact duplicate (quarantined as a conflict, original kept)
+ok   3a a changed device_manufacturer is not discarded as an exact duplicate (quarantined as a conflict, original kept)
+ok   3a a changed sampling_config is not discarded as an exact duplicate (quarantined as a conflict, original kept)
+ok   3b a correction recorded at the same instant supersedes its ancestor (id order irrelevant)
+ok   3b a same-instant retraction removes its ancestor
+ok   3b a correction recorded EARLIER than its ancestor (clock skew) still supersedes it
+ok   3b a multi-level chain with tied times resolves to its last link
+ok   3b a multi-level chain ending in a retraction removes the entry
+ok   3b cycles are still rejected safely (valid entries kept)
+ok   3c impossible timestamp 2026-02-30T10:00:00Z is quarantined, not normalised
+ok   3c impossible timestamp 2026-02-29T10:00:00Z is quarantined, not normalised
+ok   3c impossible timestamp 2026-04-31T10:00:00Z is quarantined, not normalised
+ok   3c impossible timestamp 2026-13-01T10:00:00Z is quarantined, not normalised
+ok   3c impossible timestamp 2026-01-01T24:00:00Z is quarantined, not normalised
+ok   3c impossible timestamp 2026-01-01T23:60:00Z is quarantined, not normalised
+ok   3c impossible timestamp 2026-01-01T23:59:60Z is quarantined, not normalised
+ok   3c impossible timestamp 2026-01-01T10:00:00+14:30 is quarantined, not normalised
+ok   3c impossible timestamp 2026-01-01T10:00:00-12:30 is quarantined, not normalised
+ok   3c impossible timestamp 2026-01-01T10:00:00+05:61 is quarantined, not normalised
+ok   3c valid timestamp 2024-02-29T10:00:00Z is accepted
+ok   3c valid timestamp 2026-12-31T23:59:59Z is accepted
+ok   3c valid timestamp 2026-01-01T10:00:00+14:00 is accepted
+ok   3c valid timestamp 2026-01-01T10:00:00-12:00 is accepted
+ok   3c valid timestamp 2026-01-01T10:00:00+05:45 is accepted
+ok   3c valid timestamp 2026-01-01T10:00:00.123456Z is accepted
+ok   3c an impossible end timestamp is quarantined
+ok   3c an impossible recorded_at is rejected
+ok   3c annotation dates: 29 Feb only in leap years; 31 Apr never
+ok   3d at import, a vendor night that has not ended yet is quarantined, not accepted
+ok   3d a historical vendor night imports normally
+ok   3d a future-dated vendor night does not appear in an earlier analysis
+ok   3d it appears once its night has ended under the documented convention
+ok   3d the convention is documented in the configuration
+ok   3e sampling interval 1e308 s is rejected or quarantined (out of range / not finite)
+ok   3e sampling interval 1e20 s is rejected or quarantined (out of range / not finite)
+ok   3e sampling interval 86400000 s is rejected or quarantined (out of range / not finite)
+ok   3e sampling interval 3601 s is rejected or quarantined (out of range / not finite)
+ok   3e sampling interval Infinity s is rejected or quarantined (out of range / not finite)
+ok   3e an interval at the documented maximum (3600 s) is accepted
+ok   3e a single measurement interval longer than the maximum is quarantined
+ok   3e malformed observations do not crash the whole analysis
+ok   3e calculated coverage is limited to the night window (≤ 12 h fallback window)
+ok   3e the full pipeline completes with malformed stored observations
+ok   3f CSV "33".5 is rejected, not read as 33.5
+ok   3f CSV x"y (quote inside an unquoted cell) is rejected
+ok   3f control: valid quoted CSV still parses
+ok   3f JSON records are limited to the same column count as CSV (41 fields rejected)
+ok   3f JSON cells are limited to the same length as CSV (513 characters rejected)
+ok   3f JSON values must be plain values (objects and arrays rejected)
+ok   4a [33,33,33,33,34,34,34,34]: separate detection, confirmation and possible-onset fields
+ok   4a ... the possible onset includes night 5 (the first observed high night), not only night 6
+ok   4a ... confirmation is the last night of the qualifying window
+ok   4a gradual rise: onset is an interval reaching back before the threshold crossing, or abstains
+ok   4a rise during baseline formation: not reported as "no clear shift"; onset left-censored or abstained
+ok   4a missing nights before the rise: the onset interval spans the unobserved nights
+ok   4a already-elevated readings from the first observed night (nothing near cycle start): not "no clear shift"
+ok   4b five low nights, 55 missing days, three high nights: no shift reported; labelled abstention
+ok   4b the gap policy is configurable and documented as an engineering assumption
+ok   4b control: a one-night gap still allows detection
+ok   4c a sample with a corrupted timestamp far from its session does not decide the session's night
+ok   4c setup: an uncorrected near-session wrong time still labels the session from the earliest sample
+ok   4c excluding the VALUE keeps the sample's timing (label unchanged, value not used)
+ok   4c excluding the TIMING removes the sample from session labelling and placement; the session is re-labelled
+ok   4c replay: before the timing correction the old label stands; after it, the corrected label (and provenance lists it)
+ALL PASS (111)
+exit 0

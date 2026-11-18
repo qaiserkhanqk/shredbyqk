@@ -1,10 +1,12 @@
 // Temperature units. Normalised values are in °C; the source value and unit are always kept alongside.
-const UNIT = { c: 'degC', degc: 'degC', '°c': 'degC', celsius: 'degC', f: 'degF', degf: 'degF', '°f': 'degF', fahrenheit: 'degF' };
+// Null-prototype map: a unit named "constructor" or "__proto__" must not resolve to an inherited Object property.
+const UNIT = Object.assign(Object.create(null), { c: 'degC', degc: 'degC', '°c': 'degC', celsius: 'degC', f: 'degF', degf: 'degF', '°f': 'degF', fahrenheit: 'degF' });
 
 /** Canonical unit code, or null if missing or unrecognised. The unit is never guessed from the value. */
 export function parseUnit(u) {
   if (u == null) return null;
-  return UNIT[String(u).trim().toLowerCase().replace(/\s+/g, '')] || null;
+  const v = UNIT[String(u).trim().toLowerCase().replace(/\s+/g, '')];
+  return typeof v === 'string' ? v : null;
 }
 export function toCelsius(value, unit) {
   if (unit === 'degC') return value;

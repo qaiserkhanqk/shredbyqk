@@ -12,7 +12,7 @@
 // result's `malformed` property.
 import { CONFIG } from './config.js';
 
-export const SEGMENT_VERSION = 'segmentation-1.1.0';
+export const SEGMENT_VERSION = 'segmentation-1.2.0';
 const DAY = 864e5;
 export const addDays = (d, n) => new Date(Date.parse(`${d}T00:00:00Z`) + n * DAY).toISOString().slice(0, 10);
 export const diffDays = (a, b) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / DAY);
@@ -31,18 +31,29 @@ export function correctionRoot(byId, id) {
   }
 }
 
+/* Which entries are in effect (issue 3b reported against 21317c5): supersession follows the CORRECTION STRUCTURE, not
+   recorded times. An entry is superseded as soon as any known, well-formed entry corrects it, even if both were recorded
+   at the same instant or the correction carries an earlier clock time. Within one lineage (entries sharing a root) the
+   entries that nobody corrects are its current "leaves"; normally there is one. If two corrections branch from the same
+   entry, the most recent leaf wins (recordedAt, then ingestedAt, then entry ID, so the result is deterministic) and the
+   lineage is listed in `conflicts` for review. A winning retraction removes the lineage. */
 export function effectiveAnnotations(anns, { asOf = Infinity } = {}) {
-  const known = anns.filter(a => knownAt(a, asOf)).sort((a, b) => a.recordedAt - b.recordedAt || a.entryId.localeCompare(b.entryId));
+  const known = anns.filter(a => knownAt(a, asOf));
   const byId = new Map(known.map(a => [a.entryId, a]));
-  const live = new Map(), malformed = [];
-  for (const a of known) {
-    const { root, cyclic } = correctionRoot(byId, a.entryId);
-    if (cyclic) { malformed.push(a.entryId); continue; }
-    if (a.value === 'retracted') { live.delete(root); continue; }
-    live.set(root, a);
+  const malformed = [], wellFormed = [];
+  for (const a of known) { const r = correctionRoot(byId, a.entryId); if (r.cyclic) malformed.push(a.entryId); else wellFormed.push({ a, root: r.root }); }
+  const superseded = new Set(wellFormed.filter(x => x.a.corrects).map(x => x.a.corrects));
+  const leaves = new Map();
+  for (const x of wellFormed) if (!superseded.has(x.a.entryId)) (leaves.get(x.root) || leaves.set(x.root, []).get(x.root)).push(x.a);
+  const newest = (p, q) => (q.recordedAt - p.recordedAt) || ((q.ingestedAt ?? 0) - (p.ingestedAt ?? 0)) || q.entryId.localeCompare(p.entryId);
+  const out = [], conflicts = [];
+  for (const [root, ls] of leaves) {
+    ls.sort(newest);
+    if (ls.length > 1) conflicts.push(root);
+    if (ls[0].value !== 'retracted') out.push(ls[0]);
   }
-  const out = [...live.values()].sort((a, b) => a.date.localeCompare(b.date) || a.entryId.localeCompare(b.entryId));
-  out.malformed = malformed;
+  out.sort((a, b) => a.date.localeCompare(b.date) || a.entryId.localeCompare(b.entryId));
+  out.malformed = malformed.sort(); out.conflicts = conflicts.sort();
   return out;
 }
 
