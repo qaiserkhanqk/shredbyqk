@@ -33,7 +33,9 @@
   - No MFA, password change, session list or account removal for researchers.
   - Assignments are made through the API only; there is no UI for them.
   - Withdrawing core consent blocks new imports and clears pending previews but does not delete existing data; the study protocol must define retention after withdrawal. (Withdrawing LH or hormonal consent does delete that data.)
-  - Concurrent consent withdrawal and commit from two processes on one database file is untested (single-process tests only).
+  - Concurrent consent withdrawal and commit (or reimport) from two processes on one database file is untested (single-process tests only).
+  - Canonical annotation types cover spacing, case and hyphen variants only. A synonym (for example "ovulation test") is `type_invalid`, kept in quarantine like any unrecognised row, and not caught by an LH withdrawal purge.
+  - Rows rejected for missing consent can come back only by reimporting the original file (their cells were never kept).
 - **Imports and exports:**
   - A preview is stored for up to 15 minutes (it is participant-scoped and deleted on commit, expiry, any consent withdrawal or participant deletion).
   - The CSV export's label line comes before the header; strict CSV readers need to skip the first line.

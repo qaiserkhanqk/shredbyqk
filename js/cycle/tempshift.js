@@ -18,7 +18,9 @@ import { diffDays } from './dates.js';
 import { segments } from './wearables.js';
 
 export const SHIFT_PARAMS = Object.freeze({ BASELINE: 6, CONFIRM: 3, DELTA: 0.15, MAX_BASELINE_SPAN: 12, MAX_CONFIRM_SPAN: 5 });
-export const SHIFT_VERSION = 'three-over-six-skin-0.1.0-research';
+// 0.2.0 (f67000b fix, issue 4 reported against b3d9589): one eligible observation per biological night; several sessions on
+// one night no longer count as several nights. 0.1.0 counted every session summary. (Version bumped: issue 3 reported against f67000b.)
+export const SHIFT_VERSION = 'three-over-six-skin-0.2.0-night-aggregated-research';
 
 export function retrospectiveShift(s, cycleStart, asOf, params = SHIFT_PARAMS) {
   const segs = segments(s.wearable.nights.filter(n => n.night >= cycleStart && n.night < asOf));

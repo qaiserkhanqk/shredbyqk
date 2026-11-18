@@ -5,8 +5,9 @@
 // immutability); audit rows keep only an internal number and an action name.
 import { DatabaseSync } from 'node:sqlite';
 import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
+import { canonicalType, CONSENT_SCOPED_TYPES } from '../lib/ingest.js';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 const SCHEMA = `
 PRAGMA foreign_keys = ON; PRAGMA secure_delete = ON; PRAGMA journal_mode = WAL;
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
@@ -18,13 +19,14 @@ CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, user_id INTEGE
 CREATE TABLE IF NOT EXISTS consents (id INTEGER PRIMARY KEY, participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE, scope TEXT NOT NULL, granted INTEGER NOT NULL, at INTEGER NOT NULL, by_user INTEGER);
 CREATE TABLE IF NOT EXISTS features (participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE, name TEXT NOT NULL, enabled INTEGER NOT NULL, by_user INTEGER, at INTEGER NOT NULL, PRIMARY KEY (participant_id, name));
 CREATE TABLE IF NOT EXISTS batches (id INTEGER PRIMARY KEY, participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE, record_type TEXT NOT NULL, format TEXT NOT NULL, source_hash TEXT NOT NULL,
-  filename_hash TEXT, extension TEXT, ingest_version TEXT NOT NULL, config_version TEXT NOT NULL, config_hash TEXT NOT NULL, counts_json TEXT NOT NULL, created_at INTEGER NOT NULL, created_by INTEGER, UNIQUE (participant_id, record_type, source_hash));
+  filename_hash TEXT, extension TEXT, ingest_version TEXT NOT NULL, config_version TEXT NOT NULL, config_hash TEXT NOT NULL, counts_json TEXT NOT NULL, created_at INTEGER NOT NULL, created_by INTEGER,
+  attempt INTEGER NOT NULL DEFAULT 0, reimport_reason TEXT, UNIQUE (participant_id, record_type, source_hash, attempt));
 CREATE TABLE IF NOT EXISTS observations (id INTEGER PRIMARY KEY, participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE, batch_id INTEGER NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
   obs_key TEXT NOT NULL, row_hash TEXT NOT NULL, data_json TEXT NOT NULL, ingested_at INTEGER NOT NULL, UNIQUE (participant_id, obs_key));
 CREATE TABLE IF NOT EXISTS annotations (id INTEGER PRIMARY KEY, participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE, batch_id INTEGER NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
-  entry_id TEXT NOT NULL, entry_hash TEXT NOT NULL, data_json TEXT NOT NULL, UNIQUE (participant_id, entry_id));
+  entry_id TEXT NOT NULL, entry_hash TEXT NOT NULL, data_json TEXT NOT NULL, canonical_type TEXT, UNIQUE (participant_id, entry_id));
 CREATE TABLE IF NOT EXISTS quarantine (id INTEGER PRIMARY KEY, participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE, batch_id INTEGER NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
-  line INTEGER, reasons_json TEXT NOT NULL, raw_json TEXT, rejected INTEGER NOT NULL);
+  line INTEGER, reasons_json TEXT NOT NULL, raw_json TEXT, rejected INTEGER NOT NULL, canonical_type TEXT);
 CREATE TABLE IF NOT EXISTS corrections (id INTEGER PRIMARY KEY, participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE, observation_id INTEGER NOT NULL REFERENCES observations(id) ON DELETE CASCADE,
   action TEXT NOT NULL CHECK (action IN ('exclude','restore')), reason TEXT NOT NULL, by_user INTEGER, at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS derived_runs (id INTEGER PRIMARY KEY, participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE, kind TEXT NOT NULL, algorithm_version TEXT NOT NULL,
@@ -36,16 +38,47 @@ CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY, at INTEGER NOT NULL, a
 export const CONSENT_SCOPES = ['core_research', 'lh_tests', 'hormonal_context'];
 export const FEATURES = ['experimental_shift', 'experimental_forecast'];
 /** Annotation types that may be stored only while their optional consent scope is granted. */
-export const SCOPE_DATA = { lh_tests: 'lh_test', hormonal_context: 'hormonal_medication' };
+export const SCOPE_DATA = Object.fromEntries(Object.entries(CONSENT_SCOPED_TYPES).map(([type, scope]) => [scope, type])); // { lh_tests: 'lh_test', hormonal_context: 'hormonal_medication' }
 export class ConsentError extends Error { constructor(code) { super(code); this.code = code; } }
 const PARTICIPANT_TABLES = ['previews', 'derived_runs', 'corrections', 'quarantine', 'annotations', 'observations', 'batches', 'features', 'consents', 'assignments'];
 
 const hashPw = (pw, salt) => scryptSync(String(pw), salt, 32, { N: 16384, r: 8, p: 1 });
 const sha = s => createHash('sha256').update(s).digest('hex');
 
+/* Upgrades a database created by an earlier version (schema 1), in place:
+   • batches: one row per source file → one row per ATTEMPT (explicit reimports, issue 2 reported against f67000b).
+     SQLite cannot drop a UNIQUE constraint, so the table is rebuilt with the same IDs (foreign keys stay valid).
+   • annotations / quarantine: add `canonical_type` and fill it from the stored type (issue 1). */
+function migrate(db) {
+  const cols = t => db.prepare(`SELECT name FROM pragma_table_info('${t}')`).all().map(r => r.name);
+  if (!cols('batches').includes('attempt')) {
+    db.exec('PRAGMA foreign_keys = OFF');
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.exec(`CREATE TABLE batches_v2 (id INTEGER PRIMARY KEY, participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE, record_type TEXT NOT NULL, format TEXT NOT NULL, source_hash TEXT NOT NULL,
+        filename_hash TEXT, extension TEXT, ingest_version TEXT NOT NULL, config_version TEXT NOT NULL, config_hash TEXT NOT NULL, counts_json TEXT NOT NULL, created_at INTEGER NOT NULL, created_by INTEGER,
+        attempt INTEGER NOT NULL DEFAULT 0, reimport_reason TEXT, UNIQUE (participant_id, record_type, source_hash, attempt));
+        INSERT INTO batches_v2 (id, participant_id, record_type, format, source_hash, filename_hash, extension, ingest_version, config_version, config_hash, counts_json, created_at, created_by)
+          SELECT id, participant_id, record_type, format, source_hash, filename_hash, extension, ingest_version, config_version, config_hash, counts_json, created_at, created_by FROM batches;
+        DROP TABLE batches; ALTER TABLE batches_v2 RENAME TO batches;`);
+      db.exec('COMMIT');
+    } catch (e) { db.exec('ROLLBACK'); throw e; } finally { db.exec('PRAGMA foreign_keys = ON'); }
+  }
+  for (const [t, col] of [['annotations', 'data_json'], ['quarantine', 'raw_json']]) {
+    if (!cols(t).includes('canonical_type')) db.exec(`ALTER TABLE ${t} ADD COLUMN canonical_type TEXT`);
+    const upd = db.prepare(`UPDATE ${t} SET canonical_type = ? WHERE id = ?`);
+    for (const r of db.prepare(`SELECT id, ${col} AS j FROM ${t} WHERE canonical_type IS NULL AND ${col} IS NOT NULL`).all()) {
+      let v = null; try { v = JSON.parse(r.j); } catch { /* keep null */ }
+      if (v && typeof v === 'object' && v.type != null) upd.run(canonicalType(v.type), r.id);
+    }
+  }
+  db.prepare("INSERT INTO meta (k, v) VALUES ('schema_version', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v").run(String(SCHEMA_VERSION));
+}
+
 export function openStore(path = ':memory:', { now = () => Date.now() } = {}) {
   const db = new DatabaseSync(path);
   db.exec(SCHEMA);
+  migrate(db);
   db.prepare('INSERT OR IGNORE INTO meta (k, v) VALUES (?, ?)').run('schema_version', String(SCHEMA_VERSION));
   const q = (sql) => db.prepare(sql);
   const tx = fn => { db.exec('BEGIN IMMEDIATE'); try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { db.exec('ROLLBACK'); throw e; } };
@@ -114,9 +147,9 @@ export function openStore(path = ':memory:', { now = () => Date.now() } = {}) {
         if (!granted) {
           removed.previews = Number(q('DELETE FROM previews WHERE participant_id = ?').run(pid).changes);
           const type = SCOPE_DATA[scope];
-          if (type) {
-            removed.annotations = Number(q("DELETE FROM annotations WHERE participant_id = ? AND json_extract(data_json, '$.type') = ?").run(pid, type).changes);
-            removed.quarantine = Number(q("DELETE FROM quarantine WHERE participant_id = ? AND json_extract(raw_json, '$.type') = ?").run(pid, type).changes);
+          if (type) { // by the stored CANONICAL type, never the raw spelling (issue 1 reported against f67000b)
+            removed.annotations = Number(q('DELETE FROM annotations WHERE participant_id = ? AND canonical_type = ?').run(pid, type).changes);
+            removed.quarantine = Number(q('DELETE FROM quarantine WHERE participant_id = ? AND canonical_type = ?').run(pid, type).changes);
           }
         }
         return removed;
@@ -144,21 +177,27 @@ export function openStore(path = ':memory:', { now = () => Date.now() } = {}) {
         const c = this.consents(pid);
         if (!c.core_research) throw new ConsentError('core_research_consent_missing');
         for (const [scope, type] of Object.entries(SCOPE_DATA)) if (!c[scope] && p.recordType === 'annotations' && p.accepted.some(a => a.type === type)) throw new ConsentError(`${scope}_consent_missing`);
-        if (q('SELECT 1 FROM batches WHERE participant_id = ? AND record_type = ? AND source_hash = ?').get(pid, p.recordType, p.sourceHash)) return { duplicateBatch: true, batchId: null };
-        const batchId = Number(q('INSERT INTO batches (participant_id, record_type, format, source_hash, filename_hash, extension, ingest_version, config_version, config_hash, counts_json, created_at, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
-          .run(pid, p.recordType, p.format, p.sourceHash, p.sourceFilenameHash, p.sourceExtension, p.ingestVersion, p.configVersion, p.configHash, JSON.stringify(p.counts), now(), userId).lastInsertRowid);
+        // An explicit reimport (issue 2 reported against f67000b) is stored as a new attempt of the same source file, with
+        // its reason; the earlier batch is left unchanged. Without `reimport` the same file is still a duplicate.
+        const prev = q('SELECT MAX(attempt) AS a, COUNT(*) AS n FROM batches WHERE participant_id = ? AND record_type = ? AND source_hash = ?').get(pid, p.recordType, p.sourceHash);
+        if (prev.n && !p.reimport) return { duplicateBatch: true, batchId: null };
+        if (p.reimport && !/^[a-z0-9_]{3,60}$/.test(String(p.reimportReason || ''))) throw new ConsentError('reimport_reason_required');
+        const attempt = prev.n ? prev.a + 1 : 0;
+        const batchId = Number(q('INSERT INTO batches (participant_id, record_type, format, source_hash, filename_hash, extension, ingest_version, config_version, config_hash, counts_json, created_at, created_by, attempt, reimport_reason) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+          .run(pid, p.recordType, p.format, p.sourceHash, p.sourceFilenameHash, p.sourceExtension, p.ingestVersion, p.configVersion, p.configHash, JSON.stringify(p.counts), now(), userId, attempt, p.reimport ? p.reimportReason : null).lastInsertRowid);
         const t = now();
         if (p.recordType === 'observations') { const ins = q('INSERT OR IGNORE INTO observations (participant_id, batch_id, obs_key, row_hash, data_json, ingested_at) VALUES (?,?,?,?,?,?)'); for (const o of p.accepted) { const { line, ...d } = o; ins.run(pid, batchId, o.obsKey, o.rowHash, JSON.stringify(d), t); } }
-        else { const ins = q('INSERT OR IGNORE INTO annotations (participant_id, batch_id, entry_id, entry_hash, data_json) VALUES (?,?,?,?,?)'); for (const a of p.accepted) { const { line, ...d } = a; ins.run(pid, batchId, a.entryId, annotationHash(a), JSON.stringify(d)); } }
-        const qi = q('INSERT INTO quarantine (participant_id, batch_id, line, reasons_json, raw_json, rejected) VALUES (?,?,?,?,?,?)');
+        else { const ins = q('INSERT OR IGNORE INTO annotations (participant_id, batch_id, entry_id, entry_hash, data_json, canonical_type) VALUES (?,?,?,?,?,?)'); for (const a of p.accepted) { const { line, ...d } = a; ins.run(pid, batchId, a.entryId, annotationHash(a), JSON.stringify(d), canonicalType(a.type)); } }
+        const qi = q('INSERT INTO quarantine (participant_id, batch_id, line, reasons_json, raw_json, rejected, canonical_type) VALUES (?,?,?,?,?,?,?)');
         for (const x of p.quarantined) {
-          const unconsented = Object.entries(SCOPE_DATA).some(([scope, type]) => !c[scope] && x.raw?.type === type); // never store their cells
-          qi.run(pid, batchId, x.line, JSON.stringify(x.reasons), JSON.stringify(unconsented ? null : (x.raw ?? null)), x.rejected ? 1 : 0);
+          const ct = p.recordType === 'annotations' ? (x.canonicalType ?? canonicalType(x.raw?.type)) : null;
+          const unconsented = !!ct && !!CONSENT_SCOPED_TYPES[ct] && !c[CONSENT_SCOPED_TYPES[ct]]; // never store their cells
+          qi.run(pid, batchId, x.line, JSON.stringify(x.reasons), JSON.stringify(unconsented ? null : (x.raw ?? null)), x.rejected ? 1 : 0, ct);
         }
         return { duplicateBatch: false, batchId };
       });
     },
-    batches: pid => q('SELECT id, record_type, format, source_hash, extension, ingest_version, config_version, config_hash, counts_json, created_at FROM batches WHERE participant_id = ? ORDER BY id').all(pid).map(b => ({ ...b, counts: JSON.parse(b.counts_json), counts_json: undefined })),
+    batches: pid => q('SELECT id, record_type, format, source_hash, extension, ingest_version, config_version, config_hash, counts_json, created_at, attempt, reimport_reason FROM batches WHERE participant_id = ? ORDER BY id').all(pid).map(b => ({ ...b, counts: JSON.parse(b.counts_json), counts_json: undefined })),
     /** Observations with their ingestion time and full correction history (issue 7): `corrections` lists every
      *  exclude/restore with its time, so an analysis can apply only those made before its cutoff. `excludedBy` is the
      *  CURRENT state, for current views and exports. */

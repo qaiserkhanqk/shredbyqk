@@ -43,7 +43,7 @@
 |---|---|---|
 | `participant_ref` | yes | as above |
 | `entry_id` | yes | `[A-Za-z0-9_-]{4,64}`, unique per participant |
-| `type` | yes | `bleeding` (`period_start`, `period`, `spotting`, `none`), `lh_test` (`positive`, `negative`, `invalid`; **needs consent scope `lh_tests`**), `illness` / `fever` / `disrupted_sleep` / `travel` / `device_change` (`yes`/`no`), `hormonal_medication` (`yes`/`no`; **needs the separate `hormonal_context` consent**) |
+| `type` | yes | Read in **canonical form**: trimmed, lower-case, spaces and hyphens folded to `_` (so `" LH-Test "` is `lh_test`). The canonical type is stored (`canonical_type`) and used for consent checks and consent-withdrawal purges. Values: `bleeding` (`period_start`, `period`, `spotting`, `none`), `lh_test` (`positive`, `negative`, `invalid`; **needs consent scope `lh_tests`**), `illness` / `fever` / `disrupted_sleep` / `travel` / `device_change` (`yes`/`no`), `hormonal_medication` (`yes`/`no`; **needs the separate `hormonal_context` consent**) |
 | `value` | yes | as above, or `retracted` (with `corrects`) |
 | `date` | yes | `YYYY-MM-DD` (local date) |
 | `recorded_at` | yes | ISO 8601: when the entry was made (its knowledge time) |
@@ -56,6 +56,8 @@
 
 ## Quarantine reason codes
 `participant_ref_invalid`, `participant_mismatch`, `sensor_site_invalid`, `measurement_kind_invalid`, `site_kind_mismatch`, `derivation_missing_or_invalid`, `aggregation_invalid`, `nightly_value_must_be_vendor_derived`, `device_model_missing`, `device_serial_pseudonym_invalid`, `value_not_numeric`, `precision_invalid`, `sampling_interval_invalid`, `field_format_invalid:<field>`, `timestamp_missing`, `timestamp_invalid`, `end_timestamp_invalid`, `end_not_after_start`, `utc_offset_missing`, `utc_offset_invalid`, `night_label_missing_or_invalid`, `unit_missing`, `unit_unrecognised`, `out_of_bounds_for_kind`, `conflicting_duplicate`, `entry_id_invalid`, `type_invalid`, `value_invalid`, `retraction_needs_corrects`, `date_invalid`, `recorded_at_missing_or_invalid`, `corrects_invalid`, `self_correction`, `circular_correction`, `lh_tests_not_consented`, `hormonal_context_not_consented`, `entry_id_reused_with_different_content`, `column_count`, `not_an_object`.
+
+**Reimport:** a file already imported is a duplicate batch. A researcher can explicitly **reimport** it with a reason code. Every row is then revalidated under the **current** consent, rows already stored are skipped, and the result is a new batch attempt marked with its reason. Reimports are audited. Granting consent again never restores deleted data by itself.
 
 **Rows without the needed consent:** a row rejected with `lh_tests_not_consented` or `hormonal_context_not_consented` keeps only its line number and reasons. Its cells are not retained in the saved preview, quarantine, database or exports.
 

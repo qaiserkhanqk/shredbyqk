@@ -185,7 +185,7 @@ See [docs/wearable-sdk-requirements.md](docs/wearable-sdk-requirements.md).
 ## Wearable sessions and the temperature rule (fixes against b3d9589)
 - **Corrected sessions.** A corrected sleep session is matched by its source-session identity (session ID, device, model, firmware, metric, kind), not by its derived night. It replaces the current record, and the earlier version is kept in `prior`.
 - **One observation per night.** The research temperature rule uses one eligible observation per biological night (the session with the most coverage). Several sessions on one night never count as several nights.
-- Details: `docs/fixes-b3d9589.md`.
+- Details: `docs/fixes-b3d9589.md`. The rule's version is now `three-over-six-skin-0.2.0-night-aggregated-research` (0.1.0 counted every session), so results from the two can be told apart (`docs/fixes-f67000b.md`).
 
 ## Summary for a doctor
 Settings → "Summary for a doctor" builds a plain-text summary of the person's own entries **only when they ask** (`js/cycle/summary.js`). It can be printed or saved as a local text file. Nothing is stored or sent. It contains no estimates, patterns, wearable or fertility content. Details and tests: `docs/cycle-summary-lh.md`.

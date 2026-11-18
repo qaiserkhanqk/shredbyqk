@@ -90,12 +90,19 @@ export function validateObservation(r, { participantRef, config = CONFIG } = {})
   return quarantine.length ? { quarantine, obs } : { obs };
 }
 
+/** Canonical annotation type (issue 1 reported against f67000b): trimmed, lower-case, internal spaces and hyphens
+ *  folded to "_". It is the ONLY form used for validation, consent checks, quarantine records and consent purges,
+ *  so " lh_test ", "LH_TEST", "Lh-Test" and "\tlh_test\n" are all recognised as LH content. */
+export const canonicalType = v => (v == null ? '' : String(v)).trim().toLowerCase().replace(/[\s-]+/g, '_');
+/** Annotation types that may be kept only while their optional consent scope is granted. */
+export const CONSENT_SCOPED_TYPES = { lh_test: 'lh_tests', hormonal_medication: 'hormonal_context' };
+
 /** One annotation row. Annotations are append-only: a correction is a new entry that `corrects` an earlier entry_id. */
 export function validateAnnotation(r, { participantRef, consents = {} } = {}) {
   const reject = [];
   const ref = str(r.participant_ref);
   if (!REF.test(ref)) reject.push('participant_ref_invalid'); else if (participantRef && ref !== participantRef) reject.push('participant_mismatch');
-  const entryId = str(r.entry_id), type = str(r.type), value = str(r.value), date = str(r.date), corrects = str(r.corrects) || null;
+  const entryId = str(r.entry_id), type = canonicalType(r.type), value = str(r.value), date = str(r.date), corrects = str(r.corrects) || null;
   if (!REF.test(entryId)) reject.push('entry_id_invalid');
   if (!(type in ANNOTATION_TYPES)) reject.push('type_invalid');
   else if (value !== 'retracted' && !ANNOTATION_TYPES[type].includes(value)) reject.push('value_invalid');
@@ -105,8 +112,7 @@ export function validateAnnotation(r, { participantRef, consents = {} } = {}) {
   if (rec == null || Number.isNaN(rec)) reject.push('recorded_at_missing_or_invalid');
   if (corrects && !REF.test(corrects)) reject.push('corrects_invalid');
   if (corrects && corrects === entryId) reject.push('self_correction'); // issue 8 reported against b3d9589
-  if (type === 'hormonal_medication' && !consents.hormonal_context) reject.push('hormonal_context_not_consented');
-  if (type === 'lh_test' && !consents.lh_tests) reject.push('lh_tests_not_consented');
+  if (CONSENT_SCOPED_TYPES[type] && !consents[CONSENT_SCOPED_TYPES[type]]) reject.push(`${CONSENT_SCOPED_TYPES[type]}_not_consented`); // lh_tests_not_consented / hormonal_context_not_consented
   if (reject.length) return { reject };
   return { ann: { participantRef: ref, entryId, type, value, date, recordedAt: rec, corrects } };
 }
@@ -117,13 +123,16 @@ export const annotationHash = a => hashJSON({ e: a.entryId, t: a.type, v: a.valu
  * Preview an import without storing anything.
  * existing: { batchHashes:Set, obsRowHash:Map(obsKey→rowHash), entryHash:Map(entryId→hash), entryCorrects:Map(entryId→corrects) }
  */
-export function preview(text, { format, recordType, participantRef, filename = '', existing = {}, consents = {}, config = CONFIG } = {}) {
+export function preview(text, { format, recordType, participantRef, filename = '', existing = {}, consents = {}, config = CONFIG, reimport = false } = {}) {
   const sourceHash = sha256(String(text ?? ''));
   const base = { ingestVersion: INGEST_VERSION, configVersion: config.version, configHash: configHash(config), recordType, format, sourceHash,
     sourceFilenameHash: filename ? sha256(filename) : null, sourceExtension: (/\.([a-z0-9]{1,8})$/i.exec(filename)?.[1] || '').toLowerCase() || null };
   if (!['observations', 'annotations'].includes(recordType)) return { ...base, ok: false, error: 'record_type_invalid' };
   if (!['csv', 'json'].includes(format)) return { ...base, ok: false, error: 'format_invalid' };
-  if (existing.batchHashes?.has(sourceHash)) return { ...base, ok: true, duplicateBatch: true, counts: { rows: 0, accepted: 0, duplicates: 0, quarantined: 0, rejected: 0 }, accepted: [], quarantined: [] };
+  // A file already imported is a duplicate batch unless the researcher explicitly asks to REIMPORT it (issue 2 reported
+  // against f67000b): then every row is revalidated under the current consent, and rows already stored are still
+  // skipped as duplicates. Nothing is ever reimported implicitly.
+  if (!reimport && existing.batchHashes?.has(sourceHash)) return { ...base, ok: true, duplicateBatch: true, counts: { rows: 0, accepted: 0, duplicates: 0, quarantined: 0, rejected: 0 }, accepted: [], quarantined: [] };
   let rows;
   try { rows = format === 'csv' ? parseCSV(text, config.limits) : parseJSONRecords(text, config.limits); }
   catch (e) { if (e instanceof ParseError) return { ...base, ok: false, error: e.code, line: e.line }; throw e; }
@@ -147,9 +156,9 @@ export function preview(text, { format, recordType, participantRef, filename = '
       // only as a line number and reason codes. Its cells are NOT retained anywhere (saved preview, quarantine,
       // database or export).
       const unconsented = v.reject?.some(r => r === 'lh_tests_not_consented' || r === 'hormonal_context_not_consented');
-      if (v.reject) { quarantined.push({ line: row.line, reasons: v.reject, rejected: true, raw: unconsented ? null : raw, ...(unconsented ? { redacted: 'content_not_retained_without_consent' } : {}) }); rejected++; continue; }
+      if (v.reject) { quarantined.push({ line: row.line, reasons: v.reject, rejected: true, raw: unconsented ? null : raw, canonicalType: unconsented ? null : canonicalType(raw?.type), ...(unconsented ? { redacted: 'content_not_retained_without_consent' } : {}) }); rejected++; continue; }
       const h = annotationHash(v.ann), prior = seen.get(v.ann.entryId) ?? existing.entryHash?.get(v.ann.entryId);
-      if (prior != null) { if (prior === h) duplicates++; else quarantined.push({ line: row.line, reasons: ['entry_id_reused_with_different_content'], raw }); continue; }
+      if (prior != null) { if (prior === h) duplicates++; else quarantined.push({ line: row.line, reasons: ['entry_id_reused_with_different_content'], raw, canonicalType: v.ann.type }); continue; }
       seen.set(v.ann.entryId, h); accepted.push({ line: row.line, ...v.ann, _raw: raw });
     }
   }
@@ -161,9 +170,9 @@ export function preview(text, { format, recordType, participantRef, filename = '
     for (const a of accepted) links.set(a.entryId, a.corrects);
     const loops = id => { const seenIds = new Set(); let cur = id; while (cur) { if (seenIds.has(cur)) return true; seenIds.add(cur); cur = links.get(cur); } return false; };
     const bad = new Set(accepted.filter(a => loops(a.entryId)).map(a => a.entryId));
-    for (const a of accepted.filter(x => bad.has(x.entryId))) quarantined.push({ line: a.line, reasons: ['circular_correction'], raw: a._raw });
+    for (const a of accepted.filter(x => bad.has(x.entryId))) quarantined.push({ line: a.line, reasons: ['circular_correction'], raw: a._raw, canonicalType: a.type });
     accepted = accepted.filter(a => !bad.has(a.entryId));
     for (const a of accepted) delete a._raw;
   }
-  return { ...base, ok: true, duplicateBatch: false, counts: { rows: rows.length, accepted: accepted.length, duplicates, quarantined: quarantined.length - rejected, rejected }, accepted, quarantined };
+  return { ...base, ok: true, duplicateBatch: false, reimport: !!reimport, counts: { rows: rows.length, accepted: accepted.length, duplicates, quarantined: quarantined.length - rejected, rejected }, accepted, quarantined };
 }

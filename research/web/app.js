@@ -154,15 +154,20 @@ document.addEventListener('click', async e => {
       case 'open': return openParticipant(b.dataset.ref);
       case 'signed': if (!confirm('Record that a signed consent form exists for this scope?')) return; await api('POST', `${P}/consents/record-signed`, { scope: b.dataset.scope, signedFormReference: true }); return openParticipant(current, 'Consent recorded');
       case 'withdraw': if (!confirm('Record withdrawal of this consent?')) return; await api('POST', `${P}/consents`, { scope: b.dataset.scope, granted: false }); return openParticipant(current, 'Withdrawal recorded');
-      case 'preview': {
+      case 'preview': case 'reimport': {
         const file = $('#file').files[0]; if (!file) return say('#pview', 'Choose a file first.', true);
         if (file.size > 5 * 1024 * 1024) return say('#pview', 'File is over the 5 MB limit.', true);
         const format = /\.json$/i.test(file.name) ? 'json' : 'csv';
-        const r = await api('POST', `${P}/imports/preview`, { recordType: $('#rtype').value, format, filename: file.name, content: await file.text() }).catch(err => ({ ok: false, error: err.body?.error || err.message }));
+        // A reimport is explicit and needs a reason; the server revalidates every row under the current consent and audits it.
+        const extra = b.dataset.act === 'reimport' ? { reimport: true, reason: $('#reimportReason')?.value } : {};
+        const r = await api('POST', `${P}/imports/preview`, { recordType: $('#rtype').value, format, filename: file.name, content: await file.text(), ...extra }).catch(err => ({ ok: false, error: err.body?.error || err.message }));
         if (!r.ok) { pendingPreview = null; $('#commitBtn').disabled = true; return say('#pview', `Not importable: ${r.error}`, true); }
         pendingPreview = r.previewId; $('#commitBtn').disabled = !r.previewId;
         const reasons = {}; for (const q of r.quarantined) for (const x of q.reasons) reasons[x] = (reasons[x] || 0) + 1;
-        $('#pview').innerHTML = r.duplicateBatch ? '<p>This exact file was already imported. Nothing to add.</p>' : `<p>${r.counts.rows} rows: <b>${r.counts.accepted}</b> to add, ${r.counts.duplicates} duplicates, ${r.counts.quarantined} to quarantine, ${r.counts.rejected} rejected.</p>${Object.keys(reasons).length ? `<ul class="plain">${Object.entries(reasons).map(([k, v]) => `<li>${esc(k)}: ${v}</li>`).join('')}</ul>` : ''}`;
+        $('#pview').innerHTML = r.duplicateBatch
+          ? `<p>This exact file was already imported. Nothing to add.</p>${r.reimportAvailable ? `<div class="row small"><span>If consent has changed since, or records were deleted, you can explicitly reimport it. Every row is checked again under the current consent; rows already stored are skipped. This is recorded in the audit trail.</span>
+            <select id="reimportReason"><option value="consent_granted_after_rejection">Consent granted after rows were rejected</option><option value="deleted_records_reimport_requested">Re-adding records that were deleted</option><option value="researcher_review">Other researcher review</option></select><button data-act="reimport">Reimport under current consent</button></div>` : ''}`
+          : `${r.reimport ? '<p><b>Reimport</b> under current consent.</p>' : ''}<p>${r.counts.rows} rows: <b>${r.counts.accepted}</b> to add, ${r.counts.duplicates} duplicates, ${r.counts.quarantined} to quarantine, ${r.counts.rejected} rejected.</p>${Object.keys(reasons).length ? `<ul class="plain">${Object.entries(reasons).map(([k, v]) => `<li>${esc(k)}: ${v}</li>`).join('')}</ul>` : ''}`;
         return;
       }
       case 'commit': if (!pendingPreview) return; { const r = await api('POST', `${P}/imports/commit`, { previewId: pendingPreview }); pendingPreview = null; return openParticipant(current, r.duplicateBatch ? 'Already imported' : 'Import committed'); }

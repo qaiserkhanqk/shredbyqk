@@ -56,6 +56,10 @@ const check = (name, ok, detail = '') => { count++; if (!ok) fails++; console.lo
   check('import: commit succeeds', /Import committed/.test(await p.textContent('#pmsg')));
   await p.setInputFiles('#file', tmp); await p.click('[data-act=preview]'); await p.waitForTimeout(500);
   check('import: the same file again is recognised as already imported', /already imported/.test(await p.textContent('#pview')));
+  // Explicit reimport (issue 2 reported against f67000b): offered only after a duplicate, needs a reason, previews again.
+  check('import: an explicit reimport is offered for an already-imported file', !!(await p.$('[data-act=reimport]')) && !!(await p.$('#reimportReason')));
+  await p.click('[data-act=reimport]'); await p.waitForTimeout(500);
+  check('import: the reimport preview revalidates every row (all already stored → 0 to add)', /Reimport/.test(await p.textContent('#pview')) && /<b>0<\/b> to add/.test(await p.innerHTML('#pview')));
   const [dl] = await Promise.all([p.waitForEvent('download'), p.click('#data a[href*="format=csv"] button')]);
   const csvText = fs.readFileSync(await dl.path(), 'utf8');
   check('export: CSV download starts with the research label', csvText.startsWith(`# ${LABEL}`));

@@ -130,17 +130,23 @@ export function createApp({ store, settings, log = line => process.stderr.write(
       if (!limit(`${s.userId}`, 'import')) fail(429, 'too_many_imports');
       const b = await body(req, Math.ceil(CONFIG.limits.maxUploadBytes * 1.5));
       const c = store.consents(p.id); if (!c.core_research) fail(409, 'core_research_consent_missing');
-      const pv = preview(String(b.content ?? ''), { format: b.format, recordType: b.recordType, participantRef: p.ref, filename: String(b.filename || ''), existing: store.existingFor(p.id), consents: c });
+      // Explicit, audited reimport (issue 2 reported against f67000b): revalidates a previously imported file under the
+      // CURRENT consent. It needs a reason code. Rows already stored are skipped; deleted data is never restored
+      // unless a file is reimported like this.
+      const reimport = b.reimport === true, reason = String(b.reason || '');
+      if (reimport && !/^[a-z0-9_]{3,60}$/.test(reason)) fail(400, 'reimport_reason_required');
+      const pv = preview(String(b.content ?? ''), { format: b.format, recordType: b.recordType, participantRef: p.ref, filename: String(b.filename || ''), existing: store.existingFor(p.id), consents: c, reimport });
       if (!pv.ok) { store.audit(s.userId, 'import_preview_failed', p.id, 'failed', { error: pv.error }); return ok(res, { ok: false, error: pv.error, line: pv.line ?? null }, 400); }
+      if (reimport) Object.assign(pv, { reimport: true, reimportReason: reason });
       const id = pv.duplicateBatch ? null : store.savePreview(p.id, s.userId, pv);
-      store.audit(s.userId, 'import_previewed', p.id, 'ok', { counts: pv.counts });
-      ok(res, { ok: true, previewId: id, duplicateBatch: pv.duplicateBatch, counts: pv.counts, recordType: pv.recordType, quarantined: pv.quarantined.slice(0, 200).map(q => ({ line: q.line, reasons: q.reasons, rejected: !!q.rejected })), ingestVersion: pv.ingestVersion, configVersion: pv.configVersion });
+      store.audit(s.userId, reimport ? 'import_reimport_previewed' : 'import_previewed', p.id, 'ok', { counts: pv.counts, ...(reimport ? { reason } : {}) });
+      ok(res, { ok: true, previewId: id, duplicateBatch: pv.duplicateBatch, reimportAvailable: !!pv.duplicateBatch, reimport, counts: pv.counts, recordType: pv.recordType, quarantined: pv.quarantined.slice(0, 200).map(q => ({ line: q.line, reasons: q.reasons, rejected: !!q.rejected })), ingestVersion: pv.ingestVersion, configVersion: pv.configVersion });
     }],
     ['POST', /^\/api\/participants\/([^/]+)\/imports\/commit$/, async (req, res, m, ip, s) => {
       needRole(s, 'researcher'); const p = participantFor(s, m[1]), b = await body(req, 4096);
       const pv = store.takePreview(b.previewId, p.id, s.userId); if (!pv) fail(404, 'preview_not_found_or_expired');
       let r; try { r = store.commitImport(p.id, pv, s.userId, annotationHash); } catch (e) { if (e instanceof ConsentError) { store.audit(s.userId, 'import_commit_refused', p.id, 'denied', { code: e.code }); fail(409, e.code); } throw e; }
-      store.audit(s.userId, 'import_committed', p.id, 'ok', { counts: pv.counts, duplicateBatch: r.duplicateBatch });
+      store.audit(s.userId, 'import_committed', p.id, 'ok', { counts: pv.counts, duplicateBatch: r.duplicateBatch, ...(pv.reimport ? { reimport: true, reason: pv.reimportReason } : {}) });
       ok(res, { ok: true, ...r, counts: pv.counts });
     }],
     ['GET', /^\/api\/participants\/([^/]+)\/analysis$/, (req, res, m, ip, s, url) => {

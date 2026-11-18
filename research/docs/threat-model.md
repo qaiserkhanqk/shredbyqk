@@ -39,7 +39,8 @@ Reproductive health data is treated as **highly sensitive**. This document descr
   - `core_research`, `lh_tests` and `hormonal_context` are separate scopes, each with time-stamped grant and withdrawal records.
   - A researcher can record consent only by confirming a signed form.
   - Any withdrawal invalidates pending import previews, and the commit transaction rechecks consent.
-  - Withdrawing `lh_tests` or `hormonal_context` deletes the stored data of that type, including quarantined rows. Rows submitted without that consent are never retained.
+  - Withdrawing `lh_tests` or `hormonal_context` deletes the stored data of that type, including quarantined rows, matched by the stored **canonical** type, whatever the original spelling. Rows submitted without that consent are never retained.
+  - Data deleted by a withdrawal is not restored if consent is given again. It can come back only through an explicit, audited reimport of the file under the current consent.
   - Withdrawing core consent stops new imports. What happens to data already collected must be set by the study protocol, and full deletion is available.
 - **Adults only.** Participant creation requires an adult confirmation; minors are not supported.
 - **Experimental features** are off by default and enabled per participant by a researcher. Each change is audited.

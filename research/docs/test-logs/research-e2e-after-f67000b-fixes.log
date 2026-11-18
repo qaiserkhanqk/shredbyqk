@@ -1,0 +1,29 @@
+(node:2928) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ok   label: the persistent research label is shown before sign-in
+ok   panel: "What this can and cannot tell you" is shown
+ok   auth: signed in with Secure, HttpOnly session cookie over local http
+ok   researcher: sees the three synthetic participants
+ok   dashboard: label stays visible on the participant page
+ok   dashboard: quality summary, timeline, bleeding annotations and provenance are shown
+ok   dashboard: experimental results are absent until a researcher enables them
+ok   policy (participant page, experimental off): no forbidden phrase on the page
+ok   experimental: shown in a separate, labelled experimental card with uncertainty and reasons
+ok   experimental: shift markers appear only in the separate experimental band of the timeline
+ok   policy (participant page, experimental on): no forbidden phrase on the page
+ok   device change: the transition is marked on the timeline
+ok   flat signal: experimental results never say "did not ovulate" (policy) and use the no-shift wording or insufficient data
+ok   import: preview shows counts before anything is stored
+ok   import: commit succeeds
+ok   import: the same file again is recognised as already imported
+ok   import: an explicit reimport is offered for an already-imported file
+ok   import: the reimport preview revalidates every row (all already stored → 0 to add)
+ok   export: CSV download starts with the research label
+ok   participant: sees own page with no import, feature or experimental controls
+ok   policy (participant self-view): no forbidden phrase on the page
+ok   participant: the API refuses another participant's data even when called directly
+ok   delete: raw and derived records for the participant are gone after deleting from the UI
+ok   privacy: the page made no request to any other host
+ok   logs: no participant references or values in server logs
+ok   no JavaScript or CSP errors in the browser
+ALL PASS (26)
