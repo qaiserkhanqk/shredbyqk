@@ -131,7 +131,7 @@ check(`policy: no forbidden phrase in any of ${responses.length} API responses o
 check('policy: every JSON response carries the persistent label', responses.filter(t => t.startsWith('{')).every(t => JSON.parse(t).label === LABEL));
 
 /* ---- Logs ---- */
-const logText = logs.join('\n');
+const logText = logs.map(l => { const { t, ...r } = JSON.parse(l); return JSON.stringify(r); }).join('\n'); // timestamp excluded ("…:33.6Z" is not a temperature)
 check('logs: no participant references, values, filenames, tokens or bodies in application logs', !/P-API-000|33\.\d|jane|rs_session|synthetic-pass|csrf/i.test(logText) && logs.length > 20, logs.find(l => /P-API|33\./.test(l)));
 
 /* ---- Deletion ---- */

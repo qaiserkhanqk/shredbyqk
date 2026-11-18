@@ -10,7 +10,13 @@
     "fixtures": "node tests/make-fixtures.mjs",
     "start": "python3 -m http.server 8080",
     "eval:cycle": "node tools/cycle-eval.mjs",
-    "sim:patterns": "node tools/pattern-null-sim.mjs"
+    "sim:patterns": "node tools/pattern-null-sim.mjs",
+    "research:start": "node research/server/server.js",
+    "research:demo": "node research/tools/demo.mjs",
+    "research:test": "node research/tests/ingest.test.mjs && node research/tests/analysis.test.mjs && node research/tests/extensions.test.mjs && node research/tests/api.test.mjs",
+    "research:e2e": "node research/tests/e2e.cjs",
+    "research:eval": "node research/tools/evaluate.mjs",
+    "research:fixtures": "node research/tools/make-fixtures.mjs"
   },
   "keywords": [],
   "author": "",

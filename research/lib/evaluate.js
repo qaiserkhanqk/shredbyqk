@@ -36,7 +36,7 @@ export function evaluateForecast(people, config) {
     }
   }
   const est = rows.filter(r => r.status === 'estimate'), errs = est.map(r => r.error).sort((a, b) => a - b);
-  const abst = {}; for (const r of rows.filter(r => r.status !== 'estimate')) for (const c of r.reasons) abst[c] = (abst[c] || 0) + 1;
+  const abst = {}; for (const r of rows.filter(r => r.status !== 'estimate')) abst[r.reasons[0]] = (abst[r.reasons[0]] || 0) + 1; // primary code per abstention
   return {
     endpoint: 'next period start date: forecast point minus logged start (days)', reference: 'synthetic logged period starts (generator truth)', denominator: rows.length,
     estimates: est.length, abstained: rows.length - est.length, abstentionRate: rows.length ? r2((rows.length - est.length) / rows.length) : null, abstentionReasons: abst,
@@ -70,6 +70,6 @@ export function evaluateShift(people, config, toleranceNights = 2) {
     cyclesWithEvent: ev.length, abstainedWithEvent: ev.length - decided.length, detectedWithinTolerance: hits.length, detectedOutsideTolerance: decided.filter(r => r.status === 'shift_detected').length - hits.length, missed: decided.filter(r => r.status === 'no_clear_shift').length,
     sensitivityAmongDecided: decided.length ? r2(hits.length / decided.length) : null,
     cyclesWithoutEvent: flat.length, abstainedWithoutEvent: flat.filter(r => r.status === 'insufficient_data').length, falseDetections: flat.filter(r => r.status === 'shift_detected').length,
-    offsetQuantiles: offs.length ? { p10: quantile(offs, 0.1), p50: quantile(offs, 0.5), p90: quantile(offs, 0.9) } : null, rows,
+    offsetQuantiles: offs.length ? { p10: r2(quantile(offs, 0.1)), p50: r2(quantile(offs, 0.5)), p90: r2(quantile(offs, 0.9)) } : null, rows,
   };
 }
