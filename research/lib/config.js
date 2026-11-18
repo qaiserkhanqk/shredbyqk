@@ -21,9 +21,9 @@ export const CONFIG = Object.freeze({
     labelShiftHours: 12, // a night is labelled by the local date of (local time − 12 h), so 23:00 and 02:00 share a label
   },
   quality: {
-    skin_temperature: { minValidSamples: 6, minCoverageMinutes: 180, maxGapMinutes: 90, jumpPerMinute: 0.05, outlierMadK: 5 },
+    skin_temperature: { minValidSamples: 6, minCoverageMinutes: 180, maxGapMinutes: 90, jumpPerMinute: 0.05, outlierMadK: 5, outlierMinScale: 0.05 },
     basal_body_temperature: { minValidSamples: 1, minCoverageMinutes: 0, maxGapMinutes: null, jumpPerMinute: null, outlierMadK: null },
-    ambient_temperature: { minValidSamples: 6, minCoverageMinutes: 180, maxGapMinutes: 90, jumpPerMinute: 0.2, outlierMadK: 5 },
+    ambient_temperature: { minValidSamples: 6, minCoverageMinutes: 180, maxGapMinutes: 90, jumpPerMinute: 0.2, outlierMadK: 5, outlierMinScale: 0.1 },
     // Only flags the source documents. Anything else is kept verbatim and not interpreted.
     exclusionFlags: ['off_body', 'no_contact', 'sensor_error'],
   },
