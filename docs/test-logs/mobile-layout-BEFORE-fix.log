@@ -1,0 +1,68 @@
+ok   iPhone SE · welcome: nothing wider than the screen
+FAIL iPhone SE · welcome: every control at least 24×24 px  — 2: button#listenBtn "Listen" 59×18; button#morningCheck "Add more detail" 250×19
+FAIL iPhone SE · welcome: input text at least 16 px (no iOS zoom on focus)  — input#welcomeName 12.8px
+ok   iPhone SE: pinch-zoom is not disabled
+ok   iPhone SE · today tab: nothing wider than the screen
+FAIL iPhone SE · today tab: every control at least 24×24 px  — 2: button#listenBtn "Listen" 59×18; button#morningCheck "Add more detail" 250×19
+ok   iPhone SE · today tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone SE · train tab: nothing wider than the screen
+ok   iPhone SE · train tab: every control at least 24×24 px
+FAIL iPhone SE · train tab: input text at least 16 px (no iOS zoom on focus)  — input#exSearch 12.8px
+ok   iPhone SE · progress tab: nothing wider than the screen
+FAIL iPhone SE · progress tab: every control at least 24×24 px  — 4: summary "Training days" 250×23; summary "Profile & coach" 250×23; summary "Studio: record QK's voic" 250×23; summary "App health & diagnostics" 250×23
+FAIL iPhone SE · progress tab: input text at least 16 px (no iOS zoom on focus)  — input#planTime 12.8px; input#planPlace 12.8px; input#pName 12.8px; select#pSex "MaleFemale" 12.8px; input#pHeight 12.8px; select#voiceSel "Automatic" 12.8px
+ok   iPhone SE · body tab: nothing wider than the screen
+ok   iPhone SE · body tab: every control at least 24×24 px
+ok   iPhone SE · body tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone SE · cycle consent: nothing wider than the screen
+FAIL iPhone SE · cycle consent: every control at least 24×24 px  — 1: input#cyAgree "on" 250×20
+ok   iPhone SE · cycle consent: input text at least 16 px (no iOS zoom on focus)
+FAIL iPhone SE · cycle screen with synthetic history: nothing wider than the screen  — 0px sideways; label "End" (right edge 345 > 320); input (right edge 345 > 320)
+FAIL iPhone SE · cycle screen with synthetic history: every control at least 24×24 px  — 12: summary "Why this estimate?" 140×23; input#cyUnwell "on" 250×20; input#cyTravel "on" 250×20; summary "Your history" 250×23; input "on" 189×20; button[data-act=deletePeriod] "Delete" 189×19
+FAIL iPhone SE · cycle screen with synthetic history: input text at least 16 px (no iOS zoom on focus)  — input#endFor-mwmyq0x84hnhh "2026-11-19" 12.8px; input#cyDate "2026-11-19" 12.8px; select "Not loggedLower than usu" 12.8px; select "Not loggedGoodOkayLowAnx" 12.8px; select "Not loggedPoorOKGood" 12.8px; input "2026-11-07" 12.8px
+ok   iPhone 13 · welcome: nothing wider than the screen
+FAIL iPhone 13 · welcome: every control at least 24×24 px  — 2: button#listenBtn "Listen" 59×18; button#morningCheck "Add more detail" 320×19
+FAIL iPhone 13 · welcome: input text at least 16 px (no iOS zoom on focus)  — input#welcomeName 12.8px
+ok   iPhone 13: pinch-zoom is not disabled
+ok   iPhone 13 · today tab: nothing wider than the screen
+FAIL iPhone 13 · today tab: every control at least 24×24 px  — 2: button#listenBtn "Listen" 59×18; button#morningCheck "Add more detail" 320×19
+ok   iPhone 13 · today tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone 13 · train tab: nothing wider than the screen
+ok   iPhone 13 · train tab: every control at least 24×24 px
+FAIL iPhone 13 · train tab: input text at least 16 px (no iOS zoom on focus)  — input#exSearch 12.8px
+ok   iPhone 13 · progress tab: nothing wider than the screen
+FAIL iPhone 13 · progress tab: every control at least 24×24 px  — 4: summary "Training days" 320×23; summary "Profile & coach" 320×23; summary "Studio: record QK's voic" 320×23; summary "App health & diagnostics" 320×23
+FAIL iPhone 13 · progress tab: input text at least 16 px (no iOS zoom on focus)  — input#planTime 12.8px; input#planPlace 12.8px; input#pName 12.8px; select#pSex "MaleFemale" 12.8px; input#pHeight 12.8px; select#voiceSel "Automatic" 12.8px
+ok   iPhone 13 · body tab: nothing wider than the screen
+ok   iPhone 13 · body tab: every control at least 24×24 px
+ok   iPhone 13 · body tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone 13 · cycle consent: nothing wider than the screen
+FAIL iPhone 13 · cycle consent: every control at least 24×24 px  — 1: input#cyAgree "on" 320×20
+ok   iPhone 13 · cycle consent: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone 13 · cycle screen with synthetic history: nothing wider than the screen
+FAIL iPhone 13 · cycle screen with synthetic history: every control at least 24×24 px  — 12: summary "Why this estimate?" 140×23; input#cyUnwell "on" 155×20; input#cyTravel "on" 155×20; summary "Your history" 320×23; input "on" 189×20; button[data-act=deletePeriod] "Delete" 189×19
+FAIL iPhone 13 · cycle screen with synthetic history: input text at least 16 px (no iOS zoom on focus)  — input#endFor-mwmyq5so4obfv "2026-11-19" 12.8px; input#cyDate "2026-11-19" 12.8px; select "Not loggedLower than usu" 12.8px; select "Not loggedGoodOkayLowAnx" 12.8px; select "Not loggedPoorOKGood" 12.8px; input "2026-11-07" 12.8px
+ok   Pixel 7 · welcome: nothing wider than the screen
+FAIL Pixel 7 · welcome: every control at least 24×24 px  — 2: button#listenBtn "Listen" 59×18; button#morningCheck "Add more detail" 342×19
+FAIL Pixel 7 · welcome: input text at least 16 px (no iOS zoom on focus)  — input#welcomeName 12.8px
+ok   Pixel 7: pinch-zoom is not disabled
+ok   Pixel 7 · today tab: nothing wider than the screen
+FAIL Pixel 7 · today tab: every control at least 24×24 px  — 2: button#listenBtn "Listen" 59×18; button#morningCheck "Add more detail" 342×19
+ok   Pixel 7 · today tab: input text at least 16 px (no iOS zoom on focus)
+ok   Pixel 7 · train tab: nothing wider than the screen
+ok   Pixel 7 · train tab: every control at least 24×24 px
+FAIL Pixel 7 · train tab: input text at least 16 px (no iOS zoom on focus)  — input#exSearch 12.8px
+ok   Pixel 7 · progress tab: nothing wider than the screen
+FAIL Pixel 7 · progress tab: every control at least 24×24 px  — 4: summary "Training days" 342×23; summary "Profile & coach" 342×23; summary "Studio: record QK's voic" 342×23; summary "App health & diagnostics" 342×23
+FAIL Pixel 7 · progress tab: input text at least 16 px (no iOS zoom on focus)  — input#planTime 12.8px; input#planPlace 12.8px; input#pName 12.8px; select#pSex "MaleFemale" 12.8px; input#pHeight 12.8px; select#voiceSel "Automatic" 12.8px
+ok   Pixel 7 · body tab: nothing wider than the screen
+ok   Pixel 7 · body tab: every control at least 24×24 px
+ok   Pixel 7 · body tab: input text at least 16 px (no iOS zoom on focus)
+ok   Pixel 7 · cycle consent: nothing wider than the screen
+FAIL Pixel 7 · cycle consent: every control at least 24×24 px  — 1: input#cyAgree "on" 342×20
+ok   Pixel 7 · cycle consent: input text at least 16 px (no iOS zoom on focus)
+ok   Pixel 7 · cycle screen with synthetic history: nothing wider than the screen
+FAIL Pixel 7 · cycle screen with synthetic history: every control at least 24×24 px  — 13: summary "Why this estimate?" 140×23; input#cyUnwell "on" 166×20; input#cyTravel "on" 166×20; summary "Your history" 342×23; input "on" 189×20; button[data-act=deletePeriod] "Delete" 189×19
+FAIL Pixel 7 · cycle screen with synthetic history: input text at least 16 px (no iOS zoom on focus)  — input#endFor-mwmyqajw4srjk "2026-11-19" 12.8px; input#cyDate "2026-11-19" 12.8px; select "Not loggedLower than usu" 12.8px; select "Not loggedGoodOkayLowAnx" 12.8px; select "Not loggedPoorOKGood" 12.8px; input "2026-11-07" 12.8px
+ok   no JavaScript errors on any phone
+28 FAILED of 67
