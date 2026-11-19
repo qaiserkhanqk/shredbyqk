@@ -2,7 +2,7 @@
 // to the participant actually rendered, and import previews bound to file, type and participant. Responses are delayed
 // and reordered with Playwright request interception. Real server on 127.0.0.1, in-memory database, synthetic data.
 // Run: node research/tests/e2e-races.cjs
-const { chromium } = require('playwright');
+const { launch } = require('../../tests/browser.cjs'); // E2E_BROWSER=chromium|firefox|webkit
 const path = require('path'), fs = require('fs'), os = require('os'), http = require('http');
 let fails = 0, count = 0;
 const check = (name, ok, detail = '') => { count++; if (!ok) fails++; console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${!ok && detail ? '  — ' + detail : ''}`); };
@@ -18,7 +18,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const server = http.createServer(createApp({ store, settings: { secureCookies: true, idleMs: 30 * 60e3, absoluteMs: 8 * 36e5 }, log: () => {} }));
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   const BASE = `http://127.0.0.1:${server.address().port}`;
-  const b = await chromium.launch(), errs = [];
+  const b = await launch(), errs = [];
   const ctx = await b.newContext(), p = await ctx.newPage();
   p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
   // Delay any GET for participant A by `delayA` ms (0 = no delay).

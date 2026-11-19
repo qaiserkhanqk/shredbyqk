@@ -1,7 +1,7 @@
 // Browser test of the account features: two-factor sign-in (required for researchers), self-enrolment for a
 // participant, password change, the session list and "sign out other sessions". Real server on 127.0.0.1, in-memory
 // database, Secure cookies ON, synthetic data. Run: node research/tests/e2e-account.cjs
-const { chromium } = require('playwright');
+const { launch } = require('../../tests/browser.cjs'); // E2E_BROWSER=chromium|firefox|webkit
 const http = require('http');
 let fails = 0, count = 0;
 const check = (name, ok, detail = '') => { count++; if (!ok) fails++; console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${!ok && detail ? '  — ' + detail : ''}`); };
@@ -19,7 +19,7 @@ const check = (name, ok, detail = '') => { count++; if (!ok) fails++; console.lo
   const server = http.createServer(createApp({ store, settings: { secureCookies: true, idleMs: 30 * 60e3, absoluteMs: 8 * 36e5, requireMfaRoles: ['admin', 'researcher'] }, log: () => {}, now: () => clock }));
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   const BASE = `http://127.0.0.1:${server.address().port}`;
-  const b = await chromium.launch(), errs = [], external = [];
+  const b = await launch(), errs = [], external = [];
   const ctx = await b.newContext(), p = await ctx.newPage();
   p.on('pageerror', e => errs.push(e.message));
   p.on('console', m => { if (m.type() === 'error' && !/^Failed to load resource: the server responded with a status of (401|403)/.test(m.text())) errs.push(m.text()); });

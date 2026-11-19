@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "test": "node tests/simulate.mjs && node tests/gait.mjs && node tests/library.mjs && node tests/squatTracker.test.ts && node tests/measurement.test.mjs && node tests/regression.test.mjs && node tests/rehab.test.mjs && node tests/load.test.mjs && node tests/cycle.test.mjs && node tests/cycle-integration.test.mjs && node tests/cycle-nudges.test.mjs && node tests/cycle-regressions.test.mjs && node tests/cycle-regressions-80ea40f.test.mjs && node tests/cycle-regressions-29780c5.test.mjs && node tests/cycle-summary-lh.test.mjs && node tests/cycle-regressions-b3d9589.test.mjs && node tests/cycle-regressions-f67000b.test.mjs && node tests/cycle-regressions-21317c5.test.mjs",
-    "test:e2e": "node tests/e2e.cjs && node tests/cycle-ui-regressions.cjs && node tests/cycle-ui-summary-lh.cjs && node tests/cycle-ui-races.cjs",
+    "test": "node tests/simulate.mjs && node tests/gait.mjs && node tests/library.mjs && node tests/squatTracker.test.ts && node tests/measurement.test.mjs && node tests/regression.test.mjs && node tests/rehab.test.mjs && node tests/load.test.mjs && node tests/cycle.test.mjs && node tests/cycle-integration.test.mjs && node tests/cycle-nudges.test.mjs && node tests/cycle-regressions.test.mjs && node tests/cycle-regressions-80ea40f.test.mjs && node tests/cycle-regressions-29780c5.test.mjs && node tests/cycle-summary-lh.test.mjs && node tests/cycle-regressions-b3d9589.test.mjs && node tests/cycle-regressions-f67000b.test.mjs && node tests/cycle-regressions-21317c5.test.mjs && node tests/compat-check.test.mjs",
+    "test:e2e": "node tests/e2e.cjs && node tests/cycle-ui-regressions.cjs && node tests/cycle-ui-summary-lh.cjs && node tests/cycle-ui-races.cjs && node tests/mobile-layout.cjs",
     "replay": "node tests/replay.mjs",
     "validate": "node tests/validate.mjs",
     "fixtures": "node tests/make-fixtures.mjs",
@@ -18,7 +18,12 @@
     "research:eval": "node research/tools/evaluate.mjs",
     "research:fixtures": "node research/tools/make-fixtures.mjs",
     "research:acceptance": "node research/tools/supplier-acceptance.mjs",
-    "research:acceptance-sample": "node research/tools/make-acceptance-sample.mjs"
+    "research:acceptance-sample": "node research/tools/make-acceptance-sample.mjs",
+    "test:e2e:firefox": "E2E_BROWSER=firefox npm run test:e2e",
+    "test:e2e:webkit": "E2E_BROWSER=webkit npm run test:e2e",
+    "research:e2e:firefox": "E2E_BROWSER=firefox npm run research:e2e",
+    "research:e2e:webkit": "E2E_BROWSER=webkit npm run research:e2e",
+    "compat:audit": "node tools/compat-audit.mjs"
   },
   "keywords": [],
   "author": "",

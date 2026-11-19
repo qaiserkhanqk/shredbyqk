@@ -1,0 +1,69 @@
+(node:4178) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ok   label: the persistent research label is shown before sign-in
+ok   panel: "What this can and cannot tell you" is shown
+ok   auth: signed in with Secure, HttpOnly session cookie over local http
+ok   researcher: sees the three synthetic participants
+ok   dashboard: label stays visible on the participant page
+ok   dashboard: quality summary, timeline, bleeding annotations and provenance are shown
+ok   dashboard: experimental results are absent until a researcher enables them
+ok   policy (participant page, experimental off): no forbidden phrase on the page
+ok   experimental: shown in a separate, labelled experimental card with uncertainty and reasons
+ok   experimental: shift markers appear only in the separate experimental band of the timeline
+ok   policy (participant page, experimental on): no forbidden phrase on the page
+ok   device change: the transition is marked on the timeline
+ok   flat signal: experimental results never say "did not ovulate" (policy) and use the no-shift wording or insufficient data
+ok   import: preview shows counts before anything is stored
+ok   import: commit succeeds
+ok   import: the same file again is recognised as already imported
+ok   import: an explicit reimport is offered for an already-imported file
+ok   import: the reimport preview revalidates every row (all already stored → 0 to add)
+ok   export: CSV download starts with the research label
+ok   participant: sees own page with no import, feature or experimental controls
+ok   policy (participant self-view): no forbidden phrase on the page
+ok   participant: the API refuses another participant's data even when called directly
+ok   delete: raw and derived records for the participant are gone after deleting from the UI
+ok   privacy: the page made no request to any other host
+ok   logs: no participant references or values in server logs
+ok   no JavaScript or CSP errors in the browser
+ALL PASS (26)
+(node:4255) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ok   1 reversed responses: B stays rendered after A's late response arrives
+ok   1 a mutation made on the rendered page changes exactly that participant
+ok   2 navigating home during loading: the list stays; A's late response is discarded
+ok   3 logging out during loading: the sign-in view stays, no participant data is rendered, and the late response raises no error
+ok   4 setup: a preview enables Commit
+ok   4 choosing another file after a preview disables Commit
+ok   4 a forced Commit after the file changed commits nothing
+ok   4 changing the import type after a preview disables Commit
+ok   4 a forced Commit after the type changed commits nothing
+ok   4 a preview made for one participant cannot be committed from another participant's page
+ok   4 a slow preview response for an earlier file does not enable Commit for the newly chosen file
+ok   4 ... and a forced Commit then commits nothing
+ok   4 control: preview then commit of the same file still works
+ok   no JavaScript errors
+ALL PASS (14)
+(node:4348) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ok   mfa ui: a researcher without two-factor is told it must be set up first
+ok   mfa ui: after the password, a code field appears
+ok   mfa ui: a wrong code is refused and stays on the sign-in form
+ok   mfa ui: password + valid code signs in
+ok   mfa ui: the password field is cleared after the two-step sign-in
+ok   account ui: a second session exists (other browser)
+ok   account ui: the session list shows both sessions, this one marked
+ok   account ui: two-factor status is shown as on and required
+ok   account ui: "sign out other sessions" leaves only this one
+ok   account ui: a wrong current password is reported
+ok   account ui: the password is changed
+ok   account ui: the password fields are cleared after a change
+ok   account ui: the old password no longer works
+ok   participant ui: signs in without two-factor
+ok   participant ui: two-factor shown as off and optional
+ok   participant ui: setup shows the secret to type into an authenticator app (no QR service is contacted)
+ok   participant ui: confirming shows 10 one-time recovery codes
+ok   participant ui: status now shows two-factor on
+ok   no external requests
+ok   no script, CSP or console errors
+ALL PASS (20)

@@ -12,8 +12,11 @@ function chosen() {
   if (!NAMES.includes(name)) { console.error(`E2E_BROWSER must be one of ${NAMES.join(', ')} (got "${name}")`); process.exit(1); }
   return name;
 }
-async function launch(opts = {}) {
+/** Launches the chosen browser. Browser-specific options: chromiumArgs (command-line switches), firefoxUserPrefs. */
+async function launch({ chromiumArgs, firefoxUserPrefs, ...opts } = {}) {
   const name = chosen();
+  if (name === 'chromium' && chromiumArgs) opts.args = [...(opts.args || []), ...chromiumArgs];
+  if (name === 'firefox' && firefoxUserPrefs) opts.firefoxUserPrefs = { ...(opts.firefoxUserPrefs || {}), ...firefoxUserPrefs };
   try {
     const b = await pw[name].launch(opts);
     if (process.env.E2E_BROWSER) console.log(`browser: ${name} ${b.version()}`);

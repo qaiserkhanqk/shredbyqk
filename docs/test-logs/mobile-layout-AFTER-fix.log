@@ -1,0 +1,68 @@
+ok   iPhone SE · welcome: nothing wider than the screen
+ok   iPhone SE · welcome: every control at least 24×24 px
+ok   iPhone SE · welcome: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone SE: pinch-zoom is not disabled
+ok   iPhone SE · today tab: nothing wider than the screen
+ok   iPhone SE · today tab: every control at least 24×24 px
+ok   iPhone SE · today tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone SE · train tab: nothing wider than the screen
+ok   iPhone SE · train tab: every control at least 24×24 px
+ok   iPhone SE · train tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone SE · progress tab: nothing wider than the screen
+ok   iPhone SE · progress tab: every control at least 24×24 px
+ok   iPhone SE · progress tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone SE · body tab: nothing wider than the screen
+ok   iPhone SE · body tab: every control at least 24×24 px
+ok   iPhone SE · body tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone SE · cycle consent: nothing wider than the screen
+ok   iPhone SE · cycle consent: every control at least 24×24 px
+ok   iPhone SE · cycle consent: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone SE · cycle screen with synthetic history: nothing wider than the screen
+ok   iPhone SE · cycle screen with synthetic history: every control at least 24×24 px
+ok   iPhone SE · cycle screen with synthetic history: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone 13 · welcome: nothing wider than the screen
+ok   iPhone 13 · welcome: every control at least 24×24 px
+ok   iPhone 13 · welcome: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone 13: pinch-zoom is not disabled
+ok   iPhone 13 · today tab: nothing wider than the screen
+ok   iPhone 13 · today tab: every control at least 24×24 px
+ok   iPhone 13 · today tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone 13 · train tab: nothing wider than the screen
+ok   iPhone 13 · train tab: every control at least 24×24 px
+ok   iPhone 13 · train tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone 13 · progress tab: nothing wider than the screen
+ok   iPhone 13 · progress tab: every control at least 24×24 px
+ok   iPhone 13 · progress tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone 13 · body tab: nothing wider than the screen
+ok   iPhone 13 · body tab: every control at least 24×24 px
+ok   iPhone 13 · body tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone 13 · cycle consent: nothing wider than the screen
+ok   iPhone 13 · cycle consent: every control at least 24×24 px
+ok   iPhone 13 · cycle consent: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone 13 · cycle screen with synthetic history: nothing wider than the screen
+ok   iPhone 13 · cycle screen with synthetic history: every control at least 24×24 px
+ok   iPhone 13 · cycle screen with synthetic history: input text at least 16 px (no iOS zoom on focus)
+ok   Pixel 7 · welcome: nothing wider than the screen
+ok   Pixel 7 · welcome: every control at least 24×24 px
+ok   Pixel 7 · welcome: input text at least 16 px (no iOS zoom on focus)
+ok   Pixel 7: pinch-zoom is not disabled
+ok   Pixel 7 · today tab: nothing wider than the screen
+ok   Pixel 7 · today tab: every control at least 24×24 px
+ok   Pixel 7 · today tab: input text at least 16 px (no iOS zoom on focus)
+ok   Pixel 7 · train tab: nothing wider than the screen
+ok   Pixel 7 · train tab: every control at least 24×24 px
+ok   Pixel 7 · train tab: input text at least 16 px (no iOS zoom on focus)
+ok   Pixel 7 · progress tab: nothing wider than the screen
+ok   Pixel 7 · progress tab: every control at least 24×24 px
+ok   Pixel 7 · progress tab: input text at least 16 px (no iOS zoom on focus)
+ok   Pixel 7 · body tab: nothing wider than the screen
+ok   Pixel 7 · body tab: every control at least 24×24 px
+ok   Pixel 7 · body tab: input text at least 16 px (no iOS zoom on focus)
+ok   Pixel 7 · cycle consent: nothing wider than the screen
+ok   Pixel 7 · cycle consent: every control at least 24×24 px
+ok   Pixel 7 · cycle consent: input text at least 16 px (no iOS zoom on focus)
+ok   Pixel 7 · cycle screen with synthetic history: nothing wider than the screen
+ok   Pixel 7 · cycle screen with synthetic history: every control at least 24×24 px
+ok   Pixel 7 · cycle screen with synthetic history: input text at least 16 px (no iOS zoom on focus)
+ok   no JavaScript errors on any phone
+ALL PASS (67)

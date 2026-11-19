@@ -1,7 +1,7 @@
 // End-to-end test: runs the real app in Chromium (fake camera) and clicks through every flow.
 // Serves the files via request interception, so no web server is needed.
 // Run: node tests/e2e.cjs   (needs Playwright + Chromium; not run in CI)
-const { chromium } = require('playwright');
+const { launch } = require('./browser.cjs'); // E2E_BROWSER=chromium|firefox|webkit
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.task': 'application/octet-stream', '.webmanifest': 'application/manifest+json' };
@@ -9,7 +9,7 @@ let fails = 0;
 const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? '  — ' + detail : ''}`); if (!ok) fails++; };
 
 (async () => {
-  const b = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
+  const b = await launch({ chromiumArgs: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'], firefoxUserPrefs: { 'media.navigator.streams.fake': true, 'media.navigator.permission.disabled': true } });
   // Service workers are blocked: their script fetch bypasses request interception, which only exists in this test.
   const ctx = await b.newContext({ viewport: { width: 400, height: 860 }, acceptDownloads: true, serviceWorkers: 'block' });
   const serve = r => {

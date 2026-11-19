@@ -1,7 +1,7 @@
 // Browser regression tests for phone-app input races reported against 21317c5: values must be captured when the user
 // acts, not read from the page later inside a delayed or retried repository transaction. Saves are delayed by holding
 // the same cross-tab Web Lock the app uses. Synthetic data only. Run: node tests/cycle-ui-races.cjs
-const { chromium } = require('playwright');
+const { launch } = require('./browser.cjs'); // E2E_BROWSER=chromium|firefox|webkit
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.task': 'application/octet-stream', '.webmanifest': 'application/manifest+json' };
@@ -11,7 +11,7 @@ const dayStr = n => { const d = new Date(); d.setDate(d.getDate() + n); return `
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 (async () => {
-  const b = await chromium.launch(), errs = [];
+  const b = await launch(), errs = [];
   const serve = r => { let p = new URL(r.request().url()).pathname; if (p === '/') p = '/index.html'; const f = path.join(ROOT, p);
     if (!fs.existsSync(f)) return r.fulfill({ status: 404, body: '' }); r.fulfill({ status: 200, body: fs.readFileSync(f), headers: { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' } }); };
   const c = await b.newContext({ serviceWorkers: 'block' }); await c.route('https://shred.local/**', serve);

@@ -1,6 +1,6 @@
 // Browser regression test for issue 5 reproduced in 29780c5: symptom-pattern findings must not be displayed unless the
 // separate research flag is on. Synthetic data only. Run: node tests/cycle-ui-regressions.cjs
-const { chromium } = require('playwright');
+const { launch } = require('./browser.cjs'); // E2E_BROWSER=chromium|firefox|webkit
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.task': 'application/octet-stream', '.webmanifest': 'application/manifest+json' };
@@ -9,7 +9,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
 const dayStr = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 (async () => {
-  const b = await chromium.launch(); const errs = [];
+  const b = await launch(); const errs = [];
   const serve = r => { let p = new URL(r.request().url()).pathname; if (p === '/') p = '/index.html'; const f = path.join(ROOT, p);
     if (!fs.existsSync(f)) return r.fulfill({ status: 404, body: '' }); r.fulfill({ status: 200, body: fs.readFileSync(f), headers: { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' } }); };
   async function run(flags) {

@@ -54,6 +54,7 @@ export const listClipIds = () => tx('readonly', s => s.getAllKeys()).catch(() =>
 
 /** Record from the microphone until stop() is called. */
 export async function startRecording() {
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) throw new Error('recording_unsupported'); // the caller shows a message
   const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
   const rec = new MediaRecorder(stream), chunks = [];
   rec.ondataavailable = e => e.data.size && chunks.push(e.data);

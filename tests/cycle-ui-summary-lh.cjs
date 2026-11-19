@@ -1,6 +1,6 @@
 // Browser tests for the doctor summary and optional LH-test logging. Written BEFORE the UI code.
 // Synthetic data only. Run: node tests/cycle-ui-summary-lh.cjs
-const { chromium } = require('playwright');
+const { launch } = require('./browser.cjs'); // E2E_BROWSER=chromium|firefox|webkit
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.task': 'application/octet-stream', '.webmanifest': 'application/manifest+json' };
@@ -10,7 +10,7 @@ const dayStr = n => { const d = new Date(); d.setDate(d.getDate() + n); return `
 const has = async (p, sel) => (await p.$(sel)) !== null;
 
 (async () => {
-  const b = await chromium.launch(); const errs = [];
+  const b = await launch(); const errs = [];
   const serve = r => { let p = new URL(r.request().url()).pathname; if (p === '/') p = '/index.html'; const f = path.join(ROOT, p);
     if (!fs.existsSync(f)) return r.fulfill({ status: 404, body: '' }); r.fulfill({ status: 200, body: fs.readFileSync(f), headers: { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' } }); };
   async function open(flags) {
