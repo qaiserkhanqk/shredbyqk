@@ -127,6 +127,7 @@ research/
     pipeline.js   one participant's analysis as known at a cutoff, with provenance and input hashes
     evaluate.js   leakage-checked forecast evaluation; shift-rule evaluation against synthetic events
     adapters.js   documented-file adapter; vendor STUBS with integration questions
+    acceptance.js supplier acceptance test: runs a supplier's sample through the checklist (files only; never marks a device verified)
     ml.js         model-card validator + registry guard (no model exists)
     synth.js      seeded synthetic data generator
   server/     store.js (SQLite, parameterised, isolation, deletion, field encryption), server.js (HTTP API + static), cli.mjs (operator commands),
@@ -155,6 +156,7 @@ research/
 | `research/tests/e2e-races.cjs`: dashboard with delayed and reordered responses; stale page, home and logout races; preview bound to participant, file and type | 14 | **all pass** |
 | `research/tests/migration.test.mjs`: upgrading a database made by an earlier version (schema 1 → 4) | 9 | **all pass** |
 | `research/tests/security.test.mjs`: encryption at rest (no payload readable in the database files; identical analysis; duplicates, conflicts, corrections and consent purges still work; wrong or missing key refused; key rotation; in-place encryption of an old database), key files, RFC 6238 vectors, two-factor sign-in (replay, recovery codes, lockout, enrolment, required roles), password change, session list and sign-out of others, encrypted backups (tamper and wrong-key refusal, retention, restore re-applies deletions), CLI | 102 | **all pass** |
+| `research/tests/acceptance.test.mjs`: supplier acceptance test passes good synthetic band data and fails each broken variant on its own checklist item (schema, identity, offsets, sampling, undocumented flags, too few nights, clock drift, unflagged off-wrist, missing firmware or time-zone change, re-sync conflicts, units); missing evidence is "not tested"; unreviewed supplier answers block the verdict; CLI | 29 | **all pass** |
 | `research/tests/e2e-account.cjs`: two-step sign-in, Account page, session sign-out, password change, participant self-enrolment, in Chromium | 20 | **all pass** |
 | `research/tests/e2e.cjs`: dashboard in headless Chromium with Secure cookies (each participant page is marked with `data-participant`); label, can/cannot panel, timeline, experimental separation, device-change marker, UI import, duplicate detection, explicit reimport, CSV export, participant self-view and API refusal, UI deletion, no external requests, clean logs, no script or CSP errors | 26 | **all pass** |
 
@@ -176,7 +178,7 @@ research/
 | Threat model and privacy checklist | `docs/threat-model.md` |
 | Security operations: keys, two-factor, backups, restore, rotation | `docs/security-operations.md` |
 | Evaluation plan for a future approved prospective study | `docs/evaluation-plan.md` |
-| Supplier integration checklist | `docs/supplier-checklist.md` |
+| Supplier integration checklist, and how to run the acceptance test on a supplier's sample | `docs/supplier-checklist.md` (example: `fixtures/acceptance-synthetic/`) |
 | ML extension interface and evaluation specification | `docs/ml-evaluation-spec.md` |
 | Source register (what was and wasn't read) | `docs/sources.md` |
 | What remains unvalidated or disabled, and known defects | `docs/unvalidated-and-disabled.md` |

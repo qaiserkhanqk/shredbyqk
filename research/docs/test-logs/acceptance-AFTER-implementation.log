@@ -1,0 +1,30 @@
+ok   good: every automated checklist item passes
+ok   good: with every supplier answer reviewed, the verdict is "technically_verified"
+ok   good: the report says it is technical only (not accuracy, clinical use or ovulation)
+ok   good: a synthetic sample is labelled as synthetic
+ok   good: the nights item reports per person and the quality share with its denominator
+ok   good: the bench item reports the difference for review and applies no invented tolerance
+ok   good: the report passes the output policy (no forbidden wording)
+ok   good: the report never claims the device "works" or is "validated"
+ok   good: the SWL DS07 adapter is still a stub (passing a sample changes nothing)
+ok   answers: without written answers the verdict is "not_verified" and lists them
+ok   answers: a supplier answer that we have not reviewed is "supplier_answered", not verified
+ok   fail: a row with an impossible timestamp → files_parse_cleanly fails and the verdict is not_verified
+ok   fail: firmware missing on some records → identity_on_every_record fails and the verdict is not_verified
+ok   fail: no sampling interval and no end time → sampling_interval_declared fails and the verdict is not_verified
+ok   fail: an undocumented quality flag → quality_flags_documented fails and the verdict is not_verified
+ok   fail: only two people with 10 consecutive nights → nights_and_quality fails and the verdict is not_verified
+ok   fail: a reference-clock pair 3 minutes apart → clock_within_2_minutes fails and the verdict is not_verified
+ok   fail: off-wrist samples not flagged → off_wrist_flagged fails and the verdict is not_verified
+ok   fail: the expected firmware change does not show in the data → firmware_change_detected fails and the verdict is not_verified
+ok   fail: offsets not updated after travel → time_zone_change_reflected fails and the verdict is not_verified
+ok   fail: a re-sync that changes stored values → resync_no_duplicates fails and the verdict is not_verified
+ok   units: correctly declared °F values agree with a °C bench reference after conversion
+ok   fail: the bench reference matches the other unit better than the declared one → units_confirmed_against_bench fails and the verdict is not_verified
+ok   not tested: items without their evidence are "not_tested", and the verdict is not_verified
+ok   not tested: a re-sync export that shares no rows with the first export did not test de-duplication
+ok   cli: a passing sample exits 0 and writes the Markdown and JSON reports
+ok   cli: an incomplete sample exits 1 (not verified)
+ok   cli: missing arguments exit 2 with usage
+ok   cli: the Markdown report shows every checklist item with its status
+ALL PASS (29)

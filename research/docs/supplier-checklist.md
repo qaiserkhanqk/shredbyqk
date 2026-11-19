@@ -29,3 +29,25 @@ No vendor API or SDK is implemented or assumed. `research/lib/adapters.js` conta
 - units confirmed against a bench reference.
 
 Passing these makes the integration *technically* verified only. It says nothing about clinical usefulness.
+
+## Running the acceptance test on a supplier's sample
+`research/tools/supplier-acceptance.mjs` runs the checks above that a file can show, and lists the items that need a written answer. It reads files and writes a report. Nothing is stored or sent anywhere. Try it on the synthetic example in `research/fixtures/acceptance-synthetic/` first (see its README).
+
+**What it needs:**
+1. **The supplier's export for 3 or more people, mapped to the documented observation format** (`data-dictionary.md`) by the adapter under test. Writing that mapping is the first job once the SDK and its documentation arrive. Use one file per person, covering 10+ consecutive nights.
+2. **A supplier profile (JSON):**
+   - the device name;
+   - the quality flags the supplier documents, and which of them mean off-wrist;
+   - the firmware update and time-zone change you plan during the sample;
+   - the supplier's written answers. Each answer needs a `source`, and our review needs `reviewedBy` and `reviewedOn`.
+3. **Evidence files (CSV)** for the items a sample file alone cannot show:
+   - **Re-sync export:** the same period sent again after an interrupted sync.
+   - **Reference clock:** `participant_ref, device_serial_pseudonym, device_time_utc, reference_time_utc`.
+   - **Wear log:** `participant_ref, removed_at_utc, put_on_at_utc`.
+   - **Bench reference:** `device_serial_pseudonym, timestamp_utc, reference_c`.
+
+**What it reports:** each item is **pass**, **fail**, **not tested** (its evidence was not supplied), **needs written answer**, **answered, not reviewed** or **reviewed**.
+- The verdict is *technically verified* only when every file check passes **and** every written answer has been reviewed.
+- Bench differences are reported (median, 95th percentile), not judged against a tolerance; this checklist sets no number for them.
+- The report always says that it is technical only. It is not evidence of accuracy or clinical usefulness, and it does not detect or confirm ovulation.
+- **It never changes an adapter's status.** The SWL DS07 adapter stays a stub until a real integration is written and reviewed.

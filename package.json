@@ -13,10 +13,12 @@
     "sim:patterns": "node tools/pattern-null-sim.mjs",
     "research:start": "node research/server/server.js",
     "research:demo": "node research/tools/demo.mjs",
-    "research:test": "node research/tests/ingest.test.mjs && node research/tests/analysis.test.mjs && node research/tests/extensions.test.mjs && node research/tests/api.test.mjs && node research/tests/regressions-b3d9589.test.mjs && node research/tests/regressions-f67000b.test.mjs && node research/tests/migration.test.mjs && node research/tests/regressions-21317c5.test.mjs && node research/tests/security.test.mjs",
+    "research:test": "node research/tests/ingest.test.mjs && node research/tests/analysis.test.mjs && node research/tests/extensions.test.mjs && node research/tests/api.test.mjs && node research/tests/regressions-b3d9589.test.mjs && node research/tests/regressions-f67000b.test.mjs && node research/tests/migration.test.mjs && node research/tests/regressions-21317c5.test.mjs && node research/tests/security.test.mjs && node research/tests/acceptance.test.mjs",
     "research:e2e": "node research/tests/e2e.cjs && node research/tests/e2e-races.cjs && node research/tests/e2e-account.cjs",
     "research:eval": "node research/tools/evaluate.mjs",
-    "research:fixtures": "node research/tools/make-fixtures.mjs"
+    "research:fixtures": "node research/tools/make-fixtures.mjs",
+    "research:acceptance": "node research/tools/supplier-acceptance.mjs",
+    "research:acceptance-sample": "node research/tools/make-acceptance-sample.mjs"
   },
   "keywords": [],
   "author": "",

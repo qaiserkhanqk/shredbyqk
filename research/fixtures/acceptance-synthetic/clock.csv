@@ -1,0 +1,4 @@
+participant_ref,device_serial_pseudonym,device_time_utc,reference_time_utc
+P-SAMPLE-A,P-SAMPLE-A-dev1,2026-02-03T08:00:30Z,2026-02-03T08:00:00Z
+P-SAMPLE-B,P-SAMPLE-B-dev1,2026-02-03T08:00:30Z,2026-02-03T08:00:00Z
+P-SAMPLE-C,P-SAMPLE-C-dev1,2026-02-03T08:00:30Z,2026-02-03T08:00:00Z

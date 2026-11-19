@@ -1,0 +1,31 @@
+{
+  "synthetic": true,
+  "device": {
+    "manufacturer": "SyntheticCo",
+    "model": "SYN-1",
+    "name": "Synthetic test device (not a real product)"
+  },
+  "documentedFlags": [
+    "off_body"
+  ],
+  "offWristFlags": [
+    "off_body"
+  ],
+  "expect": {
+    "firmwareChange": {
+      "ref": "P-SAMPLE-B",
+      "night": "2026-02-07"
+    },
+    "timeZoneChange": {
+      "ref": "P-SAMPLE-A",
+      "night": "2026-02-08",
+      "offsetMin": 540
+    }
+  },
+  "answers": {
+    "sdk_licence": {
+      "answer": "Example only: replace with the supplier's written answer.",
+      "source": "none (synthetic example)"
+    }
+  }
+}
