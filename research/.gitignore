@@ -1,1 +1,6 @@
 data/
+# Never commit keys, backups or deletion ledgers, wherever they are created.
+*.key
+*.rsb
+*.rsb.part
+deletion-ledger*.jsonl

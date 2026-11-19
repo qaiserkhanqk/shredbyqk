@@ -1,0 +1,23 @@
+(node:1556) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ok   mfa ui: a researcher without two-factor is told it must be set up first
+ok   mfa ui: after the password, a code field appears
+ok   mfa ui: a wrong code is refused and stays on the sign-in form
+ok   mfa ui: password + valid code signs in
+ok   mfa ui: the password field is cleared after the two-step sign-in
+ok   account ui: a second session exists (other browser)
+ok   account ui: the session list shows both sessions, this one marked
+ok   account ui: two-factor status is shown as on and required
+ok   account ui: "sign out other sessions" leaves only this one
+ok   account ui: a wrong current password is reported
+ok   account ui: the password is changed
+ok   account ui: the password fields are cleared after a change
+ok   account ui: the old password no longer works
+ok   participant ui: signs in without two-factor
+ok   participant ui: two-factor shown as off and optional
+ok   participant ui: setup shows the secret to type into an authenticator app (no QR service is contacted)
+ok   participant ui: confirming shows 10 one-time recovery codes
+ok   participant ui: status now shows two-factor on
+ok   no external requests
+ok   no script, CSP or console errors
+ALL PASS (20)

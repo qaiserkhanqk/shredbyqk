@@ -29,3 +29,4 @@ svg .expband { fill: var(--exp-bg); stroke: var(--exp); stroke-dasharray: 4 3; }
 .sw { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin-right: 4px; }
 .sw.o0 { background: var(--obs); } .sw.o1 { background: var(--obs2); } .sw.b { background: var(--bleed); height: 8px; } .sw.e { border-top: 2px dashed var(--exp); height: 0; } .sw.d { border-top: 2px dotted var(--fg); height: 0; }
 .error { color: var(--bleed); }
+.code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .05em; word-break: break-all; }

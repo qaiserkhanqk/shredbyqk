@@ -4,6 +4,9 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let me = null, csrf = null, pendingPreview = null;
+/* Two-step sign-in: after a correct password the server may ask for a code. The username and password are kept only
+   in this variable (never in the page) until the code is sent, and are cleared whatever the outcome. */
+let pendingLogin = null;
 /* Navigation guard (findings 1a/2a reported against 21317c5). Every navigation (sign-in view, list, participant page,
    sign-out) takes a new generation number; a response that arrives for an older generation is discarded, so a slow
    answer for participant A can never replace B's page, the list, or the sign-in view. Every action targets the
@@ -29,17 +32,59 @@ async function boot() {
   catch (e) { if (!(e instanceof Stale)) return loginView(); }
 }
 function loginView(msg = '') {
-  nextNav();
+  nextNav(); pendingLogin = null;
   view(`<div class="card"><h1>Sign in</h1><form id="login" class="row"><input type="text" id="u" autocomplete="username" placeholder="Username" required>
     <input type="password" id="p" autocomplete="current-password" placeholder="Password" required><button type="submit">Sign in</button></form><p id="lmsg" class="small error">${esc(msg)}</p></div>${canCannot()}`);
 }
+function codeView() {
+  nextNav();
+  view(`<div class="card"><h1>Two-factor sign-in</h1><p class="small">Enter the 6-digit code from your authenticator app, or one of your recovery codes.</p>
+    <form id="login" class="row"><input type="text" id="code" inputmode="numeric" autocomplete="one-time-code" placeholder="Code" required maxlength="23"><button type="submit">Sign in</button>
+    <button type="button" data-act="cancel-login">Cancel</button></form><p id="lmsg" class="small error"></p></div>`);
+  $('#code').focus();
+}
+const LOGIN_ERRORS = { mfa_enrolment_required: 'Two-factor sign-in must be set up for this account before you can sign in. Ask the study administrator to set it up.', too_many_attempts: 'Too many attempts. Wait a minute.' };
+async function signIn(username, password, code) {
+  try {
+    const r = await api('POST', '/api/login', { username, password, ...(code !== undefined ? { code } : {}) });
+    pendingLogin = null; me = r.user; csrf = r.csrf; return home();
+  } catch (err) {
+    const e = err.body?.error;
+    if (e === 'mfa_code_required' && code === undefined) { pendingLogin = { username, password }; return codeView(); }
+    pendingLogin = null; loginView(LOGIN_ERRORS[e] || (err.status === 429 ? LOGIN_ERRORS.too_many_attempts : 'Sign-in failed.'));
+  }
+}
+const when = t => new Date(t).toLocaleString();
+async function accountView(note = '') {
+  const gen = nextNav();
+  const [acc, ss] = await Promise.all([api('GET', '/api/account'), api('GET', '/api/account/sessions')]);
+  guard(gen);
+  const m = acc.mfa;
+  view(`<div class="row"><h1>Account</h1><span class="muted small">${esc(acc.user.username)} (${esc(acc.user.role)})</span><button data-act="home">← Back</button><button data-act="logout">Sign out</button><span id="amsg" class="muted small">${esc(note)}</span></div>
+    <div class="grid">
+      <div class="card" id="account"><h2>Two-factor sign-in</h2>
+        <p class="small" id="mfastatus">${mfaStatusText(m.enabled, m.required)}${m.enabled ? ` · ${m.recoveryCodesLeft} recovery codes left` : ''}</p>
+        <div id="mfabox">${m.enabled ? (m.required ? '<p class="muted small">Your role requires two-factor sign-in, so it cannot be turned off here. If you lose your device, the administrator can reset it.</p>'
+          : `<form id="mfadisable" class="row"><input type="password" id="mfadpw" autocomplete="current-password" placeholder="Password" required><input type="text" id="mfadcode" inputmode="numeric" autocomplete="one-time-code" placeholder="Code" required><button type="submit">Turn off two-factor</button></form>`)
+          : `<form id="mfasetup" class="row"><input type="password" id="mfapw" autocomplete="current-password" placeholder="Current password" required><button type="submit">Set up two-factor</button></form>`}</div>
+        <p id="mfamsg" class="small"></p></div>
+      <div class="card"><h2>Change password</h2><form id="pwform" class="row"><input type="password" id="pwcur" autocomplete="current-password" placeholder="Current password" required>
+        <input type="password" id="pwnew" autocomplete="new-password" placeholder="New password (12+ characters)" minlength="12" required>${m.enabled ? '<input type="text" id="pwcode" inputmode="numeric" autocomplete="one-time-code" placeholder="Code" required>' : ''}<button type="submit">Change password</button></form>
+        <p id="pwmsg" class="small"></p><p class="muted small">Changing your password signs out your other sessions.</p></div>
+    </div>
+    <div class="card"><h2>Sessions</h2><ul class="plain small" id="sessions">${sessionsHTML(ss.sessions)}</ul>
+      <button data-act="revoke-others" ${ss.sessions.length > 1 ? '' : 'disabled'}>Sign out other sessions</button></div>`);
+}
+const mfaStatusText = (on, required) => `Two-factor sign-in is <b>${on ? 'on' : 'off'}</b> (${required ? 'required for your role' : 'optional for your role'}).`;
+const sessionsHTML = list => list.map(x => `<li>Signed in ${esc(when(x.createdAt))}, last active ${esc(when(x.lastSeen))}${x.current ? ' <b>(this session)</b>' : ''}</li>`).join('');
+const groups = s => String(s).replace(/(.{4})/g, '$1 ').trim();
 async function home() {
   const gen = nextNav(), role = me?.role;
-  if (role === 'admin') return view(`<div class="card"><h1>Administrator</h1><p class="small">Administrators manage accounts with the API or CLI and cannot view participant data.</p><button data-act="logout">Sign out</button></div>`);
+  if (role === 'admin') return view(`<div class="card"><h1>Administrator</h1><p class="small">Administrators manage accounts with the API or CLI and cannot view participant data.</p><button data-act="account">Account</button> <button data-act="logout">Sign out</button></div>`);
   const { participants } = await api('GET', '/api/participants');
   guard(gen);
   if (role === 'participant' && participants[0]) return openParticipant(participants[0].ref);
-  view(`<div class="row"><h1>Participants</h1><span class="muted small">Signed in as ${esc(me.username)} (${esc(me.role)})</span><button data-act="logout">Sign out</button></div>
+  view(`<div class="row"><h1>Participants</h1><span class="muted small">Signed in as ${esc(me.username)} (${esc(me.role)})</span><button data-act="account">Account</button><button data-act="logout">Sign out</button></div>
     <div class="card"><h2>Your assigned participants</h2>${participants.length ? `<ul class="plain">${participants.map(p => `<li><button data-act="open" data-ref="${esc(p.ref)}">${esc(p.ref)}</button></li>`).join('')}</ul>` : '<p class="muted small">None yet.</p>'}
       <h3>Add a pseudonymous participant</h3><form id="newp" class="row"><input type="text" id="nref" placeholder="Pseudonymous reference, e.g. P-0001" pattern="[A-Za-z0-9_-]{4,64}" required>
       <label class="small"><input type="checkbox" id="nadult" required> I confirm the participant is an adult (18+). Minors are not supported.</label><button type="submit">Add</button></form><p id="nmsg" class="small"></p></div>${canCannot()}`);
@@ -58,7 +103,7 @@ async function openParticipant(ref, note = '') {
   const [info, a] = await Promise.all([api('GET', `/api/participants/${encodeURIComponent(ref)}`), api('GET', `/api/participants/${encodeURIComponent(ref)}/analysis`)]);
   guard(gen); // a newer navigation happened while this page was loading: discard it
   const R = me.role === 'researcher';
-  view(`<div class="row" data-participant="${esc(ref)}"><h1>${esc(ref)}</h1>${R ? '<button data-act="home">← Participants</button>' : ''}<button data-act="logout">Sign out</button><span id="pmsg" class="muted small">${esc(note)}</span></div>
+  view(`<div class="row" data-participant="${esc(ref)}"><h1>${esc(ref)}</h1>${R ? '<button data-act="home">← Participants</button>' : ''}<button data-act="account">Account</button><button data-act="logout">Sign out</button><span id="pmsg" class="muted small">${esc(note)}</span></div>
     ${canCannot()}
     <div class="grid">
       <div class="card" id="consents"><h2>Consent</h2>${Object.entries({ core_research: 'Core research data', lh_tests: 'LH test results', hormonal_context: 'Hormonal medication context' }).map(([k, l]) => `<div class="row small"><b>${l}:</b> ${info.consents[k] ? 'given' : 'not given'}
@@ -145,8 +190,36 @@ function provenanceHTML(a, info) {
 document.addEventListener('submit', async e => {
   e.preventDefault();
   if (e.target.id === 'login') {
-    try { const r = await api('POST', '/api/login', { username: $('#u').value, password: $('#p').value }); me = r.user; csrf = r.csrf; home(); }
-    catch (err) { loginView(err.status === 429 ? 'Too many attempts. Wait a minute.' : 'Sign-in failed.'); }
+    if ($('#code')) { const pl = pendingLogin, code = $('#code').value.trim(); pendingLogin = null; if (!pl) return loginView('Sign-in failed.'); return signIn(pl.username, pl.password, code); }
+    return signIn($('#u').value, $('#p').value);
+  }
+  const form = e.target.id, val = sel => $(sel)?.value ?? '';
+  const errText = { password_incorrect: 'The current password is not correct.', mfa_code_required: 'Enter a code from your authenticator app.', mfa_code_invalid: 'That code is not valid.', password_too_short: 'The new password needs at least 12 characters.',
+    password_unchanged: 'The new password must be different.', password_contains_username: 'The new password must not contain your username.', account_locked: 'Too many failed attempts. The account is locked for 15 minutes.', too_many_attempts: 'Too many attempts. Wait a minute.', mfa_already_enabled: 'Two-factor is already on.' };
+  const explain = err => errText[err.body?.error] || `That didn't work (${err.body?.error || err.message}).`;
+  if (form === 'pwform') {
+    const body = { current: val('#pwcur'), next: val('#pwnew'), ...($('#pwcode') ? { code: val('#pwcode') } : {}) };
+    try { const r = await api('POST', '/api/account/password', body); for (const id of ['#pwcur', '#pwnew', '#pwcode']) if ($(id)) $(id).value = '';
+      say('#pwmsg', `Password changed.${r.otherSessionsEnded ? ` ${r.otherSessionsEnded} other session${r.otherSessionsEnded > 1 ? 's were' : ' was'} signed out.` : ''}`); const ss = await api('GET', '/api/account/sessions'); if ($('#sessions')) $('#sessions').innerHTML = sessionsHTML(ss.sessions); }
+    catch (err) { say('#pwmsg', explain(err), true); if (err.status === 401 && err.body?.error === 'not_signed_in') loginView(); }
+  }
+  if (form === 'mfasetup') {
+    try { const r = await api('POST', '/api/account/mfa/setup', { password: val('#mfapw') });
+      $('#mfabox').innerHTML = `<p class="small">Add this account to an authenticator app by typing the key below (or the link, if your app accepts it). Nothing is sent to any other service.</p>
+        <p class="code" id="mfasecret">${esc(groups(r.secret))}</p><details class="small"><summary>Setup link</summary><p class="code small">${esc(r.otpauthUri)}</p></details>
+        <form id="mfaconfirm" class="row"><input type="text" id="mfacode" inputmode="numeric" autocomplete="one-time-code" placeholder="Code from the app" required><button type="submit">Confirm and turn on</button></form>`; say('#mfamsg', ''); }
+    catch (err) { say('#mfamsg', explain(err), true); }
+  }
+  if (form === 'mfaconfirm') {
+    try { const r = await api('POST', '/api/account/mfa/confirm', { code: val('#mfacode') });
+      $('#mfastatus').innerHTML = `${mfaStatusText(true, false)} · ${r.recoveryCodes.length} recovery codes left`;
+      $('#mfabox').innerHTML = `<p class="small"><b>Save these recovery codes now.</b> Each works once if you lose your device. They will not be shown again.</p><ul class="plain code" id="recovery">${r.recoveryCodes.map(c => `<li>${esc(c)}</li>`).join('')}</ul>`;
+      say('#mfamsg', r.otherSessionsEnded ? `Your other sessions (${r.otherSessionsEnded}) were signed out.` : ''); }
+    catch (err) { say('#mfamsg', explain(err), true); }
+  }
+  if (form === 'mfadisable') {
+    try { await api('POST', '/api/account/mfa/disable', { password: val('#mfadpw'), code: val('#mfadcode') }); return accountView('Two-factor turned off'); }
+    catch (err) { say('#mfamsg', explain(err), true); }
   }
   if (e.target.id === 'newp') {
     try { await api('POST', '/api/participants', { ref: $('#nref').value.trim(), adultConfirmed: $('#nadult').checked }); home(); }
@@ -169,6 +242,9 @@ document.addEventListener('click', async e => {
     switch (b.dataset.act) {
       case 'logout': { nextNav(); me = null; const c = csrf; csrf = null; loginView(); try { csrf = c; await api('POST', '/api/logout'); } finally { csrf = null; } return; }
       case 'home': return home();
+      case 'account': return accountView();
+      case 'cancel-login': return loginView();
+      case 'revoke-others': { const r = await api('POST', '/api/account/sessions/revoke-others'); const ss = await api('GET', '/api/account/sessions'); if ($('#sessions')) $('#sessions').innerHTML = sessionsHTML(ss.sessions); b.disabled = ss.sessions.length <= 1; say('#amsg', `${r.ended} other session${r.ended === 1 ? '' : 's'} signed out`); return; }
       case 'open': return openParticipant(b.dataset.ref);
       case 'signed': if (!confirm('Record that a signed consent form exists for this scope?')) return; await api('POST', `${P}/consents/record-signed`, { scope: b.dataset.scope, signedFormReference: true }); return rendered() === ref && openParticipant(ref, 'Consent recorded');
       case 'withdraw': if (!confirm('Record withdrawal of this consent?')) return; await api('POST', `${P}/consents`, { scope: b.dataset.scope, granted: false }); return rendered() === ref && openParticipant(ref, 'Withdrawal recorded');

@@ -1,0 +1,105 @@
+(node:1448) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ok   encryption: a store opened with a key reports encryption on
+ok   encryption: imports still preview and commit
+ok   encryption: the malformed row is quarantined with its cells
+ok   encryption: analysis is identical to the unencrypted store (same inputs, same outputs, same input hash)
+ok   encryption: re-sent identical rows are exact duplicates
+ok   encryption: a changed reading for a stored timestamp is a conflict (quarantined)
+ok   encryption: the same source file is still recognised as already imported
+ok   encryption: corrections apply to encrypted observations
+ok   encryption: quarantined verbatim cells are readable by the researcher
+ok   encryption: export contains the decrypted annotations
+ok   encryption: withdrawing LH consent still deletes LH annotations
+ok   encryption: no sensitive payload is readable in the database files (main, WAL, SHM)
+ok   encryption: the MFA secret is not stored in plaintext
+ok   encryption: the database file is still a valid SQLite file (metadata such as refs stays queryable)
+ok   encryption: opening an encrypted database without a key is refused (db_key_required)
+ok   encryption: opening it with the wrong key is refused (db_key_invalid)
+ok   encryption: a key that is not 32 bytes is refused (key_invalid)
+ok   rotation: the old key no longer opens the database
+ok   rotation: the new key opens it and the data is intact
+ok   upgrade: the unencrypted database really does contain readable payloads (control)
+ok   upgrade: after opening with a key, no sensitive payload is readable in the files
+ok   upgrade: the analysis is unchanged after encryption
+ok   upgrade: the upgraded database now refuses to open without the key
+ok   server: refuses to start on a file database without an encryption key
+ok   server: starts with a key and encrypts
+ok   keys: a generated key file is readable by its owner only (0600)
+ok   keys: the key file loads as 32 bytes
+ok   keys: a group- or world-readable key file is refused (key_file_permissions)
+ok   keys: a key that is not 32 bytes is refused (key_invalid)
+ok   settings: RESEARCH_DB_KEY_FILE provides the database key
+ok   settings: MFA is required for admins and researchers by default
+ok   settings: RESEARCH_REQUIRE_MFA=0 turns the requirement off (synthetic demo only)
+ok   totp: matches the RFC 6238 test vectors
+ok   totp: base32 round trip
+ok   mfa: a researcher without two-factor set up cannot sign in when it is required (403 mfa_enrolment_required)
+ok   mfa: the refused sign-in sets no session cookie
+ok   mfa: enrolment returns a base32 secret and an otpauth URI
+ok   mfa: an unconfirmed enrolment does not turn two-factor on
+ok   mfa: confirming with a wrong code fails
+ok   mfa: confirming with a valid code enables it and returns 10 one-time recovery codes
+ok   mfa: recovery codes are stored only as hashes
+ok   mfa: correct password without a code → 401 mfa_code_required, no session
+ok   mfa: a wrong code → 401 login_failed
+ok   mfa: a valid code with a wrong password → 401 login_failed (no hint)
+ok   mfa: password + valid code → signed in
+ok   mfa: the same code cannot be used twice (replay refused)
+ok   mfa: the next time step's code works
+ok   mfa: a recovery code signs in once
+ok   mfa: a used recovery code is refused
+ok   mfa: the status shows 9 recovery codes left
+ok   mfa: five wrong codes lock the account (even a valid code is then refused)
+ok   mfa: a participant can sign in without two-factor (optional for participants)
+ok   mfa: self-enrolment needs the current password (401 password_incorrect)
+ok   mfa: self-enrolment returns a secret and otpauth URI
+ok   mfa: self-enrolment is confirmed with a code and returns recovery codes
+ok   mfa: turning on two-factor ends the account's other sessions
+ok   mfa: after self-enrolment, sign-in needs a code
+ok   mfa: turning it off needs password and a code
+ok   mfa: a participant can turn it off with password and code
+ok   mfa: a researcher cannot turn it off while it is required (403 mfa_required_for_role)
+ok   mfa: the account endpoint shows two-factor status without the secret
+ok   mfa: no secret, code or recovery code appears in logs or the audit trail
+ok   mfa: sign-in outcomes are audited (codes only)
+ok   sessions: lists the account's sessions, exactly one marked current
+ok   sessions: each has a short opaque id and times, never a token
+ok   sessions: revoking needs the CSRF token
+ok   sessions: "sign out other sessions" ends them and keeps this one
+ok   password: a wrong current password → 401 password_incorrect
+ok   password: a new password under 12 characters → 400 password_too_short
+ok   password: the same password → 400 password_unchanged
+ok   password: a password containing the username → 400 password_contains_username
+ok   password: change succeeds and ends the other sessions
+ok   password: the old password no longer works, the new one does
+ok   password: the change is audited without any password
+ok   password: five wrong current passwords lock the account
+ok   backup: the backup key must differ from the database key
+ok   backup: the backup file is encrypted as a whole (no SQLite header, no refs, no payloads)
+ok   backup: the backup file is readable by its owner only (0600)
+ok   backup: verification decrypts it and runs an integrity check
+ok   ledger: the deletion is recorded with a random participant id only (no ref, no data)
+ok   ledger: the ledger file is readable by its owner only (0600)
+ok   restore: a participant deleted after the backup stays deleted
+ok   restore: other participants come back complete
+ok   restore: the re-applied deletions are audited (counts only)
+ok   restore: no data of the deleted participant remains in the restored files
+ok   restore: refuses to overwrite an existing database
+ok   restore: refuses without a deletion ledger (it would bring deleted people back)
+ok   restore: a modified backup fails its integrity check and writes nothing
+ok   restore: the wrong backup key fails and writes nothing
+ok   retention: a backup older than the retention period is deleted when a new one is made
+ok   retention: pruneBackups removes everything past the retention period
+ok   cli: generate-key writes owner-only key files
+ok   cli: generate-key refuses to overwrite an existing key
+ok   cli: create-user works on an encrypted database
+ok   cli: enroll-mfa prints an otpauth URI for the operator to pass on
+ok   cli: confirm-mfa enables it with a code and prints recovery codes
+ok   cli: backup writes an encrypted backup
+ok   cli: verify-backup confirms it
+ok   cli: restore writes a new database
+ok   cli: rotate-key needs an existing new key file (refuses a missing one)
+ok   cli: rotate-key re-wraps the data key
+ok   cli: nothing secret is printed by backup or restore
+ALL PASS (102)

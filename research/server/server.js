@@ -10,6 +10,7 @@ import { join, dirname, normalize, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { openStore, CONSENT_SCOPES, FEATURES, ConsentError } from './store.js';
+import { loadKeyFile } from './keys.js';
 import { preview, annotationHash } from '../lib/ingest.js';
 import { analyse } from '../lib/pipeline.js';
 import { CONFIG } from '../lib/config.js';
@@ -20,11 +21,23 @@ const WEB = join(dirname(fileURLToPath(import.meta.url)), '..', 'web');
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml' };
 const REF = /^[A-Za-z0-9_-]{4,64}$/;
 
+export const DEFAULT_MFA_ROLES = ['admin', 'researcher'];
+/**
+ * Settings from environment variables. Security-relevant ones:
+ *  RESEARCH_DB_KEY_FILE      key file (32 bytes, base64, mode 0600) that unlocks the encrypted database (required for a file database)
+ *  RESEARCH_ALLOW_UNENCRYPTED=1  run a file database without encryption (unsupported; never with real data)
+ *  RESEARCH_REQUIRE_MFA=0    do not require two-factor sign-in for admins and researchers (synthetic demo only)
+ *  RESEARCH_DELETION_LEDGER  append-only deletion-ledger file (default next to the database; keep it on separate storage)
+ */
 export function settingsFromEnv(env = process.env) {
+  const db = env.RESEARCH_DB || join(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'research.sqlite');
   return {
-    host: env.RESEARCH_HOST || '127.0.0.1', port: Number(env.RESEARCH_PORT || 8787), db: env.RESEARCH_DB || join(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'research.sqlite'),
+    host: env.RESEARCH_HOST || '127.0.0.1', port: Number(env.RESEARCH_PORT || 8787), db,
     secureCookies: env.RESEARCH_SECURE_COOKIES !== '0', allowNonLocal: env.RESEARCH_ALLOW_NON_LOCAL === '1',
     idleMs: Number(env.RESEARCH_SESSION_IDLE_MIN || 30) * 60e3, absoluteMs: Number(env.RESEARCH_SESSION_MAX_HOURS || 8) * 36e5,
+    dbKey: env.RESEARCH_DB_KEY_FILE ? loadKeyFile(env.RESEARCH_DB_KEY_FILE) : null, allowUnencrypted: env.RESEARCH_ALLOW_UNENCRYPTED === '1',
+    requireMfaRoles: env.RESEARCH_REQUIRE_MFA === '0' ? [] : [...DEFAULT_MFA_ROLES],
+    ledgerPath: env.RESEARCH_DELETION_LEDGER || (db === ':memory:' ? null : join(dirname(db), 'deletion-ledger.jsonl')),
   };
 }
 
@@ -41,7 +54,7 @@ function rateLimiter() {
 }
 
 export function createApp({ store, settings, log = line => process.stderr.write(line + '\n'), now = () => Date.now() }) {
-  const limit = rateLimiter();
+  const limit = rateLimiter(), mfaRoles = settings.requireMfaRoles ?? [];
   const send = (res, status, body, headers = {}) => {
     res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...securityHeaders, ...headers });
     res.end(typeof body === 'string' ? body : JSON.stringify(body));
@@ -79,13 +92,55 @@ export function createApp({ store, settings, log = line => process.stderr.write(
     ['POST', /^\/api\/login$/, async (req, res, m, ip) => {
       const b = await body(req, 4096);
       if (!limit(`${ip}|${String(b.username).slice(0, 40)}`, 'login')) fail(429, 'too_many_attempts');
-      const v = store.verifyLogin(b.username, b.password);
+      if (b.code !== undefined && typeof b.code !== 'string') fail(400, 'code_must_be_string');
+      const v = store.verifyLogin(b.username, b.password, b.code, { requireMfaRoles: mfaRoles });
+      if (v.enrolmentRequired) { store.audit(null, 'login_mfa_enrolment_required', null, 'denied'); fail(403, 'mfa_enrolment_required'); }
+      if (v.mfaRequired) { store.audit(null, 'login_mfa_required', null, 'pending'); fail(401, 'mfa_code_required'); }
       if (!v.ok) { store.audit(null, 'login_failed', null, v.locked ? 'locked' : 'denied'); fail(401, 'login_failed'); }
-      const s = store.createSession(v.user.id); store.audit(v.user.id, 'login', null);
+      const s = store.createSession(v.user.id); store.audit(v.user.id, 'login', null, 'ok', { method: v.method });
       res.setHeader('Set-Cookie', setCookie(s.token));
       ok(res, { user: { username: v.user.username, role: v.user.role }, csrf: s.csrf });
     }, { public: true }],
     ['POST', /^\/api\/logout$/, (req, res, m, ip, s) => { store.endSession(cookie(req, 'rs_session')); res.setHeader('Set-Cookie', setCookie('x').replace(/Max-Age=\d+/, 'Max-Age=0')); store.audit(s.userId, 'logout', null); ok(res, { ok: true }); }],
+    /* ---- account: two-factor, password, sessions (every account, own data only) ---- */
+    ['GET', /^\/api\/account$/, (req, res, m, ip, s) => {
+      const st = store.mfaStatus(s.userId);
+      ok(res, { user: { username: s.username, role: s.role }, mfa: { enabled: st.enabled, required: mfaRoles.includes(s.role), recoveryCodesLeft: st.recoveryCodesLeft } });
+    }],
+    ['POST', /^\/api\/account\/password$/, async (req, res, m, ip, s) => {
+      const b = await body(req, 4096);
+      if (!limit(`${ip}|${s.userId}`, 'login')) fail(429, 'too_many_attempts');
+      const r = store.changePassword(s.userId, { current: String(b.current ?? ''), next: String(b.next ?? ''), code: b.code == null ? '' : String(b.code), keepTokenHash: s.tokenHash });
+      if (!r.ok) { store.audit(s.userId, 'password_change_refused', null, 'denied', { code: r.error }); fail({ password_too_short: 400, password_unchanged: 400, password_contains_username: 400 }[r.error] || 401, r.error); }
+      ok(res, { ok: true, otherSessionsEnded: r.otherSessionsEnded });
+    }],
+    ['POST', /^\/api\/account\/mfa\/setup$/, async (req, res, m, ip, s) => {
+      const b = await body(req, 4096);
+      if (!limit(`${ip}|${s.userId}`, 'login')) fail(429, 'too_many_attempts');
+      if (store.mfaStatus(s.userId).enabled) fail(409, 'mfa_already_enabled');
+      const a = store.reauthenticate(s.userId, String(b.password ?? ''), '');
+      if (!a.ok) { store.audit(s.userId, 'mfa_setup_refused', null, 'denied', { code: a.error }); fail(401, a.error); }
+      const e = store.mfaBegin(s.userId); store.audit(s.userId, 'mfa_setup_started', null);
+      ok(res, { secret: e.secret, otpauthUri: e.uri });
+    }],
+    ['POST', /^\/api\/account\/mfa\/confirm$/, async (req, res, m, ip, s) => {
+      const b = await body(req, 4096);
+      if (!limit(`${ip}|${s.userId}`, 'login')) fail(429, 'too_many_attempts');
+      const r = store.mfaConfirm(s.userId, String(b.code ?? ''), { keepTokenHash: s.tokenHash });
+      if (!r.ok) { store.audit(s.userId, 'mfa_confirm_refused', null, 'denied', { code: r.error }); fail(400, r.error); }
+      ok(res, { enabled: true, recoveryCodes: r.recoveryCodes, otherSessionsEnded: r.otherSessionsEnded });
+    }],
+    ['POST', /^\/api\/account\/mfa\/disable$/, async (req, res, m, ip, s) => {
+      const b = await body(req, 4096);
+      if (mfaRoles.includes(s.role)) { store.audit(s.userId, 'mfa_disable_refused', null, 'denied', { code: 'mfa_required_for_role' }); fail(403, 'mfa_required_for_role'); }
+      if (!limit(`${ip}|${s.userId}`, 'login')) fail(429, 'too_many_attempts');
+      const a = store.reauthenticate(s.userId, String(b.password ?? ''), b.code == null ? '' : String(b.code));
+      if (!a.ok) { store.audit(s.userId, 'mfa_disable_refused', null, 'denied', { code: a.error }); fail(401, a.error); }
+      if (!store.mfaStatus(s.userId).enabled) fail(409, 'mfa_not_enabled');
+      store.mfaDisable(s.userId); ok(res, { enabled: false });
+    }],
+    ['GET', /^\/api\/account\/sessions$/, (req, res, m, ip, s) => ok(res, { sessions: store.listSessions(s.userId, s.tokenHash) })],
+    ['POST', /^\/api\/account\/sessions\/revoke-others$/, (req, res, m, ip, s) => ok(res, { ended: store.revokeOtherSessions(s.userId, s.tokenHash) })],
     ['GET', /^\/api\/me$/, (req, res, m, ip, s) => ok(res, { user: { username: s.username, role: s.role }, csrf: s.csrf, features: FEATURES, consentScopes: CONSENT_SCOPES, config: { version: CONFIG.version, status: CONFIG.status } })],
     ['POST', /^\/api\/users$/, async (req, res, m, ip, s) => {
       needRole(s, 'admin'); const b = await body(req, 4096);
@@ -251,8 +306,10 @@ function serveStatic(path, res, headers, setStatus) {
 export function start(settings = settingsFromEnv()) {
   const local = ['127.0.0.1', '::1', 'localhost'].includes(settings.host);
   if (!local && !settings.allowNonLocal) throw new Error(`Refusing to bind to ${settings.host}: this prototype is local-only. See research/docs/threat-model.md.`);
-  const store = openStore(settings.db);
-  const server = httpServer(createApp({ store, settings }));
+  if (settings.db !== ':memory:' && !settings.dbKey && !settings.allowUnencrypted)
+    throw Object.assign(new Error('db_key_required: set RESEARCH_DB_KEY_FILE to a key file (node research/server/cli.mjs generate-key). See research/docs/security-operations.md.'), { code: 'db_key_required' });
+  const store = openStore(settings.db, { key: settings.dbKey || null, ledgerPath: settings.ledgerPath || null });
+  const server = httpServer(createApp({ store, settings: { ...settings, requireMfaRoles: settings.requireMfaRoles ?? [...DEFAULT_MFA_ROLES] } }));
   return new Promise(r => server.listen(settings.port, settings.host, () => r({ server, store, port: server.address().port })));
 }
 

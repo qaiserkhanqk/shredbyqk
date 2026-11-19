@@ -20,17 +20,19 @@
 | The sustained-shift rule | Synthetic events only. It misses about half of near-threshold rises and many noisy ones (`eval-synthetic.md`). | Independent references (LH, ultrasound) in an approved study |
 | The forecast's empirical range | Not calibrated. Synthetic coverage of 77% describes independent synthetic lengths only. | Locked test-set coverage on real data |
 | The output-policy word list | Pattern-based; reviewed by engineering only | Clinical and legal review of all wording, and user testing |
-| Security controls | Automated tests only; no penetration test | External security review |
+| Security controls, including encryption at rest, two-factor sign-in and backups | Automated tests only; no penetration test or cryptographic review | External security review |
 | Accessibility of the dashboard | Not tested | Screen-reader and keyboard audit |
 | Browsers | Chromium (headless) only | Firefox, Safari, mobile |
 
 ## Known defects and limitations (current)
 - **Storage:**
   - `node:sqlite` is marked experimental in Node 22 and prints a warning.
-  - The database is not encrypted at rest.
+  - Encryption at rest is field-level: pseudonymous refs, usernames, consent scope names, record times, counts and audit codes stay readable (see `security-operations.md`).
   - The rate limiter is in-memory and per process.
+  - Backups need an external scheduler; no restore drill has been run outside the tests.
 - **Accounts and consent:**
-  - No MFA, password change, session list or account removal for researchers.
+  - No account removal for researchers, and no UI for an administrator to end another user's sessions.
+  - Two-factor uses time-based codes, not WebAuthn or passkeys.
   - Assignments are made through the API only; there is no UI for them.
   - Withdrawing core consent blocks new imports and clears pending previews but does not delete existing data; the study protocol must define retention after withdrawal. (Withdrawing LH or hormonal consent does delete that data.)
   - Concurrent consent withdrawal and commit (or reimport) from two processes on one database file is untested (single-process tests only).
