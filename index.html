@@ -87,7 +87,8 @@
   <section class="screen" id="calm">
     <button type="button" class="back" data-back>‹ Body</button>
     <div class="page-head"><div><span class="eyebrow">Sukoon</span><h1 class="display h1">Calm your mind</h1></div></div>
-    <p class="muted" style="margin:0">Pick what you're feeling. You'll breathe slowly for a few minutes, listen to a short recitation, then make a dua from the Sunnah.</p>
+    <button class="cta calm-now" type="button" id="calmNow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>Calm now</button>
+    <p class="muted" style="margin:0">Or pick what you're feeling. You'll breathe slowly, listen to a short recitation, then make a dua from the Sunnah.</p>
     <div class="goal-grid" id="calmGoals" role="group" aria-label="What are you feeling?"></div>
     <div class="card stack" id="calmDetail"></div>
     <button class="cta" type="button" id="calmStart"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Start Sukoon</button>
@@ -312,6 +313,24 @@
       </div>
     </details>
 
+    <div class="card stack">
+      <div><span class="eyebrow">Your coach</span><h2 class="display h2" style="margin-top:4px">Send your week to QK</h2></div>
+      <p class="muted small" style="margin:0">A short text summary: days trained, form score, the fault to work on and any new best weights. No video.</p>
+      <button class="cta" type="button" id="sendWeek">Send my week</button>
+      <pre class="week-text" id="weekText" hidden></pre>
+    </div>
+
+    <details class="card" id="backupCard">
+      <summary>Back up my data</summary>
+      <div class="stack" style="margin-top:14px">
+        <p class="muted small" style="margin:0">Your history is saved only on this phone. Save a backup file before changing phones or clearing your browser. Adding Shred to your home screen also stops the browser clearing it.</p>
+        <div class="btn-row">
+          <button class="ghost" type="button" id="backupBtn">Save backup file</button>
+          <label class="ghost">Restore from file<input type="file" id="restoreFile" accept="application/json,.json" hidden></label>
+        </div>
+      </div>
+    </details>
+
     <details class="card" id="diagCard">
       <summary>App health &amp; diagnostics</summary>
       <div class="stack" style="margin-top:14px">
@@ -344,6 +363,7 @@
     <div class="grab"></div>
     <div><span class="eyebrow" id="setupEyebrow"></span><h2 class="display h2" id="setupTitle" style="margin-top:6px;font-size:1.4rem">Set up your phone</h2></div>
     <ol class="steps" id="setupSteps"></ol>
+    <p class="muted small" id="setupLast" style="margin:0"></p>
     <div class="grid2" id="loadWrap" hidden>
       <label class="field">Weight (kg) for bar speed<input id="loadKg" type="number" inputmode="decimal" placeholder="e.g. 80"></label>
       <p class="muted small" style="margin:0;align-self:end">Tap <b>Calibrate</b> during the set and mark a 45 cm plate for exact speed.</p>
@@ -397,6 +417,7 @@
     <div class="live-actions">
       <button class="ghost" type="button" id="flipCam">Flip camera</button>
       <button class="ghost" type="button" id="calBtn" hidden>Calibrate</button>
+      <button class="ghost" type="button" id="anglesBtn">Angles</button>
       <button class="stop" type="button" id="endLive">End set</button>
     </div>
   </div>
@@ -408,8 +429,9 @@
     <div class="live-top"><div><span class="eyebrow" id="sumEyebrow"></span><h2 class="display h1" style="margin-top:6px">Set done.</h2></div><span class="orb-slot" data-size="52"></span></div>
     <div class="card sum-hero">
       <svg viewBox="0 0 120 120" role="img" id="scoreRing" aria-label="Form score"></svg>
-      <div><div class="num" style="font-size:2.2rem" id="sReps">0</div><span class="muted">reps · <b id="sClean" style="color:var(--text)">0 clean</b></span><p class="muted small" style="margin:8px 0 0" id="sCompare"></p></div>
+      <div><div class="rep-fix" id="repFix"><button type="button" class="iconbtn" id="repMinus" aria-label="One rep fewer">−</button><div class="num" style="font-size:2.2rem" id="sReps">0</div><button type="button" class="iconbtn" id="repPlus" aria-label="One rep more">+</button></div><span class="muted">reps · <b id="sClean" style="color:var(--text)">0 clean</b></span><p class="muted small" style="margin:8px 0 0" id="sCompare"></p></div>
     </div>
+    <div class="card grid2" id="kgWrap" hidden><label class="field">Weight used (kg)<input id="setKg" type="number" inputmode="decimal" step="0.5" min="0" placeholder="e.g. 40"></label><p class="muted small" style="margin:0;align-self:end" id="sLast"></p></div>
     <div class="one-thing" id="sFocusBox"><span class="eyebrow" style="color:var(--warn)">One thing for next set</span><p id="sFocus"></p><p class="why" id="sWhy"></p></div>
     <div class="card"><span class="eyebrow">Range of motion per rep</span><div class="rom-bars" id="romBars" style="margin-top:12px"></div><p class="muted small" style="margin:10px 0 0" id="romNote"></p></div>
     <div class="card stack" id="vbtCard" hidden>

@@ -42,7 +42,14 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.waitForSelector('#summary:not([hidden])', { timeout: 60000 });
   check('demo set: 10 reps, 7 clean', (await p.textContent('#sReps')) === '10' && /7 clean/.test(await p.textContent('#sClean')));
   check('demo set: bar speed card shown (hip thrust is horizontal → asks for plate calibration)', await p.isVisible('#vbtCard') && /Calibrate|plate/.test(await p.textContent('#vbtNote')));
+  check('summary: rest timer starts by itself', (await p.textContent('#restBtn')) === 'Pause');
+  check('summary: weight pre-filled from the setup', (await p.inputValue('#setKg')) === '80');
+  await p.click('#repPlus');
+  check('summary: rep count can be corrected', (await p.textContent('#sReps')) === '11' && /left out of your form score/.test(await p.textContent('#sCompare')));
   await p.click('#doneBtn');
+  await go('train'); await p.click('.ex-card.feature');
+  check('setup: shows last time\'s weight', /Last time: 80 kg × 11/.test(await p.textContent('#setupLast')));
+  await p.click('#setup', { position: { x: 5, y: 5 } });
 
   // 2. Library + voice-guided hold
   await go('train'); await p.click('[data-muscle=Core]');
@@ -54,6 +61,9 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('camera: Calibrate button shown for barbell lift', await p.isVisible('#calBtn'));
   await p.click('#calBtn'); await p.click('#viewport', { position: { x: 200, y: 200 } }); await p.click('#viewport', { position: { x: 200, y: 330 } });
   check('calibration: two taps accepted', /Calibrated/.test(await p.textContent('#status')));
+  check('camera: angle numbers hidden by default', !(await p.isVisible('#readout')));
+  await p.click('#endLive'); await p.click('#nextSet'); await p.waitForTimeout(1500);
+  check('camera: Next set restarts the camera with no setup sheet', await p.isVisible('#live') && !(await p.isVisible('#setup')));
   await p.click('#endLive'); await p.click('#doneBtn');
 
   // 4. Tests tab: gait demo, jump + knee test panels, live test capture starts
@@ -132,10 +142,10 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await go('calm');
   check('sukoon: 9 goals listed', (await p.$$('#calmGoals [data-goal]')).length === 9);
   await p.click('[data-goal=anger]');
-  check('sukoon: goal shows its surah and evidence rating', /Al Imran 3:133–134/.test(await p.textContent('#calmDetail')) && /Evidence: moderate/.test(await p.textContent('#calmDetail')));
+  check('sukoon: goal shows its surah and evidence rating', /Al Imran 3:133–134/.test(await p.textContent('#calmDetail')) && /Evidence: moderate/.test(await p.textContent('#calmSettings')));
   await p.click('[data-goal=healing]');
-  check('sukoon: 432 Hz goal is labelled weak evidence', /Evidence: weak/.test(await p.textContent('#calmDetail')));
-  await p.click('[data-goal=anxiety]'); await tap('#calmStart'); await p.fill('#cBefore', '10'); await p.click('#cGo');
+  check('sukoon: 432 Hz goal is labelled weak evidence', /Evidence: weak/.test(await p.textContent('#calmSettings')));
+  await p.click('[data-goal=anxiety]'); await tap('#calmStart'); await p.click('#cBefore [data-v="10"]');
   check('sukoon: tension 10 → support with emergency numbers first', /Get support now/.test(await p.textContent('#calmSheetBody')) && /116 123/.test(await p.textContent('#calmSheetBody')));
   await p.click('#cCont'); await p.waitForTimeout(1500);
   check('sukoon: breathing pacer runs', await p.isVisible('#calmPacer') && /Breathe (in|out)/.test(await p.textContent('#calmWord')));
@@ -143,14 +153,25 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('sukoon: recitation failure offers the passage on Quran.com', await p.isVisible('#calmLinks a[href="https://quran.com/94/1-8"]'));
   await p.click('#calmSkip');
   check('sukoon: dua shown with its source', await p.isVisible('#calmDua') && /Bukhari 6369/.test(await p.textContent('#calmDua')));
-  await p.click('#calmSkip'); await p.fill('#cAfter', '6'); await p.click('#cSave');
+  await p.click('#calmSkip'); await p.click('#cAfter [data-v="6"]');
   check('sukoon: before/after saved to history', /10 → 6/.test(await p.textContent('#calmList')) && /−4/.test(await p.textContent('#calmTrend')));
   // A phone that blocks sound not started by a tap must get a Play button, not a skipped recitation.
   for (const host of ['everyayah.com', 'verses.quran.com', 'verses.quran.foundation']) { await ctx.unroute(`https://${host}/**`); await ctx.route(`https://${host}/**`, () => {}); } // audio stays loading
   await p.evaluate(() => { const real = HTMLMediaElement.prototype.play; HTMLMediaElement.prototype.play = function () { return /^https:/.test(this.src) ? Promise.reject(new DOMException('blocked', 'NotAllowedError')) : real.call(this); }; });
-  await tap('#calmStart'); await p.fill('#cBefore', '5'); await p.click('#cGo'); await p.waitForTimeout(800); await p.click('#calmSkip'); await p.waitForTimeout(500);
+  await tap('#calmStart'); await p.click('#cBefore [data-v="5"]'); await p.waitForTimeout(800); await p.click('#calmSkip'); await p.waitForTimeout(500);
   check('sukoon: blocked autoplay → Play recitation button', await p.isVisible('#calmPlay') && await p.isVisible('#calmVerse'));
   await p.click('#calmEnd'); await p.click('#cSave');
+
+  // 9. You screen: weekly message to QK and backup
+  await go('progress'); await tap('#sendWeek'); await p.waitForTimeout(500);
+  check('send week: summary shared, copied or shown', await p.isVisible('#weekText') || /Copied/.test(await p.textContent('#toast')));
+  if (await p.isVisible('#weekText')) check('send week: summary has days and form score', /Trained \d+ of \d+/.test(await p.textContent('#weekText')));
+
+  // 10. Returning client skips the welcome; the home-screen shortcut opens Sukoon
+  await p.reload(); await p.waitForTimeout(800);
+  check('returning client: no welcome screen', !(await p.isVisible('#welcome')) && await p.isVisible('#today'));
+  await p.goto('https://shred.local/?calm=now'); await p.waitForTimeout(800);
+  check('shortcut: ?calm=now opens the Sukoon rating', await p.isVisible('#calm') && await p.isVisible('#cBefore'));
 
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();

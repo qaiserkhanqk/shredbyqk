@@ -116,6 +116,11 @@ A 5–15 minute session: rate tension (0–10) → slow breathing with optional 
 | **432 Hz, 528 Hz, 7.83 Hz** | Used only for "Love" and "Healing", and labelled **weak evidence** in the app. | Two small 432 Hz pilots ([doi:10.1016/j.explore.2019.04.001](https://doi.org/10.1016/j.explore.2019.04.001), [doi:10.23750/abm.v93iS2.12915](https://doi.org/10.23750/abm.v93iS2.12915)). One 528 Hz trial found saliva-marker changes but no cognitive change ([doi:10.1002/brb3.71452](https://doi.org/10.1002/brb3.71452)). No human trials for the Schumann resonance. | Weak |
 | **40 Hz for focus** | Gamma tone for "Focus & study", labelled weak. | 40 Hz stimulation is studied mainly in Alzheimer's disease. Benefits for study in healthy people are unproven. | Weak |
 
+**Usability choices (from the research in `.claude/agents/ux-researcher.md`)**
+- Default breathing is 5 minutes: a 2023 review found sessions under 5 minutes differed from 5 minutes or more, with little gained beyond that ([Brain Sci 2023](https://pmc.ncbi.nlm.nih.gov/articles/PMC10741869/)).
+- A rising/falling chime and a vibration mark each breath, so the pacer works with eyes closed. Haptic or combined guidance produced cardiac coherence at 6 breaths/min ([PMC10181630](https://pmc.ncbi.nlm.nih.gov/articles/PMC10181630)). iPhone browsers can't vibrate, so the sound is the main cue there.
+- Ratings are one tap on a 0–10 row with nothing pre-selected, so the "after" answer isn't anchored to the "before" one. Both can be skipped.
+
 **Religious design choices**
 - No verse or hadith assigns a frequency to a surah. Surahs are matched to a goal by their meaning only, and the app says so.
 - Tones stop (3 s fade) before the recitation starts, so the Quran is listened to in silence (7:204). There is deliberately no option to play tones under the recitation.
