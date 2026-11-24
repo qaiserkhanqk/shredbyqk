@@ -1,5 +1,5 @@
 // Sukoon screen and live session. Flow: pick a goal → rate tension → breathe (tones optional) → listen → dua → rate again.
-import { GOALS, GOAL, EVIDENCE, RECITERS, playlist, passageLabel, quranComUrl, breathAt, breathsPerMin, needsSupport, summarize, SukoonTones } from './sukoon.js';
+import { GOALS, GOAL, EVIDENCE, RECITERS, silentWav, playlist, passageLabel, quranComUrl, breathAt, breathsPerMin, needsSupport, summarize, SukoonTones } from './sukoon.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -8,6 +8,15 @@ let ctx; // { S, persist, toast }
 let goalId = 'anxiety';
 const tones = new SukoonTones();
 let run = null; // the live session
+let player = null; // one audio element, unlocked during the Begin tap and reused for every verse
+
+function unlockPlayer() {
+  player ||= new Audio();
+  try {
+    player.src = URL.createObjectURL(new Blob([silentWav()], { type: 'audio/wav' }));
+    player.play().then(() => player.pause()).catch(() => {});
+  } catch {}
+}
 
 const prefs = () => (ctx.S.calmPrefs ||= { tones: 'before', mode: 'binaural', minutes: 3, reciter: RECITERS[0].id, quran: true });
 
@@ -74,7 +83,6 @@ function askBefore() {
     <button class="cta" type="button" id="cGo">Begin</button>`);
   bindSlider('cBefore');
   $('#cGo').onclick = () => {
-    if (prefs().tones !== 'off') tones.unlock();
     const before = +$('#cBefore').value;
     if (needsSupport(before)) return showSupport(() => begin(before));
     closeSheet(); begin(before);
@@ -92,7 +100,10 @@ function showSupport(onContinue) {
 
 /* ---------- Live session ---------- */
 async function begin(before) {
+  // Runs inside a tap: unlock sound now, because the recitation and tones start later without one.
   const g = GOAL[goalId], p = prefs();
+  if (p.tones !== 'off') tones.unlock();
+  if (p.quran) unlockPlayer();
   run = { g, p, before, at: Date.now(), step: null, t0: 0, raf: 0, audio: null, list: [], idx: 0, tonesOn: false };
   $('#calmLive').hidden = false;
   try { run.lock = await navigator.wakeLock?.request('screen'); } catch {}
@@ -150,10 +161,23 @@ function playAyah() {
   if (run.idx >= run.list.length) return dua();
   const it = run.list[run.idx];
   $('#calmAyah').textContent = it.basmala ? 'Bismillah' : `Verse ${it.s}:${it.a} · ${run.idx + 1} of ${run.list.length}`;
-  const a = run.audio ||= new Audio();
-  a.src = it.url; a.onended = () => { run.idx++; playAyah(); };
-  a.onerror = () => { a.onerror = a.onended = null; showLinks('Couldn\'t load the recitation here. Open it on Quran.com, then tap Next.'); };
-  a.play().catch(() => { if (!$('#calmLinks').innerHTML) $('#calmAyah').textContent = 'Tap Next to continue'; });
+  const a = run.audio = player ||= new Audio();
+  let src = 0;
+  const load = () => { a.src = it.urls[src]; a.play().catch(blocked); };
+  // The phone refused to start sound without a tap: ask for one instead of skipping the recitation.
+  const blocked = err => {
+    if (err?.name !== 'NotAllowedError' || !run || run.step !== 'listen') return;
+    $('#calmLinks').innerHTML = '<button class="cta" type="button" id="calmPlay"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Play recitation</button>';
+    $('#calmPlay').onclick = () => { $('#calmLinks').innerHTML = ''; a.play().catch(() => {}); };
+  };
+  a.onended = () => { run.idx++; playAyah(); };
+  // If one audio server can't be reached, try the next; after the last, link to Quran.com.
+  a.onerror = () => {
+    if (++src < it.urls.length) return load();
+    a.onerror = a.onended = null;
+    showLinks('Couldn\'t load the recitation. Check your internet, or open it on Quran.com and tap Next when you\'re done.');
+  };
+  load();
 }
 
 function dua() {
