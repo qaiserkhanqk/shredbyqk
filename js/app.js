@@ -17,14 +17,20 @@ import { cueList, saveClip, getClip, deleteClip, listClipIds, startRecording, ex
 import { SessionRecorder, ErrorLog, downloadJSON, APP_VERSION } from './diagnostics.js';
 import { LIBRARY, LIB, MUSCLES, exFor } from './library.js';
 import { HipThrustDemo, WalkDemo, DEMO_W, DEMO_H } from './demo.js';
-import { initCalm, renderCalm } from './calm.js';
+import { initCalm, renderCalm, startCalmNow } from './calm.js';
+import { WEIGHTED, lastLoad, lastLoadText, weekSummary } from './share.js';
 import { landmarksFrom, analyse, render, navyBodyFat, bfCategory, stanceProblem } from './bodyscan.js';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 let S = store.load();
 S.gaits ||= [];
-const persist = () => store.save(S);
+let persistAsked = false;
+const persist = () => {
+  store.save(S);
+  // Ask once for storage the browser won't clear on its own (Safari can wipe site data after 7 days unused).
+  if (!persistAsked) { persistAsked = true; navigator.storage?.persist?.().catch(() => {}); }
+};
 ErrorLog.install();
 initCalm({ S, persist: () => persist(), toast: m => toast(m) });
 const recorder2 = new SessionRecorder();
@@ -96,7 +102,7 @@ function nudgeLine() {
 }
 
 function formScoreOf(list) {
-  list = list.filter(s => !s.guided);
+  list = list.filter(s => !s.guided && !s.edited); // hand-corrected counts have no camera form data for the extra reps
   const r = list.reduce((a, s) => a + s.reps, 0), g = list.reduce((a, s) => a + s.good, 0);
   return r ? Math.round(g / r * 100) : null;
 }
@@ -259,6 +265,7 @@ function openSetup(k) {
   $('#startGuided').hidden = !!ex;
   $('#startDemo').hidden = k !== 'hipThrust';
   $('#loadWrap').hidden = !vbtOn();
+  $('#setupLast').textContent = lastLoadText(lastLoad(S.sessions, k));
   $('#setup').hidden = false;
 }
 const setsToday = k => { const d = new Date(); d.setHours(0, 0, 0, 0); return S.sessions.filter(s => s.ex === k && s.at >= d.getTime()).length; };
@@ -273,7 +280,18 @@ let live = null, fb = null, engine = null, stream = null, recorder = null, chunk
 const smooth = new Smoother(0.55);
 const motion = new MotionTracker();
 
+// Keep the screen on during a set and the rest after it, so the phone doesn't lock mid-session.
+let wake = null;
+async function keepAwake(on) {
+  if (!on) { try { await wake?.release(); } catch {} wake = null; return; }
+  if (wake && !wake.released) return;
+  try { wake = await navigator.wakeLock?.request('screen'); } catch {}
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && (!$('#live').hidden || !$('#summary').hidden)) keepAwake(true); });
+let lastSource = null, lastSet = null;
+
 async function startLive({ mode, source, file }) {
+  keepAwake(true);
   $('#setup').hidden = true; $('#summary').hidden = true; $('#live').hidden = false;
   $('#tempoRing').hidden = true;
   const ex = mode === 'form' ? curEx() : null;
@@ -404,6 +422,7 @@ function formFrame(px, ctx, t) {
     if (ev.type === 'rep') {
       ev.drift = motion.endRep();
       $('#repNum').textContent = engine.reps;
+      flash(ev.faults.length ? 'bad' : 'good');
       const dot = document.createElement('i'); if (ev.faults.length) dot.className = 'f'; $('#dots').appendChild(dot);
       $('#cleanCt').textContent = `${engine.goodReps} clean`;
       $('#vlKnob').style.left = Math.min(100, ev.vl / .5 * 100) + '%';
@@ -421,10 +440,15 @@ function formFrame(px, ctx, t) {
   $('#readout').innerHTML = keys.map(k => `<span>${k} ${fmtA(m[k])}</span>`).join('') + (live.lastV ? `<span>${live.lastV.mcv.toFixed(2)} m/s</span>` : '') + `<span class="muted">${engine.view} view</span>`;
 }
 
+// A border flash per rep: green clean, red fault. Readable from across the room, unlike numbers.
+let flashT;
+function flash(kind) { const v = $('#viewport'); v.classList.remove('flash-good', 'flash-bad'); void v.offsetWidth; v.classList.add('flash-' + kind); clearTimeout(flashT); flashT = setTimeout(() => v.classList.remove('flash-' + kind), 450); }
+
 function endSet() {
   if (!live) return;
   if (live.mode === 'guided') return endGuided();
   const wasRec = recorder && recorder.state !== 'inactive';
+  lastSource = live.source;
   const hold = curEx().hold, held = Math.round(live.held || 0), goodHeld = Math.round(live.goodHeld || 0);
   stopLive();
   $('#live').hidden = true; $('#summary').hidden = false;
@@ -460,12 +484,20 @@ function endSet() {
   $('#restWhy').textContent = vl >= .3 ? 'Longer, because you went close to failure' : 'Recovery for the next set';
   $('#restCard').hidden = !reps;
 
+  lastSet = null;
+  const weighted = WEIGHTED.includes(LIB[exKey]?.equipment), last = lastLoad(S.sessions, exKey);
+  $('#repFix').hidden = !reps || !!hold;
+  $('#kgWrap').hidden = !reps || !weighted;
+  $('#setKg').value = parseFloat($('#loadKg').value) || last?.kg || '';
+  $('#sLast').textContent = lastLoadText(last);
   if (reps) {
-    S.sessions.push({ at: Date.now(), ex: exKey, name: ex.name, reps, good, faults: tally, vl, tempo, roms: roms.map(r => Math.round(r.rom)), demo: live?.source === 'demo' || undefined });
+    const kg = weighted ? parseFloat($('#setKg').value) || undefined : undefined;
+    S.sessions.push(lastSet = { at: Date.now(), ex: exKey, name: ex.name, reps, good, faults: tally, vl, tempo, roms: roms.map(r => Math.round(r.rom)), kg, demo: live?.source === 'demo' || undefined });
     persist();
     const better = prevScore != null && score > prevScore ? ` Your form score is up from ${prevScore} to ${score} percent.` : '';
     say(`Set done. ${reps} reps, ${good} clean.${better} ${top ? 'One thing for next set: ' + top.cue : 'Great form. Keep it up.'}`, { id: 'summary_' + Date.now(), priority: 'high' });
   }
+  if (reps) { stopRest(); $('#restBtn').click(); } // rest starts by itself
   const pb = $('#playback'); pb.hidden = true;
   if (wasRec) setTimeout(() => { if (!chunks.length) return; pb.src = URL.createObjectURL(new Blob(chunks, { type: chunks[0].type || 'video/webm' })); pb.hidden = false; }, 400);
   live = null;
@@ -480,10 +512,25 @@ function stopLive() {
   if (live) live.done = true;
 }
 
+const showAngles = () => { try { return localStorage.getItem('qk_angles') === '1'; } catch { return false; } };
+$('#readout').hidden = !showAngles();
+$('#anglesBtn').onclick = () => { const on = !showAngles(); try { localStorage.setItem('qk_angles', on ? '1' : '0'); } catch {} $('#readout').hidden = !on; $('#anglesBtn').textContent = on ? 'Hide angles' : 'Angles'; };
+$('#anglesBtn').textContent = showAngles() ? 'Hide angles' : 'Angles';
 $('#endLive').onclick = () => { if (!live) return; ['gait', 'jump', 'sls', 'rom'].includes(live.mode) ? finishTest() : endSet(); };
 $('#flipCam').onclick = () => { const m = live?.mode || 'form'; live && (live.done = true); facing = facing === 'user' ? 'environment' : 'user'; stopLive(); live = null; startLive({ mode: m, source: 'camera' }); };
-$('#doneBtn').onclick = () => { stopRest(); $('#summary').hidden = true; tab('today'); };
-$('#nextSet').onclick = () => { stopRest(); $('#summary').hidden = true; openSetup(exKey); };
+$('#doneBtn').onclick = () => { stopRest(); keepAwake(false); $('#summary').hidden = true; tab('today'); };
+// After a camera set the phone is already placed, so the next set starts straight away.
+$('#nextSet').onclick = () => { stopRest(); $('#summary').hidden = true; if (lastSource === 'camera' && curEx()) startLive({ mode: 'form', source: 'camera' }); else openSetup(exKey); };
+// Fix a miscount. The form score then leaves this set out, because the camera didn't see the added reps.
+function fixReps(d) {
+  if (!lastSet) return;
+  lastSet.reps = Math.max(1, lastSet.reps + d); lastSet.good = Math.min(lastSet.good, lastSet.reps); lastSet.edited = true;
+  $('#sReps').textContent = lastSet.reps; $('#sCompare').textContent = 'Count corrected. This set is left out of your form score.';
+  persist();
+}
+$('#repMinus').onclick = () => fixReps(-1);
+$('#repPlus').onclick = () => fixReps(1);
+$('#setKg').onchange = e => { if (!lastSet) return; const kg = parseFloat(e.target.value); lastSet.kg = kg > 0 ? kg : undefined; persist(); };
 
 let restLeft = 120, restTotal = 120, restTimer = null;
 function drawRest() { $('#restClock').textContent = `${Math.floor(restLeft / 60)}:${String(restLeft % 60).padStart(2, '0')}`; $('#restArc').style.strokeDashoffset = 201 * (1 - restLeft / restTotal); }
@@ -866,6 +913,24 @@ $('#diagCard').addEventListener('toggle', () => { if ($('#diagCard').open) rende
 try { $('#precisionSel').value = localStorage.getItem('qk_precision') || ''; } catch {}
 $('#precisionSel').onchange = e => { try { e.target.value ? localStorage.setItem('qk_precision', e.target.value) : localStorage.removeItem('qk_precision'); } catch {} renderDiag(); toast('Tracking precision saved'); };
 $('#exportSession').onclick = () => { if (!recorder2.meta.kind) return toast('No session recorded yet.'); downloadJSON(`shred-session-${Date.now()}.json`, recorder2.toJSON()); };
+$('#backupBtn').onclick = () => downloadJSON(`shred-backup-${new Date().toISOString().slice(0, 10)}.json`, S);
+$('#restoreFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    if (!data || typeof data !== 'object' || !Array.isArray(data.sessions)) throw new Error('not a Shred backup');
+    store.save(data); toast('Restored. Reloading…'); setTimeout(() => location.reload(), 800);
+  } catch { toast('That file isn\'t a Shred backup.'); }
+};
+$('#sendWeek').onclick = async () => {
+  const faultName = id => { for (const k of Object.keys(LIB)) { const r = exFor(k) && allRules(exFor(k)).find(x => x.id === id); if (r) return r.cue; } return id; };
+  const rk = S.rehab?.active?.checkins?.slice(-1)[0];
+  const light = rk ? painLight({ ...rk, usualMorning: S.rehab.active.usualMorning }, COND[S.rehab.active.cond].painLimit).light : null;
+  const text = weekSummary(S, { faultName, light });
+  try { if (navigator.share) { await navigator.share({ text }); return; } } catch (err) { if (err?.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(text); toast('Copied. Paste it into WhatsApp or a message to QK.'); }
+  catch { $('#weekText').textContent = text; $('#weekText').hidden = false; toast('Select the text below and copy it.'); }
+};
 $('#exportErrors').onclick = () => downloadJSON(`shred-errors-${Date.now()}.json`, { app: APP_VERSION, ua: navigator.userAgent, errors: ErrorLog.read() });
 
 /* ---------- Rehab clinic ---------- */
@@ -1115,7 +1180,7 @@ $('#logSession').onclick = () => {
   const firstToday = [...S.sessions, ...S.checkins].filter(s => dayKey(s.at) === dayKey(Date.now())).map(s => s.at).sort()[0];
   const guess = firstToday ? Math.max(10, Math.round((Date.now() - firstToday) / 60000) + 5) : 45;
   openSheet(`<div><span class="eyebrow">Session effort</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">How hard was today's session?</h2>
-    <p class="muted small" style="margin:6px 0 0">Rate the whole session about 30 minutes after finishing. 0 = rest, 3 = moderate, 5 = hard, 7 = very hard, 10 = maximal.</p></div>
+    <p class="muted small" style="margin:6px 0 0">Rate the whole session now, or any time in the next half hour. 0 = rest, 3 = moderate, 5 = hard, 7 = very hard, 10 = maximal.</p></div>
     <label class="field slider">Effort <span class="val" id="rpeV">5</span><input type="range" min="0" max="10" value="5" id="rpe"></label>
     <label class="field">Minutes<input id="mins" type="number" inputmode="numeric" value="${Math.min(guess, 180)}"></label>
     <button class="cta" type="button" id="loadSave">Save</button>`);
@@ -1168,7 +1233,13 @@ $('#studioExport').onclick = async () => { const data = await exportClips(); if 
 
 /* ---------- Boot ---------- */
 mountOrbs(); bindPlan(); bindProfile(); renderTrain(); renderToday(); applyMute(); renderTestHistory();
-if (S.profile.name) $('#welcomeNameWrap').hidden = true;
+if (S.profile.name) {
+  // Returning client: straight to Today. The first tap anywhere wakes the voice (phones need a tap before sound).
+  $('#welcome').hidden = true;
+  document.addEventListener('pointerdown', () => { try { speechSynthesis.speak(new SpeechSynthesisUtterance('')); } catch {} getVideoLandmarker().catch(() => {}); }, { once: true });
+}
+// Home-screen shortcut or a shared link: ?calm=now opens Sukoon.
+if (new URLSearchParams(location.search).has('calm') || location.hash === '#calm') { $('#welcome').hidden = true; tab('calm'); startCalmNow(); }
 $('#welcomeBtn').onclick = () => {
   const nm = $('#welcomeName').value.trim();
   if (nm && !S.profile.name) { S.profile.name = nm; $('#pName').value = nm; persist(); renderToday(); }

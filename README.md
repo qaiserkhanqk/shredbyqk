@@ -33,6 +33,10 @@ All video is processed **on the phone** (MediaPipe Pose) and nothing is uploaded
   - a dua from the Sunnah with its source
   - tension rated before and after, with your trend
   - each tone is labelled with its evidence strength, and high distress shows support numbers first
+  - one-tap **Calm now**, tap-a-number ratings, breath sounds and vibration for eyes-closed use, night mode for sleep, and a home-screen shortcut (Android)
+- **Training flow:** Next set restarts the camera in one tap, the rest timer starts by itself, the screen stays on, a miscounted set can be corrected, and weights are logged with last time's figure shown.
+- **Send my week to QK:** a one-tap text summary (days trained, form score, top fault, new best weights). No video.
+- **Back up and restore** your history as a file. The app also asks the browser not to clear its saved data.
 - **Rehab clinic:** 18 injuries and pain conditions:
   - lower back, neck
   - frozen shoulder, rotator cuff, tennis and golfer's elbow

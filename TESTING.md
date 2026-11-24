@@ -75,8 +75,11 @@ Crashes are logged on the device. **Export error log** in the same panel gives t
   - the breathing pacer runs at 6 breaths/min
   - 432, 528 and 7.83 Hz are never rated better than weak evidence
   - tension 9–10 triggers the support screen, and the before/after trend
+- **`tests/share.test.mjs`:** last weight per exercise, and the weekly message (demo and hand-corrected sets left out of the form score, new best weights, this week only).
 - **`tests/e2e.cjs`:**
-  - Sukoon: goals, evidence labels, support screen, breathing, fallback when the recitation can't load, saved history
+  - Sukoon: goals, evidence labels, support screen, breathing, fallback when the recitation can't load, blocked autoplay, saved history, the ?calm=now shortcut
+  - training flow: auto rest timer, weight pre-fill and last-time display, rep correction, one-tap next camera set, hidden angle readout
+  - You screen: Send my week; returning clients skip the welcome screen
   - demo set and exercise library
   - live camera and calibration
   - rehab clinic: safety screen, programme start, check-in, measurement, emergency red flag

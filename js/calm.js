@@ -1,5 +1,5 @@
 // Sukoon screen and live session. Flow: pick a goal → rate tension → breathe (tones optional) → listen → dua → rate again.
-import { GOALS, GOAL, EVIDENCE, RECITERS, silentWav, playlist, passageLabel, quranComUrl, breathAt, breathsPerMin, needsSupport, summarize, SukoonTones } from './sukoon.js';
+import { GOALS, GOAL, EVIDENCE, RECITERS, SURAH, silentWav, playlist, passageLabel, quranComUrl, breathAt, breathsPerMin, needsSupport, summarize, SukoonTones } from './sukoon.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -18,12 +18,20 @@ function unlockPlayer() {
   } catch {}
 }
 
-const prefs = () => (ctx.S.calmPrefs ||= { tones: 'before', mode: 'binaural', minutes: 3, reciter: RECITERS[0].id, quran: true });
+// 5 minutes is the shortest breathing dose linked to a clear benefit (SCIENCE.md §10).
+const prefs = () => (ctx.S.calmPrefs ||= { tones: 'before', mode: 'binaural', minutes: 5, reciter: RECITERS[0].id, quran: true, cue: true });
+const reducedMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 export function initCalm(c) {
   ctx = c; ctx.S.calm ||= [];
-  $('#calmGoals').onclick = e => { const b = e.target.closest('[data-goal]'); if (b) { goalId = b.dataset.goal; renderCalm(); } };
+  goalId = GOAL[prefs().lastGoal] ? prefs().lastGoal : goalId;
+  $('#calmGoals').onclick = e => { const b = e.target.closest('[data-goal]'); if (b) { goalId = prefs().lastGoal = b.dataset.goal; ctx.persist(); renderCalm(); } };
   $('#calmStart').onclick = () => askBefore();
+  $('#calmNow').onclick = () => askBefore();
+  // The screen lock is released whenever the page is hidden: take it again when the user comes back.
+  document.addEventListener('visibilitychange', async () => {
+    if (!document.hidden && run && run.step !== 'listen') try { run.lock = await navigator.wakeLock?.request('screen'); } catch {}
+  });
   $('#calmSupportLink').onclick = () => showSupport();
   $('#calmSheet').onclick = e => { if (e.target.id === 'calmSheet') closeSheet(); };
   $('#calmEnd').onclick = () => finish(true);
@@ -31,30 +39,30 @@ export function initCalm(c) {
   $('#calmNotSafe').onclick = () => showSupport();
 }
 
+// Opened from the home-screen shortcut or a ?calm=now link: go straight to the first question.
+export function startCalmNow() { askBefore(); }
+
 export function renderCalm() {
   const g = GOAL[goalId], p = prefs();
   $('#calmGoals').innerHTML = GOALS.map(x => `<button type="button" class="goal ${x.id === goalId ? 'on' : ''}" data-goal="${x.id}" aria-pressed="${x.id === goalId}"><b>${esc(x.name)}</b><span>${esc(x.blurb)}</span></button>`).join('');
   $('#calmDetail').innerHTML = `
-    <div class="card-head" style="margin:0"><div><span class="eyebrow">${esc(g.name)}</span><h2 class="display h2" style="margin-top:4px">${esc(passageLabel(g))}</h2></div><span class="chip-note">${g.band} ${g.beat} Hz</span></div>
-    <p class="verse">“${esc(g.meaning)}” <span class="muted small">(${esc(g.key)})</span></p>
-    <div class="kv">
-      <span>Breathing</span><span>${breathsPerMin()} breaths/min · ${p.minutes} min</span>
-      <span>Tone</span><span>${p.tones === 'off' ? 'Off' : `${g.band} ${g.beat} Hz on a ${g.carrier} Hz tone`}</span>
-      <span>Recitation</span><span>${p.quran ? esc(RECITERS.find(r => r.id === p.reciter)?.name || '') : 'Off'}</span>
-    </div>
-    ${p.tones === 'off' ? '' : `<p class="ev ${g.evidence}"><b>${g.evidence === 'moderate' ? 'Evidence: moderate' : 'Evidence: weak'}.</b> ${esc(EVIDENCE[g.evidence])}</p>`}`;
+    <div><span class="eyebrow">${esc(g.name)}</span><h2 class="display h2" style="margin-top:4px">${esc(passageLabel(g))}</h2></div>
+    <p class="verse">${g.why ? `<span class="muted small">Why this surah: </span>` : ''}“${esc(g.meaning)}” <span class="muted small">(${esc(g.key)})</span></p>
+    <p class="muted small" style="margin:0">${p.minutes} min breathing · ${p.quran ? 'recitation' : 'no recitation'} · dua</p>`;
   $('#calmSettings').innerHTML = `
-    <label class="field">Tones<select id="cTones">
-      <option value="before" ${p.tones === 'before' ? 'selected' : ''}>During breathing only, silent for the Quran</option>
+    <label class="check"><input type="checkbox" id="cCue" ${p.cue !== false ? 'checked' : ''}> Breath sound and vibration, so you can close your eyes</label>
+    <label class="field">Background tone<select id="cTones">
+      <option value="before" ${p.tones === 'before' ? 'selected' : ''}>On while breathing (plain tone, no music or instruments)</option>
       <option value="off" ${p.tones === 'off' ? 'selected' : ''}>Off</option></select></label>
     <label class="field">Tone type<select id="cMode">
       <option value="binaural" ${p.mode === 'binaural' ? 'selected' : ''}>Binaural (headphones)</option>
       <option value="isochronic" ${p.mode === 'isochronic' ? 'selected' : ''}>Pulsing (phone speaker)</option></select></label>
-    <label class="field">Breathing<select id="cMin">${[2, 3, 5, 10].map(m => `<option value="${m}" ${p.minutes === m ? 'selected' : ''}>${m} minutes</option>`).join('')}</select></label>
+    ${p.tones === 'off' ? '' : `<p class="ev ${g.evidence}"><b>${g.band} ${g.beat} Hz on a ${g.carrier} Hz tone. Evidence: ${g.evidence}.</b> ${esc(EVIDENCE[g.evidence])}</p>`}
+    <label class="field">Breathing<select id="cMin">${[[2, '2 minutes (quick, less effect)'], [3, '3 minutes'], [5, '5 minutes (recommended)'], [10, '10 minutes']].map(([m, l]) => `<option value="${m}" ${p.minutes === m ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
     <label class="field">Reciter<select id="cRec">${RECITERS.map(r => `<option value="${r.id}" ${p.reciter === r.id ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
     <label class="check"><input type="checkbox" id="cQuran" ${p.quran ? 'checked' : ''}> Play the recitation (needs internet)</label>`;
   const bind = (id, k, f = v => v) => $(id).onchange = e => { p[k] = f(e.target.type === 'checkbox' ? e.target.checked : e.target.value); ctx.persist(); renderCalm(); };
-  bind('#cTones', 'tones'); bind('#cMode', 'mode'); bind('#cMin', 'minutes', Number); bind('#cRec', 'reciter'); bind('#cQuran', 'quran');
+  bind('#cCue', 'cue'); bind('#cTones', 'tones'); bind('#cMode', 'mode'); bind('#cMin', 'minutes', Number); bind('#cRec', 'reciter'); bind('#cQuran', 'quran');
   renderHistory();
 }
 
@@ -67,26 +75,30 @@ function renderHistory() {
     <span>Average tension drop (last 7)</span><span class="num">${sum.avgDrop > 0 ? '−' : ''}${Math.abs(sum.avgDrop)} / 10</span>
     <span>Sessions that helped</span><span class="num">${sum.helpedPct}%</span>
     ${sum.bestGoal ? `<span>Works best for you</span><span>${esc(GOAL[sum.bestGoal].name)}</span>` : ''}</div>`;
-  $('#calmList').innerHTML = list.slice(-6).reverse().map(s => `<div class="row"><span>${esc(GOAL[s.goal]?.name || s.goal)} · ${new Date(s.at).toLocaleDateString()}</span><span class="num">${s.before} → ${s.after ?? '–'}</span></div>`).join('');
+  $('#calmList').innerHTML = list.slice(-6).reverse().map(s => `<div class="row"><span>${esc(GOAL[s.goal]?.name || s.goal)} · ${new Date(s.at).toLocaleDateString()}</span><span class="num">${s.before ?? '–'} → ${s.after ?? '–'}</span></div>`).join('');
 }
 
 /* ---------- Sheets ---------- */
 const openSheet = html => { $('#calmSheetBody').innerHTML = html; $('#calmSheet').hidden = false; };
 const closeSheet = () => { $('#calmSheet').hidden = true; };
-const slider = (id, label, v) => `<label class="field slider">${label} <span class="val" id="${id}v">${v}</span><input type="range" min="0" max="10" value="${v}" id="${id}"></label>`;
-const bindSlider = id => $('#' + id).oninput = e => $('#' + id + 'v').textContent = e.target.value;
+// One tap on a number answers and moves on: easier than a slider for a shaky hand, and nothing is pre-set,
+// so the answer isn't anchored. Skip is always allowed.
+const scale = id => `<div class="scale" id="${id}" role="group" aria-label="Tension from 0 (calm) to 10 (the worst it gets)">${Array.from({ length: 11 }, (_, n) => `<button type="button" data-v="${n}">${n}</button>`).join('')}</div>
+  <div class="scale-ends muted small"><span>0 calm</span><span>10 the worst it gets</span></div>`;
+const onScale = (id, fn) => { $('#' + id).onclick = e => { const b = e.target.closest('[data-v]'); if (b) fn(+b.dataset.v); }; };
 
 function askBefore() {
-  openSheet(`<div><span class="eyebrow">Before you start</span><h2 class="display h2" id="calmSheetTitle" style="margin-top:6px;font-size:1.3rem">How tense do you feel?</h2></div>
-    ${slider('cBefore', '0 = completely calm, 10 = the worst it gets', 5)}
-    ${prefs().tones !== 'off' && prefs().mode === 'binaural' ? '<p class="muted small" style="margin:0">Put headphones in for binaural tones. Keep the volume low and comfortable.</p>' : ''}
-    <button class="cta" type="button" id="cGo">Begin</button>`);
-  bindSlider('cBefore');
-  $('#cGo').onclick = () => {
-    const before = +$('#cBefore').value;
+  const g = GOAL[goalId], p = prefs();
+  openSheet(`<div><span class="eyebrow">${esc(g.name)} · ${p.minutes} min</span><h2 class="display h2" id="calmSheetTitle" style="margin-top:6px;font-size:1.3rem">How tense do you feel right now?</h2></div>
+    ${scale('cBefore')}
+    ${p.tones !== 'off' && p.mode === 'binaural' ? '<p class="muted small" style="margin:0">Headphones in for the background tone. Keep the volume low.</p>' : ''}
+    <button class="linkbtn" type="button" id="cGo">Skip and start</button>`);
+  const go = before => {
     if (needsSupport(before)) return showSupport(() => begin(before));
     closeSheet(); begin(before);
   };
+  onScale('cBefore', go);
+  $('#cGo').onclick = () => go(null);
 }
 
 function showSupport(onContinue) {
@@ -102,10 +114,11 @@ function showSupport(onContinue) {
 async function begin(before) {
   // Runs inside a tap: unlock sound now, because the recitation and tones start later without one.
   const g = GOAL[goalId], p = prefs();
-  if (p.tones !== 'off') tones.unlock();
+  if (p.tones !== 'off' || p.cue !== false) tones.unlock();
   if (p.quran) unlockPlayer();
   run = { g, p, before, at: Date.now(), step: null, t0: 0, raf: 0, audio: null, list: [], idx: 0, tonesOn: false };
   $('#calmLive').hidden = false;
+  $('#calmLive').classList.toggle('night', g.id === 'sleep'); // dim, warm and no countdown for winding down
   try { run.lock = await navigator.wakeLock?.request('screen'); } catch {}
   breathe();
 }
@@ -121,14 +134,22 @@ function setStep(step, eyebrow, title) {
 
 function breathe() {
   const { g, p } = run;
-  setStep('breathe', `${g.name} · step 1 of 3`, 'Breathe with the circle');
+  const cue = p.cue !== false, still = reducedMotion();
+  setStep('breathe', `${g.name} · step 1 of 3`, cue ? 'Breathe with the sound, eyes closed if you like' : 'Breathe with the circle');
   if (p.tones !== 'off') run.tonesOn = tones.start({ beat: g.beat, carrier: g.carrier, mode: p.mode, volume: 0.6 });
   const total = p.minutes * 60, start = performance.now();
+  let phase = null;
   const tick = now => {
     if (!run || run.step !== 'breathe') return;
     const t = (now - start) / 1000, b = breathAt(t);
-    $('#calmCircle').style.transform = `scale(${0.55 + 0.45 * b.scale})`;
-    $('#calmWord').textContent = b.phase === 'in' ? 'Breathe in' : 'Breathe out';
+    // Reduced motion: the circle brightens and fades instead of growing and shrinking.
+    if (still) $('#calmCircle').style.opacity = 0.35 + 0.65 * b.scale;
+    else $('#calmCircle').style.transform = `scale(${0.55 + 0.45 * b.scale})`;
+    if (b.phase !== phase) {
+      phase = b.phase;
+      $('#calmWord').textContent = phase === 'in' ? 'Breathe in' : 'Breathe out';
+      if (cue) { tones.cue(phase); try { navigator.vibrate?.(phase === 'in' ? 60 : [40, 80, 40]); } catch {} }
+    }
     const left = Math.max(0, Math.ceil(total - t));
     $('#calmClock').textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
     if (t >= total) return next();
@@ -161,6 +182,8 @@ function playAyah() {
   if (run.idx >= run.list.length) return dua();
   const it = run.list[run.idx];
   $('#calmAyah').textContent = it.basmala ? 'Bismillah' : `Verse ${it.s}:${it.a} · ${run.idx + 1} of ${run.list.length}`;
+  // Shows the surah and reciter on the lock screen, with play/pause there.
+  try { if (globalThis.MediaMetadata) navigator.mediaSession.metadata = new MediaMetadata({ title: it.basmala ? 'Bismillah' : `${SURAH[it.s]} ${it.s}:${it.a}`, artist: RECITERS.find(r => r.id === run.p.reciter)?.name || '', album: 'Sukoon' }); } catch {}
   const a = run.audio = player ||= new Audio();
   let src = 0;
   const load = () => { a.src = it.urls[src]; a.play().catch(blocked); };
@@ -204,15 +227,16 @@ function finish(early) {
   const r = run; run = null;
   $('#calmLive').hidden = true;
   openSheet(`<div><span class="eyebrow">${early ? 'Ended early' : 'Done'}</span><h2 class="display h2" id="calmSheetTitle" style="margin-top:6px;font-size:1.3rem">How tense do you feel now?</h2></div>
-    ${slider('cAfter', '0 = completely calm, 10 = the worst it gets', r.before)}
-    <button class="cta" type="button" id="cSave">Save</button>`);
-  bindSlider('cAfter');
-  $('#cSave').onclick = () => {
-    const after = +$('#cAfter').value, minutes = Math.round((Date.now() - r.at) / 6000) / 10;
+    ${scale('cAfter')}
+    <button class="linkbtn" type="button" id="cSave">Skip</button>`);
+  const save = after => {
+    const minutes = Math.round((Date.now() - r.at) / 6000) / 10;
     ctx.S.calm.push({ at: r.at, goal: r.g.id, before: r.before, after, minutes, early });
     ctx.persist(); closeSheet(); renderCalm();
-    const d = r.before - after;
-    ctx.toast(d > 0 ? `Tension down ${d} point${d > 1 ? 's' : ''}. Alhamdulillah.` : 'Saved. Some days it takes longer, and that\'s normal.');
+    const d = r.before != null && after != null ? r.before - after : null;
+    ctx.toast(d > 0 ? `Tension down ${d} point${d > 1 ? 's' : ''}. Alhamdulillah.` : d === null ? 'Saved.' : 'Saved. Some days it takes longer, and that\'s normal.');
     if (after >= 9) showSupport();
   };
+  onScale('cAfter', save);
+  $('#cSave').onclick = () => save(null);
 }

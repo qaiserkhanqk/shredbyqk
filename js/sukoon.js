@@ -50,7 +50,7 @@ export const GOALS = [
     passages: [[30, 21, 21]], key: '30:21', meaning: 'And of His signs is that He created for you spouses from among yourselves so that you may find tranquillity in them, and He placed between you affection and mercy.',
     dua: { t: "Rabbana hab lana min azwajina wa dhurriyyatina qurrata a'yun.", m: 'Our Lord, grant us from our spouses and children the comfort of our eyes.', src: 'Quran 25:74' } },
   { id: 'healing', name: 'Healing (shifa)', blurb: 'When unwell or in pain', beat: 7.83, carrier: 432, evidence: 'weak',
-    passages: [[1, 1, 7]], key: '17:82', meaning: 'And We send down of the Quran that which is healing and mercy for the believers.',
+    passages: [[1, 1, 7]], key: '17:82', why: true, meaning: 'And We send down of the Quran that which is healing and mercy for the believers.',
     dua: { t: "Allahumma Rabban-nas, adhhibil-ba's, ishfi antash-Shafi, la shifa'a illa shifa'uk, shifa'an la yughadiru saqama.",
       m: 'O Allah, Lord of mankind, remove the harm and heal, You are the Healer. There is no healing but Yours, a healing that leaves no illness.', src: 'Sahih al-Bukhari 5743',
       also: 'Al-Fatiha was used as ruqyah and the Prophet ﷺ approved it. (Sahih al-Bukhari 5736)' } },
@@ -166,6 +166,16 @@ export class SukoonTones {
       o.start(now); lfo.start(now); this.nodes.push(o, amp, lfo, depth);
     }
     return true;
+  }
+  // A soft chime at each change of breath, so the pacer can be followed with eyes closed.
+  // Rising pitch = breathe in, falling = breathe out. A pure tone, no instrument.
+  cue(phase, volume = 1) {
+    if (!this.unlock()) return;
+    const c = this.ctx, t = c.currentTime, o = c.createOscillator(), g = c.createGain();
+    const [f0, f1] = phase === 'in' ? [330, 440] : [392, 262];
+    o.type = 'sine'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + 1.4);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09 * volume, t + 0.2); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.8);
+    o.connect(g).connect(c.destination); o.start(t); o.stop(t + 1.9);
   }
   setVolume(v) { if (this.master && this.ctx) this.master.gain.setTargetAtTime(MAX_GAIN * v, this.ctx.currentTime, 0.3); }
   stop(fade = 3) {
