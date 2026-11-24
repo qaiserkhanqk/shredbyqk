@@ -128,7 +128,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('studio: record with the microphone and save a clip', /1 of \d+ lines recorded/.test(await p.textContent('#studioCount')) && /recorded/.test(await p.textContent('#studioList')));
 
   // 8. Sukoon calm session (recitation is blocked here, so the session must fall through to the dua)
-  await ctx.route('https://everyayah.com/**', r => r.fulfill({ status: 200, body: '', headers: { 'content-type': 'audio/mpeg' } }));
+  for (const host of ['everyayah.com', 'verses.quran.com', 'verses.quran.foundation']) await ctx.route(`https://${host}/**`, r => r.fulfill({ status: 200, body: '', headers: { 'content-type': 'audio/mpeg' } }));
   await go('calm');
   check('sukoon: 9 goals listed', (await p.$$('#calmGoals [data-goal]')).length === 9);
   await p.click('[data-goal=anger]');
@@ -145,6 +145,12 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('sukoon: dua shown with its source', await p.isVisible('#calmDua') && /Bukhari 6369/.test(await p.textContent('#calmDua')));
   await p.click('#calmSkip'); await p.fill('#cAfter', '6'); await p.click('#cSave');
   check('sukoon: before/after saved to history', /10 → 6/.test(await p.textContent('#calmList')) && /−4/.test(await p.textContent('#calmTrend')));
+  // A phone that blocks sound not started by a tap must get a Play button, not a skipped recitation.
+  for (const host of ['everyayah.com', 'verses.quran.com', 'verses.quran.foundation']) { await ctx.unroute(`https://${host}/**`); await ctx.route(`https://${host}/**`, () => {}); } // audio stays loading
+  await p.evaluate(() => { const real = HTMLMediaElement.prototype.play; HTMLMediaElement.prototype.play = function () { return /^https:/.test(this.src) ? Promise.reject(new DOMException('blocked', 'NotAllowedError')) : real.call(this); }; });
+  await tap('#calmStart'); await p.fill('#cBefore', '5'); await p.click('#cGo'); await p.waitForTimeout(800); await p.click('#calmSkip'); await p.waitForTimeout(500);
+  check('sukoon: blocked autoplay → Play recitation button', await p.isVisible('#calmPlay') && await p.isVisible('#calmVerse'));
+  await p.click('#calmEnd'); await p.click('#cSave');
 
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();

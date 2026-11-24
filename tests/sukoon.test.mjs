@@ -1,5 +1,5 @@
 // Sukoon calm-session logic. Run: node tests/sukoon.test.mjs
-import { GOALS, AYAH_COUNT, SURAH, EVIDENCE, playlist, ayahUrl, binauralPair, breathAt, breathsPerMin, needsSupport, summarize } from '../js/sukoon.js';
+import { GOALS, AYAH_COUNT, SURAH, EVIDENCE, RECITERS, playlist, ayahUrl, ayahUrls, silentWav, binauralPair, breathAt, breathsPerMin, needsSupport, summarize } from '../js/sukoon.js';
 let fails = 0;
 const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? '  — ' + detail : ''}`); if (!ok) fails++; };
 
@@ -12,6 +12,11 @@ check('432 / 528 / 7.83 Hz are never rated better than weak', GOALS.filter(g => 
 check('band names match beat rates', GOALS.every(g => ({ Delta: g.beat < 4, Theta: g.beat >= 4 && g.beat < 8, Alpha: g.beat >= 8 && g.beat < 13, Gamma: g.beat >= 30 })[g.band]));
 
 check('ayah URL format', ayahUrl(94, 5) === 'https://everyayah.com/data/Alafasy_128kbps/094005.mp3');
+check('every reciter has backup sources on Quran.com', RECITERS.every(r => ayahUrls(94, 5, r.id).length === 3), ayahUrls(94, 5).join(' '));
+check('backup source path format', ayahUrls(94, 5)[1] === 'https://verses.quran.com/Alafasy/mp3/094005.mp3');
+check('playlist items carry all sources, EveryAyah first', playlist(GOALS[0]).every(x => x.urls.length === 3 && x.urls[0] === x.url));
+const wav = silentWav(), txt = (o, n) => String.fromCharCode(...wav.slice(o, o + n));
+check('unlock clip is a valid silent WAV', txt(0, 4) === 'RIFF' && txt(8, 4) === 'WAVE' && txt(36, 4) === 'data' && wav.length === 844 && wav.slice(44).every(x => x === 128));
 const sharh = playlist(GOALS.find(g => g.id === 'anxiety'));
 check('surah from verse 1 opens with the basmala', sharh[0].basmala && sharh[0].url.endsWith('001001.mp3') && sharh.length === 9);
 const fatiha = playlist(GOALS.find(g => g.id === 'healing'));

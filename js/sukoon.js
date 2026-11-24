@@ -59,22 +59,42 @@ export const GOAL = Object.fromEntries(GOALS.map(g => [g.id, g]));
 
 /* ---------- Recitation ---------- */
 // EveryAyah serves one MP3 per verse, named SSSAAA.mp3. 001001 is the basmala.
+// qc = the same reciter's path on Quran.com's audio servers, tried in turn if EveryAyah can't be reached.
 export const RECITERS = [
-  { id: 'Alafasy_128kbps', name: 'Mishary Alafasy' },
-  { id: 'Husary_128kbps', name: 'Mahmoud Khalil Al-Husary' },
-  { id: 'Abdul_Basit_Murattal_192kbps', name: 'Abdul Basit (murattal)' },
+  { id: 'Alafasy_128kbps', name: 'Mishary Alafasy', qc: 'Alafasy/mp3' },
+  { id: 'Husary_128kbps', name: 'Mahmoud Khalil Al-Husary', qc: 'Husary/mp3' },
+  { id: 'Abdul_Basit_Murattal_192kbps', name: 'Abdul Basit (murattal)', qc: 'AbdulBaset/Murattal/mp3' },
 ];
 const pad3 = n => String(n).padStart(3, '0');
 export const ayahUrl = (s, a, reciter = RECITERS[0].id) => `https://everyayah.com/data/${reciter}/${pad3(s)}${pad3(a)}.mp3`;
 
+export function ayahUrls(s, a, reciter = RECITERS[0].id) {
+  const qc = RECITERS.find(r => r.id === reciter)?.qc;
+  const file = `${qc}/${pad3(s)}${pad3(a)}.mp3`;
+  return [ayahUrl(s, a, reciter), ...(qc ? [`https://verses.quran.com/${file}`, `https://verses.quran.foundation/${file}`] : [])];
+}
+
 export function playlist(goal, reciter) {
   const out = [];
+  const item = (s, a, extra = {}) => { const urls = ayahUrls(s, a, reciter); return { s, a, ...extra, url: urls[0], urls }; };
   for (const [s, from, to] of goal.passages) {
     // A surah read from its first verse opens with the basmala (Al-Fatiha's first verse IS the basmala; At-Tawbah has none).
-    if (from === 1 && s !== 1 && s !== 9) out.push({ s: 1, a: 1, basmala: true, url: ayahUrl(1, 1, reciter) });
-    for (let a = from; a <= to; a++) out.push({ s, a, url: ayahUrl(s, a, reciter) });
+    if (from === 1 && s !== 1 && s !== 9) out.push(item(1, 1, { basmala: true }));
+    for (let a = from; a <= to; a++) out.push(item(s, a));
   }
   return out;
+}
+
+// Phones only let a page play sound that a tap started. Playing this silent clip during the Begin tap
+// unlocks the audio element, so the recitation can start by itself when the breathing ends.
+export function silentWav(samples = 800, rate = 8000) {
+  const b = new Uint8Array(44 + samples), v = new DataView(b.buffer);
+  const tag = (o, t) => [...t].forEach((c, i) => b[o + i] = c.charCodeAt(0));
+  tag(0, 'RIFF'); v.setUint32(4, 36 + samples, true); tag(8, 'WAVE'); tag(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); // PCM, mono
+  v.setUint32(24, rate, true); v.setUint32(28, rate, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); // 8-bit
+  tag(36, 'data'); v.setUint32(40, samples, true); b.fill(128, 44); // 128 = silence for 8-bit audio
+  return b;
 }
 export const quranComUrl = ([s, a, b]) => `https://quran.com/${s}/${a === b ? a : `${a}-${b}`}`;
 export const passageLabel = goal => goal.passages.map(([s, a, b]) => `${SURAH[s]} ${s}:${a}${b > a ? '–' + b : ''}`).join(' · ');
