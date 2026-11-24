@@ -69,7 +69,14 @@ Crashes are logged on the device. **Export error log** in the same panel gives t
   - pain traffic lights
   - phase progression (ACL return-to-sport symmetry)
   - camera measurements on known movements: shoulder 150°, knee 125°, forward bend 80°, 11 sit-to-stands, 18 calf raises, a 120 cm hop
+- **`tests/sukoon.test.mjs`:**
+  - every Quran passage is a real verse range, and the basmala is added only where it belongs
+  - each binaural pair differs by exactly the beat rate
+  - the breathing pacer runs at 6 breaths/min
+  - 432, 528 and 7.83 Hz are never rated better than weak evidence
+  - tension 9–10 triggers the support screen, and the before/after trend
 - **`tests/e2e.cjs`:**
+  - Sukoon: goals, evidence labels, support screen, breathing, fallback when the recitation can't load, saved history
   - demo set and exercise library
   - live camera and calibration
   - rehab clinic: safety screen, programme start, check-in, measurement, emergency red flag

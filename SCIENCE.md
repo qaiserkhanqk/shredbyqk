@@ -104,7 +104,30 @@ Each condition's evidence summary (NICE NG59, NG226; JOSPT clinical practice gui
 
 **All rehab content must be reviewed and signed off by a registered physiotherapist before public release.**
 
-## 10. Known limits (honest list)
+## 10. Sukoon calm session (`js/sukoon.js`, `js/calm.js`)
+
+A 5–15 minute session: rate tension (0–10) → slow breathing with optional tones → a short Quran recitation → a dua from the Sunnah → rate tension again. Evidence, strongest first:
+
+| Component | What the app does | Evidence | Strength |
+|---|---|---|---|
+| **Slow breathing** | On-screen pacer, 5 s in / 5 s out = 6 breaths/min, for 2–10 minutes. | Breathing near 6/min maximises heart-rate variability and baroreflex sensitivity (Lehrer & Gevirtz 2014, *Front Psychol*). Reciting prayer and mantras slows breathing to about 6/min (Bernardi et al. 2001, *BMJ* 323:1446). | Strong |
+| **Listening to the Quran** | A passage matched to the goal by meaning, streamed verse by verse from EveryAyah. | Systematic review of 28 trials: anxiety fell in almost all of them; many were small or weakly designed (Ghiasi & Keramat 2018, [doi:10.4103/ijnmr.IJNMR_173_17](https://doi.org/10.4103/ijnmr.IJNMR_173_17)). RCTs before chemotherapy ([doi:10.1002/nop2.781](https://doi.org/10.1002/nop2.781)), after surgery ([doi:10.1016/j.jopan.2022.02.006](https://doi.org/10.1016/j.jopan.2022.02.006)) and during MRI ([doi:10.1177/13591053261489102](https://doi.org/10.1177/13591053261489102)). | Moderate |
+| **Binaural beats** | Two sine tones, one per ear, differing by the beat rate (delta 2, theta 6, alpha 10, gamma 40 Hz). Pulsing (isochronic) mode for phone speakers. Volume capped and faded in over 4 s. | Meta-analysis of 22 studies, g = 0.45 for anxiety, pain and cognition (Garcia-Argibay et al. 2019, [doi:10.1007/s00426-018-1066-8](https://doi.org/10.1007/s00426-018-1066-8)). Perioperative meta-analysis of 15 RCTs: less anxiety and pain, but high heterogeneity (Xiong et al. 2025, [doi:10.1016/j.ctim.2025.103299](https://doi.org/10.1016/j.ctim.2025.103299)). | Moderate |
+| **432 Hz, 528 Hz, 7.83 Hz** | Used only for "Love" and "Healing", and labelled **weak evidence** in the app. | Two small 432 Hz pilots ([doi:10.1016/j.explore.2019.04.001](https://doi.org/10.1016/j.explore.2019.04.001), [doi:10.23750/abm.v93iS2.12915](https://doi.org/10.23750/abm.v93iS2.12915)). One 528 Hz trial found saliva-marker changes but no cognitive change ([doi:10.1002/brb3.71452](https://doi.org/10.1002/brb3.71452)). No human trials for the Schumann resonance. | Weak |
+| **40 Hz for focus** | Gamma tone for "Focus & study", labelled weak. | 40 Hz stimulation is studied mainly in Alzheimer's disease. Benefits for study in healthy people are unproven. | Weak |
+
+**Religious design choices**
+- No verse or hadith assigns a frequency to a surah. Surahs are matched to a goal by their meaning only, and the app says so.
+- Tones stop (3 s fade) before the recitation starts, so the Quran is listened to in silence (7:204). There is deliberately no option to play tones under the recitation.
+- Every dua shows its source: Bukhari 6369, 6115, 6324, 5743; Tirmidhi 3433; Quran 3:173, 18:39, 20:114, 25:74. Notes cite Abu Dawud 4782 and 3855, Ibn Majah 3509, Tirmidhi 2892 and Bukhari 5017, 5736.
+- **A qualified scholar should review the surah pairings, the dua texts and translations before public release.**
+
+**Safety**
+- A tension rating of 9–10 (before or after) shows emergency numbers and a helpline finder before anything else. "I'm not OK" is always visible during the session.
+- The screen states that Sukoon is a wellbeing exercise, not treatment for anxiety disorders, depression or panic.
+- The before/after ratings are self-reported. The trend ("works best for you") needs at least 2 sessions per goal.
+
+## 11. Known limits (honest list)
 
 - A 2D camera can't see rotation well. One angle per exercise is the best it can do, so the setup instructions tell the client where to put the phone.
 - Thresholds are evidence-informed starting points. **They must be tuned on real client footage reviewed by QK**, and this is the most important next step.

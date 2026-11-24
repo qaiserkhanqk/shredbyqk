@@ -80,6 +80,28 @@
     <button type="button" class="tile" data-go="rehab"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.5-9-9.5C1.6 7.6 4.2 4 7.8 4c1.8 0 3.2 1 4.2 2.4C13 5 14.4 4 16.2 4 19.8 4 22.4 7.6 21 11.5 19 16.5 12 21 12 21z"/><path d="M9 12h6M12 9v6"/></svg></span><span><b>Fix a pain or injury</b><span>Back, shoulder, knee, ankle and more. A safe, step-by-step plan.</span></span></button>
     <button type="button" class="tile" data-go="gait"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round"><path d="M8 4c2 0 3 2 3 4s-1 5-3 5-3-3-3-5 1-4 3-4zM16 9c2 0 3 2 3 4s-1 4-3 4-3-2-3-4 1-4 3-4z"/></svg></span><span><b>Test how you move</b><span>Walking and running, jump height, knee control.</span></span></button>
     <button type="button" class="tile" data-go="scan"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="12" r="3"/></svg></span><span><b>Posture &amp; body fat</b><span>A photo check of how you stand, plus body fat.</span></span></button>
+    <button type="button" class="tile" data-go="calm"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></span><span><b>Calm your mind</b><span>Sukoon: slow breathing, Quran and dua for anxiety, anger, sleep and more.</span></span></button>
+  </section>
+
+  <!-- SUKOON (calm) -->
+  <section class="screen" id="calm">
+    <button type="button" class="back" data-back>‹ Body</button>
+    <div class="page-head"><div><span class="eyebrow">Sukoon</span><h1 class="display h1">Calm your mind</h1></div></div>
+    <p class="muted" style="margin:0">Pick what you're feeling. You'll breathe slowly for a few minutes, listen to a short recitation, then make a dua from the Sunnah.</p>
+    <div class="goal-grid" id="calmGoals" role="group" aria-label="What are you feeling?"></div>
+    <div class="card stack" id="calmDetail"></div>
+    <button class="cta" type="button" id="calmStart"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Start Sukoon</button>
+    <details class="card"><summary><b>Settings</b></summary><div class="stack" id="calmSettings" style="margin-top:10px"></div></details>
+    <div class="card stack" id="calmHistory" hidden><span class="eyebrow">Your sessions</span><div id="calmTrend"></div><div class="list" id="calmList"></div></div>
+    <details class="card"><summary><b>Why it works, and what's not proven</b></summary>
+      <div class="stack small" style="margin-top:10px">
+        <p style="margin:0"><b>Slow breathing</b> at about 6 breaths a minute switches on the body's rest system and raises heart-rate variability. It has the strongest evidence here.</p>
+        <p style="margin:0"><b>Listening to the Quran</b> lowered anxiety in most of the 28 trials in a 2018 systematic review, including before surgery, chemotherapy and MRI scans. “Verily, in the remembrance of Allah do hearts find rest.” (13:28)</p>
+        <p style="margin:0"><b>Binaural tones</b> reduced anxiety with a medium effect in meta-analyses. The tones stop before the recitation, so the Quran is listened to in silence (7:204).</p>
+        <p style="margin:0"><b>Not proven:</b> no verse or hadith links a frequency to a surah, and claims about 432 Hz, 528 Hz and 7.83 Hz rest on small pilot studies. The surahs are matched to each goal by their meaning.</p>
+      </div>
+    </details>
+    <p class="muted small" style="margin:0">Sukoon is a wellbeing exercise, not treatment for a mental-health condition. <button type="button" class="linkbtn" id="calmSupportLink">Need support now?</button></p>
   </section>
 
   <!-- TESTS -->
@@ -404,6 +426,25 @@
     </div>
     <video id="playback" controls playsinline hidden></video>
     <div class="btn-row"><button class="ghost" type="button" id="doneBtn">Done</button><button class="cta" type="button" id="nextSet">Next set</button></div>
+  </div>
+</div>
+
+<!-- Sukoon live session -->
+<div class="live calm-live" id="calmLive" hidden>
+  <div class="live-inner">
+    <div class="live-top"><div><span class="eyebrow" id="calmEyebrow"></span><div class="set" id="calmTitle"></div></div><button type="button" class="linkbtn" id="calmNotSafe">I'm not OK</button></div>
+    <div class="calm-stage">
+      <div id="calmPacer" class="pacer"><div class="pacer-ring"><div class="pacer-circle" id="calmCircle"></div><span class="pacer-word" id="calmWord">Breathe in</span></div><span class="num muted" id="calmClock"></span></div>
+      <div id="calmVerse" class="calm-text" hidden><span class="eyebrow" id="calmVerseRef"></span><p class="verse" id="calmVerseText"></p><span class="muted small" id="calmAyah"></span><div class="stack" id="calmLinks"></div></div>
+      <div id="calmDua" class="calm-text" hidden></div>
+    </div>
+    <div class="live-actions"><button class="ghost" type="button" id="calmSkip">Next</button><button class="stop" type="button" id="calmEnd">End</button></div>
+  </div>
+</div>
+<div class="sheet-wrap" id="calmSheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="calmSheetTitle">
+    <div class="grab"></div>
+    <div id="calmSheetBody" class="stack"></div>
   </div>
 </div>
 
