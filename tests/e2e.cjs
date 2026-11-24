@@ -140,7 +140,9 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.click('#cCont'); await p.waitForTimeout(1500);
   check('sukoon: breathing pacer runs', await p.isVisible('#calmPacer') && /Breathe (in|out)/.test(await p.textContent('#calmWord')));
   await p.click('#calmSkip'); await p.waitForTimeout(1500);
-  check('sukoon: recitation failure falls through to the dua', await p.isVisible('#calmDua') && /Bukhari 6369/.test(await p.textContent('#calmDua')));
+  check('sukoon: recitation failure offers the passage on Quran.com', await p.isVisible('#calmLinks a[href="https://quran.com/94/1-8"]'));
+  await p.click('#calmSkip');
+  check('sukoon: dua shown with its source', await p.isVisible('#calmDua') && /Bukhari 6369/.test(await p.textContent('#calmDua')));
   await p.click('#calmSkip'); await p.fill('#cAfter', '6'); await p.click('#cSave');
   check('sukoon: before/after saved to history', /10 → 6/.test(await p.textContent('#calmList')) && /−4/.test(await p.textContent('#calmTrend')));
 

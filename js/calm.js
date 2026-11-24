@@ -1,5 +1,5 @@
 // Sukoon screen and live session. Flow: pick a goal → rate tension → breathe (tones optional) → listen → dua → rate again.
-import { GOALS, GOAL, EVIDENCE, RECITERS, playlist, passageLabel, breathAt, breathsPerMin, needsSupport, summarize, SukoonTones } from './sukoon.js';
+import { GOALS, GOAL, EVIDENCE, RECITERS, playlist, passageLabel, quranComUrl, breathAt, breathsPerMin, needsSupport, summarize, SukoonTones } from './sukoon.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -74,6 +74,7 @@ function askBefore() {
     <button class="cta" type="button" id="cGo">Begin</button>`);
   bindSlider('cBefore');
   $('#cGo').onclick = () => {
+    if (prefs().tones !== 'off') tones.unlock();
     const before = +$('#cBefore').value;
     if (needsSupport(before)) return showSupport(() => begin(before));
     closeSheet(); begin(before);
@@ -133,7 +134,15 @@ function listen() {
   run.list = playlist(g, p.reciter); run.idx = 0;
   $('#calmVerseRef').textContent = passageLabel(g);
   $('#calmVerseText').textContent = `“${g.meaning}” (${g.key})`;
+  $('#calmLinks').innerHTML = '';
+  if (ctx.linkOnly) return showLinks('Open the recitation, listen, then come back and tap Next.');
   playAyah();
+}
+
+// Fallback when the audio can't stream (offline, or a page that blocks outside audio): open the passage on Quran.com.
+function showLinks(msg) {
+  $('#calmAyah').textContent = msg;
+  $('#calmLinks').innerHTML = run.g.passages.map(p => `<a class="ghost" href="${quranComUrl(p)}" target="_blank" rel="noopener">Listen to ${esc(passageLabel({ passages: [p] }))} on Quran.com</a>`).join('');
 }
 
 function playAyah() {
@@ -143,8 +152,8 @@ function playAyah() {
   $('#calmAyah').textContent = it.basmala ? 'Bismillah' : `Verse ${it.s}:${it.a} · ${run.idx + 1} of ${run.list.length}`;
   const a = run.audio ||= new Audio();
   a.src = it.url; a.onended = () => { run.idx++; playAyah(); };
-  a.onerror = () => { ctx.toast('Couldn\'t load the recitation. Check your internet.'); dua(); };
-  a.play().catch(() => { $('#calmAyah').textContent = 'Tap Next to continue'; });
+  a.onerror = () => { a.onerror = a.onended = null; showLinks('Couldn\'t load the recitation here. Open it on Quran.com, then tap Next.'); };
+  a.play().catch(() => { if (!$('#calmLinks').innerHTML) $('#calmAyah').textContent = 'Tap Next to continue'; });
 }
 
 function dua() {

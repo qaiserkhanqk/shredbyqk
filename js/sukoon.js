@@ -76,6 +76,7 @@ export function playlist(goal, reciter) {
   }
   return out;
 }
+export const quranComUrl = ([s, a, b]) => `https://quran.com/${s}/${a === b ? a : `${a}-${b}`}`;
 export const passageLabel = goal => goal.passages.map(([s, a, b]) => `${SURAH[s]} ${s}:${a}${b > a ? '–' + b : ''}`).join(' · ');
 
 /* ---------- Tones ---------- */
@@ -114,11 +115,15 @@ export const MAX_GAIN = 0.12; // tones stay quiet: they sit under breathing, nev
 
 export class SukoonTones {
   constructor() { this.ctx = null; this.nodes = []; this.master = null; }
-  start({ beat, carrier, mode = 'binaural', volume = 0.6 }) {
-    this.stop(0);
+  // Browsers only allow sound after a tap: call this inside the click handler.
+  unlock() {
     const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
     if (!AC) return false;
-    this.ctx ||= new AC();
+    this.ctx ||= new AC(); this.ctx.resume?.(); return true;
+  }
+  start({ beat, carrier, mode = 'binaural', volume = 0.6 }) {
+    this.stop(0);
+    if (!this.unlock()) return false;
     const c = this.ctx; c.resume?.();
     const now = c.currentTime;
     this.master = c.createGain();
