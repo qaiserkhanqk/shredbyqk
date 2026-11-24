@@ -17,6 +17,7 @@ import { cueList, saveClip, getClip, deleteClip, listClipIds, startRecording, ex
 import { SessionRecorder, ErrorLog, downloadJSON, APP_VERSION } from './diagnostics.js';
 import { LIBRARY, LIB, MUSCLES, exFor } from './library.js';
 import { HipThrustDemo, WalkDemo, DEMO_W, DEMO_H } from './demo.js';
+import { initCalm, renderCalm } from './calm.js';
 import { landmarksFrom, analyse, render, navyBodyFat, bfCategory, stanceProblem } from './bodyscan.js';
 
 const $ = s => document.querySelector(s);
@@ -25,6 +26,7 @@ let S = store.load();
 S.gaits ||= [];
 const persist = () => store.save(S);
 ErrorLog.install();
+initCalm({ S, persist: () => persist(), toast: m => toast(m) });
 const recorder2 = new SessionRecorder();
 const bar = new BarTracker();
 const VBT_EQUIP = ['Barbell', 'Dumbbell', 'Dumbbells', 'EZ bar', 'Kettlebell'];
@@ -52,11 +54,12 @@ function mountOrbs() {
 /* ---------- Navigation ---------- */
 function tab(id) {
   $$('.screen').forEach(s => s.classList.toggle('on', s.id === id));
-  const tabFor = ['gait', 'scan', 'rehab'].includes(id) ? 'body' : id;
+  const tabFor = ['gait', 'scan', 'rehab', 'calm'].includes(id) ? 'body' : id;
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tabFor));
   if (id === 'today') renderToday();
   if (id === 'progress') { renderProgress(); renderLoad(); renderToday(); $('#youName').textContent = S.profile.name || 'You'; }
   if (id === 'rehab') renderRehab();
+  if (id === 'calm') renderCalm();
   if (id === 'scan') $('#hipWrap').hidden = S.profile.sex === 'male';
   window.scrollTo(0, 0);
 }

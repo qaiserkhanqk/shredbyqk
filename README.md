@@ -27,6 +27,12 @@ All video is processed **on the phone** (MediaPipe Pose) and nothing is uploaded
 - **Guided two-view posture screen:** front and side photos merged into one report.
 - **Accuracy:** 3 model sizes (precise model for uploads and tests), 60 fps capture for tests, and a recording-quality score that blocks results from bad recordings.
 - **Diagnostics:** export any session (body points only, no video) and replay it on a computer to find bugs. See [TESTING.md](TESTING.md).
+- **Sukoon calm session:** pick a feeling (anxiety, anger, jealousy, backbiting, focus, sleep, love, healing, mind reset), then:
+  - slow breathing with a 6 breaths/min pacer and optional binaural or pulsing tones
+  - a short Quran recitation matched to the goal (tones stop first, so the Quran is heard in silence)
+  - a dua from the Sunnah with its source
+  - tension rated before and after, with your trend
+  - each tone is labelled with its evidence strength, and high distress shows support numbers first
 - **Rehab clinic:** 18 injuries and pain conditions:
   - lower back, neck
   - frozen shoulder, rotator cuff, tennis and golfer's elbow

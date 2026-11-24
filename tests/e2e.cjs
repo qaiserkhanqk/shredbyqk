@@ -23,7 +23,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   // Centre an element before tapping it, so the fixed tab bar never covers it.
   const tap = async sel => { await p.$eval(sel, el => el.scrollIntoView({ block: 'center' })); await p.click(sel); };
   const go = async id => {
-    if (['gait', 'scan', 'rehab'].includes(id)) { await go('body'); await p.click(`[data-go=${id}]`); }
+    if (['gait', 'scan', 'rehab', 'calm'].includes(id)) { await go('body'); await p.click(`[data-go=${id}]`); }
     else await p.click(`.tabs [data-tab=${id}]`);
   };
   await p.goto('https://shred.local/');
@@ -126,6 +126,23 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('studio: lists coaching lines', /of \d+ lines recorded/.test(await p.textContent('#studioCount')));
   await tap('#studioList [data-act=rec]'); await p.waitForTimeout(1200); await tap('#studioList [data-act=rec]'); await p.waitForTimeout(600);
   check('studio: record with the microphone and save a clip', /1 of \d+ lines recorded/.test(await p.textContent('#studioCount')) && /recorded/.test(await p.textContent('#studioList')));
+
+  // 8. Sukoon calm session (recitation is blocked here, so the session must fall through to the dua)
+  await ctx.route('https://everyayah.com/**', r => r.fulfill({ status: 200, body: '', headers: { 'content-type': 'audio/mpeg' } }));
+  await go('calm');
+  check('sukoon: 9 goals listed', (await p.$$('#calmGoals [data-goal]')).length === 9);
+  await p.click('[data-goal=anger]');
+  check('sukoon: goal shows its surah and evidence rating', /Al Imran 3:133–134/.test(await p.textContent('#calmDetail')) && /Evidence: moderate/.test(await p.textContent('#calmDetail')));
+  await p.click('[data-goal=healing]');
+  check('sukoon: 432 Hz goal is labelled weak evidence', /Evidence: weak/.test(await p.textContent('#calmDetail')));
+  await p.click('[data-goal=anxiety]'); await tap('#calmStart'); await p.fill('#cBefore', '10'); await p.click('#cGo');
+  check('sukoon: tension 10 → support with emergency numbers first', /Get support now/.test(await p.textContent('#calmSheetBody')) && /116 123/.test(await p.textContent('#calmSheetBody')));
+  await p.click('#cCont'); await p.waitForTimeout(1500);
+  check('sukoon: breathing pacer runs', await p.isVisible('#calmPacer') && /Breathe (in|out)/.test(await p.textContent('#calmWord')));
+  await p.click('#calmSkip'); await p.waitForTimeout(1500);
+  check('sukoon: recitation failure falls through to the dua', await p.isVisible('#calmDua') && /Bukhari 6369/.test(await p.textContent('#calmDua')));
+  await p.click('#calmSkip'); await p.fill('#cAfter', '6'); await p.click('#cSave');
+  check('sukoon: before/after saved to history', /10 → 6/.test(await p.textContent('#calmList')) && /−4/.test(await p.textContent('#calmTrend')));
 
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();

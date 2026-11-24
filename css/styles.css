@@ -372,3 +372,24 @@ details[open] > summary::after { content: "–"; }
 .tabs { pointer-events: none; }
 .tabs nav { pointer-events: auto; }
 .app { padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)); }
+
+/* Sukoon (calm) */
+.goal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.goal { text-align: left; padding: 12px 14px; border-radius: var(--r-md); background: var(--surface); border: 1px solid var(--line); cursor: pointer; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.goal b { font-size: .95rem; }
+.goal span { color: var(--muted); font-size: .78rem; line-height: 1.3; }
+.goal.on { border-color: var(--z2); background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--zone) border-box; border-color: transparent; }
+.verse { margin: 0; font-size: 1.02rem; line-height: 1.55; }
+.ev { margin: 0; font-size: .8rem; color: var(--muted); padding: 10px 12px; border-radius: var(--r-sm); background: var(--surface-2); border-left: 3px solid var(--good); }
+.ev.weak { border-left-color: var(--warn); }
+#calmSheet { z-index: 50; }
+a.ghost { text-decoration: none; text-align: center; display: inline-flex; align-items: center; justify-content: center; }
+.calm-live { background: radial-gradient(70% 50% at 50% 40%, rgba(124,108,255,.14), transparent 70%), #05070c; }
+.calm-stage { flex: 1; display: grid; place-items: center; min-height: 0; overflow: auto; }
+.pacer { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.pacer-ring { position: relative; width: min(72vw, 300px); aspect-ratio: 1; border-radius: 50%; border: 1px solid var(--line); display: grid; place-items: center; }
+.pacer-circle { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 50% 40%, rgba(69,195,255,.55), rgba(124,108,255,.35) 60%, rgba(124,108,255,.08)); transform: scale(.55); will-change: transform; }
+.pacer-word { position: relative; font: 700 1.25rem var(--f-display); font-stretch: 112%; }
+.calm-text { max-width: 520px; text-align: center; display: flex; flex-direction: column; gap: 12px; padding: 8px; }
+.calm-text p { margin: 0; }
+.dua-t { font-size: 1.15rem; font-weight: 650; line-height: 1.5; }
