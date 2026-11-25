@@ -65,10 +65,11 @@
 | **Private by architecture:** encrypted on the phone; no account, upload, ads or third-party trackers | Built |
 | **Honest predictions:** her own ranges, "not enough data" and "too variable" states, and a learning stage | Built |
 | **Learns what helps *her*:** comfort suggestions with "did it help?" | Built (prototype, awaiting clinician review) |
-| **A caring companion:** QK check-ins on her period days. It asks, never guesses, and shows at most one message a day. | Built (prototype, awaiting clinician review) |
+| **A caring companion:** check-ins from Zara (she can rename her) on her period days. Her answers stay on her phone. It asks, never guesses, and shows at most one message a day. | Built (prototype, awaiting clinician review) |
 | **Perimenopause mode from published criteria:** STRAW+10, with sources shown to her | Built (prototype, awaiting clinician review) |
 | **Fitness built in:** camera form coaching, rehab, training-feel patterns. Pregnancy and postpartum workouts would be a real differentiator. | App exists; pregnancy and postpartum next |
 | **Fair pricing:** core tracking free, simple pricing, easy cancellation | A business decision |
+| **Personal, band-adjusted estimate:** re-centred on her own temperature rise and her own past rise-to-period gaps | Built behind a research switch (off); synthetic evidence only |
 | **Wearable temperature (SWL DS07 or Hume)** | Waiting for the supplier's software kit |
 
 ## Where Flo will stay ahead for now

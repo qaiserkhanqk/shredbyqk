@@ -10,14 +10,14 @@
 //    never include symptom values or dates.
 import { addDays, diffDays, hm, fmtHM, weekday, human } from './dates.js';
 import { CycleError, CATEGORIES } from './model.js';
-import { isCompanionDay } from './companion.js';
+import { isCompanionDay, companionName } from './companion.js';
 
 export const KINDS = {
   dailyLog: 'Daily reminder to log',
   weeklyLog: 'Weekly check-in',
   periodCheck: 'Check-in when your estimated range begins',
   pattern: 'Check-in from one of your patterns',
-  companion: 'QK check-in on your period days',
+  companion: 'Companion check-in on your period days',
 };
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 let seq = 0;
@@ -88,7 +88,7 @@ export function schedule(r, s, from, to, est) {
 export function nextFire(r, s, { today, nowMin, estimate }) {
   if (!r.enabled) return { next: null, why: r.disabledReason === 'category_off' ? `Turned off because you stopped logging ${CATEGORIES[r.category]?.label.toLowerCase() || 'that category'}.` : 'Turned off.' };
   const occ = schedule(r, s, today, addDays(today, 62), estimate).find(o => (o.date > today || o.mins >= nowMin) && s.delivered[r.id] !== o.date);
-  if (occ) return { next: occ, why: reasonFor(r, estimate) };
+  if (occ) return { next: occ, why: reasonFor(r, estimate, s.settings) };
   const why = r.kind === 'periodCheck' && !estimate?.rangeStart ? 'Waiting: there is no estimated range yet.'
     : r.kind === 'pattern' ? 'Waiting for your next logged period start.'
     : (r.pausedUntil && r.pausedUntil >= today) || (s.settings.remindersPausedUntil && s.settings.remindersPausedUntil >= today) ? 'Paused.' : 'Nothing scheduled in the next two months.';
@@ -99,17 +99,17 @@ export function nextFire(r, s, { today, nowMin, estimate }) {
 export function dueNow(s, { today, nowMin, estimate }) {
   if (!s.consent.reminders) return [];
   return s.reminders.filter(r => schedule(r, s, today, today, estimate).some(o => o.mins <= nowMin) && s.delivered[r.id] !== today)
-    .map(r => ({ reminder: r, why: reasonFor(r, estimate), content: notificationContent(r, s.settings) }));
+    .map(r => ({ reminder: r, why: reasonFor(r, estimate, s.settings), content: notificationContent(r, s.settings) }));
 }
 export const markDelivered = (s, id, today) => { s.delivered[id] = today; };
 
-export function reasonFor(r, est) {
+export function reasonFor(r, est, settings = {}) {
   switch (r.kind) {
     case 'dailyLog': return `You asked for a daily reminder at ${r.time}.`;
     case 'weeklyLog': return `You asked for a check-in every ${DAYS[r.weekday]} at ${r.time}.`;
     case 'periodCheck': if (est?.overdue) return 'Your period hasn\'t been logged and it is later than your recent cycles. You asked for check-ins until you log one.';
       return est?.rangeStart ? `Your estimated range starts on ${human(est.rangeStart)}. You asked for a check-in ${r.offsetDays ? `${r.offsetDays} day${r.offsetDays > 1 ? 's' : ''} before` : 'from that day'} until you log a period.` : 'You asked for a check-in when your estimated range begins.';
-    case 'companion': return 'You asked QK to check in on the first days of your period and around your estimated start.';
+    case 'companion': return `You asked ${companionName({ settings })} to check in on the first days of your period and around your estimated start.`;
     case 'pattern': return `You set this from a pattern in your own logs (${CATEGORIES[r.category].label.toLowerCase()} around cycle day ${r.cycleDay}).${r.origin ? ' ' + r.origin : ''}`;
   }
   return '';
@@ -118,6 +118,6 @@ export function reasonFor(r, est) {
 /** What appears on the lock screen. Neutral unless the user opted in; never symptom values or dates. */
 export function notificationContent(r, settings) {
   if (!settings.lockScreenDetail) return { title: 'Shred by QK', body: 'You have a check-in.' };
-  const body = { dailyLog: 'Time for your daily log.', weeklyLog: 'Time for your weekly check-in.', periodCheck: 'Cycle check-in: has your period started?', pattern: 'A check-in you set up is ready.', companion: 'QK has a check-in for you.' }[r.kind];
+  const body = { dailyLog: 'Time for your daily log.', weeklyLog: 'Time for your weekly check-in.', periodCheck: 'Cycle check-in: has your period started?', pattern: 'A check-in you set up is ready.', companion: `${companionName({ settings })} has a check-in for you.` }[r.kind];
   return { title: 'Shred by QK', body };
 }

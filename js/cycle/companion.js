@@ -1,4 +1,5 @@
-// Companion check-in (flag companion, default OFF). One caring message from QK on the days that matter for HER:
+// Companion check-in (flag companion, default OFF). One caring message from her companion ("Zara" by default; she can
+// rename her in settings) on the days that matter for HER:
 //   1. the first days of a period she logged ("Day 2 of your period. How are you feeling today?");
 //   2. around her estimated start, from her own past cycles ("may start around now"), including when it is late;
 //   3. (only with the pattern research flag) a heads-up from her own logged pattern, with her numbers.
@@ -10,9 +11,12 @@
 import { addDays, diffDays, human } from './dates.js';
 import { CycleError, hasConsent, categoryOn, CATEGORIES, logDay, logPeriodStart } from './model.js';
 
-export const COMPANION_VERSION = 'companion-0.1.0';
+export const COMPANION_VERSION = 'companion-0.2.0'; // 0.2.0: renamed from "QK" to "Zara"; her own name; privacy line
+export const DEFAULT_NAME = 'Zara';
+export const PRIVACY = 'Your answers stay on this phone, encrypted. Nothing is uploaded or shared.';
+const NAME_RE = /^[\p{L}][\p{L} '\-]{0,19}$/u;
 export const REVIEW_STATUS = 'awaiting_clinician_review';
-export const NOTICE_DAYS = 2;   // how many days before her estimated range QK checks in (a UI choice, not physiology)
+export const NOTICE_DAYS = 2;   // how many days before her estimated range the companion checks in (a UI choice, not physiology)
 export const PERIOD_DAYS = 3;   // check in on days 1–3 after a logged start (a UI choice, not physiology)
 
 /** One-tap answers. A symptom answer is offered only when she switched that category on. */
@@ -45,7 +49,18 @@ function dayKind(s, date, estimate, patterns = []) {
   return null;
 }
 
-/** True when QK would check in on `date` (used to schedule the optional companion reminder). */
+/** The companion's name: hers if she chose one, otherwise Zara. */
+export const companionName = s => (typeof s?.settings?.companionName === 'string' && s.settings.companionName) || DEFAULT_NAME;
+
+/** She can rename her companion: letters, spaces, apostrophes and hyphens, up to 20 characters. Empty = back to Zara. */
+export function setCompanionName(s, name) {
+  const n = String(name ?? '').trim().replace(/\s+/g, ' ');
+  if (n && !NAME_RE.test(n)) throw new CycleError('INVALID_INPUT');
+  (s.settings ||= {}).companionName = n || null;
+  return s;
+}
+
+/** True when the companion would check in on `date` (used to schedule the optional companion reminder). */
 export const isCompanionDay = (s, date, estimate, patterns = []) => !!(hasConsent(s) && !s.situation?.pregnant && dayKind(s, date, estimate, patterns));
 
 /**
@@ -58,14 +73,15 @@ export function companionToday(s, today, { estimate = null, patternsOn = false, 
   if (c.dismissed?.[today] || c.answered?.[today] || loggedToday(s, today)) return null;
   const k = dayKind(s, today, estimate, patternsOn ? patterns.filter(p => !s.dismissed?.[p.key]) : []);
   if (!k) return null;
-  const base = { version: COMPANION_VERSION, reviewStatus: REVIEW_STATUS, from: 'QK', kind: k.kind };
-  if (k.kind === 'periodDays') return { ...base, title: `Day ${k.day} of your period`, text: `Hi, it's QK. Day ${k.day} of your period. How are you feeling today?`,
+  const name = companionName(s);
+  const base = { version: COMPANION_VERSION, reviewStatus: REVIEW_STATUS, from: name, privacy: PRIVACY, kind: k.kind };
+  if (k.kind === 'periodDays') return { ...base, title: `Day ${k.day} of your period`, text: `Hi, it's ${name}. Day ${k.day} of your period. How are you feeling today?`,
     why: `Your period started on ${human(startsUpTo(s, today).at(-1))}, so I'm checking in for the first few days.`, quick: quickFor(s, false) };
   if (k.kind === 'periodSoon') return { ...base, title: estimate.overdue ? 'Your period may be late' : 'Your period may start soon',
-    text: estimate.overdue ? 'Hi, it\'s QK. Your period hasn\'t been logged yet, and it is later than your past cycles. Cycles vary for many reasons. How are you feeling today?' : 'Hi, it\'s QK. Based on your past cycles, your period may start around now. How are you feeling today?',
+    text: estimate.overdue ? `Hi, it's ${name}. Your period hasn't been logged yet, and it is later than your past cycles. Cycles vary for many reasons. How are you feeling today?` : `Hi, it's ${name}. Based on your past cycles, your period may start around now. How are you feeling today?`,
     why: `Your past cycles put your next period ${estimate.singleDate ? `on ${human(estimate.rangeStart)}` : `between ${human(estimate.rangeStart)} and ${human(estimate.rangeEnd)}`}. It's a description of your history, not a certain date.`, quick: quickFor(s, true) };
   const p = k.pattern, when = k.inDays === 0 ? 'around now' : `in about ${k.inDays} day${k.inDays === 1 ? '' : 's'}`;
-  return { ...base, title: 'A heads-up from your own logs', text: `Hi, it's QK. In ${p.notable} of the ${p.observed} cycles with logs then, you logged ${CATEGORIES[p.category].notableLabel} around this point, ${when}. How are you feeling today?`,
+  return { ...base, title: 'A heads-up from your own logs', text: `Hi, it's ${name}. In ${p.notable} of the ${p.observed} cycles with logs then, you logged ${CATEGORIES[p.category].notableLabel} around this point, ${when}. How are you feeling today?`,
     why: 'This comes only from your own logs. With few cycles it can be chance (it is an unvalidated research feature).', quick: quickFor(s, false) };
 }
 

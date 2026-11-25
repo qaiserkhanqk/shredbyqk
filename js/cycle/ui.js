@@ -12,7 +12,8 @@ import { today as localToday, localMinutes, addDays, diffDays, human, deviceTime
 import { readFlags, setFlag, FLAG_DEFS } from './flags.js';
 import { clinicianSummary, summaryText, SUMMARY_MONTHS } from './summary.js';
 import { learningStage } from './learning.js';
-import { companionToday, answerCheckIn, dismissCompanion } from './companion.js';
+import { companionToday, answerCheckIn, dismissCompanion, setCompanionName, companionName } from './companion.js';
+import { adjustedEstimate } from './adjust.js';
 import { midlifeObservations, SOURCES as MIDLIFE_SOURCES, INTRO as MIDLIFE_INTRO } from './midlife.js';
 import { comfortSuggestions, pendingComfortQuestions, logComfortTry, answerComfort, deleteComfort, ANSWERS, REVIEW_STATUS } from './comfort.js';
 
@@ -93,7 +94,7 @@ function render() {
   const unsaved = unsavedInputs(); // a redraw (e.g. another tab saved) must never change what the person typed
   const est = estimateNext(s, today);
   const tempShift = f.temperatureResearch && est.lastStart ? retrospectiveShift(s, est.lastStart, addDays(today, 1)) : null;
-  root.innerHTML = [banner(), f.companion ? companionHTML(s, today, est, f) : '', summaryMonths ? summaryHTML(s, today) : '', promptsHTML(s, est, today), dueHTML(s, est, today, nowMin), estimateHTML(s, est), learningHTML(s, today), f.midlifeMode && s.situation?.perimenopause ? midlifeHTML(s, today) : '', logHTML(s, today), f.comfortSuggestions ? comfortHTML(s, today) : '', f.patternInsights ? insightHTML(s, today) : '',
+  root.innerHTML = [banner(), f.companion ? companionHTML(s, today, est, f) : '', summaryMonths ? summaryHTML(s, today) : '', promptsHTML(s, est, today), dueHTML(s, est, today, nowMin), estimateHTML(s, est), f.temperatureEstimate ? adjustHTML(s, today) : '', learningHTML(s, today), f.midlifeMode && s.situation?.perimenopause ? midlifeHTML(s, today) : '', logHTML(s, today), f.comfortSuggestions ? comfortHTML(s, today) : '', f.patternInsights ? insightHTML(s, today) : '',
     f.phaseEducation ? phaseHTML(s, today, tempShift, est) : '', historyHTML(s), f.patternInsights ? patternsHTML(s, today, f) : '', remindersHTML(s, est, today, nowMin),
     wearableHTML(s, today, f, tempShift), situationHTML(s), settingsHTML(s, f)].join('');
   for (const id of open) { const d = root.querySelector('#' + id); if (d) d.open = true; }
@@ -155,6 +156,15 @@ function dueHTML(s, est, today, nowMin) {
   return `<div class="card" id="cyDue"><span class="eyebrow">Check-ins due</span>${due.map(d => `<div class="row cy-row"><div><b>${esc(KINDS[d.reminder.kind])}</b><details><summary class="linkbtn">Why am I seeing this?</summary><p class="muted small">${esc(d.why)}</p></details></div><button class="ghost" type="button" data-act="ackDue" data-id="${d.reminder.id}">Done</button></div>`).join('')}</div>`;
 }
 
+/* Band-adjusted estimate (js/cycle/adjust.js, research flag temperatureEstimate). Shown next to the dates-only estimate,
+   never instead of it, and labelled as research with the evidence stated (synthetic only). */
+function adjustHTML(s, today) {
+  const a = adjustedEstimate(s, today);
+  const range = a.status === 'adjusted' ? `<div class="num cy-range">${a.singleDate ? human(a.rangeStart) : `${human(a.rangeStart)} – ${human(a.rangeEnd)}`}</div>` : '';
+  return `<div class="card stack" id="cyAdjusted"><span class="eyebrow">Band-adjusted estimate · research</span>${range}
+    <p class="small">${esc(a.text)}</p><p class="muted small">${esc(a.why)}</p></div>`;
+}
+
 function estimateHTML(s, est) {
   const range = est.rangeStart ? `<div class="num cy-range">${est.singleDate ? human(est.rangeStart) : `${human(est.rangeStart)} – ${human(est.rangeEnd)}`}</div><p class="small" id="cyOutside"><b>From your past cycles only. Your period may come earlier or later.</b></p>` : '';
   const pl = typicalPeriodLength(s);
@@ -194,7 +204,7 @@ function learningHTML(s, today) {
     ${l.band ? `<p class="small${l.band.lastNight === 'recorded' ? ' muted' : ''}">${esc(l.band.text)}</p>` : ''}</div>`;
 }
 
-/* QK check-in (js/cycle/companion.js, flag companion): one caring question on the days that matter for her. It asks;
+/* Companion check-in, "Zara" by default (js/cycle/companion.js, flag companion): one caring question on the days that matter for her. It asks;
    nothing is saved until she taps. Shown first on the screen. */
 function companionHTML(s, today, est, f) {
   const m = companionToday(s, today, { estimate: est, patternsOn: !!f.patternInsights, patterns: f.patternInsights ? findPatterns(s) : [] });
@@ -203,7 +213,8 @@ function companionHTML(s, today, est, f) {
   return `<div class="card stack cy-companion" id="cyCompanion"><span class="eyebrow">${esc(m.from)} · check-in</span><b>${esc(m.title)}</b><p class="small">${esc(m.text)}</p>
     <div class="btn-row">${m.quick.map(q => `<button class="ghost" type="button" data-act="companionAnswer" data-ans="${esc(q.id)}">${esc(q.label)}</button>`).join('')}</div>
     ${cr ? `<div class="btn-row" id="cyCompanionSev" hidden><span class="small">How strong?</span>${cr.severities.map(([v, l]) => `<button class="ghost" type="button" data-act="companionSeverity" data-sev="${v}">${esc(l)}</button>`).join('')}</div>` : ''}
-    <div class="row"><details><summary class="linkbtn">Why am I seeing this?</summary><p class="muted small">${esc(m.why)} Wording awaiting clinician review.</p></details><button class="linkbtn" type="button" data-act="companionDismiss">Not now</button></div></div>`;
+    <div class="row"><details><summary class="linkbtn">Why am I seeing this?</summary><p class="muted small">${esc(m.why)} Wording awaiting clinician review.</p></details><button class="linkbtn" type="button" data-act="companionDismiss">Not now</button></div>
+    <p class="muted small" id="cyCompanionPrivacy">${esc(m.privacy)}</p></div>`;
 }
 
 /* Perimenopause and menopause mode (js/cycle/midlife.js, flag midlifeMode, only when she marked the situation).
@@ -292,7 +303,7 @@ function remindersHTML(s, est, today, nowMin) {
       <div class="stack" style="flex:0 0 auto"><input type="time" data-rtime value="${r.time}"><button class="linkbtn" type="button" data-act="pauseRem">${r.pausedUntil && r.pausedUntil >= today ? 'Resume' : 'Pause 7 days'}</button><button class="linkbtn" type="button" data-act="delRem">Delete</button></div></div>`; }).join('');
   const q = s.settings.quietHours;
   return `<div class="card stack" id="cyReminders"><span class="eyebrow">Reminders</span><div class="list">${list || '<p class="empty">No reminders.</p>'}</div>
-    <div class="grid2"><label class="field">Add<select id="cyRemKind"><option value="dailyLog">Daily log</option><option value="weeklyLog">Weekly check-in (Mondays)</option><option value="periodCheck">When my range begins</option>${flags().companion ? '<option value="companion">QK check-in on my period days</option>' : ''}</select></label><label class="field">Time<input type="time" id="cyRemTime" value="09:00"></label></div>
+    <div class="grid2"><label class="field">Add<select id="cyRemKind"><option value="dailyLog">Daily log</option><option value="weeklyLog">Weekly check-in (Mondays)</option><option value="periodCheck">When my range begins</option>${flags().companion ? `<option value="companion">${esc(companionName(s))} check-in on my period days</option>` : ''}</select></label><label class="field">Time<input type="time" id="cyRemTime" value="09:00"></label></div>
     <button class="ghost" type="button" data-act="addRem">Add reminder</button>
     <div class="grid2"><label class="field">Quiet from<input type="time" id="cyQs" value="${q.start}"></label><label class="field">Quiet until<input type="time" id="cyQe" value="${q.end}"></label></div>
     <label class="check"><input type="checkbox" id="cyLockDetail" ${s.settings.lockScreenDetail ? 'checked' : ''}> Show what the reminder is about on the lock screen (off = "You have a check-in")</label>
@@ -329,7 +340,8 @@ function settingsHTML(s, f) {
     ${(() => { const mid = Object.entries(M.CATEGORIES).filter(([k, c]) => c.group === 'midlife' && ((f.midlifeMode && s.situation?.perimenopause) || M.categoryOn(s, k))); return mid.length ? `<b class="small">Perimenopause and menopause symptoms</b>${catRows(s, mid)}` : ''; })()}
     <p class="muted small">Turning a category off stops collecting it. You'll be asked whether to delete what you logged.</p>
     <b class="small">Optional features</b>
-    ${['phaseEducation', 'midlifeMode', 'comfortSuggestions', 'patternInsights', 'symptomForecast', 'temperatureResearch', 'lhTests'].map(k => `<label class="check"><input type="checkbox" data-flag="${k}" ${f[k] ? 'checked' : ''}> <span><b>${esc(FLAG_DEFS[k].label)}</b> <span class="muted small">${esc(FLAG_DEFS[k].desc)}</span></span></label>`).join('')}
+    ${['phaseEducation', 'midlifeMode', 'comfortSuggestions', 'patternInsights', 'symptomForecast', 'temperatureResearch', 'temperatureEstimate', 'lhTests'].map(k => `<label class="check"><input type="checkbox" data-flag="${k}" ${f[k] ? 'checked' : ''}> <span><b>${esc(FLAG_DEFS[k].label)}</b> <span class="muted small">${esc(FLAG_DEFS[k].desc)}</span></span></label>`).join('')}
+    ${f.companion ? `<div class="stack" id="cyCompanionNameRow"><label class="field">Your companion's name<input id="cyCompanionName" maxlength="20" autocomplete="off" value="${esc(companionName(s))}"></label><button class="ghost" type="button" data-act="companionName">Save name</button><p class="muted small">Letters, spaces, apostrophes and hyphens, up to 20. Leave empty to go back to Zara.</p></div>` : ''}
     ${f.lhTests && !s.consent.lhTests ? `<div class="stack" id="cyLhConsent"><b class="small">Ovulation test (LH) results · research</b><p class="muted small">Optional. Record home ovulation test results exactly as you read them. The app doesn't interpret them, doesn't use them for your estimate and doesn't give fertility advice. Not contraception.</p><button class="ghost" type="button" data-act="lhOn">Turn on ovulation test logging</button></div>` : ''}
     ${s.consent.lhTests ? '<button class="ghost" type="button" data-act="lhOff">Turn off &amp; delete ovulation test results</button>' : ''}
     <b class="small">Summary for a doctor</b>
@@ -393,6 +405,7 @@ async function onClick(e) {
     },
     companionSeverity: () => act((s, t) => answerCheckIn(s, t, 'cramps', { severity: ds.sev, today: t }), 'Saved. Take care of yourself today.'),
     companionDismiss: () => act((s, t) => dismissCompanion(s, t)),
+    companionName: () => { const v = root.querySelector('#cyCompanionName')?.value ?? ''; return act(s => setCompanionName(s, v), 'Name saved'); },
     comfortTry: () => act((s, t) => logComfortTry(s, t, ds.opt, { today: t }), 'Noted. You can tell us later whether it helped.'),
     comfortAnswer: () => act(s => answerComfort(s, ds.id, ds.ans), 'Thanks, noted'),
     deleteComfort: () => { if (!confirm('Delete everything you recorded about what you tried and whether it helped?')) return; return act(s => deleteComfort(s), 'Comfort records deleted'); },

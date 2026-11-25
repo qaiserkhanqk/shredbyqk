@@ -1,0 +1,14 @@
+ok   a separate research flag, off by default
+ok   rise this cycle + 2 or more past rises: the estimate is adjusted
+ok   re-centred on the rise plus her own past rise-to-period intervals (all 14 days here)
+ok   the adjusted date is the next start of the synthetic schedule
+ok   it explains itself with her numbers and says it is research, not validated
+ok   it never mentions ovulation, fertility or safe days
+ok   no rise yet this cycle: not adjusted, with that reason
+ok   fewer than 2 past cycles with a rise: not adjusted
+ok   band not worn in this cycle's second half: not adjusted, no guessing
+ok   band switched off (data deleted): not adjusted
+ok   pregnant: not adjusted
+ok   hormonal contraception: not adjusted (no natural temperature pattern to use)
+ok   identical ranges to the evaluated sensor candidate wherever it used the band
+ALL PASS (13)

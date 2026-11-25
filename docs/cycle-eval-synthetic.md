@@ -2,7 +2,7 @@
 
 > **SYNTHETIC DATA. These results test the software only. They are not real-world or clinical performance and must not be quoted as accuracy.**
 
-Frozen config: cohort `synthetic-cohort-1`, seed 20261114, device `Mock Band (synthetic)` firmware `mock-1.0`, baseline `dates-only-1.1.0`, sensor candidate `sensor-candidate-0.1.0+three-over-six-skin-0.3.0-night-aggregated-onset-interval-research`.
+Frozen config: cohort `synthetic-cohort-1`, seed 20261114, device `Mock Band (synthetic)` firmware `mock-1.0`, baseline `dates-only-1.1.0`, sensor candidate `sensor-candidate-0.1.0+three-over-six-skin-0.4.0-night-aggregated-onset-interval-disruptors-research`.
 Participants: 9 development (not scored), 31 held-out test. Leakage self-check (every test participant, 3 dates each, both models): **passed**.
 
 Cycles scored: 335. Excluded because a period in between was never logged (the true outcome is unknown to the app): 3.
