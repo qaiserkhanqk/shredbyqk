@@ -53,7 +53,8 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
 
   // 2. Library + voice-guided hold
   await go('train'); await p.click('[data-muscle=Core]');
-  check('library: core filter', /15 exercises/.test(await p.textContent('#exCount')));
+  const coreN = await p.evaluate(async () => (await import('/js/library.js')).LIBRARY.filter(x => !x.rehab && x.muscles.includes('Core')).length);
+  check('library: core filter', new RegExp(`^${coreN} exercises`).test(await p.textContent('#exCount')) && coreN > 15, `${coreN}`);
 
   // 3. Live camera form check (fake camera, no person) starts without errors
   await p.click('[data-muscle=All]'); await p.click('[data-train=squat]'); await p.click('#startCam'); await p.waitForTimeout(5000);
@@ -172,6 +173,22 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('returning client: no welcome screen', !(await p.isVisible('#welcome')) && await p.isVisible('#today'));
   await p.goto('https://shred.local/?calm=now'); await p.waitForTimeout(800);
   check('shortcut: ?calm=now opens the Sukoon rating', await p.isVisible('#calm') && await p.isVisible('#cBefore'));
+
+  // Imported exercises are searchable and open a camera form check.
+  await p.goto('https://shred.local/'); await go('train'); await p.fill('#exSearch', 'zercher');
+  check('library: imported exercise found by search', /Zercher Squat/.test(await p.textContent('#exGrid')));
+  await p.click('[data-train=xZercherSquat]');
+  check('library: imported exercise opens a camera form check', await p.isVisible('#startCam'));
+  await p.click('#setup', { position: { x: 5, y: 5 } }); await p.fill('#exSearch', '');
+
+  // Map my body: demo calibration → personal body map sheet.
+  await p.goto('https://shred.local/'); await go('body'); await tap('#bodyMapTile');
+  check('body map: intro explains the one-minute calibration', /Map my body/.test(await p.textContent('#rsheetBody')));
+  await p.click('[data-bm=demo]');
+  await p.waitForFunction(() => /QK now coaches your body/.test(document.querySelector('#rsheetBody')?.textContent || '') && !document.querySelector('#rsheet').hidden, null, { timeout: 90000 });
+  const bm = await p.textContent('#rsheetBody');
+  check('body map: fits several movements, with reasons', /Forward lean allowed/.test(bm) && /Hinge depth/.test(bm) && /Long thighs/.test(bm) && /Tight hamstrings/.test(bm));
+  await p.click('[data-bm=close]');
 
   // 11. Body check: alertness test (shortened for the test run) and camera pulse with no finger
   await p.goto('https://shred.local/'); await p.waitForTimeout(600);
