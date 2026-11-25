@@ -299,7 +299,7 @@ async function startLive({ mode, source, file }) {
   const ex = mode === 'form' ? curEx() : null;
   live = { mode, source, frames: [], t0: null, lost: 0, wrong: 0, demo: null, done: false, steps: 0, mPerPx: null, standFrames: [], times: [] };
   bar.reset(); recorder2.start({ kind: mode, exercise: mode === 'form' ? exKey : undefined, gaitMode: mode === 'gait' ? gaitMode : undefined, source, loadKg: mode === 'form' ? parseFloat($('#loadKg').value) || null : undefined });
-  engine = null; fb = null; smooth.reset(); motion.reset(); fx.reset();
+  engine = null; fb = null; smooth.reset(); motion.reset(); fx.reset(); comp = null; recorder = null; $('#faultBanner').hidden = true;
   $('#formMeters').hidden = mode !== 'form'; $('#gaitMeters').hidden = mode === 'form';
   $('#repBig').hidden = mode !== 'form'; $('#cueHint').hidden = mode !== 'form';
   $('#repNum').textContent = '0'; $('#repLbl').textContent = ex?.hold ? 'seconds' : 'reps'; $('#dots').innerHTML = ''; $('#cleanCt').textContent = '0 clean'; $('#vlKnob').style.left = '0%'; $('#vlTxt').textContent = 'fresh';
@@ -329,9 +329,7 @@ async function startLive({ mode, source, file }) {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: mode === 'form' ? 30 : 60 } }, audio: false });
         video.removeAttribute('src'); video.srcObject = stream;
         $('#viewport').classList.toggle('mirror', facing === 'user');
-        if (mode === 'form' && $('#recordChk').checked && window.MediaRecorder) {
-          chunks = []; recorder = new MediaRecorder(stream); recorder.ondataavailable = e => e.data.size && chunks.push(e.data); recorder.start(1000); $('#recBadge').hidden = false;
-        }
+
       }
       await video.play();
       // Uploaded videos don't need real-time speed, so they use the most precise model.
@@ -339,6 +337,7 @@ async function startLive({ mode, source, file }) {
       live.lm = await getVideoLandmarker(live.model);
       $('#status').textContent = '';
     }
+    if (mode === 'form' && source !== 'file' && $('#recordChk').checked) startComposite(source === 'demo' ? canvas : video);
   } catch (err) {
     console.warn(err);
     $('#status').textContent = source === 'file' ? 'That video couldn\'t be played. Try an MP4 or MOV.' : 'Camera blocked. Allow camera access for this site in your browser settings, then try again.';
@@ -357,6 +356,45 @@ function countdown(n) {
     const step = () => { if (!live) return res(); if (n === 0) { el.hidden = true; return res(); } el.textContent = n--; setTimeout(step, 900); };
     step();
   });
+}
+
+/* Recording: the camera image with the skeleton and coaching graphics burned in, so the replay
+   shows exactly what QK saw and said. Recorded from a canvas, so it never leaves the phone. */
+let comp = null;
+function startComposite(src) {
+  const c = document.createElement('canvas'), sw = src.videoWidth || src.width, sh = src.videoHeight || src.height;
+  const k = Math.min(1, 720 / Math.max(sw, sh)); c.width = Math.round(sw * k); c.height = Math.round(sh * k);
+  if (!window.MediaRecorder || !c.captureStream) return;
+  try {
+    chunks = []; recorder = new MediaRecorder(c.captureStream(30));
+    recorder.ondataavailable = e => e.data.size && chunks.push(e.data); recorder.start(1000);
+    comp = { c, ctx: c.getContext('2d'), src, mirror: $('#viewport').classList.contains('mirror') };
+    live.recT0 = performance.now(); live.marks = []; $('#recBadge').hidden = false;
+  } catch (e) { console.warn(e); recorder = null; comp = null; }
+}
+function drawComposite() {
+  if (!comp || !recorder || recorder.state !== 'recording') return;
+  const { c, ctx, src, mirror } = comp, ov = $('#overlay');
+  ctx.save(); if (mirror) { ctx.translate(c.width, 0); ctx.scale(-1, 1); }
+  if (src.tagName === 'VIDEO') ctx.drawImage(src, 0, 0, c.width, c.height); else { ctx.fillStyle = '#07090f'; ctx.fillRect(0, 0, c.width, c.height); }
+  ctx.drawImage(ov, 0, 0, c.width, c.height); ctx.restore();
+}
+// Every correction is marked on the recording so the lifter can jump straight to it afterwards.
+function markFault(rule, fixed) {
+  if (!live?.marks || !rule) return;
+  live.marks.push({ t: (performance.now() - live.recT0) / 1000, label: fixed ? (rule.yes || `Fixed: ${rule.tag || rule.cue}`) : (rule.wrong || rule.cue), fix: fixed ? '' : (rule.tag || ''), ok: !!fixed });
+}
+
+let bannerT;
+function showBanner(rule, fixed) {
+  const el = $('#faultBanner'); if (!rule) return;
+  $('#fbWrong').textContent = fixed ? (rule.yes || 'Fixed') : (rule.wrong || rule.tag || 'Check your form');
+  $('#fbFix').textContent = fixed ? '' : (rule.tag || rule.cue);
+  $('#fbFix').hidden = fixed;
+  el.classList.toggle('fixed', !!fixed); el.hidden = false;
+  el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
+  clearTimeout(bannerT); bannerT = setTimeout(() => { el.hidden = true; }, fixed ? 1800 : 2600);
+  if (!fixed && live) live.badUntil = performance.now() + 1500;
 }
 
 let lastTs = -1;
@@ -380,6 +418,7 @@ function loop(now) {
     }
   }
   if (px) { live.times.push(t); live.mode === 'form' ? formFrame(px, ctx, t) : testFrame(px, ctx, t); }
+  drawComposite();
   if (!live || live.done) return;
   if (live.source === 'file' && video.ended) return live.mode === 'form' ? endSet() : finishTest();
   if (live.demo?.done && live.mode === 'form' && !live.ending) { live.ending = true; setTimeout(() => live && endSet(), 1500); }
@@ -431,17 +470,19 @@ function formFrame(px, ctx, t) {
       $('#vlTxt').textContent = ev.vl < .1 ? 'fresh' : ev.vl < .25 ? `−${Math.round(ev.vl * 100)}%` : `−${Math.round(ev.vl * 100)}% · near failure`;
       if (vbtOn() && live.mPerPx) { const v = bar.closeRep(); if (v) { live.lastV = v; $('#vlTxt').textContent = `${v.mcv.toFixed(2)} m/s`; } }
     }
-    if (ev.faults.length) flagged = true;
+    if (ev.faults.length && ev.type !== 'rep') flagged = true;
     const awaiting = fb.awaitingFix;
-    const line = ev.type === 'rep' ? fb.onRep(ev) : fb.onContinuousFault(ev.faults[0]);
+    const line = ev.type === 'live' ? fb.onLive(ev.faults[0]) : ev.type === 'rep' ? fb.onRep(ev) : fb.onContinuousFault(ev.faults[0]);
     if (line) say(line.text, line);
-    // Motion graphics follow what QK says: the cued fault's correction, a check when it's fixed.
-    if (line?.id?.startsWith('yes_')) fx.fixed(awaiting, t);
-    else if (line?.id && ev.faults.some(f => f.id === line.id)) fx.cue(ev.faults.find(f => f.id === line.id), t);
+    // On screen, at the same moment as the voice: what's wrong, what to do, and the graphic on the body.
+    const cued = line?.id && ev.faults.find(f => line.id === f.id || line.id === f.id + '_short');
+    if (line?.id?.startsWith('yes_')) { fx.fixed(awaiting, t); showBanner(awaiting, true); markFault(awaiting, true); }
+    else if (cued) { fx.cue(cued, t); showBanner(cued); markFault(cued); }
     else if (ev.type === 'rep' && !ev.faults.length) fx.clean(t);
   }
   motion.draw(ctx);
   const s = raw.s;
+  if (live.badUntil > performance.now()) flagged = true; // skeleton stays red while the fault is on screen
   drawPose(ctx, px, { color: flagged ? '#ff5a5f' : '#7c6cff', labels: [{ at: s.kn, value: m.knee }, { at: s.hip, value: m.hip }, ...(ex.primary === 'elbow' ? [{ at: s.el, value: m.elbow }] : [])] });
   if (ex.primary === 'knee') drawDepthArc(ctx, s.kn, s.hip, s.an, m.knee, { start: ex.upT + 10, target: 100 });
   else if (ex.primary === 'elbow') drawDepthArc(ctx, s.el, s.sh, s.wr, m.elbow, { start: ex.upT + 15, target: 95 });
@@ -509,7 +550,17 @@ function endSet() {
   }
   if (reps) { stopRest(); $('#restBtn').click(); } // rest starts by itself
   const pb = $('#playback'); pb.hidden = true;
-  if (wasRec) setTimeout(() => { if (!chunks.length) return; pb.src = URL.createObjectURL(new Blob(chunks, { type: chunks[0].type || 'video/webm' })); pb.hidden = false; }, 400);
+  const marks = live?.marks || [], fm = $('#faultMarks'); fm.hidden = true;
+  if (wasRec) setTimeout(() => {
+    if (!chunks.length) return; pb.src = URL.createObjectURL(new Blob(chunks, { type: chunks[0].type || 'video/webm' })); pb.hidden = false;
+    if (marks.length) {
+      const mmss = x => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, '0')}`;
+      fm.innerHTML = `<span class="eyebrow">Watch it back · ${marks.filter(m => !m.ok).length} correction${marks.filter(m => !m.ok).length === 1 ? '' : 's'}</span>` +
+        marks.map(m => `<button type="button" class="${m.ok ? 'ok' : ''}" data-seek="${m.t}"><span class="data">${mmss(m.t)}</span><span><b>${esc(m.label)}</b>${m.fix ? `<br><span class="muted small">${esc(m.fix)}</span>` : ''}</span></button>`).join('');
+      fm.hidden = false;
+      fm.onclick = e => { const b = e.target.closest('[data-seek]'); if (!b) return; pb.currentTime = Math.max(0, +b.dataset.seek - 1.5); pb.play(); pb.scrollIntoView({ block: 'center', behavior: 'smooth' }); };
+    }
+  }, 400);
   live = null;
 }
 

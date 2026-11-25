@@ -23,6 +23,7 @@ const lastSaid = {};
 let lastAny = 0;
 let speaking = false;
 let queued = null;
+let gen = 0, currentAudio = null;
 let avatarEls = [];
 let muted = false;
 
@@ -43,6 +44,7 @@ function pickVoice() {
 }
 
 async function play(text, id) {
+  const my = ++gen;
   setTalking(true);
   showCaption(text);
   try {
@@ -65,13 +67,16 @@ async function play(text, id) {
       setTimeout(res, 9000); // safety net if onend never fires
     });
   } finally {
-    setTalking(false);
-    if (queued) { const q = queued; queued = null; say(q.text, q.opts); }
+    // An interruption started a newer line: leave the talking state to it.
+    if (my === gen) {
+      setTalking(false);
+      if (queued) { const q = queued; queued = null; say(q.text, q.opts); }
+    }
   }
 }
 
 function playUrl(url) {
-  return new Promise(res => { const a = new Audio(url); a.onended = a.onerror = res; a.play().catch(res); });
+  return new Promise(res => { const a = currentAudio = new Audio(url); a._done = res; a.onended = a.onerror = res; a.play().catch(res); });
 }
 
 let captionTimer;
@@ -86,11 +91,21 @@ function showCaption(text) {
 /**
  * Speak a line as the coach.
  * opts.id       cue id (enables recorded clips + per-cue cooldown)
- * opts.priority 'high' (corrections, queued if busy) | 'low' (counts/praise, dropped if busy)
+ * opts.priority 'now' (live correction: interrupts the current line and speaks at once)
+ *              | 'high' (corrections, queued if busy) | 'low' (counts/praise, dropped if busy)
  */
 export function say(text, opts = {}) {
   if (muted) { showCaption(text); return; }
   const now = Date.now();
+  if (opts.priority === 'now') {
+    // Same fault again within 1.5 s is the same moment, not a new mistake.
+    if (opts.id && lastSaid[opts.id] && now - lastSaid[opts.id] < 1500) return;
+    stopSpeaking(); queued = null;
+    if (opts.id) lastSaid[opts.id] = now;
+    lastAny = now;
+    play(text, opts.id);
+    return;
+  }
   if (opts.id && lastSaid[opts.id] && now - lastSaid[opts.id] < CONFIG.sameCueCooldownMs) return;
   if (opts.priority === 'high' && !speaking && now - lastAny < CONFIG.anyCueGapMs) {
     setTimeout(() => say(text, opts), CONFIG.anyCueGapMs - (now - lastAny));
@@ -103,6 +118,13 @@ export function say(text, opts = {}) {
   if (opts.id) lastSaid[opts.id] = now;
   if (opts.priority === 'high') lastAny = now;
   play(text, opts.id);
+}
+
+function stopSpeaking() {
+  if (!speaking) return;
+  gen++; // the interrupted play() won't clear the talking state of the new line
+  try { speechSynthesis?.cancel(); } catch {}
+  if (currentAudio) { currentAudio.pause(); currentAudio._done?.(); currentAudio = null; }
 }
 
 export function greeting(name) {

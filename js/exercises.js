@@ -414,6 +414,34 @@ export const EXERCISES = {
   },
 };
 
+// Faults that can be judged mid-rep (posture, alignment), not ones that need the end of the rep
+// (depth, lockout, range). These are cued the moment they show.
+const LIVE = new Set(['sq_valgus', 'sq_heels', 'sq_chest', 'bp_legs', 'pu_sag', 'pu_pike', 'rdl_squat', 'lu_torso', 'cu_swing', 'raise_swing', 'fly_bend', 'dip_deep']);
+// What the lifter is doing wrong, in plain words, shown on screen next to the fix.
+const WRONG = {
+  sq_valgus: 'Knees caving in', sq_heels: 'Heels lifting', sq_chest: 'Leaning too far forward', sq_depth: 'Not deep enough',
+  sq_hips_first: 'Hips shooting up first', sq_lockout: 'Not standing all the way up',
+  bp_legs: 'No leg drive', bp_butt: 'Hips coming off the bench', bp_scap: 'Shoulders rolling off the bench', bp_depth: 'Not touching your chest', bp_lockout: 'Not locking out',
+  ht_arch: 'Arching your lower back', ht_feet_far: 'Feet too far away', ht_feet_close: 'Feet too close', ht_lockout: 'Hips not all the way up',
+  pu_sag: 'Hips sagging', pu_pike: 'Hips too high', pu_depth: 'Not going low enough',
+  rdl_squat: 'Squatting, not hinging', rdl_lockout: 'Not standing tall', lu_torso: 'Leaning forward', lu_depth: 'Not deep enough',
+  cu_swing: 'Swinging your elbows', cu_squeeze: 'Not curling all the way', cu_extend: 'Not lowering all the way',
+  pr_even: 'Pressing unevenly', pr_lockout: 'Not locking out', raise_swing: 'Using momentum', raise_high: 'Lifting too high', raise_low: 'Not lifting high enough',
+  dip_deep: 'Going too deep', fly_bend: 'Bending your elbows too much', pl_sag: 'Hips sagging', pl_pike: 'Hips too high',
+};
+// Short coach's shout used once the full cue has been said twice.
+const SHOUT = {
+  ht_arch: 'Ribs down', ht_feet_far: 'Feet back', ht_feet_close: 'Feet out', ht_lockout: 'Hips up',
+  pu_sag: 'Hips up', pu_pike: 'Hips down', pu_depth: 'Chest down', rdl_squat: 'Hips back', rdl_lockout: 'Stand tall',
+  lu_torso: 'Stay tall', lu_depth: 'Knee down', cu_swing: 'Elbows still', cu_squeeze: 'All the way up', cu_extend: 'All the way down',
+  pr_even: 'Even', pr_lockout: 'Lock out', raise_swing: 'No swinging', raise_high: 'Shoulder height', raise_low: 'Higher',
+  dip_deep: 'Not so deep', dip_depth: 'Lower', fly_bend: 'Soft elbows', pl_sag: 'Hips up', pl_pike: 'Hips down',
+};
+for (const ex of Object.values(EXERCISES)) {
+  for (const r of ex.bottom || []) if (LIVE.has(r.id)) r.live = true;
+  for (const r of [...(ex.bottom || []), ...(ex.ascent || []), ...(ex.top || []), ...(ex.always || [])]) { r.wrong ||= WRONG[r.id]; r.tag ||= SHOUT[r.id]; }
+}
+
 export const allRules = ex => [...(ex.bottom || []), ...(ex.ascent || []), ...(ex.top || []), ...(ex.always || [])];
 
 /**
@@ -428,6 +456,7 @@ export class RepEngine {
     this.faultTally = {}; this.tempo = []; // [{ecc, con}] seconds per rep
     this.tLeaveTop = null; this.tBottom = null; this.roms = [];
     this.base = null; this.ascentSnap = null; // base = start position (standing / set up on the bench)
+    this.liveSeen = new Set(); this.liveCount = {};
   }
 
   // `only` limits a rule to some library exercises (e.g. heel rise is meaningless on a leg press).
@@ -449,11 +478,24 @@ export class RepEngine {
 
     if (this.phase === 'top') {
       if (!this.topSnap || v > this.topSnap[ex.primary]) { this.topSnap = { ...m }; this.tLeaveTop = t; }
-      if (v < ex.downT) { this.base ||= { ...this.topSnap }; this.phase = 'bottom'; this.bottomSnap = { ...m }; this.tBottom = t; this.ascentSnap = null; }
+      if (v < ex.downT) { this.base ||= { ...this.topSnap }; this.phase = 'bottom'; this.bottomSnap = { ...m }; this.tBottom = t; this.ascentSnap = null; this.liveSeen = new Set(); this.liveCount = {}; }
     } else {
       if (v < this.bottomSnap[ex.primary]) { this.bottomSnap = { ...m }; this.tBottom = t; this.ascentSnap = null; }
       const b = this.bottomSnap[ex.primary];
-      if (!this.ascentSnap && v >= b + 0.4 * (ex.upT - b)) this.ascentSnap = { ...m };
+      // LIVE: faults that can be judged mid-rep are reported the moment they show (held ~0.2 s),
+      // so the coach can correct the rep while it's happening, like a coach standing next to you.
+      // Bottom-position faults are watched on the way down and at the bottom; once the lifter is
+      // clearly rising, the drive-up (ascent) rules take over, so one mistake isn't cued twice.
+      const lc = this.ctx(), rising = v > b + 0.15 * (ex.upT - b);
+      for (const r of this.rules(ex.bottom)) {
+        if (!r.live || rising || this.liveSeen.has(r.id)) continue;
+        this.liveCount[r.id] = r.test(m, lc) ? (this.liveCount[r.id] || 0) + 1 : 0;
+        if (this.liveCount[r.id] >= 6) { this.liveSeen.add(r.id); events.push({ type: 'live', faults: [r] }); }
+      }
+      if (!this.ascentSnap && v >= b + 0.4 * (ex.upT - b)) {
+        this.ascentSnap = { ...m };
+        for (const r of this.rules(ex.ascent)) if (r.test(this.ascentSnap, this.ctx())) { this.liveSeen.add(r.id); events.push({ type: 'live', faults: [r] }); }
+      }
       if (v > ex.upT) {
         this.phase = 'top';
         this.reps++;
@@ -461,8 +503,12 @@ export class RepEngine {
         const down = (this.tBottom - this.tLeaveTop) / 1000, up = (t - this.tBottom) / 1000;
         this.tempo.push(ex.concentric === 'down' ? { ecc: up, con: down } : { ecc: down, con: up });
         const c = this.ctx();
+        const all = [...this.rules(ex.bottom), ...this.rules(ex.ascent)];
         this.repFaults = [...this.rules(ex.bottom).filter(r => r.test(this.bottomSnap, c)),
           ...(this.ascentSnap ? this.rules(ex.ascent).filter(r => r.test(this.ascentSnap, c)) : [])];
+        // Faults caught live during the rep count for the rep even if the bottom snapshot missed them.
+        for (const r of all) if (this.liveSeen.has(r.id) && !this.repFaults.includes(r)) this.repFaults.push(r);
+        this.repLive = [...this.liveSeen];
         this.repBottom = this.bottomSnap;
         this.pendingTop = true; this.topSnap = { ...m }; this.topFrames = 0; this.tLeaveTop = t;
       }
@@ -480,14 +526,14 @@ export class RepEngine {
         if (!faults.length) this.goodReps++;
         const rom = Math.abs(this.topSnap[ex.primary] - this.bottomSnap[ex.primary]);
         this.roms.push({ rom, clean: !faults.length });
-        events.push({ type: 'rep', reps: this.reps, faults, tempo: this.tempo[this.tempo.length - 1], vl: this.velocityLoss(), rom });
+        events.push({ type: 'rep', reps: this.reps, faults, live: this.repLive || [], tempo: this.tempo[this.tempo.length - 1], vl: this.velocityLoss(), rom });
       }
     }
 
-    // Continuous faults must persist ~15 frames (~0.5 s) — a "bandwidth" so brief wobbles are ignored.
+    // Continuous faults must persist ~10 frames (~0.33 s) — a "bandwidth" so brief wobbles are ignored.
     for (const r of this.rules(ex.always)) {
       this.alwaysCount[r.id] = r.test(m) ? (this.alwaysCount[r.id] || 0) + 1 : 0;
-      if (this.alwaysCount[r.id] === 15) {
+      if (this.alwaysCount[r.id] === 10) {
         this.faultTally[r.id] = (this.faultTally[r.id] || 0) + 1;
         events.push({ type: 'fault', faults: [r] });
       }

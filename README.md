@@ -9,12 +9,13 @@ All video is processed **on the phone** (MediaPipe Pose) and nothing is uploaded
   - **66 have a live camera form check**, built on 20 movement patterns: squat, hinge, lunge, hip thrust, bench and press, push-up, dip, fly, row, vertical pull, curl, triceps extension, raises, calf raise, crunch, leg raise, leg extension, leg curl and plank hold.
   - **18 are voice-coached for tempo** (twists, carries, wrist curls and similar). A phone camera can't judge these reliably, so the app says so instead of showing a fake form score.
 - **Live form check:**
+  - **Corrects you mid-rep, like a coach beside you.** Posture faults (knees caving, heels lifting, leaning, hips shooting up, no leg drive) are called out the moment they appear, interrupting whatever QK was saying. A red banner shows what's wrong and the fix, and the skeleton turns red. End-of-rep faults (depth, lockout, shoulders at the top) are cued as soon as the rep finishes. After two full cues QK switches to a short shout ("Knees out!").
   - Joint angles are drawn on the client's body, with a live depth gauge at the working joint.
   - **Motion graphics on the body** when QK cues a fault: arrows and targets that move with the joints (knees out, heels down, chest leads, pin shoulders, leg drive, glutes down), then a green check when it's fixed.
   - Squat faults: knees caving in, hips shooting up first, heels lifting, too much forward lean, depth, lockout.
   - Bench faults: shoulder blades not pinned (shoulders rolling off the bench), no leg drive, hips lifting off the bench, depth, lockout.
   - Corrections are spoken by the coach, with rep counting.
-  - Tempo, rep-speed loss and reps-in-reserve are tracked, and the set can be recorded and played back.
+  - Tempo, rep-speed loss and reps-in-reserve are tracked. The set is recorded with the skeleton and coaching graphics burned in, and every correction is listed with its time, so you can tap it to jump straight to that moment.
   - Clients can also upload a video they filmed earlier.
 - **Motion tracking.** Live movement trail of the hips or bar, range of motion per rep, partial-rep and bar-path-drift detection.
 - **Gait analysis.** Record 10 seconds of walking or running on the live camera, or upload a video. You get:

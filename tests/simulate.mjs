@@ -24,7 +24,7 @@ console.log({ reps: eng.reps, clean: eng.goodReps, velocityLoss: Math.round(eng.
 const assert = (c, m) => { if (!c) { console.error('FAIL', m); process.exit(1); } };
 assert(eng.reps === 10, 'counts 10 reps');
 assert(said[0].includes('Walk your feet back'), 'first rep cues feet');
-assert(said.filter(x => x.includes('Walk your feet back')).length <= 2, 'cue is faded, not repeated every rep');
+assert(said.filter(x => x.includes('Walk your feet back')).length === 2 && said.some(x => x.includes('Feet back!')), 'full cue twice, then the short shout');
 assert(said.some(x => x.includes('Shins vertical')), 'praises the correction');
 assert(said.some(x => /slowed right down|getting hard/.test(x)), 'detects fatigue');
 console.log('ALL PASS');

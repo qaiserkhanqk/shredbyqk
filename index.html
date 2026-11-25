@@ -397,6 +397,7 @@
       <div class="media"><video id="video" playsinline muted></video><canvas id="overlay"></canvas></div>
       <div class="rep-big" id="repBig"><span class="num" id="repNum">0</span><small id="repLbl">reps</small></div>
       <div class="readout" id="readout"></div>
+      <div class="fault-banner" id="faultBanner" hidden aria-live="assertive"><b id="fbWrong"></b><span id="fbFix"></span></div>
       <div class="countdown num" id="countdown" hidden></div>
       <div class="tempo-ring" id="tempoRing" hidden><div class="word" id="tempoWord"></div></div>
       <div class="status" id="status"></div>
@@ -447,6 +448,7 @@
       <button class="ghost" type="button" id="restBtn">Start</button>
     </div>
     <video id="playback" controls playsinline hidden></video>
+    <div class="fault-marks" id="faultMarks" hidden></div>
     <div class="btn-row"><button class="ghost" type="button" id="doneBtn">Done</button><button class="cta" type="button" id="nextSet">Next set</button></div>
   </div>
 </div>

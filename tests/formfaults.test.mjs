@@ -34,6 +34,8 @@ check('squat: hips shooting up detected on reps 1–2', sq.reps[0]?.includes('sq
 check('squat: heels lifting detected on reps 5–6', sq.reps[4]?.includes('sq_heels') && sq.reps[5]?.includes('sq_heels'));
 check('squat: clean reps have no faults', [2, 3, 6, 7].every(i => sq.reps[i]?.length === 0), JSON.stringify([2, 3, 6, 7].map(i => sq.reps[i])));
 check('squat: cues "lead with your chest", then praises the fix', sq.said.some(x => x.includes('Lead with your chest')) && sq.said.some(x => x.includes('chest and hips together')));
+check('squat: hips-first is called out mid-rep, before the rep is counted', sq.said[0]?.startsWith('rep 0: Lead with your chest'));
+check('squat: a faulty rep is never praised as good', !sq.said.some(x => /^rep (1|2|5|6):.*(Good rep|That's it|Perfect|Strong|Lovely)/.test(x)));
 check('squat: cues heels, then praises the fix', sq.said.some(x => x.includes('through your heels')) && sq.said.some(x => x.includes('Heels down')));
 
 const bp = run('benchPress', BenchDemo);
