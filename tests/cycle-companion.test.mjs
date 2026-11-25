@@ -100,7 +100,22 @@ run('notifications', () => {
 run('wording', () => {
   const s = history('2026-06-29'); const m = today(s, '2026-06-30', opts(s, '2026-06-30')) || {};
   check('no forbidden wording', !FORBIDDEN.some(([, re]) => re.test(words(m))));
-  check('warm, first person from QK, and no medical claims', /QK/.test(m.from || '') && !/diagnos|treat|cure|medicine|tablet|dose/i.test(words(m)), words(m));
+  // Renamed from "QK" to "Zara" at the product owner's request (2026-11-25); she can rename her companion.
+  check('warm, first person from Zara by default, and no medical claims', m.from === 'Zara' && /it's Zara/.test(m.text || '') && !/diagnos|treat|cure|medicine|tablet|dose/i.test(words(m)), words(m));
+  check('it reassures her that her answers stay on her phone', /stay on this phone/i.test(m.privacy || '') && /encrypted/i.test(m.privacy || ''), m.privacy);
   check('no sexual or adult content (the audience may include teenagers)', !/\bsex\b|intercourse|contracept/i.test(words(m)));
+});
+run('her own name for the companion', () => {
+  const s = history('2026-06-29'), t = '2026-06-30';
+  check('setCompanionName exists', typeof C.setCompanionName === 'function');
+  C.setCompanionName?.(s, '  Amna ');
+  const m = today(s, t, opts(s, t)) || {};
+  check('she can rename her companion; messages use her chosen name', m.from === 'Amna' && /it's Amna/.test(m.text || ''), words(m));
+  let e = null; try { C.setCompanionName(s, '<script>'); } catch (x) { e = x.code; } check('only letters, spaces, apostrophes and hyphens (up to 20)', e === 'INVALID_INPUT');
+  let e2 = null; try { C.setCompanionName(s, 'A'.repeat(21)); } catch (x) { e2 = x.code; } check('too long is refused', e2 === 'INVALID_INPUT');
+  C.setCompanionName?.(s, ''); check('an empty name goes back to Zara', (today(s, t, opts(s, t)) || {}).from === 'Zara');
+  M.setScopeConsent(s, 'reminders', true, AT); C.setCompanionName?.(s, 'Amna');
+  const r = R.addReminder(s, { kind: 'companion', time: '09:00' }, { at: AT });
+  check('the opt-in lock-screen detail uses her chosen name, still with no health detail', R.notificationContent(r, { ...s.settings, lockScreenDetail: true }).body === 'Amna has a check-in for you.', R.notificationContent(r, { ...s.settings, lockScreenDetail: true }).body);
 });
 console.log(fails ? `${fails} FAILED of ${count}` : `ALL PASS (${count})`); process.exit(fails ? 1 : 0);

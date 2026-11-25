@@ -1,0 +1,37 @@
+ok   a separate flag, off by default
+ok   no consent or nothing to say: null
+ok   day 2 of her period: a check-in
+ok   it offers one-tap answers only for categories she switched on (+ Fine, Something else)
+ok   it explains why it is asking
+ok   mid-cycle with no pattern: nothing (no daily nagging)
+ok   a day before her estimated range: "may start around now", from past cycles, not certain
+ok   …with a "period started" answer
+ok   pattern heads-up needs the pattern research flag
+ok   period days come before a pattern heads-up (one message only)
+ok   overdue period: still a gentle check-in
+ok   the pattern heads-up (when on) shows her own numbers and says it may be chance
+ok   pregnant: silent (pregnancy mode will handle it)
+ok   asking never changes her data (nothing guessed or saved)
+ok   cramps needs a valid severity
+ok   cramps → saves pain as she chose it, marked as coming from the companion
+ok   once answered, no more companion message today
+ok   …and it comes back on the next relevant day
+ok   "Fine" records only that she answered: no symptom is invented
+ok   an answer for a category she switched off is refused
+ok   "Period started" logs a period start (she confirmed it)
+ok   "Not now" hides it for today only
+ok   if she already logged today, it stays quiet
+ok   a "companion" reminder kind exists
+ok   it fires only on companion days (period days, around the estimated start), not every day
+ok   lock-screen text stays neutral
+ok   no forbidden wording
+FAIL warm, first person from Zara by default, and no medical claims  — {"version":"companion-0.1.0","reviewStatus":"awaiting_clinician_review","from":"QK","kind":"periodDays","title":"Day 2 of your period","text":"Hi, it's QK. Day 2 of your period. How are you feeling today?","why":"Your period started on 29 Jun, so I'm checking in for the first few days.","quick":[{"id":"fine","label":"Fine","severities":null},{"id":"cramps","label":"Cramps","severities":[["mild","Mild"],["moderate","Moderate"],["severe","Severe"]]},{"id":"lowEnergy","label":"Low energy","severities":null},{"id":"other","label":"Something else","severities":null}]}
+FAIL it reassures her that her answers stay on her phone
+ok   no sexual or adult content (the audience may include teenagers)
+FAIL setCompanionName exists
+FAIL she can rename her companion; messages use her chosen name  — {"version":"companion-0.1.0","reviewStatus":"awaiting_clinician_review","from":"QK","kind":"periodDays","title":"Day 2 of your period","text":"Hi, it's QK. Day 2 of your period. How are you feeling today?","why":"Your period started on 29 Jun, so I'm checking in for the first few days.","quick":[{"id":"fine","label":"Fine","severities":null},{"id":"cramps","label":"Cramps","severities":[["mild","Mild"],["moderate","Moderate"],["severe","Severe"]]},{"id":"lowEnergy","label":"Low energy","severities":null},{"id":"other","label":"Something else","severities":null}]}
+FAIL only letters, spaces, apostrophes and hyphens (up to 20)
+FAIL too long is refused
+FAIL an empty name goes back to Zara
+FAIL the opt-in lock-screen detail uses her chosen name, still with no health detail  — QK has a check-in for you.
+8 FAILED of 36

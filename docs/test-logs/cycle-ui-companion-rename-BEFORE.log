@@ -1,0 +1,16 @@
+ok   flag off: no companion card
+FAIL day 1 of a period: Zara asks how she is feeling (renamed from QK)  — QK · check-inDay 1 of your periodHi, it's QK. Day 1 of your period. How are you feeling today? FineCrampsSomething else How strong?MildModerateSevere Why am I s
+FAIL the card says her answers stay on her phone
+ok   the companion card is the first card on the screen (above the estimate)
+ok   it says why it is asking
+ok   "Cramps" asks how strong, in one tap
+ok   after answering, the check-in closes for today
+ok   her answer is saved in today's log
+ok   and what helped her before is offered (comfort card)
+FAIL run completed  — page.fill: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('#cyCompanionName')[22m
+
+    at /home/user/shredbyqk/tests/cycle-ui-companion.cjs:50:15
+ok   no JavaScript errors
+3 FAILED of 11
