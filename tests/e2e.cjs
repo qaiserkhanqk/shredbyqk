@@ -175,11 +175,11 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
 
   // Map my body: demo calibration → personal body map sheet.
   await p.goto('https://shred.local/'); await go('body'); await tap('#bodyMapTile');
-  check('body map: intro explains the 30-second calibration', /Map my body/.test(await p.textContent('#rsheetBody')));
+  check('body map: intro explains the one-minute calibration', /Map my body/.test(await p.textContent('#rsheetBody')));
   await p.click('[data-bm=demo]');
-  await p.waitForFunction(() => /QK now coaches your body/.test(document.querySelector('#rsheetBody')?.textContent || '') && !document.querySelector('#rsheet').hidden, null, { timeout: 60000 });
+  await p.waitForFunction(() => /QK now coaches your body/.test(document.querySelector('#rsheetBody')?.textContent || '') && !document.querySelector('#rsheet').hidden, null, { timeout: 90000 });
   const bm = await p.textContent('#rsheetBody');
-  check('body map: shows personal lean and depth limits with reasons', /Forward lean allowed/.test(bm) && /Long thighs/.test(bm) && /Tight ankles/.test(bm));
+  check('body map: fits several movements, with reasons', /Forward lean allowed/.test(bm) && /Hinge depth/.test(bm) && /Long thighs/.test(bm) && /Tight hamstrings/.test(bm));
   await p.click('[data-bm=close]');
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();

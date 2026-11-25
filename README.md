@@ -8,13 +8,14 @@ All video is processed **on the phone** (MediaPipe Pose) and nothing is uploaded
 - **84 exercises for every muscle group:** chest, back, shoulders, biceps, triceps, forearms, quads, hamstrings, glutes, calves, core and full body. Search them, or filter by muscle.
   - **66 have a live camera form check**, built on 20 movement patterns: squat, hinge, lunge, hip thrust, bench and press, push-up, dip, fly, row, vertical pull, curl, triceps extension, raises, calf raise, crunch, leg raise, leg extension, leg curl and plank hold.
   - **18 are voice-coached for tempo** (twists, carries, wrist curls and similar). A phone camera can't judge these reliably, so the app says so instead of showing a fake form score.
-- **Map my body (30 s):** stand side-on, do 3 slow bodyweight squats, turn to face the camera and do 2 more. QK measures:
-  - thigh-to-torso proportions
-  - the depth you can comfortably reach
-  - ankle mobility (shin angle, heel rise)
-  - your natural knee alignment
+- **Map my body (1 min), applied to every camera exercise.** QK guides you through standing, a toe rise, 3 squats, an overhead reach and 2 hinges side-on, then arms out and 2 squats facing the camera. It measures:
+  - your proportions
+  - how straight your joints go
+  - squat depth, ankle, hamstring and shoulder mobility
+  - knee alignment
+  - your natural posture
 
-  From then on, squats are judged against **your** body. Long thighs get more forward lean allowed. Depth and rep counting follow your own range, so a stiff lifter's reps still count. Knee caving is measured from your own standing alignment. Each finding is explained in plain words, with fixes such as heel plates or ankle and hip work. Re-map as mobility improves.
+  Every one of the 66 camera exercises is then judged against **your** body: lean, depth and rep counting, lockouts, hinge depth, pressing depth, raise and calf-raise height, and body line. The setup screen says exactly what was fitted for that exercise, and findings come with fixes. Technique criteria follow the NSCA (see [SCIENCE.md](SCIENCE.md) §11).
 - **Live form check:**
   - **Corrects you mid-rep, like a coach beside you.** Posture faults (knees caving, heels lifting, leaning, hips shooting up, no leg drive) are called out the moment they appear, interrupting whatever QK was saying. A red banner shows what's wrong and the fix, and the skeleton turns red. End-of-rep faults (depth, lockout, shoulders at the top) are cued as soon as the rep finishes. After two full cues QK switches to a short shout ("Knees out!").
   - Joint angles are drawn on the client's body, with a live depth gauge at the working joint.

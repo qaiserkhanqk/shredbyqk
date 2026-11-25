@@ -107,15 +107,15 @@ export class SquatDemo {
 // Side-on squat pose. B describes the body: segment lengths (px) and how far each segment tilts at
 // full depth, so different bodies (long thighs, tight ankles) can be simulated.
 export const AVG_BODY = { foot: 62, shin: 130, thigh: 136, torso: 150, shinDeg: 30, thighDeg: 84, leanDeg: 38 };
-export function squatPose(d, hipsFirst, heel, B = AVG_BODY) {
+export function squatPose(d, hipsFirst, heel, B = AVG_BODY, scaled = 0) {
   const toe = { x: 410, y: FLOOR }, { foot, shin, thigh, torso } = B;
   const phi = rad(26 * heel); // foot pivots about the toe when the heels lift
   const he = { x: toe.x - foot * Math.cos(phi), y: FLOOR - foot * Math.sin(phi) };
   const A = { x: he.x + 14 * Math.cos(phi) + 6 * Math.sin(phi), y: he.y - 22 };
-  const ts = rad(B.shinDeg * d), tt = rad(B.thighDeg * d);
+  const k = scaled ? 1 : d, ts = rad(B.shinDeg * k), tt = rad(B.thighDeg * k);
   const K = { x: A.x + shin * Math.sin(ts), y: A.y - shin * Math.cos(ts) };
   const H = { x: K.x - thigh * Math.sin(tt), y: K.y - thigh * Math.cos(tt) };
-  const lean = rad(B.leanDeg * d + (hipsFirst ? 34 * Math.sin(Math.PI * (1 - d)) : 0));
+  const lean = rad(B.leanDeg * k + (hipsFirst ? 34 * Math.sin(Math.PI * (1 - d)) : 0));
   const S = { x: H.x + torso * Math.sin(lean), y: H.y - torso * Math.cos(lean) };
   const head = { x: S.x + 30 * Math.sin(lean) + 10, y: S.y - 34 * Math.cos(lean) - 6 };
   const bar = { x: S.x - 8 * Math.cos(lean), y: S.y + 4 };
@@ -123,38 +123,61 @@ export function squatPose(d, hipsFirst, heel, B = AVG_BODY) {
   return { S, H, K, A, head, toe, heel: he, elbow, hand, bar };
 }
 
+// Side-on pose for the body map: squat depth d, heel rise, shoulder flexion (arm, degrees from the
+// trunk) and a hip hinge h. B: segment lengths and how far each tilts.
+export function sidePose({ d = 0, heel = 0, arm = 0, h = 0 }, B) {
+  const P = squatPose(d, false, heel, { ...B, shinDeg: B.shinDeg * d + 8 * h, thighDeg: B.thighDeg * d + 20 * h, leanDeg: B.leanDeg * d + B.hingeDeg * h }, 1);
+  const v = { x: P.H.x - P.S.x, y: P.H.y - P.S.y }, n = Math.hypot(v.x, v.y); v.x /= n; v.y /= n; // trunk, pointing down
+  const rot = (u, a) => ({ x: u.x * Math.cos(a) + u.y * Math.sin(a), y: -u.x * Math.sin(a) + u.y * Math.cos(a) });
+  const ua = rot(v, rad(arm)), fa = rot(v, rad(arm + (180 - B.elbowStraight)));
+  P.elbow = { x: P.S.x + 70 * ua.x, y: P.S.y + 70 * ua.y }; P.hand = { x: P.elbow.x + 62 * fa.x, y: P.elbow.y + 62 * fa.y };
+  return P;
+}
+
 // Facing-the-camera squat, as 33 pixel landmarks. knees: how far the knees move out (+) or cave in (−)
-// at full depth, in px per side.
-export function frontSquatLandmarks(d, { knees = 10, cx = DEMO_W / 2 } = {}) {
+// at full depth, in px per side. abd: arms raised out to the side, degrees.
+export function frontSquatLandmarks(d, { knees = 10, abd = 0, cx = DEMO_W / 2 } = {}) {
   const c = (x, y) => ({ x, y, v: 1 }), px = Array.from({ length: 33 }, () => c(cx, 300));
   const ankY = FLOOR - 22, kneeY = ankY - 130 + 6 * d, hipY = ankY - 266 + 120 * d, shY = hipY - 150 + 12 * d;
-  const side = (k, sh, el, wr, hp, kn, an, hl, ft, sg) => {
-    px[sh] = c(cx + sg * 62, shY); px[el] = c(cx + sg * 80, shY + 70 - 40 * d); px[wr] = c(cx + sg * 70, shY + 130 - 90 * d);
+  const A = rad(abd);
+  const side = (sh, el, wr, hp, kn, an, hl, ft, sg) => {
+    px[sh] = c(cx + sg * 62, shY);
+    if (abd > 0) { px[el] = c(cx + sg * (62 + 70 * Math.sin(A)), shY + 70 * Math.cos(A)); px[wr] = c(cx + sg * (62 + 132 * Math.sin(A)), shY + 132 * Math.cos(A)); }
+    else { px[el] = c(cx + sg * 80, shY + 70 - 40 * d); px[wr] = c(cx + sg * 70, shY + 130 - 90 * d); }
     px[hp] = c(cx + sg * 38, hipY); px[kn] = c(cx + sg * (44 + knees * d), kneeY); px[an] = c(cx + sg * 46, ankY);
     px[hl] = c(cx + sg * 44, FLOOR - 4); px[ft] = c(cx + sg * 56, FLOOR);
   };
-  side(0, 11, 13, 15, 23, 25, 27, 29, 31, -1); side(1, 12, 14, 16, 24, 26, 28, 30, 32, 1);
+  side(11, 13, 15, 23, 25, 27, 29, 31, -1); side(12, 14, 16, 24, 26, 28, 30, 32, 1);
   px[0] = c(cx, shY - 60); px[7] = c(cx - 18, shY - 58); px[8] = c(cx + 18, shY - 58);
   return px;
 }
 
-/* ---------- Body-map demo: the 30-second calibration ----------
-   A lifter with long thighs and tight ankles: stands side-on, 3 slow squats, turns, 2 more. */
-export const BODYMAP_SECS = 31;
-const DEMO_BODY = { foot: 62, shin: 124, thigh: 150, torso: 138, shinDeg: 22, thighDeg: 42, leanDeg: 50 };
+/* ---------- Body-map demo: the one-minute calibration ----------
+   A lifter with long thighs, tight ankles, tight hamstrings, limited overhead reach and elbows that
+   don't fully straighten. Every step of the real calibration, in order. */
+// [start s, step]. The camera version gives a real person more time per step (BODYMAP_STEPS in app.js).
+export const BODYMAP_DEMO_STEPS = [[0, 'stand'], [3, 'toes'], [6, 'squat'], [18, 'reach'], [22, 'hinge'], [30, 'face'], [33, 'arms'], [37, 'fsquat']];
+export const BODYMAP_SECS = 47;
+export const DEMO_BODY = { foot: 62, shin: 124, thigh: 150, torso: 138, shinDeg: 22, thighDeg: 42, leanDeg: 50, hingeDeg: 62, elbowStraight: 168, armMax: 150, abdMax: 150 };
 export class BodyMapDemo {
   constructor(B = DEMO_BODY) { this.B = B; this.t0 = null; this.done = false; }
   frame(now) {
     if (this.t0 == null) this.t0 = now;
-    const t = (now - this.t0) / 1000, sq = x => Math.sin(Math.PI * Math.min(1, Math.max(0, x))) ** 2;
-    this.view = t < 16 ? 'side' : 'front';
+    const t = (now - this.t0) / 1000, B = this.B, bell = x => Math.sin(Math.PI * Math.min(1, Math.max(0, x))) ** 2;
+    const hold = (x, a, b) => Math.min(1, Math.max(0, (x - a) / 0.8)) * Math.min(1, Math.max(0, (b - x) / 0.8)); // ease in, hold, ease out
     if (t >= BODYMAP_SECS) this.done = true;
-    if (this.view === 'side') {
-      const d = t < 3.5 ? 0 : sq(((t - 3.5) % 4) / 3.4) * (t < 15.5 ? 1 : 0);
-      this.P = squatPose(d, false, 0.6 * d, this.B); this.px = toPxLandmarks(this.P);
+    if (t < 30) {
+      let q = {};
+      if (t >= 3 && t < 6) q.heel = hold(t, 3, 6) * 1.0;
+      else if (t >= 6 && t < 18) { const d = bell(((t - 6) % 4) / 3.4); q.d = d; q.heel = 0.6 * d; }
+      else if (t >= 18 && t < 22) q.arm = B.armMax * hold(t, 18, 22);
+      else if (t >= 22 && t < 30) q.h = bell(((t - 22) % 4) / 3.4);
+      this.P = sidePose(q, B); this.px = toPxLandmarks(this.P);
     } else {
-      const d = t < 20 ? 0 : sq(((t - 20) % 4.5) / 3.8) * (t < 29 ? 1 : 0);
-      this.P = null; this.px = frontSquatLandmarks(d, { knees: -14 });
+      this.P = null;
+      const abd = t >= 33 && t < 37 ? B.abdMax * hold(t, 33, 37) : 0;
+      const d = t >= 37 ? bell(((t - 37) % 4.5) / 3.8) * (t < 46 ? 1 : 0) : 0;
+      this.px = frontSquatLandmarks(d, { knees: -14, abd });
     }
     return this.px;
   }

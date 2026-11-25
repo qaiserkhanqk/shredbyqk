@@ -1,6 +1,6 @@
 import * as store from './store.js';
 import { say, registerAvatar, setMuted, greeting, CONFIG } from './coach.js';
-import { EXERCISES, RepEngine, allRules, estimateRIR, FREE_SQUATS } from './exercises.js';
+import { EXERCISES, RepEngine, allRules, estimateRIR } from './exercises.js';
 import { FeedbackCoach, restSeconds } from './feedback.js';
 import { getVideoLandmarker, drawPose, liveModelName } from './pose.js';
 import { toPx, viewOf, Smoother, bestSide } from './angles.js';
@@ -16,8 +16,8 @@ import { readiness, recommendToday, sessionLoad, weekStats, loadSpike, dayKey } 
 import { cueList, saveClip, getClip, deleteClip, listClipIds, startRecording, exportClips } from './studio.js';
 import { SessionRecorder, ErrorLog, downloadJSON, APP_VERSION } from './diagnostics.js';
 import { LIBRARY, LIB, MUSCLES, exFor } from './library.js';
-import { HipThrustDemo, SquatDemo, BenchDemo, WalkDemo, BodyMapDemo, BODYMAP_SECS, DEMO_W, DEMO_H } from './demo.js';
-import { analyseBodyMap, personalThresholds, explainBodyMap } from './bodymap.js';
+import { HipThrustDemo, SquatDemo, BenchDemo, WalkDemo, BodyMapDemo, BODYMAP_SECS, BODYMAP_DEMO_STEPS, DEMO_W, DEMO_H } from './demo.js';
+import { analyseBodyMap, personalFor, explainBodyMap, fitLines } from './bodymap.js';
 import { FormFX, drawDepthArc } from './fx.js';
 import { initCalm, renderCalm, startCalmNow } from './calm.js';
 import { WEIGHTED, lastLoad, lastLoadText, weekSummary } from './share.js';
@@ -266,10 +266,10 @@ function openSetup(k) {
   $('#startCam').hidden = !ex; $('#videoFile').parentElement.hidden = !ex; $('#recordChk').parentElement.hidden = !ex;
   $('#startGuided').hidden = !!ex;
   $('#startDemo').hidden = !['hipThrust', 'squat', 'benchPress'].includes(k);
-  const fit = FREE_SQUATS.includes(k), mapped = S.profile.body?.ok;
+  const fit = !!ex, mapped = S.profile.body?.ok, lines = mapped && ex ? fitLines(ex.patternKey, S.profile.body) : [];
   $('#fitNote').hidden = !fit; $('#fitNote').classList.toggle('on', !!mapped);
-  $('#fitNote').innerHTML = mapped ? `<span><b>✓ Fit to your body.</b> Lean, depth and knees are judged against your body map.</span><button class="ghost" type="button" id="fitView">View</button>`
-    : `<span>QK uses standard numbers until it maps your body (30 s).</span><button class="ghost" type="button" id="fitMap">Map my body</button>`;
+  $('#fitNote').innerHTML = mapped ? `<span><b>✓ Fit to your body.</b> ${lines.length ? esc(lines.join('. ')) + '.' : 'Your body matches the standard limits for this one.'}</span><button class="ghost" type="button" id="fitView">View</button>`
+    : `<span>QK uses standard limits until it maps your body (1 min).</span><button class="ghost" type="button" id="fitMap">Map my body</button>`;
   $('#fitView')?.addEventListener('click', () => { $('#setup').hidden = true; showBodyMap(S.profile.body); });
   $('#fitMap')?.addEventListener('click', () => { $('#setup').hidden = true; showBodyMapIntro(); });
   $('#loadWrap').hidden = !vbtOn();
@@ -436,8 +436,8 @@ const fmtA = v => (v == null || Number.isNaN(v) ? '–' : Math.round(v) + '°');
 function formFrame(px, ctx, t) {
   const ex = curEx(), view = viewOf(px);
   if (!engine) {
-    // Free squats are judged against the lifter's own body map (not the demo athlete's).
-    live.P = live.source !== 'demo' && FREE_SQUATS.includes(ex.libId) ? personalThresholds(S.profile.body) : null;
+    // Every camera exercise is judged against the lifter's own body map (not the demo athlete's).
+    live.P = live.source !== 'demo' ? personalFor(ex.patternKey, S.profile.body) : null;
     engine = new RepEngine(ex, ex.view === 'either' ? view : ex.view, live.P); fb = new FeedbackCoach();
   }
   const raw = ex.metrics(px, engine.view), m = { ...raw };
@@ -681,13 +681,23 @@ function endGuided() {
 
 /* ---------- Movement tests: gait, jump, single-leg squat ---------- */
 let gaitMode = 'walk', testMode = 'gait';
+// What QK says and shows for each body-map step.
+const BM_STEP = {
+  stand: ['', 'Stand still, side-on'],
+  toes: ['Rise up onto your toes as high as you can, and hold.', 'Up on your toes'],
+  squat: ['Now three slow squats. As deep as is comfortable, heels down.', '3 slow squats'],
+  reach: ['Stand tall and reach both arms straight up, as high as you can.', 'Arms overhead'],
+  hinge: ['Soft knees. Slide your hands down your thighs as far as you can with a flat back, then stand. Twice.', '2 slow hinges'],
+  face: ['Now turn and face me. Stand still.', 'Face the camera'],
+  arms: ['Raise your arms out to the sides and up, as high as you can.', 'Arms out and up'],
+  fsquat: ['Two more slow squats, facing me.', '2 slow squats, facing me'],
+};
 const TEST = {
   gait: { secs: 10, label: 'Record 10 seconds', minFps: 25, view: null, intro: () => gaitMode === 'run' ? 'Start running at an easy pace. Recording starts after the countdown.' : 'Walk naturally. Recording starts after the countdown.' },
   jump: { secs: 15, label: 'Record jumps (15 s)', minFps: 50, view: 'side', intro: () => 'Hands on hips. Stand still for a second, then jump as high as you can. Three jumps with a short rest.' },
-  bodymap: { secs: 36, label: 'Map my body', minFps: 15, view: null, intro: () => 'Let\'s map your body. Stand side-on to me, whole body in view, and stay still.',
-    // [seconds, what QK says, step shown on screen]. The demo athlete runs a slightly faster timeline.
-    steps: demo => (demo ? [[0, '', 'Stand still, side-on'], [3.5, 'Now three slow squats. As deep as is comfortable, heels down.', '3 slow squats, side-on'], [16, 'Now turn and face me. Stand still.', 'Face the camera'], [20, 'Two more slow squats, facing me.', '2 slow squats, facing me']]
-      : [[0, '', 'Stand still, side-on'], [4, 'Now three slow squats. As deep as is comfortable, heels down.', '3 slow squats, side-on'], [19, 'Now turn and face me. Stand still.', 'Face the camera'], [23, 'Two more slow squats, facing me.', '2 slow squats, facing me']]) },
+  bodymap: { secs: 62, label: 'Map my body', minFps: 15, view: null, intro: () => 'Let\'s map your body. Stand side-on to me, whole body in view, arms by your sides, and stay still.',
+    // [seconds, step]. The demo athlete runs a faster timeline (BODYMAP_DEMO_STEPS in demo.js).
+    steps: demo => demo ? BODYMAP_DEMO_STEPS : [[0, 'stand'], [5, 'toes'], [10, 'squat'], [25, 'reach'], [31, 'hinge'], [41, 'face'], [45, 'arms'], [51, 'fsquat']] },
   sls: { secs: 30, label: 'Record knee test (30 s)', minFps: 25, view: 'front', intro: () => 'Stand on your left leg and do five slow squats.' },
 };
 $$('[data-gmode]').forEach(b => b.onclick = () => { gaitMode = b.dataset.gmode; $$('[data-gmode]').forEach(x => x.classList.toggle('on', x === b)); });
@@ -702,17 +712,17 @@ $$('[data-test]').forEach(b => b.onclick = () => {
 /* ---------- Map my body ---------- */
 $('#bodyMapTile').onclick = () => S.profile.body?.ok ? showBodyMap(S.profile.body) : showBodyMapIntro();
 function showBodyMapIntro() {
-  openSheet(`<div><span class="eyebrow">30 seconds · on camera</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Map my body</h2></div>
-    <p class="muted" style="margin:0">Everyone's built differently. Long thighs need more forward lean; tight ankles limit depth. QK measures yours, then judges your form against <b>your</b> body instead of one textbook number.</p>
-    <ol class="steps"><li>Phone at hip height, 2–3 metres away. Whole body in view.</li><li>Stand side-on and still, then do 3 slow bodyweight squats, as deep as is comfortable.</li><li>Turn to face the camera, then do 2 more. QK talks you through it.</li></ol>
-    <button class="cta" type="button" data-bm="start">Start (30 s)</button>
+  openSheet(`<div><span class="eyebrow">1 minute · on camera</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Map my body</h2></div>
+    <p class="muted" style="margin:0">Everyone's built differently. Long thighs need more forward lean, tight hamstrings limit a hinge, and some elbows never fully straighten. QK measures yours, then judges every exercise against <b>your</b> body instead of one textbook number.</p>
+    <ol class="steps"><li>Phone at hip height, 2–3 metres away. Whole body in view.</li><li>Side-on: stand still, rise onto your toes, 3 slow squats, reach overhead, 2 slow hinges.</li><li>Facing the camera: stand still, arms out and up, 2 slow squats. QK talks you through each step.</li></ol>
+    <button class="cta" type="button" data-bm="start">Start (1 min)</button>
     <div class="btn-row"><button class="ghost" type="button" data-bm="demo">Watch a demo</button><button class="ghost" type="button" data-bm="close">Not now</button></div>`);
 }
 function startBodyMap(demo) { closeSheet(); $('#setup').hidden = true; startLive({ mode: 'bodymap', source: demo ? 'demo' : 'camera' }); }
 function renderBodyMapTile() {
   const b = S.profile.body;
   $('#bodyMapTitle').textContent = b?.ok ? 'Your body map' : 'Map my body';
-  $('#bodyMapSub').textContent = b?.ok ? `Mapped ${new Date(b.at).toLocaleDateString()}. QK coaches your squat to your proportions and mobility.` : '30 seconds on camera. QK learns your proportions, depth and mobility, then coaches your body, not a textbook.';
+  $('#bodyMapSub').textContent = b?.ok ? (b.v >= 2 ? `Mapped ${new Date(b.at).toLocaleDateString()}. Every exercise is judged against your proportions and mobility.` : 'Re-map (1 min) so QK can fit every exercise to you, not just squats.') : 'One minute on camera. QK learns your proportions and mobility, then judges every exercise against your body, not a textbook.';
 }
 function finishBodyMap(frames, demo) {
   const b = analyseBodyMap(frames);
@@ -723,19 +733,25 @@ function finishBodyMap(frames, demo) {
   }
   b.demo = demo || undefined;
   if (!demo) { S.profile.body = b; persist(); renderBodyMapTile(); }
-  const P = personalThresholds(b), fixes = explainBodyMap(b).filter(x => x.fix);
-  say(`Body mapped. ${demo ? 'This is a demo lifter. ' : ''}From now on I'll judge your squat against your own body. ${P.sqLean > 50 ? 'You have long thighs, so leaning forward more is normal for you.' : ''} ${fixes.length ? 'One thing to work on: ' + fixes[0].title.toLowerCase() + '.' : ''}`, { id: 'bm_done_' + Date.now(), priority: 'high' });
+  const P = personalFor('squat', b), fixes = explainBodyMap(b).filter(x => x.fix);
+  say(`Body mapped. ${demo ? 'This is a demo lifter. ' : ''}From now on I'll judge every exercise against your own body. ${P.sqLean > 50 ? 'You have long thighs, so leaning forward more is normal for you.' : ''} ${fixes.length ? 'One thing to work on: ' + fixes[0].title.toLowerCase() + '.' : ''}`, { id: 'bm_done_' + Date.now(), priority: 'high' });
   showBodyMap(b);
 }
 function showBodyMap(b) {
-  const P = personalThresholds(b), find = explainBodyMap(b);
+  const P = personalFor('squat', b), find = explainBodyMap(b);
+  // Which exercises it changed, grouped by movement, so the lifter sees it applies everywhere.
+  const GROUPS = [['squat', 'Squats'], ['lunge', 'Lunges'], ['rdl', 'Hinges'], ['bench', 'Bench'], ['pushUp', 'Push-ups'], ['press', 'Overhead press'], ['dip', 'Dips'], ['triExt', 'Triceps'], ['curl', 'Curls'], ['row', 'Rows'], ['vPull', 'Pull-downs'], ['raise', 'Raises'], ['calf', 'Calf raises'], ['legRaise', 'Leg raises'], ['kneeExt', 'Leg extension'], ['kneeFlex', 'Leg curl'], ['hipThrust', 'Hip thrust'], ['plank', 'Plank']];
+  const changed = GROUPS.map(([k, n]) => [n, fitLines(k, b)]).filter(([, l]) => l.length);
   openSheet(`<div><span class="eyebrow">${b.demo ? 'Demo lifter · not saved' : 'Your body map'}</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">QK now coaches your body</h2></div>
     <div class="bm-grid">
       <div><span class="num">${b.femurTorso}</span><small>thigh : torso</small></div>
       <div><span class="num">${b.kneeMin}°</span><small>your best depth</small></div>
       <div><span class="num">${b.shinAtDepth}°</span><small>ankle bend</small></div>
+      ${b.hingeMin != null ? `<div><span class="num">${b.hingeMin}°</span><small>hinge</small></div>` : ''}
+      ${b.shoulderFlex != null ? `<div><span class="num">${b.shoulderFlex}°</span><small>overhead reach</small></div>` : ''}
+      ${b.elbowStraight != null ? `<div><span class="num">${b.elbowStraight}°</span><small>elbow straight</small></div>` : ''}
     </div>
-    <div class="kv card" style="padding:12px 14px"><span>Forward lean allowed</span><span>${P.sqLean}° · std 45°</span><span>Depth target (knee)</span><span>${P.sqDepth}° · std 105°</span>${b.kneeRatioStand ? `<span>Knees caving in below</span><span>${Math.round(P.sqValgus * 100)}% of feet</span>` : ''}</div>
+    <div class="card stack" style="padding:12px 14px;gap:8px"><span class="eyebrow">Fitted to you · ${changed.length} movement${changed.length === 1 ? '' : 's'}</span>${changed.map(([n, l]) => `<div><b class="small">${esc(n)}</b>${l.map(x => `<div class="muted small">${esc(x)}</div>`).join('')}</div>`).join('') || '<span class="muted small">Your body matches the standard limits for every movement.</span>'}<span class="muted small">Every other limit stays at the standard, which already suits your body.</span></div>
     ${find.map(f => `<div class="bm-find ${f.fix ? 'fix' : ''}"><b>${esc(f.title)}</b><span class="muted small">${esc(f.detail)}</span></div>`).join('')}
     <p class="muted small" style="margin:0">Re-map every few weeks: as your mobility improves, QK raises the bar with you.</p>
     <div class="btn-row"><button class="ghost" type="button" data-bm="again">${b.demo ? 'Map my body' : 'Re-map'}</button><button class="cta" type="button" data-bm="close">Done</button></div>`);
@@ -754,8 +770,8 @@ function testFrame(px, ctx, t) {
   drawPose(ctx, px, { color: '#45c3ff' });
   const cfg = TEST[live.mode], el = (t - (live.source === 'file' ? 0 : live.t0)) / 1000;
   if (live.mode === 'bodymap' && live.source !== 'file') {
-    const steps = cfg.steps(live.source === 'demo'), i = steps.filter(x => el >= x[0]).length - 1;
-    if (i !== live.step) { live.step = i; $('#liveTitle').textContent = `Step ${i + 1} of 4 · ${steps[i][2]}`; if (steps[i][1]) say(steps[i][1], { id: 'bm_' + i, priority: 'now' }); }
+    const steps = cfg.steps(live.source === 'demo'), i = steps.filter(x => el >= x[0]).length - 1, [line, label] = BM_STEP[steps[i][1]];
+    if (i !== live.step) { live.step = i; $('#liveTitle').textContent = `Step ${i + 1} of ${steps.length} · ${label}`; if (line) say(line, { id: 'bm_' + steps[i][1], priority: 'now' }); }
     $('#gProg').style.width = Math.min(100, el / (live.source === 'demo' ? BODYMAP_SECS : cfg.secs) * 100) + '%';
     if (el >= (live.source === 'demo' ? BODYMAP_SECS : cfg.secs)) return finishTest();
     $('#gSteps').textContent = Math.round(el) + ' s';
