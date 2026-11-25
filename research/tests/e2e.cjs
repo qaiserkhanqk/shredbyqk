@@ -1,6 +1,10 @@
 // End-to-end browser test of the research dashboard against the real server (127.0.0.1, in-memory database,
 // synthetic data, Secure cookies ON). Run: node research/tests/e2e.cjs
 const { launch } = require('../../tests/browser.cjs'); // E2E_BROWSER=chromium|firefox|webkit
+// Safari/WebKit does not keep Secure cookies on plain http, even on 127.0.0.1. RESEARCH_E2E_INSECURE_COOKIES=1 runs the
+// rest of the dashboard tests without the Secure flag (the server's documented RESEARCH_SECURE_COOKIES=0 local mode).
+const INSECURE = process.env.RESEARCH_E2E_INSECURE_COOKIES === '1';
+if (INSECURE) console.log('note: Secure cookie flag OFF for this run (RESEARCH_E2E_INSECURE_COOKIES=1); the default is Secure');
 const path = require('path'), fs = require('fs');
 let fails = 0, count = 0;
 const check = (name, ok, detail = '') => { count++; if (!ok) fails++; console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${!ok && detail ? '  — ' + detail : ''}`); };
@@ -16,7 +20,7 @@ const check = (name, ok, detail = '') => { count++; if (!ok) fails++; console.lo
   seedDemo(store, { researcherId: rid });
   store.createUser({ username: 'other', password: PW, role: 'researcher' });
   store.createUser({ username: 'p_demo_a', password: PW, role: 'participant', participantId: store.participantByRef('P-DEMO-A').id });
-  const logs = [], server = http.createServer(createApp({ store, settings: { secureCookies: true, idleMs: 30 * 60e3, absoluteMs: 8 * 36e5 }, log: l => logs.push(l) }));
+  const logs = [], server = http.createServer(createApp({ store, settings: { secureCookies: !INSECURE, idleMs: 30 * 60e3, absoluteMs: 8 * 36e5 }, log: l => logs.push(l) }));
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   const BASE = `http://127.0.0.1:${server.address().port}`;
   const b = await launch(), errs = [], external = [];
@@ -31,7 +35,7 @@ const check = (name, ok, detail = '') => { count++; if (!ok) fails++; console.lo
   check('label: the persistent research label is shown before sign-in', (await p.textContent('#label')).trim() === LABEL);
   check('panel: "What this can and cannot tell you" is shown', /can and cannot tell you/.test(await p.textContent('#cancannot')));
   await signIn('researcher');
-  check('auth: signed in with Secure, HttpOnly session cookie over local http', (await ctx.cookies()).some(c => c.name === 'rs_session' && c.httpOnly && c.secure && c.sameSite === 'Strict'));
+  check(`auth: signed in with ${INSECURE ? '(not Secure: local http mode)' : 'Secure,'} HttpOnly session cookie over local http`, (await ctx.cookies()).some(c => c.name === 'rs_session' && c.httpOnly && c.secure === !INSECURE && c.sameSite === 'Strict'));
   check('researcher: sees the three synthetic participants', (await p.$$('[data-act=open]')).length === 3);
   await p.click('[data-ref=P-DEMO-A]'); await p.waitForSelector('#timeline svg');
   check('dashboard: label stays visible on the participant page', (await p.isVisible('#label')) && (await p.textContent('#label')).trim() === LABEL);

@@ -2,6 +2,10 @@
 // participant, password change, the session list and "sign out other sessions". Real server on 127.0.0.1, in-memory
 // database, Secure cookies ON, synthetic data. Run: node research/tests/e2e-account.cjs
 const { launch } = require('../../tests/browser.cjs'); // E2E_BROWSER=chromium|firefox|webkit
+// Safari/WebKit does not keep Secure cookies on plain http, even on 127.0.0.1. RESEARCH_E2E_INSECURE_COOKIES=1 runs the
+// rest of the dashboard tests without the Secure flag (the server's documented RESEARCH_SECURE_COOKIES=0 local mode).
+const INSECURE = process.env.RESEARCH_E2E_INSECURE_COOKIES === '1';
+if (INSECURE) console.log('note: Secure cookie flag OFF for this run (RESEARCH_E2E_INSECURE_COOKIES=1); the default is Secure');
 const http = require('http');
 let fails = 0, count = 0;
 const check = (name, ok, detail = '') => { count++; if (!ok) fails++; console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${!ok && detail ? '  — ' + detail : ''}`); };
@@ -16,7 +20,7 @@ const check = (name, ok, detail = '') => { count++; if (!ok) fails++; console.lo
   const rid = store.createUser({ username: 'researcher', password: PW, role: 'researcher' });
   seedDemo(store, { researcherId: rid });
   store.createUser({ username: 'p_demo_a', password: PW, role: 'participant', participantId: store.participantByRef('P-DEMO-A').id });
-  const server = http.createServer(createApp({ store, settings: { secureCookies: true, idleMs: 30 * 60e3, absoluteMs: 8 * 36e5, requireMfaRoles: ['admin', 'researcher'] }, log: () => {}, now: () => clock }));
+  const server = http.createServer(createApp({ store, settings: { secureCookies: !INSECURE, idleMs: 30 * 60e3, absoluteMs: 8 * 36e5, requireMfaRoles: ['admin', 'researcher'] }, log: () => {}, now: () => clock }));
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   const BASE = `http://127.0.0.1:${server.address().port}`;
   const b = await launch(), errs = [], external = [];
