@@ -9,7 +9,10 @@ All video is processed **on the phone** (MediaPipe Pose) and nothing is uploaded
   - **66 have a live camera form check**, built on 20 movement patterns: squat, hinge, lunge, hip thrust, bench and press, push-up, dip, fly, row, vertical pull, curl, triceps extension, raises, calf raise, crunch, leg raise, leg extension, leg curl and plank hold.
   - **18 are voice-coached for tempo** (twists, carries, wrist curls and similar). A phone camera can't judge these reliably, so the app says so instead of showing a fake form score.
 - **Live form check:**
-  - Joint angles are drawn on the client's body.
+  - Joint angles are drawn on the client's body, with a live depth gauge at the working joint.
+  - **Motion graphics on the body** when QK cues a fault: arrows and targets that move with the joints (knees out, heels down, chest leads, pin shoulders, leg drive, glutes down), then a green check when it's fixed.
+  - Squat faults: knees caving in, hips shooting up first, heels lifting, too much forward lean, depth, lockout.
+  - Bench faults: shoulder blades not pinned (shoulders rolling off the bench), no leg drive, hips lifting off the bench, depth, lockout.
   - Corrections are spoken by the coach, with rep counting.
   - Tempo, rep-speed loss and reps-in-reserve are tracked, and the set can be recorded and played back.
   - Clients can also upload a video they filmed earlier.
@@ -51,7 +54,7 @@ All video is processed **on the phone** (MediaPipe Pose) and nothing is uploaded
   - weekly function scores
 
   It supports rehab and doesn't diagnose; content must be signed off by a physio before launch.
-- **Demo modes.** A simulated athlete (hip thrust) and walker run through the real engine, so you can show clients how it works without a camera.
+- **Demo modes.** Simulated athletes (hip thrust, squat, bench press) and a walker run through the real engine, so you can show clients how it works without a camera.
 - **Body scan.** Shows a posture picture with joint angles and asymmetries, plus fixes, and gives body fat by the US Navy method. Readings from a smart scale or InBody can be logged.
 - **Accountability.** Training plan (implementation intention), plan-aware streak, weekly goal and supportive nudges.
 - **Progress.** Body-fat trend, recurring form faults and session history.
@@ -92,6 +95,7 @@ This simulates a full hip-thrust set (checks the coach's cueing logic) and a wal
 | `js/angles.js` | Joint-angle geometry, side and view detection, smoothing |
 | `js/exercises.js` | 20 movement patterns: metrics, fault rules, rep/tempo/velocity engine |
 | `js/library.js` | 84 exercises mapped to patterns, muscles and equipment |
+| `js/fx.js` | Motion graphics drawn on the body for each cued fault, and the depth gauge |
 | `js/feedback.js` | Motor-learning feedback scheduler: what to say and when to stay quiet |
 | `js/coach.js` | Avatar plus voice: recorded clip, then cloned TTS, then device voice |
 | `js/motion.js` | Movement trails, range of motion per rep, bar-path drift |

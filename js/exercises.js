@@ -32,6 +32,12 @@ function common(p) {
 // Squat: forward lean is a consequence of femur length relative to torso (Fry et al. 2003;
 // Demers et al. 2018). Long-femur lifters MUST lean more to keep the bar over mid-foot,
 // so the allowed lean scales with their own proportions instead of one number for everyone.
+// Free-standing squats only: these rules don't apply on a leg press, hack squat or slant board.
+const FREE_SQUATS = ['squat', 'frontSquat', 'gobletSquat', 'thruster'];
+// Flat or incline pressing with feet on the floor (decline has the feet hooked; machines have no bench).
+const FEET_DOWN_PRESS = ['benchPress', 'dbBench', 'inclinePress', 'closeGrip'];
+const BENCH_PRESS = [...FEET_DOWN_PRESS, 'declinePress'];
+
 const squatLeanLimit = m => Math.min(60, Math.max(38, 45 + (m.femurTorso - 0.85) * 60));
 
 export const EXERCISES = {
@@ -39,7 +45,10 @@ export const EXERCISES = {
     track: 'hip', name: 'Squat', view: 'either', primary: 'knee', downT: 115, upT: 160, concentric: 'up',
     setup: 'Phone at hip height, side-on to the camera, whole body in frame.',
     metrics(p, view) {
-      const m = common(p);
+      const m = common(p), s = m.s;
+      // Heel rise: how far the heel sits above the toe, as a fraction of foot length.
+      // Judged against the lifter's own standing value (ctx.base), so camera tilt cancels out.
+      if (s.he && s.ft && s.he.v > 0.4 && s.ft.v > 0.4) m.heelLift = (s.ft.y - s.he.y) / (dist(s.he, s.ft) || 1);
       if (view === 'front') {
         m.kneeGap = dist(p[25], p[26]);
         m.ankleGap = dist(p[27], p[28]);
@@ -49,18 +58,29 @@ export const EXERCISES = {
     },
     bottom: [
       { id: 'sq_valgus', view: 'front', priority: 1, test: m => m.kneeGap < m.ankleGap * 0.8,
-        cue: 'Spread the floor apart with your feet.', yes: 'Yes, knees tracking out. That\'s it.',
+        cue: 'Spread the floor apart with your feet.', yes: 'Yes, knees tracking out. That\'s it.', tag: 'Knees out',
         why: 'Knees caving in (valgus) shifts load onto the inner knee ligaments.' },
+      { id: 'sq_heels', view: 'side', only: FREE_SQUATS, priority: 2,
+        test: (m, c) => m.heelLift != null && c?.base?.heelLift != null && m.heelLift - c.base.heelLift > 0.3,
+        cue: 'Keep your whole foot down and push the floor away through your heels.', yes: 'Heels down. Much better.', tag: 'Heels down',
+        why: 'When the heels lift, the weight rolls onto the toes and the knees take load the hips should share.' },
       { id: 'sq_chest', view: 'side', priority: 2, test: m => m.torsoLean > squatLeanLimit(m),
-        cue: 'Show the logo on your shirt to the wall in front.', yes: 'Better, chest stayed proud.',
+        cue: 'Show the logo on your shirt to the wall in front.', yes: 'Better, chest stayed proud.', tag: 'Chest up',
         why: 'Leaning past what your limb proportions need moves load to the lower back.' },
       { id: 'sq_depth', priority: 3, test: m => m.knee > 105,
-        cue: 'Sit down between your heels, a little deeper.', yes: 'Great depth.',
+        cue: 'Sit down between your heels, a little deeper.', yes: 'Great depth.', tag: 'Deeper',
         why: 'Deeper squats train the glutes and quads through a longer range (Kubo 2019).' },
+    ],
+    // Judged early in the drive up (40% of the way from the bottom), where "hips shoot up" shows.
+    ascent: [
+      { id: 'sq_hips_first', view: 'side', only: FREE_SQUATS, priority: 2,
+        test: (m, c) => c?.bottom && m.torsoLean - c.bottom.torsoLean > 10,
+        cue: 'Lead with your chest. Hips and shoulders rise together.', yes: 'Yes, chest and hips together.', tag: 'Chest leads',
+        why: 'If the hips rise before the shoulders, the squat turns into a good morning and the lower back takes the load.' },
     ],
     top: [
       { id: 'sq_lockout', priority: 3, test: m => m.knee < 165,
-        cue: 'Push the floor away and stand tall.', yes: 'Full lockout, nice.',
+        cue: 'Push the floor away and stand tall.', yes: 'Full lockout, nice.', tag: 'Stand tall',
         why: 'Finishing each rep completes hip extension.' },
     ],
   },
@@ -233,13 +253,34 @@ export const EXERCISES = {
   bench: {
     track: 'wr', name: 'Press', view: 'side', primary: 'elbow', downT: 105, upT: 150, concentric: 'up',
     setup: 'Side-on, camera at bench height, about two metres away.',
-    metrics: p => common(p),
+    metrics(p) {
+      const m = common(p), s = m.s;
+      m.upperArm = dist(s.sh, s.el); m.torso = dist(s.sh, s.hip);
+      m.shY = s.sh.y; m.hipY = s.hip.y;
+      m.feetUp = s.an.y < s.hip.y; // ankles above the bench line = feet off the floor
+      return m;
+    },
     bottom: [
-      { id: 'bp_depth', priority: 3, test: m => m.elbow > 100, cue: 'Bring the weight all the way down to your chest.', yes: 'Good depth.',
+      { id: 'bp_legs', only: FEET_DOWN_PRESS, priority: 2, test: m => m.knee > 140 || m.feetUp,
+        cue: 'Pull your feet back under your knees and drive them into the floor.', yes: 'Feet set. Good leg drive.', tag: 'Leg drive',
+        why: 'Planted feet give a stable base and transfer force from the legs into the press.' },
+      { id: 'bp_depth', priority: 3, test: m => m.elbow > 100, cue: 'Bring the weight all the way down to your chest.', yes: 'Good depth.', tag: 'Touch chest',
         why: 'Full range loads the chest in its stretched position, where much of the growth comes from.' },
     ],
+    ascent: [
+      { id: 'bp_butt', only: FEET_DOWN_PRESS, priority: 2,
+        test: (m, c) => c?.base && (c.base.hipY - m.hipY) / (m.torso || 1) > 0.1,
+        cue: 'Keep your glutes on the bench. Push with your legs, not your hips.', yes: 'Glutes down. That\'s it.', tag: 'Glutes down',
+        why: 'Lifting the hips shortens the press and puts the lower back in extension under load.' },
+    ],
     top: [
-      { id: 'bp_lockout', priority: 3, test: m => m.elbow < 155, cue: 'Press all the way up until your arms are straight.', yes: 'Locked out.',
+      // 2D proxy for scapular retraction: if the shoulder rises off the bench as the arms lock out,
+      // the shoulder blades have rolled forward (protracted) instead of staying pinned back.
+      { id: 'bp_scap', only: BENCH_PRESS, priority: 2,
+        test: (m, c) => c?.bottom && (c.bottom.shY - m.shY) / (c.bottom.upperArm || 1) > 0.2,
+        cue: 'Pinch your shoulder blades together and keep them pinned to the bench.', yes: 'Shoulders stayed pinned. Perfect.', tag: 'Pin shoulders',
+        why: 'Retracted shoulder blades protect the shoulder joint and give the chest a stable base to press from.' },
+      { id: 'bp_lockout', priority: 3, test: m => m.elbow < 155, cue: 'Press all the way up until your arms are straight.', yes: 'Locked out.', tag: 'Lock out',
         why: 'Finishing each rep trains the triceps through range.' },
     ],
   },
@@ -373,7 +414,7 @@ export const EXERCISES = {
   },
 };
 
-export const allRules = ex => [...(ex.bottom || []), ...(ex.top || []), ...(ex.always || [])];
+export const allRules = ex => [...(ex.bottom || []), ...(ex.ascent || []), ...(ex.top || []), ...(ex.always || [])];
 
 /**
  * Rep counter, fault detector and tempo/fatigue tracker.
@@ -386,9 +427,12 @@ export class RepEngine {
     this.bottomSnap = null; this.topSnap = null; this.alwaysCount = {};
     this.faultTally = {}; this.tempo = []; // [{ecc, con}] seconds per rep
     this.tLeaveTop = null; this.tBottom = null; this.roms = [];
+    this.base = null; this.ascentSnap = null; // base = start position (standing / set up on the bench)
   }
 
-  rules(list) { return (list || []).filter(r => !r.view || r.view === this.view); }
+  // `only` limits a rule to some library exercises (e.g. heel rise is meaningless on a leg press).
+  rules(list) { return (list || []).filter(r => (!r.view || r.view === this.view) && (!r.only || !this.ex.libId || r.only.includes(this.ex.libId))); }
+  ctx() { return { base: this.base, bottom: this.bottomSnap, top: this.topSnap, ascent: this.ascentSnap }; }
 
   // Velocity loss within a set (Sánchez-Medina & González-Badillo 2011): slowing of the lifting
   // phase vs the fastest of the first reps tracks how close the set is to failure.
@@ -405,16 +449,21 @@ export class RepEngine {
 
     if (this.phase === 'top') {
       if (!this.topSnap || v > this.topSnap[ex.primary]) { this.topSnap = { ...m }; this.tLeaveTop = t; }
-      if (v < ex.downT) { this.phase = 'bottom'; this.bottomSnap = { ...m }; this.tBottom = t; }
+      if (v < ex.downT) { this.base ||= { ...this.topSnap }; this.phase = 'bottom'; this.bottomSnap = { ...m }; this.tBottom = t; this.ascentSnap = null; }
     } else {
-      if (v < this.bottomSnap[ex.primary]) { this.bottomSnap = { ...m }; this.tBottom = t; }
+      if (v < this.bottomSnap[ex.primary]) { this.bottomSnap = { ...m }; this.tBottom = t; this.ascentSnap = null; }
+      const b = this.bottomSnap[ex.primary];
+      if (!this.ascentSnap && v >= b + 0.4 * (ex.upT - b)) this.ascentSnap = { ...m };
       if (v > ex.upT) {
         this.phase = 'top';
         this.reps++;
         // Phase durations: top→bottom and bottom→top. Which is "lifting" depends on the exercise.
         const down = (this.tBottom - this.tLeaveTop) / 1000, up = (t - this.tBottom) / 1000;
         this.tempo.push(ex.concentric === 'down' ? { ecc: up, con: down } : { ecc: down, con: up });
-        this.repFaults = this.rules(ex.bottom).filter(r => r.test(this.bottomSnap));
+        const c = this.ctx();
+        this.repFaults = [...this.rules(ex.bottom).filter(r => r.test(this.bottomSnap, c)),
+          ...(this.ascentSnap ? this.rules(ex.ascent).filter(r => r.test(this.ascentSnap, c)) : [])];
+        this.repBottom = this.bottomSnap;
         this.pendingTop = true; this.topSnap = { ...m }; this.topFrames = 0; this.tLeaveTop = t;
       }
     }
@@ -424,7 +473,8 @@ export class RepEngine {
       if (v > this.topSnap[ex.primary]) { this.topSnap = { ...m }; this.tLeaveTop = t; }
       if (++this.topFrames >= 12 || this.phase === 'bottom') {
         this.pendingTop = false;
-        const faults = [...this.repFaults, ...this.rules(ex.top).filter(r => r.test(this.topSnap))]
+        const c = { ...this.ctx(), bottom: this.repBottom };
+        const faults = [...this.repFaults, ...this.rules(ex.top).filter(r => r.test(this.topSnap, c))]
           .sort((a, b) => a.priority - b.priority);
         faults.forEach(f => { this.faultTally[f.id] = (this.faultTally[f.id] || 0) + 1; });
         if (!faults.length) this.goodReps++;

@@ -16,7 +16,8 @@ import { readiness, recommendToday, sessionLoad, weekStats, loadSpike, dayKey } 
 import { cueList, saveClip, getClip, deleteClip, listClipIds, startRecording, exportClips } from './studio.js';
 import { SessionRecorder, ErrorLog, downloadJSON, APP_VERSION } from './diagnostics.js';
 import { LIBRARY, LIB, MUSCLES, exFor } from './library.js';
-import { HipThrustDemo, WalkDemo, DEMO_W, DEMO_H } from './demo.js';
+import { HipThrustDemo, SquatDemo, BenchDemo, WalkDemo, DEMO_W, DEMO_H } from './demo.js';
+import { FormFX, drawDepthArc } from './fx.js';
 import { initCalm, renderCalm, startCalmNow } from './calm.js';
 import { WEIGHTED, lastLoad, lastLoadText, weekSummary } from './share.js';
 import { landmarksFrom, analyse, render, navyBodyFat, bfCategory, stanceProblem } from './bodyscan.js';
@@ -263,7 +264,7 @@ function openSetup(k) {
   }
   $('#startCam').hidden = !ex; $('#videoFile').parentElement.hidden = !ex; $('#recordChk').parentElement.hidden = !ex;
   $('#startGuided').hidden = !!ex;
-  $('#startDemo').hidden = k !== 'hipThrust';
+  $('#startDemo').hidden = !['hipThrust', 'squat', 'benchPress'].includes(k);
   $('#loadWrap').hidden = !vbtOn();
   $('#setupLast').textContent = lastLoadText(lastLoad(S.sessions, k));
   $('#setup').hidden = false;
@@ -278,6 +279,7 @@ $('#videoFile').onchange = e => { const f = e.target.files[0]; e.target.value = 
 /* ---------- Live session (form check + gait capture) ---------- */
 let live = null, fb = null, engine = null, stream = null, recorder = null, chunks = [], facing = 'user', raf = 0;
 const smooth = new Smoother(0.55);
+const fx = new FormFX();
 const motion = new MotionTracker();
 
 // Keep the screen on during a set and the rest after it, so the phone doesn't lock mid-session.
@@ -297,7 +299,7 @@ async function startLive({ mode, source, file }) {
   const ex = mode === 'form' ? curEx() : null;
   live = { mode, source, frames: [], t0: null, lost: 0, wrong: 0, demo: null, done: false, steps: 0, mPerPx: null, standFrames: [], times: [] };
   bar.reset(); recorder2.start({ kind: mode, exercise: mode === 'form' ? exKey : undefined, gaitMode: mode === 'gait' ? gaitMode : undefined, source, loadKg: mode === 'form' ? parseFloat($('#loadKg').value) || null : undefined });
-  engine = null; fb = null; smooth.reset(); motion.reset();
+  engine = null; fb = null; smooth.reset(); motion.reset(); fx.reset();
   $('#formMeters').hidden = mode !== 'form'; $('#gaitMeters').hidden = mode === 'form';
   $('#repBig').hidden = mode !== 'form'; $('#cueHint').hidden = mode !== 'form';
   $('#repNum').textContent = '0'; $('#repLbl').textContent = ex?.hold ? 'seconds' : 'reps'; $('#dots').innerHTML = ''; $('#cleanCt').textContent = '0 clean'; $('#vlKnob').style.left = '0%'; $('#vlTxt').textContent = 'fresh';
@@ -316,7 +318,7 @@ async function startLive({ mode, source, file }) {
 
   try {
     if (source === 'demo') {
-      video.hidden = true; live.demo = mode === 'form' ? new HipThrustDemo() : new WalkDemo();
+      video.hidden = true; live.demo = mode !== 'form' ? new WalkDemo() : ex.patternKey === 'squat' ? new SquatDemo() : ex.patternKey === 'bench' ? new BenchDemo() : new HipThrustDemo();
       canvas.width = DEMO_W; canvas.height = DEMO_H;
     } else {
       video.hidden = false;
@@ -389,7 +391,7 @@ function formFrame(px, ctx, t) {
   const ex = curEx(), view = viewOf(px);
   if (!engine) { engine = new RepEngine(ex, ex.view === 'either' ? view : ex.view); fb = new FeedbackCoach(); }
   const raw = ex.metrics(px, engine.view), m = { ...raw };
-  for (const k of ['knee', 'hip', 'elbow', 'torsoLean']) if (raw[k] != null) m[k] = smooth.push(k, raw[k]);
+  for (const k of ['knee', 'hip', 'elbow', 'torsoLean', 'heelLift', 'shY', 'hipY']) if (raw[k] != null) m[k] = smooth.push(k, raw[k]);
 
   // Confidence gate: low-confidence landmarks give wrong angles, so stay quiet instead.
   if (raw.s.conf < 0.55) {
@@ -430,12 +432,20 @@ function formFrame(px, ctx, t) {
       if (vbtOn() && live.mPerPx) { const v = bar.closeRep(); if (v) { live.lastV = v; $('#vlTxt').textContent = `${v.mcv.toFixed(2)} m/s`; } }
     }
     if (ev.faults.length) flagged = true;
+    const awaiting = fb.awaitingFix;
     const line = ev.type === 'rep' ? fb.onRep(ev) : fb.onContinuousFault(ev.faults[0]);
     if (line) say(line.text, line);
+    // Motion graphics follow what QK says: the cued fault's correction, a check when it's fixed.
+    if (line?.id?.startsWith('yes_')) fx.fixed(awaiting, t);
+    else if (line?.id && ev.faults.some(f => f.id === line.id)) fx.cue(ev.faults.find(f => f.id === line.id), t);
+    else if (ev.type === 'rep' && !ev.faults.length) fx.clean(t);
   }
   motion.draw(ctx);
   const s = raw.s;
   drawPose(ctx, px, { color: flagged ? '#ff5a5f' : '#7c6cff', labels: [{ at: s.kn, value: m.knee }, { at: s.hip, value: m.hip }, ...(ex.primary === 'elbow' ? [{ at: s.el, value: m.elbow }] : [])] });
+  if (ex.primary === 'knee') drawDepthArc(ctx, s.kn, s.hip, s.an, m.knee, { start: ex.upT + 10, target: 100 });
+  else if (ex.primary === 'elbow') drawDepthArc(ctx, s.el, s.sh, s.wr, m.elbow, { start: ex.upT + 15, target: 95 });
+  fx.draw(ctx, px, s, t, { mirror: $('#viewport').classList.contains('mirror') });
   const keys = ex.primary === 'elbow' ? ['elbow', 'hip'] : ['hip', 'knee'];
   $('#readout').innerHTML = keys.map(k => `<span>${k} ${fmtA(m[k])}</span>`).join('') + (live.lastV ? `<span>${live.lastV.mcv.toFixed(2)} m/s</span>` : '') + `<span class="muted">${engine.view} view</span>`;
 }
