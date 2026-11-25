@@ -4,3 +4,4 @@ data/
 *.rsb
 *.rsb.part
 deletion-ledger*.jsonl
+*.pem

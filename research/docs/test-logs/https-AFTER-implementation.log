@@ -1,0 +1,19 @@
+ok   makes a local certificate and key for localhost, 127.0.0.1 and ::1
+ok   the private key file is readable by its owner only (0600)
+ok   it refuses to overwrite an existing key
+ok   the certificate names localhost and 127.0.0.1
+ok   loads a certificate and key
+ok   only one of the two: refused
+ok   a key others can read: refused (like the database key file)
+ok   RESEARCH_TLS_CERT and RESEARCH_TLS_KEY turn HTTPS on
+ok   without them, settings have no TLS (unchanged behaviour)
+(node:3142) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ok   start() reports an https:// address
+{"t":"2026-11-25T15:06:43.744Z","reqId":"e124d0da217e","method":"GET","route":"static","status":200,"ms":2}
+ok   the dashboard is served over HTTPS (certificate verified against the local certificate)
+ok   plain http on the same port does not serve the dashboard
+{"t":"2026-11-25T15:06:43.854Z","reqId":"daa6cedd6df1","method":"POST","route":"POST ^/api/login$","status":200,"ms":53}
+ok   sign-in over HTTPS sets the session cookie with Secure and HttpOnly (default kept)
+ok   HTTPS responses tell browsers to keep using HTTPS (Strict-Transport-Security)
+ALL PASS (14)

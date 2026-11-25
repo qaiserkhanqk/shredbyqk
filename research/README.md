@@ -105,6 +105,7 @@ The demo database is encrypted too, with a key that exists only while the demo r
 - `RESEARCH_PORT` (8787)
 - `RESEARCH_HOST` (127.0.0.1; other addresses are refused)
 - `RESEARCH_SECURE_COOKIES` (1)
+- `RESEARCH_TLS_CERT`, `RESEARCH_TLS_KEY` (unset = plain http; both set = HTTPS, needed for Safari). Make them with `node research/server/cli.mjs make-local-cert --dir DIR`, or run `npm run research:demo:https`. See `docs/security-operations.md` ("HTTPS").
 - `RESEARCH_SESSION_IDLE_MIN` (30)
 - `RESEARCH_SESSION_MAX_HOURS` (8)
 - `RESEARCH_DB_KEY_FILE` (required for a database file; `RESEARCH_ALLOW_UNENCRYPTED=1` is unsupported)

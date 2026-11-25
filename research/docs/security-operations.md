@@ -107,6 +107,49 @@ node research/server/cli.mjs disable-mfa --username alex
 RESEARCH_NEW_PASSWORD='…' node research/server/cli.mjs set-password --username alex
 ```
 
+## HTTPS (needed for Safari)
+**Why:** Safari does not keep `Secure` cookies on plain http, even on `127.0.0.1`. Over plain http, sign-in therefore fails in Safari (`docs/browser-test-report-2026-11-25.md`, finding 3). HTTPS fixes this and keeps the `Secure` cookie default.
+
+**Quick demo:**
+
+```bash
+npm run research:demo:https
+```
+
+- A fresh self-signed certificate is made in `research/data/demo-tls/` (git-ignored).
+- The browser warns once.
+  - Safari: "Show Details" → "visit this website".
+  - Chrome: "Advanced" → "Proceed".
+
+**A real instance:**
+1. Make a certificate:
+
+   ```bash
+   node research/server/cli.mjs make-local-cert --dir research/data/tls
+   ```
+
+   This writes `cert.pem` and `key.pem` (owner-only, never overwritten) for `localhost`, `127.0.0.1` and `::1`.
+2. Start with:
+
+   ```bash
+   RESEARCH_TLS_CERT=research/data/tls/cert.pem RESEARCH_TLS_KEY=research/data/tls/key.pem npm run research:start
+   ```
+
+   The server prints its `https://` address.
+
+**No warning at all:** use a locally trusted certificate instead of the self-signed one. For example, mkcert:
+1. Run `mkcert -install` once per computer. This installs a local certificate authority on that computer only.
+2. Run `mkcert localhost 127.0.0.1 ::1`.
+3. Point `RESEARCH_TLS_CERT` and `RESEARCH_TLS_KEY` at the two files, then `chmod 600` the key.
+
+**Rules:**
+- The key must be readable by its owner only, or the server refuses to start (`tls_key_permissions`).
+- Both variables are needed, or neither (`tls_incomplete`).
+- Over HTTPS the server sends `Strict-Transport-Security: max-age=86400` (one day, no subdomains).
+- Plain http on the HTTPS port is not served.
+
+**Not covered:** certificates for a server reachable from other machines. That needs a reviewed hosting set-up (see "Not done yet").
+
 ## Deletion and backups: what a participant should be told
 - Deleting a participant removes their raw and derived data from the live database at once.
 - Their data remains only in backups made before the deletion. Those backups are deleted within the retention period (default 35 days).

@@ -3,6 +3,7 @@
 // See research/docs/security-operations.md for the full procedures.
 //
 //   node research/server/cli.mjs generate-key --out FILE              new 32-byte key file (mode 0600); refuses to overwrite
+//   node research/server/cli.mjs make-local-cert --dir DIR            self-signed HTTPS certificate for localhost (key 0600)
 //   RESEARCH_NEW_PASSWORD=… … create-user --role admin|researcher --username NAME
 //   RESEARCH_NEW_PASSWORD=… … set-password --username NAME            operator reset; ends the account's sessions
 //   … enroll-mfa --username NAME                                       prints a secret / otpauth URI to pass on securely
@@ -21,6 +22,7 @@ import { openStore, rotateKey } from './store.js';
 import { settingsFromEnv } from './server.js';
 import { generateKey, writeKeyFile, loadKeyFile } from './keys.js';
 import { backup, verifyBackup, restore, pruneBackups } from './backup.js';
+import { makeLocalCert, certInfo } from './tls.js';
 
 const arg = k => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : undefined; };
 const [cmd] = process.argv.slice(2);
@@ -38,6 +40,12 @@ const user = (st, name) => st.userByName(name) || die(`No such user: ${name}`);
 
 try {
   switch (cmd) {
+    case 'make-local-cert': {
+      const dir = arg('dir'); if (!dir) die('usage: make-local-cert --dir DIR', 2);
+      const c = makeLocalCert(dir);
+      console.log(`Wrote ${c.certPath} and ${c.keyPath} (owner-only). ${certInfo(c.certPath)}\nStart with: RESEARCH_TLS_CERT=${c.certPath} RESEARCH_TLS_KEY=${c.keyPath} npm run research:start\nBrowsers warn once about a self-signed certificate. See research/docs/security-operations.md ("HTTPS").`);
+      break;
+    }
     case 'generate-key': {
       const out = arg('out'); if (!out) die('usage: generate-key --out FILE', 2);
       if (existsSync(out)) die('Refusing to overwrite an existing key file.');

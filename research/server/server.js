@@ -5,12 +5,14 @@
 // • Logs record method, route template, status and timing only: no bodies, query strings, references or values.
 // • Every JSON response passes through the output-policy layer.
 import { createServer as httpServer } from 'node:http';
+import { createServer as httpsServer } from 'node:https';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname, normalize, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { openStore, CONSENT_SCOPES, FEATURES, ConsentError } from './store.js';
 import { loadKeyFile } from './keys.js';
+import { loadTls } from './tls.js';
 import { preview, annotationHash } from '../lib/ingest.js';
 import { analyse } from '../lib/pipeline.js';
 import { CONFIG } from '../lib/config.js';
@@ -37,6 +39,7 @@ export function settingsFromEnv(env = process.env) {
     idleMs: Number(env.RESEARCH_SESSION_IDLE_MIN || 30) * 60e3, absoluteMs: Number(env.RESEARCH_SESSION_MAX_HOURS || 8) * 36e5,
     dbKey: env.RESEARCH_DB_KEY_FILE ? loadKeyFile(env.RESEARCH_DB_KEY_FILE) : null, allowUnencrypted: env.RESEARCH_ALLOW_UNENCRYPTED === '1',
     requireMfaRoles: env.RESEARCH_REQUIRE_MFA === '0' ? [] : [...DEFAULT_MFA_ROLES],
+    tls: env.RESEARCH_TLS_CERT || env.RESEARCH_TLS_KEY ? loadTls(env.RESEARCH_TLS_CERT, env.RESEARCH_TLS_KEY) : null, // HTTPS (tls.js)
     ledgerPath: env.RESEARCH_DELETION_LEDGER || (db === ':memory:' ? null : join(dirname(db), 'deletion-ledger.jsonl')),
   };
 }
@@ -60,7 +63,8 @@ export function createApp({ store, settings, log = line => process.stderr.write(
     res.end(typeof body === 'string' ? body : JSON.stringify(body));
   };
   const securityHeaders = { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY', 'Cross-Origin-Opener-Policy': 'same-origin',
-    'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'", 'Permissions-Policy': 'camera=(), microphone=(), geolocation=()' };
+    'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'", 'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+    ...(settings.tls ? { 'Strict-Transport-Security': 'max-age=86400' } : {}) }; // HTTPS only; one day, no subdomains (local tool)
   const ok = (res, payload, status = 200) => {
     let out; try { out = policy.apply(res.viewerRole === 'participant' ? forParticipant(payload) : payload); } catch (e) { if (e instanceof policy.PolicyViolation) { store.audit(null, 'policy_violation_blocked', null, 'blocked', { code: e.code }); fail(500, 'output_blocked_by_policy'); } throw e; }
     send(res, status, out);
@@ -309,11 +313,13 @@ export function start(settings = settingsFromEnv()) {
   if (settings.db !== ':memory:' && !settings.dbKey && !settings.allowUnencrypted)
     throw Object.assign(new Error('db_key_required: set RESEARCH_DB_KEY_FILE to a key file (node research/server/cli.mjs generate-key). See research/docs/security-operations.md.'), { code: 'db_key_required' });
   const store = openStore(settings.db, { key: settings.dbKey || null, ledgerPath: settings.ledgerPath || null });
-  const server = httpServer(createApp({ store, settings: { ...settings, requireMfaRoles: settings.requireMfaRoles ?? [...DEFAULT_MFA_ROLES] } }));
-  return new Promise(r => server.listen(settings.port, settings.host, () => r({ server, store, port: server.address().port })));
+  const app = createApp({ store, settings: { ...settings, requireMfaRoles: settings.requireMfaRoles ?? [...DEFAULT_MFA_ROLES] } });
+  const server = settings.tls ? httpsServer({ cert: settings.tls.cert, key: settings.tls.key }, app) : httpServer(app);
+  const scheme = settings.tls ? 'https' : 'http';
+  return new Promise(r => server.listen(settings.port, settings.host, () => { const port = server.address().port; r({ server, store, port, url: `${scheme}://${settings.host.includes(':') ? `[${settings.host}]` : settings.host}:${port}/` }); }));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const s = settingsFromEnv();
-  start(s).then(({ port }) => console.log(`Research prototype (synthetic data only) on http://${s.host}:${port}/  — ${policy.LABEL}`)).catch(e => { console.error(e.message); process.exit(1); });
+  start(s).then(({ url }) => console.log(`Research prototype (synthetic data only) on ${url}  — ${policy.LABEL}${s.tls ? '' : '\nTip: Safari needs HTTPS to keep the sign-in cookie. See research/docs/security-operations.md ("HTTPS").'}`)).catch(e => { console.error(e.message); process.exit(1); });
 }

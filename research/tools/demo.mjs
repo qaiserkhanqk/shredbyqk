@@ -5,11 +5,14 @@
 // every run). Two-factor sign-in is NOT enforced in the demo, so you can sign in with the printed password; a real
 // instance (npm run research:start) requires it for admins and researchers.
 //   npm run research:demo            (or: node research/tools/demo.mjs --port 8787)
+//   npm run research:demo:https      (HTTPS with a fresh self-signed certificate: needed for Safari, which drops
+//                                     Secure cookies on plain http; the browser warns once about the certificate)
 import { rmSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { generateKey } from '../server/keys.js';
+import { makeLocalCert, loadTls } from '../server/tls.js';
 import { openStore } from '../server/store.js';
 import { start, settingsFromEnv } from '../server/server.js';
 import { seedDemo } from './seed.mjs';
@@ -24,5 +27,9 @@ const rid = store.createUser({ username: 'researcher', password, role: 'research
 seedDemo(store, { researcherId: rid });
 store.close();
 const i = process.argv.indexOf('--port'), settings = { ...settingsFromEnv(), db, dbKey, ledgerPath, requireMfaRoles: [], port: i > 0 ? Number(process.argv[i + 1]) : 8787 };
-const { port } = await start(settings);
-console.log(`\n${LABEL}\nSynthetic demo running at http://127.0.0.1:${port}/\n  username: researcher\n  password: ${password}\nTwo-factor sign-in is not enforced in this synthetic demo (it is for admins and researchers on a real instance).\nStop with Ctrl+C. The demo database is research/data/demo.sqlite (git-ignored, encrypted with a key that is discarded when the demo stops).\n`);
+if (process.argv.includes('--https')) { // a new certificate each run, in the git-ignored data folder
+  const tlsDir = join(dir, 'demo-tls'); rmSync(tlsDir, { recursive: true, force: true });
+  const c = makeLocalCert(tlsDir); settings.tls = loadTls(c.certPath, c.keyPath);
+}
+const { port, url } = await start(settings);
+console.log(`\n${LABEL}\nSynthetic demo running at ${url}${settings.tls ? ' (self-signed certificate: your browser will warn once; choose to continue)' : ''}\n  username: researcher\n  password: ${password}\nTwo-factor sign-in is not enforced in this synthetic demo (it is for admins and researchers on a real instance).\nStop with Ctrl+C. The demo database is research/data/demo.sqlite (git-ignored, encrypted with a key that is discarded when the demo stops).\n`);
