@@ -1,0 +1,54 @@
+ok   A no period logged: stage "not_started", tells her what to do first
+ok   A one start: "first_cycle", an estimate appears after the next start
+ok   A one complete cycle: "learning", 1 of 3 cycles
+ok   A three complete cycles: "learned", and it keeps updating
+ok   A the 3-cycle threshold is the estimate's own (no new number)
+ok   A a cycle with a missed log does not count towards learning
+ok   A pregnancy pauses the learning message too
+ok   B no band consent: no band section
+ok   B counts nights recorded this cycle (usable ones only)
+ok   B says how many nights the temperature research needs (its own 6 + 3)
+ok   B last night (29th) not recorded: says so plainly
+ok   B and says nothing is filled in, and the period estimate does not depend on the band
+ok   B last night too short: "too little wear"
+ok   B last night recorded: "recorded", no warning
+ok   C alcohol, late night and hot or cold room can be logged per night (true/false)
+ok   C only true or false is accepted
+ok   C unticking removes it
+ok   C M.NIGHT_DISRUPTORS lists them with unwell and travel
+ok   C nights marked hot or cold room / alcohol are excluded from the temperature rule
+ok   C the rule version changed (behaviour changed) and still names the night aggregation
+ok   D a separate flag, off by default
+ok   D nothing without the pain category on
+ok   D nothing when no pain is logged today
+ok   D nothing for mild pain (only moderate or severe, the category's own "notable" values)
+ok   D moderate pain: offers heat, gentle movement and a warm drink
+ok   D every option cites published evidence (DOI links)
+ok   D warning signs are always included
+ok   D the wording is marked as awaiting clinician review
+ok   D says it is not treatment and that results differ between people
+ok   D never suggests medicines, supplements, doses, calories or weight
+ok   D no forbidden wording (output policy)
+ok   D severe pain: warning signs come first
+ok   D only the listed options can be logged
+ok   D not in the future
+ok   D "did it help?" is asked for recent tries (last 3 days) and not for older ones
+ok   D answers are yes / a little / no only
+ok   D answered tries are not asked again; an unanswered old try stays unknown (never assumed)
+ok   D what helped her comes first; what didn't comes last
+ok   D her record is shown with its denominator ("helped 3 of 3 times you answered")
+ok   D an option she never tried says so, with no claim
+ok   D turning pain off AND deleting also deletes the comfort records
+ok   D "delete my comfort records" works on its own
+ok   D turning pain off without deleting stops new suggestions but keeps records
+ok   D no new comfort entries while pain logging is off
+ok   D no consent, no entries
+ok   E "training" is an optional category: easier / usual / harder
+ok   E its explanation says no training advice is given by cycle phase
+ok   E off until switched on, like every category
+ok   E once on, it is logged and appears in the doctor summary counts
+ok   F app: a Hume Band adapter exists and is not verified
+ok   F app: it refuses to connect (NOT_VERIFIED) and says why
+ok   F app: listed with the other adapters
+ok   F research prototype: a Hume Band stub that refuses to import and returns the supplier questions
+ALL PASS (53)

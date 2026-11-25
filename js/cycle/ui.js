@@ -5,12 +5,14 @@ import { estimateNext, typicalPeriodLength, DISCLAIMER } from './predict.js';
 import { findPatterns, patternStatus, evidenceText, insightForToday, forecastCheckins } from './patterns.js';
 import { phaseInfo, PHASE_EDUCATION } from './phase.js';
 import { KINDS, addReminder, updateReminder, deleteReminder, nextFire, dueNow, markDelivered, notificationContent } from './reminders.js';
-import { MockWearable, SwlDs07Adapter, normalise, summariseNights, mergeNights, nightTable, METRICS } from './wearables.js';
+import { MockWearable, SwlDs07Adapter, HumeBandAdapter, normalise, summariseNights, mergeNights, nightTable, METRICS } from './wearables.js';
 import { retrospectiveShift } from './tempshift.js';
 import { openCycleRepo, indexedDbKeys, indexedDbStorage, migrateLegacyLocalStorage, webLock, resetCycleStorage } from './store.js';
 import { today as localToday, localMinutes, addDays, diffDays, human, deviceTimeZone } from './dates.js';
 import { readFlags, setFlag, FLAG_DEFS } from './flags.js';
 import { clinicianSummary, summaryText, SUMMARY_MONTHS } from './summary.js';
+import { learningStage } from './learning.js';
+import { comfortSuggestions, pendingComfortQuestions, logComfortTry, answerComfort, deleteComfort, ANSWERS, REVIEW_STATUS } from './comfort.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const MSG = {
@@ -89,7 +91,7 @@ function render() {
   const unsaved = unsavedInputs(); // a redraw (e.g. another tab saved) must never change what the person typed
   const est = estimateNext(s, today);
   const tempShift = f.temperatureResearch && est.lastStart ? retrospectiveShift(s, est.lastStart, addDays(today, 1)) : null;
-  root.innerHTML = [banner(), summaryMonths ? summaryHTML(s, today) : '', promptsHTML(s, est, today), dueHTML(s, est, today, nowMin), estimateHTML(s, est), logHTML(s, today), f.patternInsights ? insightHTML(s, today) : '',
+  root.innerHTML = [banner(), summaryMonths ? summaryHTML(s, today) : '', promptsHTML(s, est, today), dueHTML(s, est, today, nowMin), estimateHTML(s, est), learningHTML(s, today), logHTML(s, today), f.comfortSuggestions ? comfortHTML(s, today) : '', f.patternInsights ? insightHTML(s, today) : '',
     f.phaseEducation ? phaseHTML(s, today, tempShift, est) : '', historyHTML(s), f.patternInsights ? patternsHTML(s, today, f) : '', remindersHTML(s, est, today, nowMin),
     wearableHTML(s, today, f, tempShift), situationHTML(s), settingsHTML(s, f)].join('');
   for (const id of open) { const d = root.querySelector('#' + id); if (d) d.open = true; }
@@ -99,7 +101,7 @@ function render() {
 
 /* Unsaved form input survives redraws (defect found by the simultaneous-save browser test on this fix: a redraw
    triggered by another tab reset the date field to today, so the person's click saved today instead of their date). */
-const FORM = '#cyDate, #cyUnwell, #cyTravel, #cyRemKind, #cyRemTime, #cyLh, #cySumMonths, [data-sym]';
+const FORM = '#cyDate, #cyUnwell, #cyTravel, #cyAlcohol, #cyLateNight, #cyRoomTemp, #cyRemKind, #cyRemTime, #cyLh, #cySumMonths, [data-sym]';
 const inputKey = el => el.id || `sym:${el.dataset.sym}`;
 function unsavedInputs() {
   const out = {};
@@ -173,11 +175,36 @@ function logHTML(s, today) {
     ${cats.length ? `<div class="grid2">${cats.map(([k, c]) => `<label class="field">${c.label}<select data-sym="${k}"><option value="">Not logged</option>${c.options.map(([v, l]) => `<option value="${v}" ${d[k] === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`).join('')}</div>` : '<p class="muted small">Symptom logging is off. You can switch categories on in settings below.</p>'}
     ${lhOn(s) ? `<label class="field">Ovulation test (LH), as you read it<select id="cyLh"><option value="">Not logged</option>${Object.entries(M.LH_RESULTS).map(([v, l]) => `<option value="${v}" ${d.lh === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>` : ''}
     <div class="btn-row"><label class="check"><input type="checkbox" id="cyUnwell" ${d.unwell ? 'checked' : ''}> Unwell</label><label class="check"><input type="checkbox" id="cyTravel" ${d.travel ? 'checked' : ''}> Travelling</label></div>
+    ${s.consent.wearable ? `<div class="stack" id="cyNight"><b class="small">The night of this date (optional)</b><div class="btn-row"><label class="check"><input type="checkbox" id="cyAlcohol" ${d.alcohol ? 'checked' : ''}> Alcohol</label><label class="check"><input type="checkbox" id="cyLateNight" ${d.lateNight ? 'checked' : ''}> Late night</label><label class="check"><input type="checkbox" id="cyRoomTemp" ${d.hotOrColdRoom ? 'checked' : ''}> Very hot or cold room</label></div>
+      <p class="muted small">These can change skin temperature, so the temperature research leaves those nights out. Nothing else uses them.</p></div>` : ''}
     <button class="cta" type="button" data-act="saveDay">Save this day</button>
     <p class="muted small">Days you don't log stay blank. Blank never means "no bleeding" or "no symptoms".</p></div>`;
 }
 
 const lhOn = s => flags().lhTests && !!s.consent.lhTests;
+
+/* Learning stage (js/cycle/learning.js): how much the app has learned from her own logs, and, with a band, how many
+   nights were recorded and whether last night was. Missing nights are never filled in. */
+function learningHTML(s, today) {
+  const l = learningStage(s, today);
+  return `<div class="card stack" id="cyLearning"><span class="eyebrow">Learning your cycle${l.stage === 'learning' ? ` · ${l.usableCycles} of ${l.needed}` : ''}</span><p class="small">${esc(l.text)}</p>
+    ${l.band ? `<p class="small${l.band.lastNight === 'recorded' ? ' muted' : ''}">${esc(l.band.text)}</p>` : ''}</div>`;
+}
+
+/* Comfort suggestions that learn what helps her (js/cycle/comfort.js, flag comfortSuggestions). Wording is a
+   placeholder awaiting clinician review; warning signs come first when pain is severe. */
+function comfortHTML(s, today) {
+  const g = comfortSuggestions(s, today), pend = pendingComfortQuestions(s, today);
+  if (!g && !pend.length) return '';
+  const flagsHTML = `<div class="stack" id="cyComfortFlags"><b class="small">See a doctor if you notice</b><ul class="issues">${(g?.redFlags || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>`;
+  const ask = pend.length ? `<div class="stack" id="cyComfortAsk">${pend.map(t => `<div class="row cy-row"><b class="small">Did ${esc(t.label.toLowerCase())} help? <span class="muted">(${human(t.date)})</span></b><div class="btn-row">${Object.entries(ANSWERS).map(([k, l]) => `<button class="ghost" type="button" data-act="comfortAnswer" data-id="${esc(t.id)}" data-ans="${k}">${l}</button>`).join('')}</div></div>`).join('')}</div>` : '';
+  const opts = g ? g.options.map(o => `<div class="row cy-row"><div><b>${esc(o.label)}</b><p class="small">${esc(o.text)}</p><p class="muted small">Your record: ${esc(o.own.text)}</p>
+      <p class="muted small">Evidence: ${o.evidence.map(e => `<a href="${esc(e.url)}" target="_blank" rel="noopener noreferrer">${esc(e.label)}</a>`).join('; ')}</p></div>
+      <button class="ghost" type="button" data-act="comfortTry" data-opt="${esc(o.id)}">I'll try this</button></div>`).join('') : '';
+  return `<div class="card stack" id="cyComfort"><span class="eyebrow">Comfort · prototype · ${REVIEW_STATUS === 'awaiting_clinician_review' ? 'awaiting clinician review' : ''}</span>
+    ${g?.severe ? flagsHTML : ''}${ask}${opts ? `<div class="list">${opts}</div>` : ''}${g && !g.severe ? flagsHTML : ''}
+    ${g ? `<p class="muted small">${esc(g.note)}</p>` : ''}</div>`;
+}
 
 /* Summary for a doctor: built from the person's own entries on request (js/cycle/summary.js). Shown here, printable,
    or saved as a local text file. Nothing is sent or stored; a printed or saved copy is not encrypted. */
@@ -245,9 +272,9 @@ function remindersHTML(s, est, today, nowMin) {
 }
 
 function wearableHTML(s, today, f, tempShift) {
-  const ds07 = new SwlDs07Adapter();
+  const ds07 = new SwlDs07Adapter(), hume = new HumeBandAdapter();
   if (!s.consent.wearable) return `<div class="card stack" id="cyWearable"><span class="eyebrow">Wearable · off</span><p class="small">Optional. Adds nightly wrist skin temperature and heart data, kept as nightly summaries. A watch can't detect a period and isn't used for your estimate.</p>
-    <button class="ghost" type="button" data-act="wearableOn">Turn on and connect demo device (synthetic data)</button><p class="muted small"><b>${esc(ds07.displayName)}:</b> ${esc(ds07.status)}</p></div>`;
+    <button class="ghost" type="button" data-act="wearableOn">Turn on and connect demo device (synthetic data)</button><p class="muted small"><b>${esc(ds07.displayName)}:</b> ${esc(ds07.status)}</p><p class="muted small"><b>${esc(hume.displayName)}:</b> ${esc(hume.status)}</p></div>`;
   const dev = s.wearable.devices[0], from = addDays(today, -7), tbl = nightTable(s.wearable.nights, from, addDays(today, -1));
   const hr = new Map(s.wearable.nights.filter(n => n.metric === 'heart_rate').map(n => [n.night, n]));
   return `<div class="card stack" id="cyWearable"><span class="eyebrow">Wearable · last 7 nights</span>
@@ -256,7 +283,7 @@ function wearableHTML(s, today, f, tempShift) {
     <p class="muted small">${esc(METRICS.skin_temp.note)} Raw values as reported by the device; heart-rate variability is vendor-derived. Gaps are never filled in.</p>
     ${f.temperatureResearch ? `<p class="small" id="cyShift"><b>Research:</b> ${esc(tempShift?.detected ? `A sustained rise in wrist skin temperature was seen from ${human(tempShift.firstHighNight)}. This may be consistent with ovulation having already happened. It is not proof, it is not a warning in advance, and it is not used for your period estimate.` : tempShift?.why || 'No data.')}</p>` : ''}
     <div class="btn-row"><button class="ghost" type="button" data-act="syncWearable">Sync demo data</button><button class="ghost" type="button" data-act="wearableOff">Disconnect &amp; delete wearable data</button></div>
-    <p class="muted small"><b>${esc(ds07.displayName)}:</b> ${esc(ds07.status)}</p></div>`;
+    <p class="muted small"><b>${esc(ds07.displayName)}:</b> ${esc(ds07.status)}</p><p class="muted small"><b>${esc(hume.displayName)}:</b> ${esc(hume.status)}</p></div>`;
 }
 
 function situationHTML(s) {
@@ -272,12 +299,13 @@ function settingsHTML(s, f) {
     ${Object.entries(M.CATEGORIES).map(([k, c]) => `<label class="check"><input type="checkbox" data-cat="${k}" ${M.categoryOn(s, k) ? 'checked' : ''}> <span><b>${c.label}</b> <span class="muted small">${esc(c.why)}</span></span></label>`).join('')}
     <p class="muted small">Turning a category off stops collecting it. You'll be asked whether to delete what you logged.</p>
     <b class="small">Optional features</b>
-    ${['phaseEducation', 'patternInsights', 'symptomForecast', 'temperatureResearch', 'lhTests'].map(k => `<label class="check"><input type="checkbox" data-flag="${k}" ${f[k] ? 'checked' : ''}> <span><b>${esc(FLAG_DEFS[k].label)}</b> <span class="muted small">${esc(FLAG_DEFS[k].desc)}</span></span></label>`).join('')}
+    ${['phaseEducation', 'comfortSuggestions', 'patternInsights', 'symptomForecast', 'temperatureResearch', 'lhTests'].map(k => `<label class="check"><input type="checkbox" data-flag="${k}" ${f[k] ? 'checked' : ''}> <span><b>${esc(FLAG_DEFS[k].label)}</b> <span class="muted small">${esc(FLAG_DEFS[k].desc)}</span></span></label>`).join('')}
     ${f.lhTests && !s.consent.lhTests ? `<div class="stack" id="cyLhConsent"><b class="small">Ovulation test (LH) results · research</b><p class="muted small">Optional. Record home ovulation test results exactly as you read them. The app doesn't interpret them, doesn't use them for your estimate and doesn't give fertility advice. Not contraception.</p><button class="ghost" type="button" data-act="lhOn">Turn on ovulation test logging</button></div>` : ''}
     ${s.consent.lhTests ? '<button class="ghost" type="button" data-act="lhOff">Turn off &amp; delete ovulation test results</button>' : ''}
     <b class="small">Summary for a doctor</b>
     <p class="muted small">Your logged periods, cycle lengths and the symptoms you switched on, as plain figures. No estimates. Made only when you ask; nothing is sent.</p>
     <div class="btn-row"><label class="field">Covering<select id="cySumMonths">${SUMMARY_MONTHS.map(m => `<option value="${m}" ${m === 12 ? 'selected' : ''}>Last ${m} months</option>`).join('')}</select></label><button class="ghost" type="button" data-act="summary">Make summary</button></div>
+    ${s.comfort?.tries?.length ? '<button class="ghost" type="button" data-act="deleteComfort">Delete my comfort records</button>' : ''}
     <div class="btn-row"><button class="ghost" type="button" data-act="export">Export my data</button><button class="stop" type="button" data-act="deleteAll">Delete all cycle data</button></div>
     <p class="muted small">Deleting removes your records and destroys the encryption key on this device. It can't reach files you exported or device backups made earlier (they hold encrypted data, but may also hold the key).</p>
     <details><summary class="linkbtn">Consent record</summary><ul class="issues">${s.consent.log.map(l => `<li>${esc(l.at.slice(0, 10))}: ${esc(l.change)}</li>`).join('')}</ul></details></div></details>`;
@@ -326,6 +354,9 @@ async function onClick(e) {
     saveDay: () => act((s, t) => M.logDay(s, snapDate, { ...dayForm }, { today: t }), 'Saved'),
     deletePeriod: () => act(s => M.deletePeriod(s, pid), 'Period deleted'),
     eraseSit: () => act(s => M.eraseSituation(s, ds.key), 'Deleted'),
+    comfortTry: () => act((s, t) => logComfortTry(s, t, ds.opt, { today: t }), 'Noted. You can tell us later whether it helped.'),
+    comfortAnswer: () => act(s => answerComfort(s, ds.id, ds.ans), 'Thanks, noted'),
+    deleteComfort: () => { if (!confirm('Delete everything you recorded about what you tried and whether it helped?')) return; return act(s => deleteComfort(s), 'Comfort records deleted'); },
     dismissInsight: () => act((s, t) => { s.dismissed[ds.key] = t; }, 'Dismissed'),
     patternReminder: () => act(s => { if (!s.consent.reminders) M.setScopeConsent(s, 'reminders', true); const p = findPatterns(s).find(x => x.key === ds.key); addReminder(s, { kind: 'pattern', time: '09:00', cycleDay: p.from, category: p.category, origin: p.text }); }, 'Reminder set for next cycle'),
     checkinReminder: () => act(s => { if (!s.consent.reminders) M.setScopeConsent(s, 'reminders', true); addReminder(s, { kind: 'dailyLog', time: '20:00' }); }, 'Daily check-in set for 20:00'),
@@ -361,6 +392,7 @@ async function sync() {
 /** The day form's values, read once when Save is pressed (finding 2b). */
 function daySnapshot() {
   const f = { unwell: !!root.querySelector('#cyUnwell')?.checked, travel: !!root.querySelector('#cyTravel')?.checked };
+  for (const [id, k] of [['#cyAlcohol', 'alcohol'], ['#cyLateNight', 'lateNight'], ['#cyRoomTemp', 'hotOrColdRoom']]) { const el = root.querySelector(id); if (el) f[k] = el.checked; } // only when shown
   root.querySelectorAll('[data-sym]').forEach(x => { f[x.dataset.sym] = x.value || null; });
   const lh = root.querySelector('#cyLh'); if (lh) f.lh = lh.value || null;
   return f;

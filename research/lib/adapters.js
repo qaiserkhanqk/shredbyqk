@@ -32,4 +32,5 @@ class VendorStub {
   preview() { throw Object.assign(new Error('adapter_not_implemented'), { code: 'adapter_not_implemented', questions: VENDOR_QUESTIONS }); }
 }
 export const SwlDs07Adapter = () => new VendorStub('swl-ds07-stub', 'SWL DS07 (stub)');
+export const HumeBandAdapter = () => new VendorStub('hume-band-stub', 'Hume Band (stub)');
 export const GenericVendorAdapter = name => new VendorStub(`vendor-stub-${String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, `${name} (stub)`);

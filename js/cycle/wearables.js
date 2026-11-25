@@ -293,4 +293,12 @@ export class MockWearable extends WearableAdapter {
     return out;
   }
 }
-export const ADAPTERS = { mock: () => new MockWearable(), 'swl-ds07': () => new SwlDs07Adapter() };
+/** Hume Band (Hume Health). It measures wrist skin temperature, but we have no documented way to read its data, and
+ *  Hume offers no cycle tracking of its own. Placeholder until it passes the supplier acceptance test. */
+export class HumeBandAdapter extends WearableAdapter {
+  get id() { return 'hume-band'; }
+  get displayName() { return 'Hume Band (not available)'; }
+  get status() { return 'Unverified. No documented data access (SDK or API) for overnight skin temperature yet, so it is not connected. Hume itself offers no cycle tracking.'; }
+  async connect() { throw new CycleError('NOT_VERIFIED'); }
+}
+export const ADAPTERS = { mock: () => new MockWearable(), 'swl-ds07': () => new SwlDs07Adapter(), 'hume-band': () => new HumeBandAdapter() };

@@ -57,6 +57,7 @@ Existing features were not changed. Changes to shared files are small:
 | `cycleTracking` | off | The whole feature. Toggle: You → App health & diagnostics → "Cycle tracking prototype". |
 | `phaseEducation` | off | Phase card (settings inside the Cycle screen) |
 | `symptomForecast` | off | Experimental "you may want to check in about X" suggestions |
+| `comfortSuggestions` | off | After moderate or severe pain is logged: heat, gentle movement or a warm drink, each with its published evidence. Then "did it help?", and the options are ordered by her own answers. Warning signs are always shown. Never medicines, supplements, doses, diets, calories or weight. **Wording awaiting clinician review.** See `docs/competitor-gaps.md`. |
 | `temperatureResearch` | off | Retrospective temperature-rise display. Never feeds the period estimate. |
 | `patternInsights` | off | Symptom-pattern findings and the "around now" insight. **Research, unvalidated.** Synthetic false-pattern rates range from 1.5% to 94.5% depending on logging (`docs/cycle-fixes-29780c5.md`) |
 | `quickSuggestions` | off | Low-effort mode: one-tap pre-filled answers from the person's own patterns. **Logic only, no screen yet.** |
@@ -340,3 +341,19 @@ It reports:
 | Regulatory assessment (medical-device software qualification) | **Not done** | Regulatory advice before any claim beyond logging |
 | Real-world evaluation | **Not started** | [Validation plan](docs/cycle-validation-plan.md) |
 | Deployment | **Not done.** Pushed to a feature branch only. Merging to `main` deploys the app, but the feature stays off by flag. | Your approval |
+
+## Competitor-gap features (2026-11-25)
+Built after comparing Hume Band, WHOOP and Oura (`docs/competitor-gaps.md`). They are tested in `tests/cycle-missing-links.test.mjs` and `tests/cycle-ui-missing-links.cjs`.
+- **Learning stage** (`js/cycle/learning.js`):
+  - "Learning your cycle: n of 3 cycles", using the estimate's own minimum.
+  - With a band: nights recorded this cycle, and whether last night was recorded.
+  - Missing nights are never filled in, and the period estimate never uses the band.
+- **Night disruptors:**
+  - optional per-night ticks for alcohol, a late night, or a very hot or cold room (`model.NIGHT_DISRUPTORS`, together with unwell and travelling);
+  - they are shown only when a wearable is on;
+  - the temperature research rule (`three-over-six-skin-0.4.0-…`) and the wearable-timed questions leave those nights out.
+- **Comfort suggestions** (`js/cycle/comfort.js`, flag `comfortSuggestions`): see the flag table above. The records are deleted:
+  - together with pain data (turning pain off and deleting);
+  - or on their own (Settings → "Delete my comfort records").
+- **Training category:** how workouts felt (easier, usual, harder), off until switched on, like every category. No training advice is given by cycle phase.
+- **Hume Band:** a placeholder adapter that refuses to connect (`NOT_VERIFIED`), the same as the SWL DS07.

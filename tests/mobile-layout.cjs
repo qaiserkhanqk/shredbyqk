@@ -16,7 +16,7 @@ let fails = 0, count = 0;
 const check = (name, ok, detail = '') => { count++; if (!ok) fails++; console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${!ok && detail ? '  — ' + detail : ''}`); };
 const PHONES = ['iPhone SE', 'iPhone 13', 'Pixel 7'];
 const dayStr = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-const FLAGS = { cycleTracking: true, phaseEducation: true, patternInsights: true, symptomForecast: true, quickSuggestions: true, sensorPrompts: true, temperatureResearch: true, lhTests: true };
+const FLAGS = { cycleTracking: true, phaseEducation: true, patternInsights: true, symptomForecast: true, quickSuggestions: true, sensorPrompts: true, temperatureResearch: true, lhTests: true, comfortSuggestions: true };
 
 // Runs in the page: measures the visible screen.
 function measure() {
@@ -78,10 +78,11 @@ function measure() {
       const S = await import('/js/cycle/store.js'), M = await import('/js/cycle/model.js'), D = await import('/js/cycle/dates.js');
       const repo = await S.openCycleRepo({ storage: S.indexedDbStorage(), keys: S.indexedDbKeys(), userId: localStorage.getItem('shred_cycle_uid') });
       await repo.update(s => {
-        for (const k of ['energy', 'mood', 'sleep', 'cramps']) try { M.setCategory(s, k, true); } catch { /* category may not exist */ }
+        for (const k of ['energy', 'mood', 'sleep', 'pain', 'training']) try { M.setCategory(s, k, true); } catch { /* category may not exist */ }
         const last = D.addDays(today, -12), starts = Array.from({ length: 5 }, (_, i) => D.addDays(last, -29 * (4 - i)));
         for (const st of starts) M.logPeriodStart(s, st, { today });
         starts.slice(0, 4).forEach(st => { for (let k = 1; k <= 29; k++) M.logDay(s, D.addDays(st, k - 1), { energy: k > 22 ? 'low' : 'usual' }, { today }); });
+        M.logDay(s, today, { pain: 'moderate' }, { today }); // so the comfort card (flag comfortSuggestions) is on screen too
       });
     }, dayStr(0));
     await p.tap('.tabs [data-tab=today]'); await p.tap('.tabs [data-tab=body]'); await p.tap('[data-go=cycle]');

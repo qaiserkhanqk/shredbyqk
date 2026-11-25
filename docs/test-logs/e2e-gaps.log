@@ -1,0 +1,195 @@
+ok   welcome: asks for a first name
+ok   today: greets by name
+ok   navigation: 4 tabs
+ok   setup: weight field shown for a barbell lift
+ok   demo set: 10 reps, 7 clean
+ok   demo set: bar speed card shown (hip thrust is horizontal → asks for plate calibration)
+ok   library: core filter
+ok   camera: live squat session starts
+ok   camera: Calibrate button shown for barbell lift
+ok   calibration: two taps accepted
+ok   gait demo: report with quality badge and hip finding
+ok   diagnostics: last session listed   — App version1.3.0Live tracking modellite
+    Last sessiongait · 601 frames · 60 fps
+    Last recording quality100/100
+    Errors logged0
+ok   diagnostics: exported session replayable (meta + frames)
+ok   jump panel shown, demo hidden
+ok   knee test: live capture runs (camera granted)
+ok   knee test with no person: refuses to give a result
+ok   two-view scan: lunge photo rejected with advice
+ok   rehab: safety screen requires every answer
+ok   rehab: programme starts at phase 1 with exercises
+ok   rehab: check-in gives a traffic light
+ok   rehab: phase criteria listed and not yet met
+ok   rehab: camera measurement starts
+ok   rehab: no-person measurement refused safely
+ok   today: rehab card shown
+ok   rehab: cauda equina red flag → emergency advice with 999
+ok   readiness: one tap "Great" → train as planned  — Train as planned
+ok   readiness: poor check-in → lighter or recovery day  — Recovery day: walk, mobility, easy cardio
+ok   load: weekly load shown in Progress
+ok   studio: lists coaching lines
+ok   studio: record with the microphone and save a clip
+ok   cycle: hidden by default (flag off)
+ok   cycle: tile shown once the prototype flag is on
+ok   cycle: consent screen first, says no sharing and not contraception
+ok   cycle: consent needs the box ticked
+ok   cycle: no history → "not enough data", no range
+ok   cycle: 5 cycles → dates from past cycles, explained, never called a prediction interval  — Your last 5 cycles were between 29 and 31 days long (typical: 30), which would put your next period between 14 Dec and 16 Dec. Your next period may come earlier or later than this. It is what your past cycles would show, not a prediction interval, and it has not been validated.
+ok   cycle: "may come earlier or later" is visible without opening any section
+ok   cycle: spotting logged without changing the estimate
+ok   cycle: correcting the latest start updates the estimate  — Your last 5 cycles were between 25 and 31 days long (typical: 30), which would put your next period between 4 Dec and 10 Dec. Your next period may come earlier or later than this. It is what your past cycles would show, not a prediction interval, and it has not been validated.
+ok   cycle: optional symptom (energy) logged after switching it on
+ok   cycle: symptom-pattern findings hidden by default (research flag off)
+ok   cycle: research flag on → pattern card shown, labelled unvalidated
+ok   cycle: reminder added with its next time and reason
+ok   cycle: reminder paused
+ok   cycle: reminder deleted
+ok   cycle: demo wearable labelled synthetic, skin temp not core temp, DS07 unavailable  — Wearable · last 7 nights
+    Mock Band (synthetic) · firmware mock-1.0 · synthetic demo, not your measurements
+    18 Nov33.80 °C · 2 rejected19 Nov33.76 °C · 3 rejected20 Nov33.79 °C · 1 rejected21 N
+ok   cycle: phase education (opt-in) has a "not enough data" state, no day-14 assumption
+ok   cycle: stored encrypted in IndexedDB (no dates or words in the stored value)
+ok   cycle: no cycle record left in localStorage
+ok   cycle: nothing cycle-related in the main store or error log
+ok   cycle: export contains the user's data
+ok   cycle: delete all → data gone and consent asked again
+ok   two tabs: entries from both tabs are kept (no lost update)  — ["2026-10-16","2026-11-15"]
+ok   two tabs: the other tab clears itself after a delete elsewhere
+ok   two tabs: after delete + reload, nothing comes back and no "can't unlock" error
+ok   unreadable data: a reset button is offered and returns to the consent screen
+ok   purge (browser): mood pattern reminder shown before purge, gone from reminders, due list and export after  — {"seeded":true}
+ok   simultaneous first opens (Web Locks available): one user ID, one key; a save from the second tab decrypts after reload  — ["b4fc509e-cacf-4a5e-9b9b-898214bd0841","b4fc509e-cacf-4a5e-9b9b-898214bd0841"]
+ok   simultaneous saves (Web Locks available): neither period is lost  — ["2026-09-06","2026-10-06","2026-11-05"]
+ok   other tab saves while this tab is typing (Web Locks available): the typed date is kept  — 2026-08-22
+ok   simultaneous save + delete (Web Locks available): nothing survives, both tabs ask for consent again
+ok   simultaneous first opens (Web Locks removed): one user ID, one key; a save from the second tab decrypts after reload  — ["7b75247e-4895-4110-8652-83f6c578d229","7b75247e-4895-4110-8652-83f6c578d229"]
+ok   simultaneous saves (Web Locks removed): neither period is lost  — ["2026-09-06","2026-10-06","2026-11-05"]
+ok   other tab saves while this tab is typing (Web Locks removed): the typed date is kept  — 2026-08-22
+ok   simultaneous save + delete (Web Locks removed): nothing survives, both tabs ask for consent again
+ok   no JavaScript errors
+ALL PASS
+ok   5 cycle tracking on, research flag off: no symptom-pattern finding is displayed
+ok   5 research flag on: the pattern card is shown, and the card itself says it is unvalidated research  — <div class="card" id="cyPatterns"><span class="eyebrow">Your patterns · research, unvalidated</span><div class="list"><div class="row cy-row"><div><b>You logged
+ok   no JavaScript errors
+ALL PASS
+ok   S1 a "summary for a doctor" button is offered
+ok   S1 no summary is shown until the person asks
+ok   S2 the summary appears on request, with periods, cycle lengths and pain counts  — Summary for a doctorCycle summary for a health professional
+Made on 2026-11-25, on request, from your own entries in Shred by QK (prototype). Covers 2025-11-25 to 2026-11-25.
+This is not a diagnosis a
+ok   S2 it says it is not a diagnosis and comes from the person's own entries
+ok   S2 it contains no estimate or fertility wording
+ok   S3 print and download-as-text buttons are offered; nothing is sent anywhere  — https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap https://fonts.gstatic.com/s/archivo/v25/k3kQo8UDI-1M0wlSfdnoLg.woff2 https://fonts.gstatic.com/s/figtree/v9/_Xms-HUzqDCFdgfMm4S9DQ.woff2 https://fonts.gstatic.com/s/ibmplexmono/v23/-F6qfjptAgt5VM-kVkqdyU8n3twJwlBFgg.woff2 https://fonts.gstatic.com/s/ibmplexmono/v23/-F6qfjptAgt5VM-kVkqdyU8n3vAOwlBFgg.woff2 https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap https://fonts.gstatic.com/s/archivo/v25/k3kQo8UDI-1M0wlSfdnoLg.woff2 https://fonts.gstatic.com/s/figtree/v9/_Xms-HUzqDCFdgfMm4S9DQ.woff2 https://fonts.gstatic.com/s/ibmplexmono/v23/-F6qfjptAgt5VM-kVkqdyU8n3twJwlBFgg.woff2 https://fonts.gstatic.com/s/ibmplexmono/v23/-F6qfjptAgt5VM-kVkqdyU8n3vAOwlBFgg.woff2
+ok   S3 the download is a local plain-text file with the same summary  — cycle-summary-2026-11-25.txt
+ok   S4 the summary is not stored in plain localStorage
+ok   S4 the summary can be closed
+ok   L1 with the LH research flag off, there is no LH field or opt-in
+ok   L2 with the flag on, LH logging needs its own opt-in first
+ok   L3 after opting in, the log form has an LH result field
+ok   L3 the result is saved in the encrypted store  — positive
+ok   L4 a positive result adds no fertility or ovulation wording to the page  — 1 → 1
+ok   L5 the doctor summary lists the LH result as recorded, not interpreted  —  (not interpreted)
+  2026-11-25: Positive
+    PrintSave as text fileClose
+    Made only because you asked. It isn't saved or sent anywhere. A printed or saved copy isn't encrypted, so keep it private.
+ok   L6 turning LH logging off deletes the results  — 0
+ok   no JavaScript errors
+ALL PASS
+ok   delayed save stores the values shown when Save was pressed (date, symptom, checkbox)
+ok   delayed save does not store the values typed afterwards
+ok   delayed "Period started" uses the date shown when it was pressed
+ok   two rapid saves each store their own date and values
+ok   cross-tab contention: this tab stores the values shown when Save was pressed
+ok   cross-tab contention: the other tab's save is kept too (no lost update)
+ok   no JavaScript errors
+ALL PASS (7)
+ok   iPhone SE · welcome: nothing wider than the screen
+ok   iPhone SE · welcome: every control at least 24×24 px
+ok   iPhone SE · welcome: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone SE: pinch-zoom is not disabled
+ok   iPhone SE · today tab: nothing wider than the screen
+ok   iPhone SE · today tab: every control at least 24×24 px
+ok   iPhone SE · today tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone SE · train tab: nothing wider than the screen
+ok   iPhone SE · train tab: every control at least 24×24 px
+ok   iPhone SE · train tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone SE · progress tab: nothing wider than the screen
+ok   iPhone SE · progress tab: every control at least 24×24 px
+ok   iPhone SE · progress tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone SE · body tab: nothing wider than the screen
+ok   iPhone SE · body tab: every control at least 24×24 px
+ok   iPhone SE · body tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone SE · cycle consent: nothing wider than the screen
+ok   iPhone SE · cycle consent: every control at least 24×24 px
+ok   iPhone SE · cycle consent: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone SE · cycle screen with synthetic history: nothing wider than the screen
+ok   iPhone SE · cycle screen with synthetic history: every control at least 24×24 px
+ok   iPhone SE · cycle screen with synthetic history: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone 13 · welcome: nothing wider than the screen
+ok   iPhone 13 · welcome: every control at least 24×24 px
+ok   iPhone 13 · welcome: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone 13: pinch-zoom is not disabled
+ok   iPhone 13 · today tab: nothing wider than the screen
+ok   iPhone 13 · today tab: every control at least 24×24 px
+ok   iPhone 13 · today tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone 13 · train tab: nothing wider than the screen
+ok   iPhone 13 · train tab: every control at least 24×24 px
+ok   iPhone 13 · train tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone 13 · progress tab: nothing wider than the screen
+ok   iPhone 13 · progress tab: every control at least 24×24 px
+ok   iPhone 13 · progress tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone 13 · body tab: nothing wider than the screen
+ok   iPhone 13 · body tab: every control at least 24×24 px
+ok   iPhone 13 · body tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone 13 · cycle consent: nothing wider than the screen
+ok   iPhone 13 · cycle consent: every control at least 24×24 px
+ok   iPhone 13 · cycle consent: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone 13 · cycle screen with synthetic history: nothing wider than the screen
+ok   iPhone 13 · cycle screen with synthetic history: every control at least 24×24 px
+ok   iPhone 13 · cycle screen with synthetic history: input text at least 16 px (no iOS zoom on focus)
+ok   Pixel 7 · welcome: nothing wider than the screen
+ok   Pixel 7 · welcome: every control at least 24×24 px
+ok   Pixel 7 · welcome: input text at least 16 px (no iOS zoom on focus)
+ok   Pixel 7: pinch-zoom is not disabled
+ok   Pixel 7 · today tab: nothing wider than the screen
+ok   Pixel 7 · today tab: every control at least 24×24 px
+ok   Pixel 7 · today tab: input text at least 16 px (no iOS zoom on focus)
+ok   Pixel 7 · train tab: nothing wider than the screen
+ok   Pixel 7 · train tab: every control at least 24×24 px
+ok   Pixel 7 · train tab: input text at least 16 px (no iOS zoom on focus)
+ok   Pixel 7 · progress tab: nothing wider than the screen
+ok   Pixel 7 · progress tab: every control at least 24×24 px
+ok   Pixel 7 · progress tab: input text at least 16 px (no iOS zoom on focus)
+ok   Pixel 7 · body tab: nothing wider than the screen
+ok   Pixel 7 · body tab: every control at least 24×24 px
+ok   Pixel 7 · body tab: input text at least 16 px (no iOS zoom on focus)
+ok   Pixel 7 · cycle consent: nothing wider than the screen
+ok   Pixel 7 · cycle consent: every control at least 24×24 px
+ok   Pixel 7 · cycle consent: input text at least 16 px (no iOS zoom on focus)
+ok   Pixel 7 · cycle screen with synthetic history: nothing wider than the screen
+ok   Pixel 7 · cycle screen with synthetic history: every control at least 24×24 px
+ok   Pixel 7 · cycle screen with synthetic history: input text at least 16 px (no iOS zoom on focus)
+ok   no JavaScript errors on any phone
+ALL PASS (67)
+ok   learning: before any period, the card says to log the first period
+ok   learning: after one start, it says the first cycle is in progress
+ok   training: "Training" is an optional category in settings, off by default
+ok   comfort: with its flag off there is no comfort card
+ok   Hume Band: the wearable card lists it as not available (unverified)
+ok   comfort: nothing before pain is logged
+ok   comfort: moderate pain shows the card with heat, gentle movement and a warm drink
+ok   comfort: warning signs are listed
+ok   comfort: marked as awaiting clinician review, and not a treatment
+ok   comfort: each option links its evidence
+ok   comfort: after "I'll try this", it asks "Did it help?"
+ok   comfort: her answer is recorded and shown with its denominator
+ok   comfort: the answer survives a reload (saved encrypted with her data)
+ok   comfort: "Delete my comfort records" removes them
+ok   nights: without a wearable, the night questions are not shown
+ok   nights: with the demo wearable on, alcohol / late night / hot or cold room appear
+ok   nights: the learning card shows band nights and is honest about gaps
+ok   nights: the entries are saved
+ok   no JavaScript errors
+ALL PASS (19)

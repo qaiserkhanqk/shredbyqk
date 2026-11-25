@@ -17,7 +17,7 @@
 // All thresholds are placeholders, NOT validated. The synthetic evaluation (js/cycle/eval.js) shows the plumbing
 // works and says nothing about real devices.
 import { addDays, diffDays, human } from './dates.js';
-import { CATEGORIES } from './model.js';
+import { CATEGORIES, nightDisrupted } from './model.js';
 import { segments } from './wearables.js';
 import { findPatterns, PATTERN_PARAMS } from './patterns.js';
 
@@ -34,7 +34,7 @@ const median = xs => { const a = [...xs].sort((x, y) => x - y), m = a.length >> 
 function validNights(s, metric, before) {
   const seg = segments(s.wearable.nights.filter(n => n.night < before), metric).at(-1);
   if (!seg) return [];
-  return seg.nights.filter(n => n.status === 'ok' && n.value != null && !n.flags.includes('tz_change') && !s.days[n.night]?.unwell && !s.days[n.night]?.travel);
+  return seg.nights.filter(n => n.status === 'ok' && n.value != null && !n.flags.includes('tz_change') && !nightDisrupted(s, n.night));
 }
 
 /** Should we ask "Has your period started?" because of a temperature drop last night? */

@@ -13,16 +13,20 @@
 // pre-registered before any study.
 //
 // Data rules: only 'ok' nights, from ONE device + firmware segment (a device change restarts the baseline),
-// excluding nights with a time-zone change and days the user marked as unwell or travelling.
+// excluding nights with a time-zone change and nights the user marked as disturbed (unwell, travelling, alcohol, a late
+// night, a hot or cold room: model.NIGHT_DISRUPTORS).
 import { diffDays, addDays } from './dates.js';
 import { segments } from './wearables.js';
+import { nightDisrupted } from './model.js';
 
 export const SHIFT_PARAMS = Object.freeze({ BASELINE: 6, CONFIRM: 3, DELTA: 0.15, MAX_BASELINE_SPAN: 12, MAX_CONFIRM_SPAN: 5 });
 // 0.2.0 (f67000b fix, issue 4 reported against b3d9589): one eligible observation per biological night; several sessions on
 // one night no longer count as several nights. 0.1.0 counted every session summary. (Version bumped: issue 3 reported against f67000b.)
 // 0.3.0 (findings reported against 21317c5): reports a possible-onset interval, and says when a rise may have begun while
 // the baseline was forming. The detection rule itself is unchanged from 0.2.0.
-export const SHIFT_VERSION = 'three-over-six-skin-0.3.0-night-aggregated-onset-interval-research';
+// 0.4.0 (competitor-gap work): nights marked with alcohol, a late night or a hot or cold room are left out too, as
+// unwell and travelling nights already were. The detection rule is unchanged.
+export const SHIFT_VERSION = 'three-over-six-skin-0.4.0-night-aggregated-onset-interval-disruptors-research';
 const BASELINE_LIMIT = 'This rule cannot see a rise that begins while its 6-night baseline is still forming.';
 
 export function retrospectiveShift(s, cycleStart, asOf, params = SHIFT_PARAMS) {
@@ -40,7 +44,7 @@ export function retrospectiveShift(s, cycleStart, asOf, params = SHIFT_PARAMS) {
   for (const n of seg.nights) {
     if (n.status !== 'ok' || n.value == null) { res.excluded.notOk++; continue; }
     if (n.flags.includes('tz_change')) { res.excluded.flagged++; continue; }
-    if (s.days[n.night]?.unwell || s.days[n.night]?.travel) { res.excluded.userFlagged++; continue; }
+    if (nightDisrupted(s, n.night)) { res.excluded.userFlagged++; continue; }
     const cur = byNight.get(n.night);
     if (!cur) { byNight.set(n.night, n); continue; }
     res.excluded.sameNightSessions++;

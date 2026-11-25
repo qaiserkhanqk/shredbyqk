@@ -19,7 +19,14 @@ export const CATEGORIES = {
   mood: { label: 'Mood', why: 'A word for your mood, only if you want to track it. Nothing is inferred from sensors.', options: [['good', 'Good'], ['okay', 'Okay'], ['low', 'Low'], ['anxious', 'Anxious'], ['irritable', 'Irritable']], notable: ['low', 'anxious', 'irritable'], notableLabel: 'low, anxious or irritable mood' },
   cravings: { label: 'Cravings', why: 'Food cravings, if you notice them.', options: [['none', 'None'], ['some', 'Some'], ['strong', 'Strong']], notable: ['strong'], notableLabel: 'strong cravings' },
   sleep: { label: 'Sleep', why: 'How you felt you slept. This is your rating, not a sensor reading.', options: [['poor', 'Poor'], ['ok', 'OK'], ['good', 'Good']], notable: ['poor'], notableLabel: 'poor sleep' },
+  // Training feel (competitor-gap work, docs/competitor-gaps.md): lets her own pattern show. No training advice is
+  // given by cycle phase, because the evidence for general phase-based rules is weak and individual (docs).
+  training: { label: 'Training', why: 'How your workouts felt compared with usual, so you can see your own pattern. No training advice is given by cycle phase.', options: [['easier', 'Easier than usual'], ['usual', 'Usual'], ['harder', 'Harder than usual']], notable: ['harder'], notableLabel: 'training feeling harder' },
 };
+/** Things that can disturb a night's skin temperature. Optional, per night (the evening's date), true or false.
+ *  The temperature research rule and the wearable-timed questions leave these nights out. Not health judgements. */
+export const NIGHT_DISRUPTORS = ['unwell', 'travel', 'alcohol', 'lateNight', 'hotOrColdRoom'];
+export const nightDisrupted = (s, date) => NIGHT_DISRUPTORS.some(k => s.days[date]?.[k] === true);
 export const BLEEDING = ['period', 'spotting', 'none'];
 /** Home ovulation-test (urinary LH) results, recorded exactly as the person read them. Research only, opt-in
  *  (consent scope 'lhTests'). Deliberately NOT a symptom category, so pattern, suggestion and forecast code never
@@ -52,6 +59,7 @@ export const blankState = owner => ({
   dismissed: {},         // insight key → date dismissed
   promptsDismissed: {},  // confirmation prompt key → date
   wearable: { devices: [], nights: [] }, // nightly summaries only; raw samples are not kept
+  comfort: { tries: [] }, // comfort options she tried and whether they helped (js/cycle/comfort.js)
 });
 
 let seq = 0;
@@ -88,6 +96,7 @@ function invalidateDerived(s, cat, purge) {
     for (const id of ids) delete s.delivered[id];
     for (const k of Object.keys(s.dismissed)) if (k.startsWith(`${cat}:`)) delete s.dismissed[k];
     for (const k of Object.keys(s.promptsDismissed)) if (k.startsWith(`sugg:${cat}:`)) delete s.promptsDismissed[k];
+    if (cat === 'pain') s.comfort = { tries: [] }; // comfort records reveal pain, so they go with it
   } else for (const r of derived) { r.enabled = false; r.disabledReason = 'category_off'; }
 }
 export const categoryOn = (s, cat) => !!s.consent.categories[cat];
@@ -209,7 +218,7 @@ export function logDay(s, date, fields, { today: t, source, at = new Date().toIS
   for (const [k, v] of Object.entries(fields)) {
     if (k === 'bleeding') { if (v != null && !BLEEDING.includes(v)) throw new CycleError('INVALID_INPUT'); }
     else if (k === 'lh') { if (!s.consent.lhTests) throw new CycleError('LH_OFF'); if (v != null && !(v in LH_RESULTS)) throw new CycleError('INVALID_INPUT'); }
-    else if (k === 'unwell' || k === 'travel') { if (v != null && typeof v !== 'boolean') throw new CycleError('INVALID_INPUT'); }
+    else if (NIGHT_DISRUPTORS.includes(k)) { if (v != null && typeof v !== 'boolean') throw new CycleError('INVALID_INPUT'); }
     else if (k in CATEGORIES) {
       if (!categoryOn(s, k)) throw new CycleError('CATEGORY_OFF');
       if (v != null && !CATEGORIES[k].options.some(([o]) => o === v)) throw new CycleError('INVALID_INPUT');
