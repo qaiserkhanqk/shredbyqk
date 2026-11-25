@@ -36,7 +36,8 @@ export function hrvReading(rawRR, { minBeats = 40, maxArtefacts = 0.1 } = {}) {
 /* ---------- Phone camera (fingertip photoplethysmography) ---------- */
 // The fingertip covers the camera and flash; each heartbeat briefly darkens the image.
 // Red clearly dominant. Loose enough for a strong flash, where green and blue also brighten.
-export function fingerOn({ r, g, b }) { return r > 40 && r > 1.3 * g && r > 1.3 * b; }
+// Without a flash (iPhone browsers can't switch it on) room light through a fingertip is dim, so the brightness bar is low.
+export function fingerOn({ r, g, b }) { return r > 20 && r > 1.3 * g && r > 1.3 * b; }
 
 function movAvg(x, w) {
   const out = new Float64Array(x.length), h = w >> 1; let s = 0, lo = 0, hi = -1;

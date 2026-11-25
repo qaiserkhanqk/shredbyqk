@@ -189,7 +189,16 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('alertness: saved and shown on Body check', /\d+ ms/.test(await p.textContent('#vPvtLast')));
   await tap('#vHr'); await p.waitForTimeout(2500);
   check('camera pulse: asks for a fingertip when none is on the camera', await p.isVisible('#measure') && /fingertip|camera/i.test(await p.textContent('#mStatus')), await p.textContent('#mStatus'));
-  await p.click('#mCancel');
+  await p.waitForSelector('#mTap:not([hidden])', { timeout: 12000 }).catch(() => {});
+  check('camera pulse: after 8 s with no finger, explains and offers tap-along', await p.isVisible('#mTap') && /finger|dark/i.test(await p.textContent('#mStatus')), await p.textContent('#mStatus'));
+  await p.click('#mTap');
+  for (let i = 0; i < 12; i++) { await p.click('#tpArea'); await p.waitForTimeout(750); }
+  await p.waitForSelector('#tpDone:not([hidden])', { timeout: 12000 }).catch(() => {});
+  const tapBpm = parseInt(await p.textContent('#tpCount'));
+  check('tap-along pulse: 12 taps 750 ms apart → about 80 bpm', Math.abs(tapBpm - 80) <= 3, `${tapBpm}`);
+  await p.click('#tpDone');
+  check('tap-along pulse: saved to Body check', /\d+ bpm/.test(await p.textContent('#vHrLast')));
+  await tap('#vHr'); await p.waitForTimeout(1500); await p.click('#mCancel');
   check('camera pulse: cancel closes it', !(await p.isVisible('#measure')));
 
   // 12. Sukoon: cyclic sighing style
