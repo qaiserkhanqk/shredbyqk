@@ -12,6 +12,7 @@ import { today as localToday, localMinutes, addDays, diffDays, human, deviceTime
 import { readFlags, setFlag, FLAG_DEFS } from './flags.js';
 import { clinicianSummary, summaryText, SUMMARY_MONTHS } from './summary.js';
 import { learningStage } from './learning.js';
+import { companionToday, answerCheckIn, dismissCompanion } from './companion.js';
 import { midlifeObservations, SOURCES as MIDLIFE_SOURCES, INTRO as MIDLIFE_INTRO } from './midlife.js';
 import { comfortSuggestions, pendingComfortQuestions, logComfortTry, answerComfort, deleteComfort, ANSWERS, REVIEW_STATUS } from './comfort.js';
 
@@ -92,7 +93,7 @@ function render() {
   const unsaved = unsavedInputs(); // a redraw (e.g. another tab saved) must never change what the person typed
   const est = estimateNext(s, today);
   const tempShift = f.temperatureResearch && est.lastStart ? retrospectiveShift(s, est.lastStart, addDays(today, 1)) : null;
-  root.innerHTML = [banner(), summaryMonths ? summaryHTML(s, today) : '', promptsHTML(s, est, today), dueHTML(s, est, today, nowMin), estimateHTML(s, est), learningHTML(s, today), f.midlifeMode && s.situation?.perimenopause ? midlifeHTML(s, today) : '', logHTML(s, today), f.comfortSuggestions ? comfortHTML(s, today) : '', f.patternInsights ? insightHTML(s, today) : '',
+  root.innerHTML = [banner(), f.companion ? companionHTML(s, today, est, f) : '', summaryMonths ? summaryHTML(s, today) : '', promptsHTML(s, est, today), dueHTML(s, est, today, nowMin), estimateHTML(s, est), learningHTML(s, today), f.midlifeMode && s.situation?.perimenopause ? midlifeHTML(s, today) : '', logHTML(s, today), f.comfortSuggestions ? comfortHTML(s, today) : '', f.patternInsights ? insightHTML(s, today) : '',
     f.phaseEducation ? phaseHTML(s, today, tempShift, est) : '', historyHTML(s), f.patternInsights ? patternsHTML(s, today, f) : '', remindersHTML(s, est, today, nowMin),
     wearableHTML(s, today, f, tempShift), situationHTML(s), settingsHTML(s, f)].join('');
   for (const id of open) { const d = root.querySelector('#' + id); if (d) d.open = true; }
@@ -148,8 +149,9 @@ function promptsHTML(s, est, today) {
   return out.join('');
 }
 
+const dueFiltered = (s, o) => dueNow(s, o).filter(d => d.reminder.kind !== 'companion' || flags().companion);
 function dueHTML(s, est, today, nowMin) {
-  const due = dueNow(s, { today, nowMin, estimate: est }); if (!due.length) return '';
+  const due = dueFiltered(s, { today, nowMin, estimate: est }); if (!due.length) return '';
   return `<div class="card" id="cyDue"><span class="eyebrow">Check-ins due</span>${due.map(d => `<div class="row cy-row"><div><b>${esc(KINDS[d.reminder.kind])}</b><details><summary class="linkbtn">Why am I seeing this?</summary><p class="muted small">${esc(d.why)}</p></details></div><button class="ghost" type="button" data-act="ackDue" data-id="${d.reminder.id}">Done</button></div>`).join('')}</div>`;
 }
 
@@ -190,6 +192,18 @@ function learningHTML(s, today) {
   const l = learningStage(s, today);
   return `<div class="card stack" id="cyLearning"><span class="eyebrow">Learning your cycle${l.stage === 'learning' ? ` · ${l.usableCycles} of ${l.needed}` : ''}</span><p class="small">${esc(l.text)}</p>
     ${l.band ? `<p class="small${l.band.lastNight === 'recorded' ? ' muted' : ''}">${esc(l.band.text)}</p>` : ''}</div>`;
+}
+
+/* QK check-in (js/cycle/companion.js, flag companion): one caring question on the days that matter for her. It asks;
+   nothing is saved until she taps. Shown first on the screen. */
+function companionHTML(s, today, est, f) {
+  const m = companionToday(s, today, { estimate: est, patternsOn: !!f.patternInsights, patterns: f.patternInsights ? findPatterns(s) : [] });
+  if (!m) return '';
+  const cr = m.quick.find(q => q.id === 'cramps');
+  return `<div class="card stack cy-companion" id="cyCompanion"><span class="eyebrow">${esc(m.from)} · check-in</span><b>${esc(m.title)}</b><p class="small">${esc(m.text)}</p>
+    <div class="btn-row">${m.quick.map(q => `<button class="ghost" type="button" data-act="companionAnswer" data-ans="${esc(q.id)}">${esc(q.label)}</button>`).join('')}</div>
+    ${cr ? `<div class="btn-row" id="cyCompanionSev" hidden><span class="small">How strong?</span>${cr.severities.map(([v, l]) => `<button class="ghost" type="button" data-act="companionSeverity" data-sev="${v}">${esc(l)}</button>`).join('')}</div>` : ''}
+    <div class="row"><details><summary class="linkbtn">Why am I seeing this?</summary><p class="muted small">${esc(m.why)} Wording awaiting clinician review.</p></details><button class="linkbtn" type="button" data-act="companionDismiss">Not now</button></div></div>`;
 }
 
 /* Perimenopause and menopause mode (js/cycle/midlife.js, flag midlifeMode, only when she marked the situation).
@@ -278,7 +292,7 @@ function remindersHTML(s, est, today, nowMin) {
       <div class="stack" style="flex:0 0 auto"><input type="time" data-rtime value="${r.time}"><button class="linkbtn" type="button" data-act="pauseRem">${r.pausedUntil && r.pausedUntil >= today ? 'Resume' : 'Pause 7 days'}</button><button class="linkbtn" type="button" data-act="delRem">Delete</button></div></div>`; }).join('');
   const q = s.settings.quietHours;
   return `<div class="card stack" id="cyReminders"><span class="eyebrow">Reminders</span><div class="list">${list || '<p class="empty">No reminders.</p>'}</div>
-    <div class="grid2"><label class="field">Add<select id="cyRemKind"><option value="dailyLog">Daily log</option><option value="weeklyLog">Weekly check-in (Mondays)</option><option value="periodCheck">When my range begins</option></select></label><label class="field">Time<input type="time" id="cyRemTime" value="09:00"></label></div>
+    <div class="grid2"><label class="field">Add<select id="cyRemKind"><option value="dailyLog">Daily log</option><option value="weeklyLog">Weekly check-in (Mondays)</option><option value="periodCheck">When my range begins</option>${flags().companion ? '<option value="companion">QK check-in on my period days</option>' : ''}</select></label><label class="field">Time<input type="time" id="cyRemTime" value="09:00"></label></div>
     <button class="ghost" type="button" data-act="addRem">Add reminder</button>
     <div class="grid2"><label class="field">Quiet from<input type="time" id="cyQs" value="${q.start}"></label><label class="field">Quiet until<input type="time" id="cyQe" value="${q.end}"></label></div>
     <label class="check"><input type="checkbox" id="cyLockDetail" ${s.settings.lockScreenDetail ? 'checked' : ''}> Show what the reminder is about on the lock screen (off = "You have a check-in")</label>
@@ -334,7 +348,7 @@ async function notifyDue() {
   if (!repo || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
   const s = repo.read(); if (!M.hasConsent(s)) return;
   const { today, nowMin } = now();
-  for (const d of dueNow(s, { today, nowMin, estimate: estimateNext(s, today) })) {
+  for (const d of dueFiltered(s, { today, nowMin, estimate: estimateNext(s, today) })) {
     const tag = `${d.reminder.id}:${today}`; if (notified.has(tag)) continue; notified.add(tag);
     const c = notificationContent(d.reminder, s.settings);
     try { const reg = await navigator.serviceWorker?.getRegistration?.(); reg ? reg.showNotification(c.title, { body: c.body, tag }) : new Notification(c.title, { body: c.body, tag }); } catch { /* ignore */ }
@@ -372,6 +386,13 @@ async function onClick(e) {
     saveDay: () => act((s, t) => M.logDay(s, snapDate, { ...dayForm }, { today: t }), 'Saved'),
     deletePeriod: () => act(s => M.deletePeriod(s, pid), 'Period deleted'),
     eraseSit: () => act(s => M.eraseSituation(s, ds.key), 'Deleted'),
+    companionAnswer: () => {
+      if (ds.ans === 'cramps') { const sev = root.querySelector('#cyCompanionSev'); if (sev) sev.hidden = false; return; }
+      if (ds.ans === 'other') { act((s, t) => answerCheckIn(s, t, 'other', { today: t })); root.querySelector('#cyLog')?.scrollIntoView?.({ block: 'start' }); return; }
+      return act((s, t) => answerCheckIn(s, t, ds.ans, { today: t }), ds.ans === 'fine' ? 'Glad to hear it' : ds.ans === 'periodStarted' ? 'Period start saved' : 'Saved. Take care of yourself today.');
+    },
+    companionSeverity: () => act((s, t) => answerCheckIn(s, t, 'cramps', { severity: ds.sev, today: t }), 'Saved. Take care of yourself today.'),
+    companionDismiss: () => act((s, t) => dismissCompanion(s, t)),
     comfortTry: () => act((s, t) => logComfortTry(s, t, ds.opt, { today: t }), 'Noted. You can tell us later whether it helped.'),
     comfortAnswer: () => act(s => answerComfort(s, ds.id, ds.ans), 'Thanks, noted'),
     deleteComfort: () => { if (!confirm('Delete everything you recorded about what you tried and whether it helped?')) return; return act(s => deleteComfort(s), 'Comfort records deleted'); },

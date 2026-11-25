@@ -10,12 +10,14 @@
 //    never include symptom values or dates.
 import { addDays, diffDays, hm, fmtHM, weekday, human } from './dates.js';
 import { CycleError, CATEGORIES } from './model.js';
+import { isCompanionDay } from './companion.js';
 
 export const KINDS = {
   dailyLog: 'Daily reminder to log',
   weeklyLog: 'Weekly check-in',
   periodCheck: 'Check-in when your estimated range begins',
   pattern: 'Check-in from one of your patterns',
+  companion: 'QK check-in on your period days',
 };
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 let seq = 0;
@@ -55,6 +57,7 @@ function occurrence(r, s, date, est) {
       if (!est?.lastStart) return null;
       return diffDays(est.lastStart, date) + 1 === r.cycleDay ? t : null;
     }
+    case 'companion': return isCompanionDay(s, date, est) ? t : null; // period days and around the estimated start
   }
   return null;
 }
@@ -106,6 +109,7 @@ export function reasonFor(r, est) {
     case 'weeklyLog': return `You asked for a check-in every ${DAYS[r.weekday]} at ${r.time}.`;
     case 'periodCheck': if (est?.overdue) return 'Your period hasn\'t been logged and it is later than your recent cycles. You asked for check-ins until you log one.';
       return est?.rangeStart ? `Your estimated range starts on ${human(est.rangeStart)}. You asked for a check-in ${r.offsetDays ? `${r.offsetDays} day${r.offsetDays > 1 ? 's' : ''} before` : 'from that day'} until you log a period.` : 'You asked for a check-in when your estimated range begins.';
+    case 'companion': return 'You asked QK to check in on the first days of your period and around your estimated start.';
     case 'pattern': return `You set this from a pattern in your own logs (${CATEGORIES[r.category].label.toLowerCase()} around cycle day ${r.cycleDay}).${r.origin ? ' ' + r.origin : ''}`;
   }
   return '';
@@ -114,6 +118,6 @@ export function reasonFor(r, est) {
 /** What appears on the lock screen. Neutral unless the user opted in; never symptom values or dates. */
 export function notificationContent(r, settings) {
   if (!settings.lockScreenDetail) return { title: 'Shred by QK', body: 'You have a check-in.' };
-  const body = { dailyLog: 'Time for your daily log.', weeklyLog: 'Time for your weekly check-in.', periodCheck: 'Cycle check-in: has your period started?', pattern: 'A check-in you set up is ready.' }[r.kind];
+  const body = { dailyLog: 'Time for your daily log.', weeklyLog: 'Time for your weekly check-in.', periodCheck: 'Cycle check-in: has your period started?', pattern: 'A check-in you set up is ready.', companion: 'QK has a check-in for you.' }[r.kind];
   return { title: 'Shred by QK', body };
 }

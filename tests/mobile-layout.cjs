@@ -16,7 +16,7 @@ let fails = 0, count = 0;
 const check = (name, ok, detail = '') => { count++; if (!ok) fails++; console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${!ok && detail ? '  — ' + detail : ''}`); };
 const PHONES = ['iPhone SE', 'iPhone 13', 'Pixel 7'];
 const dayStr = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-const FLAGS = { cycleTracking: true, phaseEducation: true, patternInsights: true, symptomForecast: true, quickSuggestions: true, sensorPrompts: true, temperatureResearch: true, lhTests: true, comfortSuggestions: true, midlifeMode: true };
+const FLAGS = { cycleTracking: true, phaseEducation: true, patternInsights: true, symptomForecast: true, quickSuggestions: true, sensorPrompts: true, temperatureResearch: true, lhTests: true, comfortSuggestions: true, midlifeMode: true, companion: true };
 
 // Runs in the page: measures the visible screen.
 function measure() {
