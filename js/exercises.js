@@ -35,11 +35,13 @@ function common(p) {
 // Squat: forward lean is a consequence of femur length relative to torso (Fry et al. 2003;
 // Demers et al. 2018). Long-femur lifters MUST lean more to keep the bar over mid-foot,
 // so the allowed lean scales with their own proportions instead of one number for everyone.
-// Free-standing squats only: these rules don't apply on a leg press, hack squat or slant board.
-export const FREE_SQUATS = ['squat', 'frontSquat', 'gobletSquat', 'thruster'];
+// Which library exercises a rule applies to is set by flags on each exercise (js/library.js):
+//   free: true      free-standing squat (not a leg press, hack squat or slant board)
+//   bench: 'feet'   lying on a bench with feet on the floor; bench: 'scap' = lying, feet hooked / on the floor
+const FREE_SQUATS = ex => !!ex.free;
 // Flat or incline pressing with feet on the floor (decline has the feet hooked; machines have no bench).
-const FEET_DOWN_PRESS = ['benchPress', 'dbBench', 'inclinePress', 'closeGrip'];
-const BENCH_PRESS = [...FEET_DOWN_PRESS, 'declinePress'];
+const FEET_DOWN_PRESS = ex => ex.bench === 'feet';
+const BENCH_PRESS = ex => !!ex.bench;
 
 const squatLeanLimit = m => Math.min(60, Math.max(38, 45 + (m.femurTorso - 0.85) * 60));
 
@@ -469,7 +471,12 @@ export class RepEngine {
   }
 
   // `only` limits a rule to some library exercises (e.g. heel rise is meaningless on a leg press).
-  rules(list) { return (list || []).filter(r => (!r.view || r.view === this.view) && (!r.only || !this.ex.libId || r.only.includes(this.ex.libId))); }
+  // skipRules: a library exercise can switch off a rule that doesn't fit it (e.g. "elbow swing" on a
+  // preacher curl, where the arm rests on a pad at an angle).
+  rules(list) {
+    const ex = this.ex;
+    return (list || []).filter(r => (!r.view || r.view === this.view) && (!r.only || !ex.libId || r.only(ex)) && !ex.skipRules?.includes(r.id));
+  }
   ctx() { return { base: this.base, bottom: this.bottomSnap, top: this.topSnap, ascent: this.ascentSnap, P: this.P }; }
 
   // Velocity loss within a set (Sánchez-Medina & González-Badillo 2011): slowing of the lifting

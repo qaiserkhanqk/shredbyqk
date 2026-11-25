@@ -173,6 +173,17 @@ A 5–15 minute session: rate tension (0–10) → slow breathing with optional 
   - wger is CC-BY-SA, so derived data would have to share alike.
   - ExRx, ACE and ACSM are all rights reserved.
   - The open data is suitable for exercise names and muscle metadata only.
+- **Imported exercises (`js/library-extra.js`).** 124 exercises from free-exercise-db (Unlicense, public domain).
+  - `tools/exercise-candidates.py` sorted its 622 strength and powerlifting entries into 324 pattern candidates by name.
+  - Each candidate was then reviewed by hand (`KEEP` list in `tools/import-exercises.py`). Left out:
+    - duplicates of existing exercises
+    - band, chain and speed variants
+    - Olympic and get-up movements
+    - alternating or one-arm presses, pulls and curls, which the camera's evenness and side-picking logic would miscount
+    - behind-the-neck pulls
+    - kneeling or overhead-cable curls and crunches, where the camera angle doesn't match the pattern
+  - Each kept exercise inherits its pattern's NSCA-based rules and the lifter's personal limits.
+  - Flags on each exercise scope the rules: free-standing squat, bench with feet down, or a rule that doesn't apply. For example, a preacher curl's arm rests on the pad at an angle, so the "elbow swing" check is off. That also fixed two existing false alarms, on the preacher curl and the conventional deadlift. A deadlift's knees bend by design, so "squatting, not hinging" no longer fires on it or on the kettlebell swing.
 - **Not yet verified:** NSCA text, wording against the manual itself (it couldn't be fetched); the exact ankle dorsiflexion cut-off (no consensus value was found, so the app uses a conservative 28° shin angle and doesn't quote a "typical" number).
 
 ## 12. Known limits (honest list)
