@@ -69,19 +69,27 @@ export function measureCamera({ mode = 'hr', title } = {}) {
     $('#mStatus').textContent = 'Cover the back camera with your fingertip. Press gently.';
     // Time each frame by when the camera captured it, not when the browser handed it over: callback timing
     // jitters by several ms, which would add false beat-to-beat variability (inflating HRV).
+    // Safari and Chrome report these differently, so the capture time is used only when it is clearly on the same clock.
+    let chan = null, frames = 0, firstAt = performance.now();
     const frame = (cbNow, meta) => {
       if (done) return;
-      const now = (meta?.captureTime ?? (meta?.mediaTime != null ? meta.mediaTime * 1000 : null) ?? performance.now()) / 1000;
+      const pn = performance.now(), ct = meta?.captureTime;
+      const now = (Number.isFinite(ct) && Math.abs(ct - pn) < 1000 ? ct : pn) / 1000;
+      frames++;
       cx.drawImage(v, 0, 0, PW, PH);
       const d = cx.getImageData(0, 0, PW, PH).data; let r = 0, gg = 0, b = 0;
       for (let i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; }
       const px = d.length / 4, rgb = { r: r / px, g: gg / px, b: b / px };
+      // Live numbers so a failed reading can be explained (red should be high, green and blue low).
+      $('#mSignal').textContent = `Signal: red ${Math.round(rgb.r)} · green ${Math.round(rgb.g)} · blue ${Math.round(rgb.b)} · ${Math.round(frames / Math.max(0.001, (pn - firstAt) / 1000))} fps`;
       if (fingerOn(rgb)) {
         lostSince = null;
         fingerSince ??= now;
         const t = now - fingerSince;
         if (t >= settle) {
-          samples.push({ t: now, v: rgb.r });
+          // A strong flash can max out the red channel, which flattens the pulse; green still carries it.
+          chan ??= rgb.r > 245 ? 'g' : 'r';
+          samples.push({ t: now, v: rgb[chan] });
           setProg((t - settle) / secs);
           $('#mStatus').textContent = 'Hold still…';
           drawWave(g, wave, samples);
@@ -92,7 +100,9 @@ export function measureCamera({ mode = 'hr', title } = {}) {
         } else $('#mStatus').textContent = 'Finding your pulse…';
       } else if (fingerSince != null) {
         lostSince ??= now;
-        if (now - lostSince > 1) { fingerSince = null; samples = []; setProg(0); $('#mStatus').textContent = 'Finger moved. Cover the camera again and it starts over.'; }
+        if (now - lostSince > 1) { fingerSince = null; samples = []; chan = null; setProg(0); $('#mStatus').textContent = 'Finger moved. Cover the camera again and it starts over.'; }
+      } else if (pn - firstAt > 8000) {
+        $('#mStatus').textContent = rgb.r < 40 ? 'Too dark. Cover both the camera and the flash, or face a bright lamp.' : 'Not enough light shining through your fingertip. Cover the camera fully, with the flash under your finger too.';
       }
       raf = v.requestVideoFrameCallback ? v.requestVideoFrameCallback(frame) : requestAnimationFrame(frame);
     };

@@ -19,7 +19,7 @@ const noisy = rr.map((x, i) => i % 6 === 0 ? x * 1.5 : x);
 check('HRV reading: >10% artefacts rejected', !hrvReading(noisy).ok);
 
 // --- Camera fingertip pulse: synthetic signals with drift, noise and jittery frame times
-check('finger detection: red-dominant frame', fingerOn({ r: 210, g: 30, b: 25 }) && !fingerOn({ r: 120, g: 110, b: 100 }) && !fingerOn({ r: 20, g: 5, b: 5 }));
+check('finger detection: red-dominant frame, including a strong flash', fingerOn({ r: 210, g: 30, b: 25 }) && fingerOn({ r: 255, g: 170, b: 120 }) && !fingerOn({ r: 120, g: 110, b: 100 }) && !fingerOn({ r: 20, g: 5, b: 5 }));
 function ppg(bpm, secs = 15, noise = 0.25) {
   const f = bpm / 60, out = []; let t = 0;
   while (t < secs) {
