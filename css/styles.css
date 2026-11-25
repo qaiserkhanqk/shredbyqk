@@ -414,3 +414,16 @@ a.ghost { text-decoration: none; text-align: center; display: inline-flex; align
 .rep-fix { display: flex; align-items: center; gap: 10px; }
 .rep-fix .iconbtn { width: 36px; height: 36px; font: 700 1.2rem var(--f-data); }
 .week-text { white-space: pre-wrap; font: .82rem/1.5 var(--f-data); background: var(--surface-2); padding: 12px; border-radius: var(--r-sm); margin: 0; user-select: all; }
+
+/* Body check */
+.vital-last { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.vital-last .num { font-size: 1.8rem; }
+.chip-note.low { color: var(--warn); } .chip-note.normal, .chip-note.high { color: var(--good); }
+.m-ring { position: relative; width: 190px; aspect-ratio: 1; max-width: 100%; }
+.m-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.m-ring video { position: absolute; inset: 22%; width: 56%; height: 56%; object-fit: cover; border-radius: 50%; }
+#mWave { width: min(300px, 100%); height: 70px; }
+.m-value { font-size: 3.4rem; }
+.pvt-area { flex: 1; min-height: 240px; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+#pvtIntro:not([hidden]) ~ .pvt-area, #pvtResult:not([hidden]) ~ .pvt-area { display: none; }
+.pvt-area #pvtNum { font-size: 3.4rem; color: var(--bad); font-variant-numeric: tabular-nums; }

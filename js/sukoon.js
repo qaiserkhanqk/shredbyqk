@@ -106,11 +106,26 @@ export function binauralPair(beat, carrier) { return { left: carrier - beat / 2,
 /* ---------- Breathing pacer ---------- */
 // Default 5 s in, 5 s out = 6 breaths/min, the rate that maximises heart-rate variability in most adults.
 export const BREATH = { inhale: 5, exhale: 5 };
-export const breathsPerMin = (b = BREATH) => 60 / (b.inhale + b.exhale);
+// Cyclic sighing (Balban et al. 2023, Stanford RCT): a breath in through the nose, a short second breath in to fill
+// the lungs, then a long slow breath out. 5 minutes a day improved mood more than mindfulness meditation.
+export const PATTERNS = {
+  slow: { name: 'Slow breathing: 5 s in, 5 s out', steps: [['in', 5], ['out', 5]] },
+  sigh: { name: 'Cyclic sighing: double breath in, long breath out', steps: [['in', 2], ['top', 1], ['out', 6]] },
+};
+const stepsOf = b => b.steps || [['in', b.inhale], ['out', b.exhale]];
+export const breathsPerMin = (b = BREATH) => Math.round(600 / stepsOf(b).reduce((a, [, d]) => a + d, 0)) / 10;
 export function breathAt(t, b = BREATH) {
-  const cyc = b.inhale + b.exhale, x = ((t % cyc) + cyc) % cyc;
-  if (x < b.inhale) { const p = x / b.inhale; return { phase: 'in', progress: p, scale: ease(p) }; }
-  const p = (x - b.inhale) / b.exhale; return { phase: 'out', progress: p, scale: 1 - ease(p) };
+  const steps = stepsOf(b), cyc = steps.reduce((a, [, d]) => a + d, 0), x = ((t % cyc) + cyc) % cyc;
+  const full = steps.some(([ph]) => ph === 'top') ? 0.8 : 1; // with a top-up, the first breath fills to 80%
+  let acc = 0;
+  for (const [phase, d] of steps) {
+    if (x < acc + d) {
+      const p = (x - acc) / d;
+      return { phase, progress: p, scale: phase === 'in' ? full * ease(p) : phase === 'top' ? full + (1 - full) * ease(p) : 1 - ease(p) };
+    }
+    acc += d;
+  }
+  return { phase: steps[0][0], progress: 0, scale: 0 };
 }
 const ease = p => 0.5 - Math.cos(Math.PI * p) / 2;
 
@@ -121,13 +136,15 @@ export const needsSupport = before => before >= SUPPORT_AT;
 export function summarize(sessions, n = 7) {
   const done = sessions.filter(s => Number.isFinite(s.before) && Number.isFinite(s.after));
   const recent = done.slice(-n);
-  if (!recent.length) return { count: done.length, avgDrop: null, helpedPct: null, bestGoal: null };
+  if (!recent.length) return { count: done.length, avgDrop: null, helpedPct: null, bestGoal: null, hrDrop: null };
   const avgDrop = Math.round(recent.reduce((a, s) => a + (s.before - s.after), 0) / recent.length * 10) / 10;
+  const withHr = sessions.filter(s => s.hr?.before && s.hr?.after).slice(-n);
+  const hrDrop = withHr.length ? Math.round(withHr.reduce((a, s) => a + (s.hr.before - s.hr.after), 0) / withHr.length) : null;
   const helpedPct = Math.round(recent.filter(s => s.after < s.before).length / recent.length * 100);
   const by = {};
   for (const s of done) (by[s.goal] ||= []).push(s.before - s.after);
   const ranked = Object.entries(by).filter(([, d]) => d.length >= 2).map(([g, d]) => [g, d.reduce((a, b) => a + b, 0) / d.length]).sort((a, b) => b[1] - a[1]);
-  return { count: done.length, avgDrop, helpedPct, bestGoal: ranked[0]?.[0] ?? null };
+  return { count: done.length, avgDrop, helpedPct, bestGoal: ranked[0]?.[0] ?? null, hrDrop };
 }
 
 /* ---------- Web Audio engine (browser only) ---------- */
@@ -172,7 +189,7 @@ export class SukoonTones {
   cue(phase, volume = 1) {
     if (!this.unlock()) return;
     const c = this.ctx, t = c.currentTime, o = c.createOscillator(), g = c.createGain();
-    const [f0, f1] = phase === 'in' ? [330, 440] : [392, 262];
+    const [f0, f1] = phase === 'in' ? [330, 440] : phase === 'top' ? [440, 523] : [392, 262];
     o.type = 'sine'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + 1.4);
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09 * volume, t + 0.2); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.8);
     o.connect(g).connect(c.destination); o.start(t); o.stop(t + 1.9);

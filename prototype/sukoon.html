@@ -420,6 +420,19 @@ a.ghost { text-decoration: none; text-align: center; display: inline-flex; align
 .rep-fix .iconbtn { width: 36px; height: 36px; font: 700 1.2rem var(--f-data); }
 .week-text { white-space: pre-wrap; font: .82rem/1.5 var(--f-data); background: var(--surface-2); padding: 12px; border-radius: var(--r-sm); margin: 0; user-select: all; }
 
+/* Body check */
+.vital-last { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.vital-last .num { font-size: 1.8rem; }
+.chip-note.low { color: var(--warn); } .chip-note.normal, .chip-note.high { color: var(--good); }
+.m-ring { position: relative; width: 190px; aspect-ratio: 1; max-width: 100%; }
+.m-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.m-ring video { position: absolute; inset: 22%; width: 56%; height: 56%; object-fit: cover; border-radius: 50%; }
+#mWave { width: min(300px, 100%); height: 70px; }
+.m-value { font-size: 3.4rem; }
+.pvt-area { flex: 1; min-height: 240px; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+#pvtIntro:not([hidden]) ~ .pvt-area, #pvtResult:not([hidden]) ~ .pvt-area { display: none; }
+.pvt-area #pvtNum { font-size: 3.4rem; color: var(--bad); font-variant-numeric: tabular-nums; }
+
 /* Standalone page: no tab bar, so less bottom padding */
 .app { padding-block: 16px 48px; }
 .page-head { margin-top: 4px; }
@@ -470,9 +483,192 @@ a.ghost { text-decoration: none; text-align: center; display: inline-flex; align
   </div>
 </div>
 
+<!-- Camera pulse measurement -->
+<div class="live measure" id="measure" hidden>
+  <div class="live-inner">
+    <div class="live-top"><div><span class="eyebrow">Body check</span><div class="set" id="mTitle"></div></div><button type="button" class="linkbtn" id="mCancel">Cancel</button></div>
+    <div class="calm-stage">
+      <div class="stack" id="mLive" style="align-items:center;text-align:center">
+        <div class="m-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="40" fill="none" stroke="#1a2130" stroke-width="7"/><circle id="mArc" cx="50" cy="50" r="40" fill="none" stroke="url(#zoneStroke)" stroke-width="7" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="251" transform="rotate(-90 50 50)"/></svg><video id="mVideo" playsinline muted></video></div>
+        <canvas id="mWave" width="300" height="70"></canvas>
+        <p id="mStatus" style="margin:0;font-weight:600"></p>
+        <p class="muted small" id="mTip" style="margin:0"></p>
+        <p class="muted small" id="mLight" hidden style="margin:0">This phone's browser can't switch the flash on. Face a lamp or window so light shines through your fingertip.</p>
+        <button class="ghost" type="button" id="mRetry" hidden>Try again</button>
+      </div>
+      <div class="stack" id="mResult" hidden style="align-items:center;text-align:center">
+        <div class="num m-value" id="mValue"></div>
+        <p class="muted small" id="mWhat" style="margin:0;max-width:340px"></p>
+        <button class="cta" type="button" id="mDone">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 <div class="toast" id="toast" hidden></div>
 <script type="module">
+// Heart rate, HRV and alertness maths. Pure functions with no browser APIs, so every one is unit tested.
+// Accuracy notes and sources: SCIENCE.md §11.
+
+const mean = a => a.reduce((s, x) => s + x, 0) / a.length;
+const sd = a => { const m = mean(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / Math.max(1, a.length - 1)); };
+const median = a => { if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y), h = s.length >> 1; return s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2; };
+
+// Remove artefacts (missed or extra beats): outside 300–2000 ms, or more than 20% away from the recent median.
+function cleanRR(rr) {
+  const inRange = rr.filter(x => x >= 300 && x <= 2000), start = median(inRange);
+  const out = []; let removed = rr.length - inRange.length;
+  for (const x of inRange) {
+    const ref = out.length >= 3 ? median(out.slice(-5)) : start;
+    if (Math.abs(x - ref) / ref > 0.2) { removed++; continue; }
+    out.push(x);
+  }
+  return { rr: out, removed, pctRemoved: rr.length ? removed / rr.length : 1 };
+}
+
+// RMSSD: the standard short-recording HRV measure, mainly reflecting the rest-and-digest (vagal) system.
+function rmssd(rr) {
+  if (rr.length < 2) return NaN;
+  let s = 0; for (let i = 1; i < rr.length; i++) s += (rr[i] - rr[i - 1]) ** 2;
+  return Math.sqrt(s / (rr.length - 1));
+}
+
+// A usable HRV reading needs enough clean beats and few artefacts; otherwise the client is asked to repeat it.
+function hrvReading(rawRR, { minBeats = 40, maxArtefacts = 0.1 } = {}) {
+  const c = cleanRR(rawRR);
+  if (c.rr.length < minBeats) return { ok: false, reason: 'Not enough clear beats. Keep your fingertip still on the camera for the whole minute.' };
+  if (c.pctRemoved > maxArtefacts) return { ok: false, reason: 'Too many irregular beats in this reading. Sit still and try again.' };
+  const v = rmssd(c.rr);
+  return { ok: true, rmssd: Math.round(v * 10) / 10, ln: Math.log(v), bpm: Math.round(60000 / mean(c.rr)), beats: c.rr.length, artefacts: c.removed };
+}
+
+/* ---------- Phone camera (fingertip photoplethysmography) ---------- */
+// The fingertip covers the camera and flash; each heartbeat briefly darkens the image.
+function fingerOn({ r, g, b }) { return r > 40 && r > 1.6 * g && r > 1.6 * b; }
+
+function movAvg(x, w) {
+  const out = new Float64Array(x.length), h = w >> 1; let s = 0, lo = 0, hi = -1;
+  for (let i = 0; i < x.length; i++) {
+    const a = Math.max(0, i - h), b = Math.min(x.length - 1, i + h);
+    while (hi < b) s += x[++hi];
+    while (lo < a) s -= x[lo++];
+    out[i] = s / (hi - lo + 1);
+  }
+  return out;
+}
+
+// Time each beat precisely. A single peak sample is noisy (camera noise is a large fraction of the pulse), so:
+// 1) average all beats into one template, 2) slide the template over each beat and take the best match,
+// 3) refine between frames with a parabola through the match scores. This uses the whole beat shape, not one point.
+function refineBeats(x, peaks, fs) {
+  const pre = Math.round(fs * 0.25), post = Math.round(fs * 0.45), L = pre + post + 1, maxLag = Math.round(fs * 0.12);
+  const ok = peaks.filter(p => p - pre - maxLag - 1 >= 0 && p + post + maxLag + 1 < x.length);
+  if (ok.length < 4) return peaks.map(i => i);
+  const tpl = new Float64Array(L);
+  for (const p of ok) for (let k = 0; k < L; k++) tpl[k] += x[p - pre + k] / ok.length;
+  const tm = tpl.reduce((a, v) => a + v, 0) / L; for (let k = 0; k < L; k++) tpl[k] -= tm;
+  const score = (c) => { let m = 0; for (let k = 0; k < L; k++) m += x[c - pre + k]; m /= L; let s = 0; for (let k = 0; k < L; k++) s += (x[c - pre + k] - m) * tpl[k]; return s; };
+  return peaks.map(p => {
+    if (!ok.includes(p)) return p;
+    let best = p, bs = -Infinity;
+    for (let c = p - maxLag; c <= p + maxLag; c++) { const v = score(c); if (v > bs) { bs = v; best = c; } }
+    const a = score(best - 1), b = bs, c2 = score(best + 1), d = a - 2 * b + c2;
+    return best + (d < 0 ? 0.5 * (a - c2) / d : 0);
+  });
+}
+
+// samples: [{t: seconds, v: mean red brightness}] at the camera's (irregular) frame rate.
+function ppgHeartRate(samples, { fs = 30, minBeats = 8 } = {}) {
+  if (samples.length < fs * 4) return { ok: false, reason: 'Recording too short.' };
+  const t0 = samples[0].t, n = Math.floor((samples.at(-1).t - t0) * fs);
+  const x = new Float64Array(n); let j = 0;
+  for (let k = 0; k < n; k++) {        // resample to an even 30 Hz
+    const t = t0 + k / fs;
+    while (j < samples.length - 2 && samples[j + 1].t < t) j++;
+    const a = samples[j], b = samples[j + 1], f = b.t > a.t ? Math.min(1, Math.max(0, (t - a.t) / (b.t - a.t))) : 0;
+    x[k] = a.v + (b.v - a.v) * f;
+  }
+  const trend = movAvg(x, Math.round(fs * 1.5)), detr = x.map((v, i) => trend[i] - v); // remove drift; invert so beats are peaks
+  const y = movAvg(detr, 5), s = sd([...y]);
+  const gap = Math.round(fs * 60 / 200), peaks = [];  // no two beats closer than 200 bpm
+  for (let i = gap; i < n - gap; i++) {
+    if (y[i] < 0.3 * s) continue;
+    let top = true;
+    for (let k = i - gap; k <= i + gap && top; k++) if (y[k] > y[i]) top = false;
+    if (top && (!peaks.length || i - peaks.at(-1) >= gap)) peaks.push(i);
+  }
+  const at = refineBeats(detr, peaks, fs);
+  const ibi = at.slice(1).map((p, i) => (p - at[i]) * 1000 / fs);
+  const c = cleanRR(ibi);
+  if (c.rr.length < minBeats) return { ok: false, reason: 'No clear pulse. Cover the camera and flash completely, and press gently.' };
+  const quality = 1 - c.pctRemoved;
+  if (quality < 0.75) return { ok: false, reason: 'The signal was too noisy. Keep your hand still and try again.' };
+  return { ok: true, bpm: Math.round(60000 / median(c.rr)), beats: c.rr.length, quality: Math.round(quality * 100) / 100, rr: c.rr };
+}
+
+// HRV estimate from a 60-second fingertip recording. Stricter than heart rate: one wrong beat distorts RMSSD.
+// Phone-camera HRV tracks ECG closely but reads high, so it is shown only against the person's own baseline.
+function ppgHrv(samples, opts) {
+  const r = ppgHeartRate(samples, opts);
+  if (!r.ok) return r;
+  const h = hrvReading(r.rr, { minBeats: 40, maxArtefacts: 0.1 });
+  if (!h.ok) return h;
+  if (r.quality < 0.9) return { ok: false, reason: 'The signal wasn\'t steady enough for HRV. Rest your hand on a table and try again.' };
+  return { ...h, bpm: r.bpm };
+}
+
+/* ---------- Personal baseline ---------- */
+// Readings are only compared with the person's own last 30 days (at least 5 readings):
+// "normal" = within 1 SD of their average. Phone and strap values are never mixed.
+function vsBaseline(value, history, { now = Date.now(), days = 30, minN = 5 } = {}) {
+  const past = history.filter(h => h.at < now && h.at >= now - days * 864e5).map(h => h.value);
+  if (past.length < minN) return { status: 'building', need: minN - past.length };
+  const m = mean(past), s = Math.max(sd(past), Math.abs(m) * 0.02);
+  return { status: value < m - s ? 'low' : value > m + s ? 'high' : 'normal', mean: m, sd: s, pct: Math.round((value / m - 1) * 100) };
+}
+
+/* ---------- Alertness: 3-minute psychomotor vigilance test (PVT-B) ---------- */
+// PVT-B (Basner et al.): 3 minutes, stimulus every 2–5 s, a lapse is a response of 355 ms or slower,
+// a false start is a tap with no stimulus or under 100 ms.
+const PVT = { seconds: 180, isiMin: 2000, isiMax: 5000, lapseMs: 355, falseMs: 100 };
+const nextDelay = (rand = Math.random) => PVT.isiMin + rand() * (PVT.isiMax - PVT.isiMin);
+
+function pvtScore(trials) {
+  const rts = trials.filter(t => t.rt != null && t.rt >= PVT.falseMs).map(t => t.rt);
+  const falseStarts = trials.filter(t => t.falseStart || (t.rt != null && t.rt < PVT.falseMs)).length;
+  if (!rts.length) return { ok: false, falseStarts };
+  return {
+    ok: true, n: rts.length, falseStarts,
+    meanRT: Math.round(mean(rts)), medianRT: Math.round(median(rts)),
+    lapses: rts.filter(r => r >= PVT.lapseMs).length,
+    speed: Math.round(mean(rts.map(r => 1000 / r)) * 100) / 100, // responses per second: the most sensitive PVT measure
+  };
+}
+
+/* ---------- What today's readings mean, in plain words ---------- */
+const sameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateString();
+function vitalNotes(vitals = [], now = Date.now()) {
+  const notes = [];
+  const latest = kind => [...vitals].reverse().find(v => v.kind === kind && sameDay(v.at, now));
+  const hist = (kind, key) => vitals.filter(v => v.kind === kind && !sameDay(v.at, now)).map(v => ({ at: v.at, value: v[key] }));
+  const h = latest('hrv');
+  if (h) {
+    const b = vsBaseline(h.ln, hist('hrv', 'ln'), { now });
+    if (b.status === 'low') notes.push({ level: 'adjust', text: `HRV ${Math.round((1 - Math.exp(h.ln - b.mean)) * 100)}% below your normal range: your body may still be recovering.` });
+    else if (b.status === 'building') notes.push({ level: 'info', text: `HRV recorded. ${b.need} more morning reading${b.need > 1 ? 's' : ''} until it's compared with your normal.` });
+    else notes.push({ level: 'go', text: b.status === 'high' ? 'HRV above your normal range.' : 'HRV in your normal range.' });
+  }
+  const p = latest('pvt');
+  if (p) {
+    const b = vsBaseline(p.speed, hist('pvt', 'speed'), { now });
+    if (b.status === 'low') notes.push({ level: 'adjust', text: `Alertness ${Math.abs(b.pct)}% slower than your normal: you may be short on sleep. Take extra care with heavy or technical lifts.` });
+    else if (b.status === 'building') notes.push({ level: 'info', text: `Alertness recorded. ${b.need} more test${b.need > 1 ? 's' : ''} until it's compared with your normal.` });
+    else notes.push({ level: 'go', text: 'Alertness in your normal range.' });
+  }
+  return notes;
+}
+
 // Sukoon: a short calm-down session. Slow breathing, optional tones, a recited passage of the Quran, then a dua.
 // The logic here has no browser dependencies so it can be unit tested. SukoonTones (bottom) needs Web Audio.
 //
@@ -581,11 +777,26 @@ function binauralPair(beat, carrier) { return { left: carrier - beat / 2, right:
 /* ---------- Breathing pacer ---------- */
 // Default 5 s in, 5 s out = 6 breaths/min, the rate that maximises heart-rate variability in most adults.
 const BREATH = { inhale: 5, exhale: 5 };
-const breathsPerMin = (b = BREATH) => 60 / (b.inhale + b.exhale);
+// Cyclic sighing (Balban et al. 2023, Stanford RCT): a breath in through the nose, a short second breath in to fill
+// the lungs, then a long slow breath out. 5 minutes a day improved mood more than mindfulness meditation.
+const PATTERNS = {
+  slow: { name: 'Slow breathing: 5 s in, 5 s out', steps: [['in', 5], ['out', 5]] },
+  sigh: { name: 'Cyclic sighing: double breath in, long breath out', steps: [['in', 2], ['top', 1], ['out', 6]] },
+};
+const stepsOf = b => b.steps || [['in', b.inhale], ['out', b.exhale]];
+const breathsPerMin = (b = BREATH) => Math.round(600 / stepsOf(b).reduce((a, [, d]) => a + d, 0)) / 10;
 function breathAt(t, b = BREATH) {
-  const cyc = b.inhale + b.exhale, x = ((t % cyc) + cyc) % cyc;
-  if (x < b.inhale) { const p = x / b.inhale; return { phase: 'in', progress: p, scale: ease(p) }; }
-  const p = (x - b.inhale) / b.exhale; return { phase: 'out', progress: p, scale: 1 - ease(p) };
+  const steps = stepsOf(b), cyc = steps.reduce((a, [, d]) => a + d, 0), x = ((t % cyc) + cyc) % cyc;
+  const full = steps.some(([ph]) => ph === 'top') ? 0.8 : 1; // with a top-up, the first breath fills to 80%
+  let acc = 0;
+  for (const [phase, d] of steps) {
+    if (x < acc + d) {
+      const p = (x - acc) / d;
+      return { phase, progress: p, scale: phase === 'in' ? full * ease(p) : phase === 'top' ? full + (1 - full) * ease(p) : 1 - ease(p) };
+    }
+    acc += d;
+  }
+  return { phase: steps[0][0], progress: 0, scale: 0 };
 }
 const ease = p => 0.5 - Math.cos(Math.PI * p) / 2;
 
@@ -596,13 +807,15 @@ const needsSupport = before => before >= SUPPORT_AT;
 function summarize(sessions, n = 7) {
   const done = sessions.filter(s => Number.isFinite(s.before) && Number.isFinite(s.after));
   const recent = done.slice(-n);
-  if (!recent.length) return { count: done.length, avgDrop: null, helpedPct: null, bestGoal: null };
+  if (!recent.length) return { count: done.length, avgDrop: null, helpedPct: null, bestGoal: null, hrDrop: null };
   const avgDrop = Math.round(recent.reduce((a, s) => a + (s.before - s.after), 0) / recent.length * 10) / 10;
+  const withHr = sessions.filter(s => s.hr?.before && s.hr?.after).slice(-n);
+  const hrDrop = withHr.length ? Math.round(withHr.reduce((a, s) => a + (s.hr.before - s.hr.after), 0) / withHr.length) : null;
   const helpedPct = Math.round(recent.filter(s => s.after < s.before).length / recent.length * 100);
   const by = {};
   for (const s of done) (by[s.goal] ||= []).push(s.before - s.after);
   const ranked = Object.entries(by).filter(([, d]) => d.length >= 2).map(([g, d]) => [g, d.reduce((a, b) => a + b, 0) / d.length]).sort((a, b) => b[1] - a[1]);
-  return { count: done.length, avgDrop, helpedPct, bestGoal: ranked[0]?.[0] ?? null };
+  return { count: done.length, avgDrop, helpedPct, bestGoal: ranked[0]?.[0] ?? null, hrDrop };
 }
 
 /* ---------- Web Audio engine (browser only) ---------- */
@@ -647,7 +860,7 @@ class SukoonTones {
   cue(phase, volume = 1) {
     if (!this.unlock()) return;
     const c = this.ctx, t = c.currentTime, o = c.createOscillator(), g = c.createGain();
-    const [f0, f1] = phase === 'in' ? [330, 440] : [392, 262];
+    const [f0, f1] = phase === 'in' ? [330, 440] : phase === 'top' ? [440, 523] : [392, 262];
     o.type = 'sine'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + 1.4);
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09 * volume, t + 0.2); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.8);
     o.connect(g).connect(c.destination); o.start(t); o.stop(t + 1.9);
@@ -662,7 +875,172 @@ class SukoonTones {
   }
 }
 
+// Body check: heart rate and HRV from a fingertip on the phone camera, and a 3-minute alertness test.
+// Everything stays on the phone. Maths lives in hr.js (unit tested); this file is the camera, timing and screens.
+
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let ctx; // { S, persist, toast }
+
+function initVitals(c) {
+  ctx = c; ctx.S.vitals ||= [];
+  $('#vHr').onclick = async () => { const r = await measureCamera({ mode: 'hr' }); if (r) { save({ kind: 'hr', bpm: r.bpm }); renderVitals(); } };
+  $('#vHrv').onclick = async () => { const r = await measureCamera({ mode: 'hrv' }); if (r) { save({ kind: 'hrv', rmssd: r.rmssd, ln: r.ln, bpm: r.bpm }); renderVitals(); } };
+  $('#vPvt').onclick = () => runPvt();
+}
+const save = v => { ctx.S.vitals.push({ at: Date.now(), source: 'camera', ...v }); ctx.persist(); };
+
+/* ---------- Screen ---------- */
+const fmtDay = t => new Date(t).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+function trendLine(kind, key, fmt) {
+  const list = ctx.S.vitals.filter(v => v.kind === kind);
+  if (!list.length) return '<span class="muted small">No readings yet.</span>';
+  const last = list.at(-1), b = vsBaseline(last[key], list.slice(0, -1).map(v => ({ at: v.at, value: v[key] })), { now: last.at + 1 });
+  const word = { low: kind === 'pvt' ? 'Slower than your normal' : 'Below your normal', high: kind === 'pvt' ? 'Faster than your normal' : 'Above your normal', normal: 'In your normal range', building: `${b.need} more until your normal range is set` }[b.status];
+  return `<div class="vital-last"><span class="num">${fmt(last)}</span><span class="chip-note ${b.status}">${word}</span></div><span class="muted small">${fmtDay(last.at)} · ${list.length} reading${list.length > 1 ? 's' : ''}</span>`;
+}
+function renderVitals() {
+  $('#vHrLast').innerHTML = trendLine('hr', 'bpm', v => `${v.bpm} bpm`);
+  $('#vHrvLast').innerHTML = trendLine('hrv', 'ln', v => `${v.rmssd} ms`);
+  $('#vPvtLast').innerHTML = trendLine('pvt', 'speed', v => `${v.meanRT} ms`);
+}
+
+/* ---------- Camera measurement ---------- */
+// Fingertip over the back camera (and flash, where the browser can switch it on). Each heartbeat darkens the image slightly.
+// Returns the result, or null if cancelled or failed (the overlay explains why and offers a retry).
+function measureCamera({ mode = 'hr', title } = {}) {
+  const secs = mode === 'hrv' ? 60 : 15, settle = 3;
+  return new Promise(async resolve => {
+    const ov = $('#measure'), wave = $('#mWave'), g = wave.getContext('2d');
+    let stream = null, done = false, samples = [], fingerSince = null, lostSince = null, raf = 0;
+    $('#mTitle').textContent = title || (mode === 'hrv' ? 'HRV · 1 minute' : 'Heart rate · 15 seconds');
+    $('#mResult').hidden = true; $('#mLive').hidden = false; $('#mRetry').hidden = true;
+    $('#mTip').textContent = mode === 'hrv'
+      ? 'Sit still, rest your hand on a table and breathe normally. Best done each morning before coffee, in the same position.'
+      : 'Rest your hand and keep still.';
+    setProg(0); ov.hidden = false;
+    const finish = r => {
+      if (done) return; done = true; cancelAnimationFrame(raf);
+      stream?.getTracks().forEach(t => t.stop());
+      if (r === undefined) { ov.hidden = true; resolve(null); }
+      else if (r.ok) { showResult(mode, r); $('#mDone').onclick = () => { ov.hidden = true; resolve(r); }; }
+      else { $('#mStatus').textContent = r.reason; $('#mRetry').hidden = false; $('#mRetry').onclick = () => { ov.hidden = true; measureCamera({ mode, title }).then(resolve); }; }
+    };
+    $('#mCancel').onclick = () => finish(undefined);
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 30 } }, audio: false });
+    } catch {
+      $('#mStatus').textContent = 'The camera isn\'t available. Allow camera access for Shred and try again.';
+      $('#mRetry').hidden = false; $('#mRetry').onclick = () => { ov.hidden = true; measureCamera({ mode, title }).then(resolve); };
+      $('#mCancel').onclick = () => { ov.hidden = true; resolve(null); };
+      return;
+    }
+    const track = stream.getVideoTracks()[0];
+    let torch = false;
+    try { if (track.getCapabilities?.().torch) { await track.applyConstraints({ advanced: [{ torch: true }] }); torch = true; } } catch {}
+    $('#mLight').hidden = torch;
+    const v = $('#mVideo'); v.srcObject = stream; await v.play().catch(() => {});
+    // Average many pixels: each pixel is noisy, the mean of thousands is not.
+    const PW = 64, PH = 48, c = document.createElement('canvas'); c.width = PW; c.height = PH; const cx = c.getContext('2d', { willReadFrequently: true }); cx.imageSmoothingQuality = 'high';
+    $('#mStatus').textContent = 'Cover the back camera with your fingertip. Press gently.';
+    // Time each frame by when the camera captured it, not when the browser handed it over: callback timing
+    // jitters by several ms, which would add false beat-to-beat variability (inflating HRV).
+    const frame = (cbNow, meta) => {
+      if (done) return;
+      const now = (meta?.captureTime ?? (meta?.mediaTime != null ? meta.mediaTime * 1000 : null) ?? performance.now()) / 1000;
+      cx.drawImage(v, 0, 0, PW, PH);
+      const d = cx.getImageData(0, 0, PW, PH).data; let r = 0, gg = 0, b = 0;
+      for (let i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; }
+      const px = d.length / 4, rgb = { r: r / px, g: gg / px, b: b / px };
+      if (fingerOn(rgb)) {
+        lostSince = null;
+        fingerSince ??= now;
+        const t = now - fingerSince;
+        if (t >= settle) {
+          samples.push({ t: now, v: rgb.r });
+          setProg((t - settle) / secs);
+          $('#mStatus').textContent = 'Hold still…';
+          drawWave(g, wave, samples);
+          if (t - settle >= secs) {
+            globalThis.__shredLastPulse = samples; // read by tests/camera-pulse.cjs
+            return finish(mode === 'hrv' ? ppgHrv(samples) : ppgHeartRate(samples));
+          }
+        } else $('#mStatus').textContent = 'Finding your pulse…';
+      } else if (fingerSince != null) {
+        lostSince ??= now;
+        if (now - lostSince > 1) { fingerSince = null; samples = []; setProg(0); $('#mStatus').textContent = 'Finger moved. Cover the camera again and it starts over.'; }
+      }
+      raf = v.requestVideoFrameCallback ? v.requestVideoFrameCallback(frame) : requestAnimationFrame(frame);
+    };
+    raf = v.requestVideoFrameCallback ? v.requestVideoFrameCallback(frame) : requestAnimationFrame(frame);
+  });
+}
+function setProg(f) { $('#mArc').style.strokeDashoffset = 251 * (1 - Math.max(0, Math.min(1, f))); }
+function drawWave(g, cv, s) {
+  const W = cv.width, H = cv.height, last = s.filter(p => p.t > s.at(-1).t - 4);
+  if (last.length < 3) return;
+  const m = last.reduce((a, p) => a + p.v, 0) / last.length, span = Math.max(1, ...last.map(p => Math.abs(p.v - m)));
+  g.clearRect(0, 0, W, H); g.strokeStyle = '#7c6cff'; g.lineWidth = 2; g.beginPath();
+  last.forEach((p, i) => { const x = (p.t - last[0].t) / 4 * W, y = H / 2 + (p.v - m) / span * H * 0.4; i ? g.lineTo(x, y) : g.moveTo(x, y); });
+  g.stroke();
+}
+function showResult(mode, r) {
+  $('#mLive').hidden = true; $('#mResult').hidden = false;
+  $('#mValue').textContent = mode === 'hrv' ? `${r.rmssd} ms` : `${r.bpm} bpm`;
+  $('#mWhat').textContent = mode === 'hrv'
+    ? `HRV (RMSSD), heart rate ${r.bpm} bpm. A phone camera reads HRV a little high, so Shred only compares it with your own readings.`
+    : 'Heart rate from your fingertip. Phone readings are usually within a few beats of a medical monitor.';
+  $('#mStatus').textContent = '';
+}
+
+/* ---------- Alertness test (3-minute PVT-B) ---------- */
+function runPvt() {
+  const ov = $('#pvt'), area = $('#pvtArea'), num = $('#pvtNum');
+  const seconds = globalThis.__shredPvtSeconds || PVT.seconds;
+  const trials = []; let shownAt = null, timer = 0, tick = 0, start = 0, running = false;
+  $('#pvtIntro').hidden = false; $('#pvtResult').hidden = true; num.textContent = ''; area.classList.remove('live');
+  ov.hidden = false;
+  const stop = () => { running = false; clearTimeout(timer); cancelAnimationFrame(tick); };
+  const schedule = () => { timer = setTimeout(show, nextDelay()); };
+  const show = () => {
+    if (!running) return;
+    if (performance.now() - start >= seconds * 1000) return end();
+    requestAnimationFrame(ts => { shownAt = ts; num.textContent = '0'; area.classList.add('go'); count(); });
+  };
+  const count = () => { tick = requestAnimationFrame(ts => { if (shownAt == null) return; num.textContent = Math.round(ts - shownAt); if (ts - shownAt > 30000) { trials.push({ rt: 30000 }); reset(); } else count(); }); };
+  const reset = () => { shownAt = null; cancelAnimationFrame(tick); area.classList.remove('go'); setTimeout(() => { num.textContent = ''; }, 300); schedule(); };
+  area.onpointerdown = e => {
+    if (!running) return;
+    e.preventDefault();
+    if (shownAt == null) { trials.push({ falseStart: true }); clearTimeout(timer); num.textContent = 'Too early'; setTimeout(() => { if (shownAt == null) num.textContent = ''; }, 500); return schedule(); }
+    trials.push({ rt: e.timeStamp - shownAt }); reset();
+  };
+  const end = () => {
+    stop(); area.classList.remove('live', 'go'); num.textContent = '';
+    const s = pvtScore(trials);
+    if (!s.ok) { ctx.toast('No responses recorded. Try again when you can give it your full attention.'); ov.hidden = true; return; }
+    const prior = ctx.S.vitals.filter(v => v.kind === 'pvt').map(v => ({ at: v.at, value: v.speed }));
+    save({ kind: 'pvt', ...s, ok: undefined });
+    const b = vsBaseline(s.speed, prior);
+    $('#pvtResult').hidden = false;
+    $('#pvtSummary').innerHTML = `<div class="kv"><span>Average reaction</span><span class="num">${s.meanRT} ms</span>
+      <span>Slow responses (355 ms or more)</span><span class="num">${s.lapses}</span><span>Early taps</span><span class="num">${s.falseStarts}</span></div>
+      <p class="muted small" style="margin:0">${b.status === 'building' ? `Do this test ${b.need} more time${b.need > 1 ? 's' : ''}, ideally each morning, and Shred will show how today compares with your normal.` : b.status === 'low' ? `${Math.abs(b.pct)}% slower than your normal. Often a sign of short or poor sleep.` : 'In line with your normal alertness, or better.'} Always use the same phone: screens add their own delay.</p>`;
+    renderVitals();
+  };
+  $('#pvtStart').onclick = () => {
+    $('#pvtIntro').hidden = true; area.classList.add('live'); running = true; start = performance.now();
+    $('#pvtClock').textContent = ''; schedule();
+    const clock = () => { if (!running) return; const left = Math.max(0, seconds - (performance.now() - start) / 1000); const tot = Math.ceil(left); $('#pvtClock').textContent = `${Math.floor(tot / 60)}:${String(tot % 60).padStart(2, '0')}`; if (left <= 0 && shownAt == null) return end(); setTimeout(clock, 250); };
+    clock();
+  };
+  $('#pvtClose').onclick = $('#pvtDone').onclick = () => { stop(); ov.hidden = true; };
+}
+
 // Sukoon screen and live session. Flow: pick a goal → rate tension → breathe (tones optional) → listen → dua → rate again.
+
+
 
 
 const $ = s => document.querySelector(s);
@@ -683,7 +1061,7 @@ function unlockPlayer() {
 }
 
 // 5 minutes is the shortest breathing dose linked to a clear benefit (SCIENCE.md §10).
-const prefs = () => (ctx.S.calmPrefs ||= { tones: 'before', mode: 'binaural', minutes: 5, reciter: RECITERS[0].id, quran: true, cue: true });
+const prefs = () => (ctx.S.calmPrefs ||= { tones: 'before', mode: 'binaural', minutes: 5, reciter: RECITERS[0].id, quran: true, cue: true, breath: 'slow', hr: false });
 const reducedMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 function initCalm(c) {
@@ -712,8 +1090,10 @@ function renderCalm() {
   $('#calmDetail').innerHTML = `
     <div><span class="eyebrow">${esc(g.name)}</span><h2 class="display h2" style="margin-top:4px">${esc(passageLabel(g))}</h2></div>
     <p class="verse">${g.why ? `<span class="muted small">Why this surah: </span>` : ''}“${esc(g.meaning)}” <span class="muted small">(${esc(g.key)})</span></p>
-    <p class="muted small" style="margin:0">${p.minutes} min breathing · ${p.quran ? 'recitation' : 'no recitation'} · dua</p>`;
+    <p class="muted small" style="margin:0">${p.minutes} min ${p.breath === 'sigh' ? 'cyclic sighing' : 'slow breathing'} · ${p.quran ? 'recitation' : 'no recitation'} · dua${p.hr ? ' · heart rate before and after' : ''}</p>`;
   $('#calmSettings').innerHTML = `
+    <label class="field">Breathing style<select id="cBreath">${Object.entries(PATTERNS).map(([k, v]) => `<option value="${k}" ${(p.breath || 'slow') === k ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select></label>
+    <label class="check"><input type="checkbox" id="cHr" ${p.hr ? 'checked' : ''}> Measure my heart rate before and after (15 s each, fingertip on the camera)</label>
     <label class="check"><input type="checkbox" id="cCue" ${p.cue !== false ? 'checked' : ''}> Breath sound and vibration, so you can close your eyes</label>
     <label class="field">Background tone<select id="cTones">
       <option value="before" ${p.tones === 'before' ? 'selected' : ''}>On while breathing (plain tone, no music or instruments)</option>
@@ -726,7 +1106,7 @@ function renderCalm() {
     <label class="field">Reciter<select id="cRec">${RECITERS.map(r => `<option value="${r.id}" ${p.reciter === r.id ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
     <label class="check"><input type="checkbox" id="cQuran" ${p.quran ? 'checked' : ''}> Play the recitation (needs internet)</label>`;
   const bind = (id, k, f = v => v) => $(id).onchange = e => { p[k] = f(e.target.type === 'checkbox' ? e.target.checked : e.target.value); ctx.persist(); renderCalm(); };
-  bind('#cCue', 'cue'); bind('#cTones', 'tones'); bind('#cMode', 'mode'); bind('#cMin', 'minutes', Number); bind('#cRec', 'reciter'); bind('#cQuran', 'quran');
+  bind('#cBreath', 'breath'); bind('#cHr', 'hr'); bind('#cCue', 'cue'); bind('#cTones', 'tones'); bind('#cMode', 'mode'); bind('#cMin', 'minutes', Number); bind('#cRec', 'reciter'); bind('#cQuran', 'quran');
   renderHistory();
 }
 
@@ -738,8 +1118,9 @@ function renderHistory() {
     <div class="kv"><span>Sessions</span><span class="num">${sum.count}</span>
     <span>Average tension drop (last 7)</span><span class="num">${sum.avgDrop > 0 ? '−' : ''}${Math.abs(sum.avgDrop)} / 10</span>
     <span>Sessions that helped</span><span class="num">${sum.helpedPct}%</span>
+    ${sum.hrDrop != null ? `<span>Average heart-rate change</span><span class="num">${sum.hrDrop > 0 ? '−' : '+'}${Math.abs(sum.hrDrop)} bpm</span>` : ''}
     ${sum.bestGoal ? `<span>Works best for you</span><span>${esc(GOAL[sum.bestGoal].name)}</span>` : ''}</div>`;
-  $('#calmList').innerHTML = list.slice(-6).reverse().map(s => `<div class="row"><span>${esc(GOAL[s.goal]?.name || s.goal)} · ${new Date(s.at).toLocaleDateString()}</span><span class="num">${s.before ?? '–'} → ${s.after ?? '–'}</span></div>`).join('');
+  $('#calmList').innerHTML = list.slice(-6).reverse().map(s => `<div class="row"><span>${esc(GOAL[s.goal]?.name || s.goal)} · ${new Date(s.at).toLocaleDateString()}</span><span class="num">${s.before ?? '–'} → ${s.after ?? '–'}${s.hr?.after ? ` · ${s.hr.before}→${s.hr.after} bpm` : ''}</span></div>`).join('');
 }
 
 /* ---------- Sheets ---------- */
@@ -757,9 +1138,15 @@ function askBefore() {
     ${scale('cBefore')}
     ${p.tones !== 'off' && p.mode === 'binaural' ? '<p class="muted small" style="margin:0">Headphones in for the background tone. Keep the volume low.</p>' : ''}
     <button class="linkbtn" type="button" id="cGo">Skip and start</button>`);
+  const start = async before => {
+    unlockAudio(); // inside the tap: phones only allow sound that a tap started
+    let hr0 = null;
+    if (p.hr) { closeSheet(); hr0 = (await measureCamera({ mode: 'hr', title: 'Heart rate before you start' }))?.bpm ?? null; }
+    closeSheet(); begin(before, hr0);
+  };
   const go = before => {
-    if (needsSupport(before)) return showSupport(() => begin(before));
-    closeSheet(); begin(before);
+    if (needsSupport(before)) return showSupport(() => start(before));
+    start(before);
   };
   onScale('cBefore', go);
   $('#cGo').onclick = () => go(null);
@@ -775,12 +1162,16 @@ function showSupport(onContinue) {
 }
 
 /* ---------- Live session ---------- */
-async function begin(before) {
-  // Runs inside a tap: unlock sound now, because the recitation and tones start later without one.
-  const g = GOAL[goalId], p = prefs();
+function unlockAudio() {
+  const p = prefs();
   if (p.tones !== 'off' || p.cue !== false) tones.unlock();
   if (p.quran) unlockPlayer();
-  run = { g, p, before, at: Date.now(), step: null, t0: 0, raf: 0, audio: null, list: [], idx: 0, tonesOn: false };
+}
+
+async function begin(before, hr0 = null) {
+  const g = GOAL[goalId], p = prefs();
+  unlockAudio(); // also runs inside a tap (the heart-rate Done button) when there was a measurement first
+  run = { g, p, before, hr0, at: Date.now(), step: null, t0: 0, raf: 0, audio: null, list: [], idx: 0, tonesOn: false };
   $('#calmLive').hidden = false;
   $('#calmLive').classList.toggle('night', g.id === 'sleep'); // dim, warm and no countdown for winding down
   try { run.lock = await navigator.wakeLock?.request('screen'); } catch {}
@@ -801,18 +1192,19 @@ function breathe() {
   const cue = p.cue !== false, still = reducedMotion();
   setStep('breathe', `${g.name} · step 1 of 3`, cue ? 'Breathe with the sound, eyes closed if you like' : 'Breathe with the circle');
   if (p.tones !== 'off') run.tonesOn = tones.start({ beat: g.beat, carrier: g.carrier, mode: p.mode, volume: 0.6 });
-  const total = p.minutes * 60, start = performance.now();
+  const total = p.minutes * 60, start = performance.now(), pat = PATTERNS[p.breath] || PATTERNS.slow, sigh = pat === PATTERNS.sigh;
+  const WORD = { in: sigh ? 'Breathe in through your nose' : 'Breathe in', top: 'Top up: one more short breath in', out: sigh ? 'Long, slow breath out' : 'Breathe out' };
   let phase = null;
   const tick = now => {
     if (!run || run.step !== 'breathe') return;
-    const t = (now - start) / 1000, b = breathAt(t);
+    const t = (now - start) / 1000, b = breathAt(t, pat);
     // Reduced motion: the circle brightens and fades instead of growing and shrinking.
     if (still) $('#calmCircle').style.opacity = 0.35 + 0.65 * b.scale;
     else $('#calmCircle').style.transform = `scale(${0.55 + 0.45 * b.scale})`;
     if (b.phase !== phase) {
       phase = b.phase;
-      $('#calmWord').textContent = phase === 'in' ? 'Breathe in' : 'Breathe out';
-      if (cue) { tones.cue(phase); try { navigator.vibrate?.(phase === 'in' ? 60 : [40, 80, 40]); } catch {} }
+      $('#calmWord').textContent = WORD[phase];
+      if (cue) { tones.cue(phase); try { navigator.vibrate?.(phase === 'in' ? 60 : phase === 'top' ? 30 : [40, 80, 40]); } catch {} }
     }
     const left = Math.max(0, Math.ceil(total - t));
     $('#calmClock').textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
@@ -890,15 +1282,28 @@ function finish(early) {
   try { run.lock?.release(); } catch {}
   const r = run; run = null;
   $('#calmLive').hidden = true;
-  openSheet(`<div><span class="eyebrow">${early ? 'Ended early' : 'Done'}</span><h2 class="display h2" id="calmSheetTitle" style="margin-top:6px;font-size:1.3rem">How tense do you feel now?</h2></div>
+  if (r.hr0) {
+    openSheet(`<div><span class="eyebrow">Before: ${r.hr0} bpm</span><h2 class="display h2" id="calmSheetTitle" style="margin-top:6px;font-size:1.3rem">Measure your heart rate again</h2></div>
+      <p class="muted small" style="margin:0">Same as before: fingertip over the back camera, 15 seconds.</p>
+      <button class="cta" type="button" id="cHrAfter">Measure</button><button class="linkbtn" type="button" id="cHrSkip">Skip</button>`);
+    $('#cHrAfter').onclick = async () => { closeSheet(); const m = await measureCamera({ mode: 'hr', title: 'Heart rate after' }); rateAfter(r, early, m?.bpm ?? null); };
+    $('#cHrSkip').onclick = () => rateAfter(r, early, null);
+    return;
+  }
+  rateAfter(r, early, null);
+}
+
+function rateAfter(r, early, hr1) {
+  openSheet(`<div><span class="eyebrow">${early ? 'Ended early' : 'Done'}${hr1 ? ` · heart rate ${r.hr0} → ${hr1} bpm` : ''}</span><h2 class="display h2" id="calmSheetTitle" style="margin-top:6px;font-size:1.3rem">How tense do you feel now?</h2></div>
     ${scale('cAfter')}
     <button class="linkbtn" type="button" id="cSave">Skip</button>`);
   const save = after => {
     const minutes = Math.round((Date.now() - r.at) / 6000) / 10;
-    ctx.S.calm.push({ at: r.at, goal: r.g.id, before: r.before, after, minutes, early });
+    ctx.S.calm.push({ at: r.at, goal: r.g.id, before: r.before, after, minutes, early, breath: r.p.breath, hr: r.hr0 && hr1 ? { before: r.hr0, after: hr1 } : undefined });
     ctx.persist(); closeSheet(); renderCalm();
     const d = r.before != null && after != null ? r.before - after : null;
-    ctx.toast(d > 0 ? `Tension down ${d} point${d > 1 ? 's' : ''}. Alhamdulillah.` : d === null ? 'Saved.' : 'Saved. Some days it takes longer, and that\'s normal.');
+    const hrTxt = r.hr0 && hr1 ? ` Heart rate ${r.hr0} → ${hr1}.` : '';
+    ctx.toast((d > 0 ? `Tension down ${d} point${d > 1 ? 's' : ''}. Alhamdulillah.` : d === null ? 'Saved.' : 'Saved. Some days it takes longer, and that\'s normal.') + hrTxt);
     if (after >= 9) showSupport();
   };
   onScale('cAfter', save);

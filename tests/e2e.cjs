@@ -23,7 +23,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   // Centre an element before tapping it, so the fixed tab bar never covers it.
   const tap = async sel => { await p.$eval(sel, el => el.scrollIntoView({ block: 'center' })); await p.click(sel); };
   const go = async id => {
-    if (['gait', 'scan', 'rehab', 'calm'].includes(id)) { await go('body'); await p.click(`[data-go=${id}]`); }
+    if (['gait', 'scan', 'rehab', 'calm', 'vitals'].includes(id)) { await go("body"); await p.click(`#body [data-go=${id}]`); }
     else await p.click(`.tabs [data-tab=${id}]`);
   };
   await p.goto('https://shred.local/');
@@ -172,6 +172,34 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('returning client: no welcome screen', !(await p.isVisible('#welcome')) && await p.isVisible('#today'));
   await p.goto('https://shred.local/?calm=now'); await p.waitForTimeout(800);
   check('shortcut: ?calm=now opens the Sukoon rating', await p.isVisible('#calm') && await p.isVisible('#cBefore'));
+
+  // 11. Body check: alertness test (shortened for the test run) and camera pulse with no finger
+  await p.goto('https://shred.local/'); await p.waitForTimeout(600);
+  await go('vitals');
+  check('body check: three measurements offered', await p.isVisible('#vHr') && await p.isVisible('#vHrv') && await p.isVisible('#vPvt'));
+  await p.evaluate(() => { window.__shredPvtSeconds = 9; });
+  await tap('#vPvt'); await p.click('#pvtStart');
+  await p.click('#pvtArea', { position: { x: 60, y: 60 } }); // too early: counted as a false start
+  for (let i = 0; i < 3; i++) { await p.waitForFunction(() => /^\d+$/.test(document.querySelector('#pvtNum').textContent), null, { timeout: 7000 }).catch(() => {}); await p.waitForTimeout(220); await p.click('#pvtArea', { position: { x: 80, y: 80 } }); }
+  await p.waitForSelector('#pvtResult:not([hidden])', { timeout: 15000 }).catch(() => {});
+  const pvtTxt = await p.textContent('#pvtSummary');
+  check('alertness: result shows average reaction and early taps', /Average reaction\s*\d+ ms/.test(pvtTxt) && /Early taps\s*[1-9]/.test(pvtTxt), pvtTxt.replace(/\s+/g, ' ').slice(0, 120));
+  check('alertness: reaction times plausible (about 200–400 ms)', (() => { const m = pvtTxt.match(/Average reaction\s*(\d+)/); return m && +m[1] > 150 && +m[1] < 500; })());
+  await p.click('#pvtDone');
+  check('alertness: saved and shown on Body check', /\d+ ms/.test(await p.textContent('#vPvtLast')));
+  await tap('#vHr'); await p.waitForTimeout(2500);
+  check('camera pulse: asks for a fingertip when none is on the camera', await p.isVisible('#measure') && /fingertip|camera/i.test(await p.textContent('#mStatus')), await p.textContent('#mStatus'));
+  await p.click('#mCancel');
+  check('camera pulse: cancel closes it', !(await p.isVisible('#measure')));
+
+  // 12. Sukoon: cyclic sighing style
+  await go('calm'); await tap('#calmSettings'.replace('#calmSettings', 'details.card:has(#calmSettings) summary'));
+  await p.selectOption('#cBreath', 'sigh');
+  await tap('#calmNow'); await p.click('#cBefore [data-v="4"]'); await p.waitForTimeout(400);
+  check('cyclic sighing: pacer says breathe in through the nose', /through your nose/.test(await p.textContent('#calmWord')), await p.textContent('#calmWord'));
+  await p.waitForTimeout(2300);
+  check('cyclic sighing: then the top-up breath', /Top up/.test(await p.textContent('#calmWord')), await p.textContent('#calmWord'));
+  await p.click('#calmEnd'); await p.click('#cSave');
 
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();
