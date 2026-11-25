@@ -55,6 +55,7 @@ The app is built so a new client is never faced with a wall of features:
   - tension rated before and after, with your trend
   - each tone is labelled with its evidence strength, and high distress shows support numbers first
   - one-tap **Calm now**, tap-a-number ratings, breath sounds and vibration for eyes-closed use, night mode for sleep, and a home-screen shortcut (Android)
+- **Native app (optional):** `native/README.md` wraps Shred as an iPhone/Android app with a native pulse camera (flash on iPhone, higher frame rates).
 - **Body check (phone only, no wearable):** fingertip heart rate in 15 seconds, a 1-minute morning HRV compared with your own normal, and the 3-minute PVT-B alertness test. Today's HRV and alertness feed the readiness card. Sukoon can measure heart rate before and after, and adds a cyclic-sighing breathing style.
 - **Training flow:** Next set restarts the camera in one tap, the rest timer starts by itself, the screen stays on, a miscounted set can be corrected, and weights are logged with last time's figure shown.
 - **Send my week to QK:** a one-tap text summary (days trained, form score, top fault, new best weights). No video.

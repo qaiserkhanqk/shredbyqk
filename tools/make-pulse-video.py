@@ -1,11 +1,12 @@
 """Make a fake fingertip camera video (Y4M) with a known heart rate and HRV, for tests/camera-pulse.cjs.
-Usage: python3 tools/make-pulse-video.py OUT.y4m BPM [HRV_AMPLITUDE_MS] [SECONDS]
+Usage: python3 tools/make-pulse-video.py OUT.y4m BPM [HRV_AMPLITUDE_MS] [SECONDS] [FPS]
 Each beat darkens the red image slightly, with per-pixel sensor noise in every channel, like a real camera."""
 import math, random, sys
 out, bpm = sys.argv[1], float(sys.argv[2])
 amp = float(sys.argv[3]) if len(sys.argv) > 3 else 0
 secs = int(sys.argv[4]) if len(sys.argv) > 4 else 80
-W, H, fps = 64, 48, 30
+W, H = 64, 48
+fps = int(sys.argv[5]) if len(sys.argv) > 5 else 30
 random.seed(2)
 beats, rr, t, i = [], [], 0.3, 0
 while t < secs + 2:
