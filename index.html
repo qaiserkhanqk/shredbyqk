@@ -49,7 +49,7 @@
         <button type="button" data-feel="rough"><b>Rough</b><span>Sore or drained</span></button>
       </div>
       <div id="readyResult" hidden><b id="readyTitle"></b> <span class="ready-score num" id="readyScore"></span><ul class="issues" id="readyReasons" style="margin-top:6px"></ul></div>
-      <button type="button" class="linkbtn" id="morningCheck">Add more detail</button>
+      <div class="btn-row"><button type="button" class="linkbtn" id="morningCheck">Add more detail</button><button type="button" class="linkbtn" data-go="vitals">Measure HRV and alertness</button></div>
     </div>
 
     <div class="card">
@@ -80,7 +80,40 @@
     <button type="button" class="tile" data-go="rehab"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.5-9-9.5C1.6 7.6 4.2 4 7.8 4c1.8 0 3.2 1 4.2 2.4C13 5 14.4 4 16.2 4 19.8 4 22.4 7.6 21 11.5 19 16.5 12 21 12 21z"/><path d="M9 12h6M12 9v6"/></svg></span><span><b>Fix a pain or injury</b><span>Back, shoulder, knee, ankle and more. A safe, step-by-step plan.</span></span></button>
     <button type="button" class="tile" data-go="gait"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round"><path d="M8 4c2 0 3 2 3 4s-1 5-3 5-3-3-3-5 1-4 3-4zM16 9c2 0 3 2 3 4s-1 4-3 4-3-2-3-4 1-4 3-4z"/></svg></span><span><b>Test how you move</b><span>Walking and running, jump height, knee control.</span></span></button>
     <button type="button" class="tile" data-go="scan"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="12" r="3"/></svg></span><span><b>Posture &amp; body fat</b><span>A photo check of how you stand, plus body fat.</span></span></button>
+    <button type="button" class="tile" data-go="vitals"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-5 4 10 2-5h6"/></svg></span><span><b>Body check</b><span>Heart rate and HRV with your fingertip on the camera, plus a 3-minute alertness test.</span></span></button>
     <button type="button" class="tile" data-go="calm"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></span><span><b>Calm your mind</b><span>Sukoon: slow breathing, Quran and dua for anxiety, anger, sleep and more.</span></span></button>
+  </section>
+
+  <!-- BODY CHECK (vitals) -->
+  <section class="screen" id="vitals">
+    <button type="button" class="back" data-back>‹ Body</button>
+    <div class="page-head"><div><span class="eyebrow">Body check</span><h1 class="display h1">How's your system today?</h1></div></div>
+    <p class="muted" style="margin:0">Uses only your phone's camera and screen. Readings are compared with your own normal, never with other people.</p>
+    <div class="card stack vital-card">
+      <div><span class="eyebrow">Heart rate · 15 seconds</span><h2 class="display h2" style="margin-top:4px">Fingertip pulse</h2></div>
+      <div id="vHrLast"></div>
+      <button class="cta" type="button" id="vHr">Measure heart rate</button>
+    </div>
+    <div class="card stack vital-card">
+      <div><span class="eyebrow">Recovery · 1 minute, each morning</span><h2 class="display h2" style="margin-top:4px">Heart-rate variability (HRV)</h2></div>
+      <p class="muted small" style="margin:0">Higher than your normal usually means well recovered; lower can mean poor sleep, stress, illness or hard training. Measure it at the same time each morning, sitting, before coffee.</p>
+      <div id="vHrvLast"></div>
+      <button class="cta" type="button" id="vHrv">Measure HRV</button>
+    </div>
+    <div class="card stack vital-card">
+      <div><span class="eyebrow">Alertness · 3 minutes</span><h2 class="display h2" style="margin-top:4px">Reaction-time test</h2></div>
+      <p class="muted small" style="margin:0">The standard sleep-loss test used in research (PVT-B). Tap as fast as you can each time the numbers start counting.</p>
+      <div id="vPvtLast"></div>
+      <button class="cta" type="button" id="vPvt">Start alertness test</button>
+    </div>
+    <details class="card"><summary><b>How accurate is this?</b></summary>
+      <div class="stack small" style="margin-top:10px">
+        <p style="margin:0"><b>Heart rate:</b> fingertip camera readings are usually within 2–5 beats a minute of a hospital ECG. Less accurate if your heartbeat is irregular.</p>
+        <p style="margin:0"><b>HRV:</b> tracks your changes well but reads a little high, especially when HRV is low. So Shred only compares it with your own readings, after at least 5 mornings.</p>
+        <p style="margin:0"><b>Alertness:</b> the 3-minute phone test is validated against the 10-minute lab version. Phone screens add their own delay, so always use the same phone.</p>
+        <p style="margin:0">None of these diagnose anything. If your resting heart rate is often above 100 or below 40 without a reason (such as being very fit), or you feel your heart racing or skipping, see a doctor.</p>
+      </div>
+    </details>
   </section>
 
   <!-- SUKOON (calm) -->
@@ -467,6 +500,42 @@
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="calmSheetTitle">
     <div class="grab"></div>
     <div id="calmSheetBody" class="stack"></div>
+  </div>
+</div>
+
+<!-- Camera pulse measurement -->
+<div class="live measure" id="measure" hidden>
+  <div class="live-inner">
+    <div class="live-top"><div><span class="eyebrow">Body check</span><div class="set" id="mTitle"></div></div><button type="button" class="linkbtn" id="mCancel">Cancel</button></div>
+    <div class="calm-stage">
+      <div class="stack" id="mLive" style="align-items:center;text-align:center">
+        <div class="m-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="40" fill="none" stroke="#1a2130" stroke-width="7"/><circle id="mArc" cx="50" cy="50" r="40" fill="none" stroke="url(#zoneStroke)" stroke-width="7" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="251" transform="rotate(-90 50 50)"/></svg><video id="mVideo" playsinline muted></video></div>
+        <canvas id="mWave" width="300" height="70"></canvas>
+        <p id="mStatus" style="margin:0;font-weight:600"></p>
+        <p class="muted small" id="mTip" style="margin:0"></p>
+        <p class="muted small" id="mLight" hidden style="margin:0">This phone's browser can't switch the flash on. Face a lamp or window so light shines through your fingertip.</p>
+        <button class="ghost" type="button" id="mRetry" hidden>Try again</button>
+      </div>
+      <div class="stack" id="mResult" hidden style="align-items:center;text-align:center">
+        <div class="num m-value" id="mValue"></div>
+        <p class="muted small" id="mWhat" style="margin:0;max-width:340px"></p>
+        <button class="cta" type="button" id="mDone">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Alertness test -->
+<div class="live" id="pvt" hidden>
+  <div class="live-inner">
+    <div class="live-top"><div><span class="eyebrow">Alertness test</span><div class="set num" id="pvtClock"></div></div><button type="button" class="linkbtn" id="pvtClose">Stop</button></div>
+    <div class="stack" id="pvtIntro">
+      <p style="margin:0">For 3 minutes, red numbers will start counting at random moments. Tap anywhere in the box the instant you see them. Don't tap early.</p>
+      <p class="muted small" style="margin:0">Somewhere quiet, phone held the same way each time, notifications off.</p>
+      <button class="cta" type="button" id="pvtStart">Start</button>
+    </div>
+    <div class="pvt-area" id="pvtArea"><span class="num" id="pvtNum"></span></div>
+    <div class="stack" id="pvtResult" hidden><div id="pvtSummary" class="stack"></div><button class="cta" type="button" id="pvtDone">Done</button></div>
   </div>
 </div>
 

@@ -1,4 +1,6 @@
 // Sukoon screen and live session. Flow: pick a goal → rate tension → breathe (tones optional) → listen → dua → rate again.
+import { measureCamera } from './vitals.js';
+import { PATTERNS } from './sukoon.js';
 import { GOALS, GOAL, EVIDENCE, RECITERS, SURAH, silentWav, playlist, passageLabel, quranComUrl, breathAt, breathsPerMin, needsSupport, summarize, SukoonTones } from './sukoon.js';
 
 const $ = s => document.querySelector(s);
@@ -19,7 +21,7 @@ function unlockPlayer() {
 }
 
 // 5 minutes is the shortest breathing dose linked to a clear benefit (SCIENCE.md §10).
-const prefs = () => (ctx.S.calmPrefs ||= { tones: 'before', mode: 'binaural', minutes: 5, reciter: RECITERS[0].id, quran: true, cue: true });
+const prefs = () => (ctx.S.calmPrefs ||= { tones: 'before', mode: 'binaural', minutes: 5, reciter: RECITERS[0].id, quran: true, cue: true, breath: 'slow', hr: false });
 const reducedMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 export function initCalm(c) {
@@ -48,8 +50,10 @@ export function renderCalm() {
   $('#calmDetail').innerHTML = `
     <div><span class="eyebrow">${esc(g.name)}</span><h2 class="display h2" style="margin-top:4px">${esc(passageLabel(g))}</h2></div>
     <p class="verse">${g.why ? `<span class="muted small">Why this surah: </span>` : ''}“${esc(g.meaning)}” <span class="muted small">(${esc(g.key)})</span></p>
-    <p class="muted small" style="margin:0">${p.minutes} min breathing · ${p.quran ? 'recitation' : 'no recitation'} · dua</p>`;
+    <p class="muted small" style="margin:0">${p.minutes} min ${p.breath === 'sigh' ? 'cyclic sighing' : 'slow breathing'} · ${p.quran ? 'recitation' : 'no recitation'} · dua${p.hr ? ' · heart rate before and after' : ''}</p>`;
   $('#calmSettings').innerHTML = `
+    <label class="field">Breathing style<select id="cBreath">${Object.entries(PATTERNS).map(([k, v]) => `<option value="${k}" ${(p.breath || 'slow') === k ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select></label>
+    <label class="check"><input type="checkbox" id="cHr" ${p.hr ? 'checked' : ''}> Measure my heart rate before and after (15 s each, fingertip on the camera)</label>
     <label class="check"><input type="checkbox" id="cCue" ${p.cue !== false ? 'checked' : ''}> Breath sound and vibration, so you can close your eyes</label>
     <label class="field">Background tone<select id="cTones">
       <option value="before" ${p.tones === 'before' ? 'selected' : ''}>On while breathing (plain tone, no music or instruments)</option>
@@ -62,7 +66,7 @@ export function renderCalm() {
     <label class="field">Reciter<select id="cRec">${RECITERS.map(r => `<option value="${r.id}" ${p.reciter === r.id ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
     <label class="check"><input type="checkbox" id="cQuran" ${p.quran ? 'checked' : ''}> Play the recitation (needs internet)</label>`;
   const bind = (id, k, f = v => v) => $(id).onchange = e => { p[k] = f(e.target.type === 'checkbox' ? e.target.checked : e.target.value); ctx.persist(); renderCalm(); };
-  bind('#cCue', 'cue'); bind('#cTones', 'tones'); bind('#cMode', 'mode'); bind('#cMin', 'minutes', Number); bind('#cRec', 'reciter'); bind('#cQuran', 'quran');
+  bind('#cBreath', 'breath'); bind('#cHr', 'hr'); bind('#cCue', 'cue'); bind('#cTones', 'tones'); bind('#cMode', 'mode'); bind('#cMin', 'minutes', Number); bind('#cRec', 'reciter'); bind('#cQuran', 'quran');
   renderHistory();
 }
 
@@ -74,8 +78,9 @@ function renderHistory() {
     <div class="kv"><span>Sessions</span><span class="num">${sum.count}</span>
     <span>Average tension drop (last 7)</span><span class="num">${sum.avgDrop > 0 ? '−' : ''}${Math.abs(sum.avgDrop)} / 10</span>
     <span>Sessions that helped</span><span class="num">${sum.helpedPct}%</span>
+    ${sum.hrDrop != null ? `<span>Average heart-rate change</span><span class="num">${sum.hrDrop > 0 ? '−' : '+'}${Math.abs(sum.hrDrop)} bpm</span>` : ''}
     ${sum.bestGoal ? `<span>Works best for you</span><span>${esc(GOAL[sum.bestGoal].name)}</span>` : ''}</div>`;
-  $('#calmList').innerHTML = list.slice(-6).reverse().map(s => `<div class="row"><span>${esc(GOAL[s.goal]?.name || s.goal)} · ${new Date(s.at).toLocaleDateString()}</span><span class="num">${s.before ?? '–'} → ${s.after ?? '–'}</span></div>`).join('');
+  $('#calmList').innerHTML = list.slice(-6).reverse().map(s => `<div class="row"><span>${esc(GOAL[s.goal]?.name || s.goal)} · ${new Date(s.at).toLocaleDateString()}</span><span class="num">${s.before ?? '–'} → ${s.after ?? '–'}${s.hr?.after ? ` · ${s.hr.before}→${s.hr.after} bpm` : ''}</span></div>`).join('');
 }
 
 /* ---------- Sheets ---------- */
@@ -93,9 +98,15 @@ function askBefore() {
     ${scale('cBefore')}
     ${p.tones !== 'off' && p.mode === 'binaural' ? '<p class="muted small" style="margin:0">Headphones in for the background tone. Keep the volume low.</p>' : ''}
     <button class="linkbtn" type="button" id="cGo">Skip and start</button>`);
+  const start = async before => {
+    unlockAudio(); // inside the tap: phones only allow sound that a tap started
+    let hr0 = null;
+    if (p.hr) { closeSheet(); hr0 = (await measureCamera({ mode: 'hr', title: 'Heart rate before you start' }))?.bpm ?? null; }
+    closeSheet(); begin(before, hr0);
+  };
   const go = before => {
-    if (needsSupport(before)) return showSupport(() => begin(before));
-    closeSheet(); begin(before);
+    if (needsSupport(before)) return showSupport(() => start(before));
+    start(before);
   };
   onScale('cBefore', go);
   $('#cGo').onclick = () => go(null);
@@ -111,12 +122,16 @@ function showSupport(onContinue) {
 }
 
 /* ---------- Live session ---------- */
-async function begin(before) {
-  // Runs inside a tap: unlock sound now, because the recitation and tones start later without one.
-  const g = GOAL[goalId], p = prefs();
+function unlockAudio() {
+  const p = prefs();
   if (p.tones !== 'off' || p.cue !== false) tones.unlock();
   if (p.quran) unlockPlayer();
-  run = { g, p, before, at: Date.now(), step: null, t0: 0, raf: 0, audio: null, list: [], idx: 0, tonesOn: false };
+}
+
+async function begin(before, hr0 = null) {
+  const g = GOAL[goalId], p = prefs();
+  unlockAudio(); // also runs inside a tap (the heart-rate Done button) when there was a measurement first
+  run = { g, p, before, hr0, at: Date.now(), step: null, t0: 0, raf: 0, audio: null, list: [], idx: 0, tonesOn: false };
   $('#calmLive').hidden = false;
   $('#calmLive').classList.toggle('night', g.id === 'sleep'); // dim, warm and no countdown for winding down
   try { run.lock = await navigator.wakeLock?.request('screen'); } catch {}
@@ -137,18 +152,19 @@ function breathe() {
   const cue = p.cue !== false, still = reducedMotion();
   setStep('breathe', `${g.name} · step 1 of 3`, cue ? 'Breathe with the sound, eyes closed if you like' : 'Breathe with the circle');
   if (p.tones !== 'off') run.tonesOn = tones.start({ beat: g.beat, carrier: g.carrier, mode: p.mode, volume: 0.6 });
-  const total = p.minutes * 60, start = performance.now();
+  const total = p.minutes * 60, start = performance.now(), pat = PATTERNS[p.breath] || PATTERNS.slow, sigh = pat === PATTERNS.sigh;
+  const WORD = { in: sigh ? 'Breathe in through your nose' : 'Breathe in', top: 'Top up: one more short breath in', out: sigh ? 'Long, slow breath out' : 'Breathe out' };
   let phase = null;
   const tick = now => {
     if (!run || run.step !== 'breathe') return;
-    const t = (now - start) / 1000, b = breathAt(t);
+    const t = (now - start) / 1000, b = breathAt(t, pat);
     // Reduced motion: the circle brightens and fades instead of growing and shrinking.
     if (still) $('#calmCircle').style.opacity = 0.35 + 0.65 * b.scale;
     else $('#calmCircle').style.transform = `scale(${0.55 + 0.45 * b.scale})`;
     if (b.phase !== phase) {
       phase = b.phase;
-      $('#calmWord').textContent = phase === 'in' ? 'Breathe in' : 'Breathe out';
-      if (cue) { tones.cue(phase); try { navigator.vibrate?.(phase === 'in' ? 60 : [40, 80, 40]); } catch {} }
+      $('#calmWord').textContent = WORD[phase];
+      if (cue) { tones.cue(phase); try { navigator.vibrate?.(phase === 'in' ? 60 : phase === 'top' ? 30 : [40, 80, 40]); } catch {} }
     }
     const left = Math.max(0, Math.ceil(total - t));
     $('#calmClock').textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
@@ -226,15 +242,28 @@ function finish(early) {
   try { run.lock?.release(); } catch {}
   const r = run; run = null;
   $('#calmLive').hidden = true;
-  openSheet(`<div><span class="eyebrow">${early ? 'Ended early' : 'Done'}</span><h2 class="display h2" id="calmSheetTitle" style="margin-top:6px;font-size:1.3rem">How tense do you feel now?</h2></div>
+  if (r.hr0) {
+    openSheet(`<div><span class="eyebrow">Before: ${r.hr0} bpm</span><h2 class="display h2" id="calmSheetTitle" style="margin-top:6px;font-size:1.3rem">Measure your heart rate again</h2></div>
+      <p class="muted small" style="margin:0">Same as before: fingertip over the back camera, 15 seconds.</p>
+      <button class="cta" type="button" id="cHrAfter">Measure</button><button class="linkbtn" type="button" id="cHrSkip">Skip</button>`);
+    $('#cHrAfter').onclick = async () => { closeSheet(); const m = await measureCamera({ mode: 'hr', title: 'Heart rate after' }); rateAfter(r, early, m?.bpm ?? null); };
+    $('#cHrSkip').onclick = () => rateAfter(r, early, null);
+    return;
+  }
+  rateAfter(r, early, null);
+}
+
+function rateAfter(r, early, hr1) {
+  openSheet(`<div><span class="eyebrow">${early ? 'Ended early' : 'Done'}${hr1 ? ` · heart rate ${r.hr0} → ${hr1} bpm` : ''}</span><h2 class="display h2" id="calmSheetTitle" style="margin-top:6px;font-size:1.3rem">How tense do you feel now?</h2></div>
     ${scale('cAfter')}
     <button class="linkbtn" type="button" id="cSave">Skip</button>`);
   const save = after => {
     const minutes = Math.round((Date.now() - r.at) / 6000) / 10;
-    ctx.S.calm.push({ at: r.at, goal: r.g.id, before: r.before, after, minutes, early });
+    ctx.S.calm.push({ at: r.at, goal: r.g.id, before: r.before, after, minutes, early, breath: r.p.breath, hr: r.hr0 && hr1 ? { before: r.hr0, after: hr1 } : undefined });
     ctx.persist(); closeSheet(); renderCalm();
     const d = r.before != null && after != null ? r.before - after : null;
-    ctx.toast(d > 0 ? `Tension down ${d} point${d > 1 ? 's' : ''}. Alhamdulillah.` : d === null ? 'Saved.' : 'Saved. Some days it takes longer, and that\'s normal.');
+    const hrTxt = r.hr0 && hr1 ? ` Heart rate ${r.hr0} → ${hr1}.` : '';
+    ctx.toast((d > 0 ? `Tension down ${d} point${d > 1 ? 's' : ''}. Alhamdulillah.` : d === null ? 'Saved.' : 'Saved. Some days it takes longer, and that\'s normal.') + hrTxt);
     if (after >= 9) showSupport();
   };
   onScale('cAfter', save);
