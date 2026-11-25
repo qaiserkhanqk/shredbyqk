@@ -405,3 +405,4 @@ label.check { min-height: 24px; display: inline-flex; align-items: center; gap: 
 label.field input, label.field select { min-width: 0; max-width: 100%; }
 .grid2 > *, .btn-row > * { min-width: 0; }
 .too-old { position: relative; z-index: 100; margin: 12px; padding: 14px 16px; border-radius: 12px; background: #fff3cd; color: #3d2e00; font: 600 16px/1.45 system-ui, sans-serif; }
+.cy-alert { margin: 0; padding: 10px 12px; border: 2px solid var(--bad); border-radius: var(--r-sm); }

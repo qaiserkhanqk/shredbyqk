@@ -1,0 +1,13 @@
+ok   flag off: no midlife card even with perimenopause ticked
+ok   flag off: no midlife symptom categories in settings
+ok   flag on, perimenopause not ticked: no midlife card
+ok   flag on, perimenopause not ticked: midlife categories hidden
+ok   perimenopause ticked: the midlife card appears with its intro
+ok   warning signs are listed
+ok   marked as awaiting clinician review
+ok   sources link to the published papers (8 or more)
+ok   the midlife symptom categories appear in settings, off by default
+ok   switching one on adds it to the day log
+ok   it saves
+ok   no JavaScript errors
+ALL PASS (12)

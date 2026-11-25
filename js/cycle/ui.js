@@ -12,6 +12,7 @@ import { today as localToday, localMinutes, addDays, diffDays, human, deviceTime
 import { readFlags, setFlag, FLAG_DEFS } from './flags.js';
 import { clinicianSummary, summaryText, SUMMARY_MONTHS } from './summary.js';
 import { learningStage } from './learning.js';
+import { midlifeObservations, SOURCES as MIDLIFE_SOURCES, INTRO as MIDLIFE_INTRO } from './midlife.js';
 import { comfortSuggestions, pendingComfortQuestions, logComfortTry, answerComfort, deleteComfort, ANSWERS, REVIEW_STATUS } from './comfort.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -91,7 +92,7 @@ function render() {
   const unsaved = unsavedInputs(); // a redraw (e.g. another tab saved) must never change what the person typed
   const est = estimateNext(s, today);
   const tempShift = f.temperatureResearch && est.lastStart ? retrospectiveShift(s, est.lastStart, addDays(today, 1)) : null;
-  root.innerHTML = [banner(), summaryMonths ? summaryHTML(s, today) : '', promptsHTML(s, est, today), dueHTML(s, est, today, nowMin), estimateHTML(s, est), learningHTML(s, today), logHTML(s, today), f.comfortSuggestions ? comfortHTML(s, today) : '', f.patternInsights ? insightHTML(s, today) : '',
+  root.innerHTML = [banner(), summaryMonths ? summaryHTML(s, today) : '', promptsHTML(s, est, today), dueHTML(s, est, today, nowMin), estimateHTML(s, est), learningHTML(s, today), f.midlifeMode && s.situation?.perimenopause ? midlifeHTML(s, today) : '', logHTML(s, today), f.comfortSuggestions ? comfortHTML(s, today) : '', f.patternInsights ? insightHTML(s, today) : '',
     f.phaseEducation ? phaseHTML(s, today, tempShift, est) : '', historyHTML(s), f.patternInsights ? patternsHTML(s, today, f) : '', remindersHTML(s, est, today, nowMin),
     wearableHTML(s, today, f, tempShift), situationHTML(s), settingsHTML(s, f)].join('');
   for (const id of open) { const d = root.querySelector('#' + id); if (d) d.open = true; }
@@ -189,6 +190,20 @@ function learningHTML(s, today) {
   const l = learningStage(s, today);
   return `<div class="card stack" id="cyLearning"><span class="eyebrow">Learning your cycle${l.stage === 'learning' ? ` · ${l.usableCycles} of ${l.needed}` : ''}</span><p class="small">${esc(l.text)}</p>
     ${l.band ? `<p class="small${l.band.lastNight === 'recorded' ? ' muted' : ''}">${esc(l.band.text)}</p>` : ''}</div>`;
+}
+
+/* Perimenopause and menopause mode (js/cycle/midlife.js, flag midlifeMode, only when she marked the situation).
+   Describes her own entries against published criteria; never diagnoses; awaiting clinician review. */
+function midlifeHTML(s, today) {
+  const o = midlifeObservations(s, today); if (!o) return '';
+  const rows = o.applicable ? [o.variability.text, o.longGap.text, o.sinceLastPeriod?.text].filter(Boolean) : [o.why];
+  return `<div class="card stack" id="cyMidlife"><span class="eyebrow">Perimenopause and menopause · prototype · awaiting clinician review</span>
+    <p class="small">${esc(MIDLIFE_INTRO)}</p>
+    ${o.alerts.map(a => `<p class="small cy-alert" role="alert"><b>${esc(a)}</b></p>`).join('')}
+    <div class="list">${rows.map(r => `<p class="small">${esc(r)}</p>`).join('')}</div>
+    <p class="muted small">Track symptoms such as hot flushes, sleep, concentration or aches by switching them on in settings below. The doctor summary includes them.</p>
+    <div class="stack" id="cyMidlifeFlags"><b class="small">See a doctor if you notice</b><ul class="issues">${o.redFlags.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>
+    <details><summary class="linkbtn">Where this comes from</summary><ul class="issues small">${MIDLIFE_SOURCES.map(x => `<li><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.authors)} ${esc(x.title)}. ${esc(x.journal)}.</a> <span class="muted">${esc(x.used)}</span></li>`).join('')}</ul></details></div>`;
 }
 
 /* Comfort suggestions that learn what helps her (js/cycle/comfort.js, flag comfortSuggestions). Wording is a
@@ -296,10 +311,11 @@ function situationHTML(s) {
 function settingsHTML(s, f) {
   return `<details class="card" id="cySettings"><summary><span class="eyebrow">Settings, export &amp; delete</span></summary><div class="stack" style="margin-top:10px">
     <b class="small">Symptom categories (each is optional)</b>
-    ${Object.entries(M.CATEGORIES).map(([k, c]) => `<label class="check"><input type="checkbox" data-cat="${k}" ${M.categoryOn(s, k) ? 'checked' : ''}> <span><b>${c.label}</b> <span class="muted small">${esc(c.why)}</span></span></label>`).join('')}
+    ${catRows(s, Object.entries(M.CATEGORIES).filter(([, c]) => !c.group))}
+    ${(() => { const mid = Object.entries(M.CATEGORIES).filter(([k, c]) => c.group === 'midlife' && ((f.midlifeMode && s.situation?.perimenopause) || M.categoryOn(s, k))); return mid.length ? `<b class="small">Perimenopause and menopause symptoms</b>${catRows(s, mid)}` : ''; })()}
     <p class="muted small">Turning a category off stops collecting it. You'll be asked whether to delete what you logged.</p>
     <b class="small">Optional features</b>
-    ${['phaseEducation', 'comfortSuggestions', 'patternInsights', 'symptomForecast', 'temperatureResearch', 'lhTests'].map(k => `<label class="check"><input type="checkbox" data-flag="${k}" ${f[k] ? 'checked' : ''}> <span><b>${esc(FLAG_DEFS[k].label)}</b> <span class="muted small">${esc(FLAG_DEFS[k].desc)}</span></span></label>`).join('')}
+    ${['phaseEducation', 'midlifeMode', 'comfortSuggestions', 'patternInsights', 'symptomForecast', 'temperatureResearch', 'lhTests'].map(k => `<label class="check"><input type="checkbox" data-flag="${k}" ${f[k] ? 'checked' : ''}> <span><b>${esc(FLAG_DEFS[k].label)}</b> <span class="muted small">${esc(FLAG_DEFS[k].desc)}</span></span></label>`).join('')}
     ${f.lhTests && !s.consent.lhTests ? `<div class="stack" id="cyLhConsent"><b class="small">Ovulation test (LH) results · research</b><p class="muted small">Optional. Record home ovulation test results exactly as you read them. The app doesn't interpret them, doesn't use them for your estimate and doesn't give fertility advice. Not contraception.</p><button class="ghost" type="button" data-act="lhOn">Turn on ovulation test logging</button></div>` : ''}
     ${s.consent.lhTests ? '<button class="ghost" type="button" data-act="lhOff">Turn off &amp; delete ovulation test results</button>' : ''}
     <b class="small">Summary for a doctor</b>
@@ -310,6 +326,8 @@ function settingsHTML(s, f) {
     <p class="muted small">Deleting removes your records and destroys the encryption key on this device. It can't reach files you exported or device backups made earlier (they hold encrypted data, but may also hold the key).</p>
     <details><summary class="linkbtn">Consent record</summary><ul class="issues">${s.consent.log.map(l => `<li>${esc(l.at.slice(0, 10))}: ${esc(l.change)}</li>`).join('')}</ul></details></div></details>`;
 }
+
+const catRows = (s, list) => list.map(([k, c]) => `<label class="check"><input type="checkbox" data-cat="${k}" ${M.categoryOn(s, k) ? 'checked' : ''}> <span><b>${c.label}</b> <span class="muted small">${esc(c.why)}</span></span></label>`).join('');
 
 /* ---------- Local notifications (only while the app is open) ---------- */
 async function notifyDue() {
