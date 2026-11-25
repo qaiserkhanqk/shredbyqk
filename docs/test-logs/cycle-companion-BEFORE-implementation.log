@@ -1,0 +1,23 @@
+FAIL module js/cycle/companion.js exists  — Cannot find module '/home/user/shredbyqk/js/cycle/companion.js' imported from /home/user/shredbyqk/tests/cycle-companion.test.mjs
+FAIL a separate flag, off by default
+FAIL no consent or nothing to say: null
+FAIL day 2 of her period: a check-in
+FAIL it offers one-tap answers only for categories she switched on (+ Fine, Something else)
+FAIL it explains why it is asking
+FAIL mid-cycle with no pattern: nothing (no daily nagging)
+FAIL a day before her estimated range: "may start around now", from past cycles, not certain
+FAIL …with a "period started" answer
+ok   pattern heads-up needs the pattern research flag
+FAIL period days come before a pattern heads-up (one message only)
+FAIL overdue period: still a gentle check-in
+ok   the pattern heads-up (when on) shows her own numbers and says it may be chance
+FAIL pregnant: silent (pregnancy mode will handle it)
+ok   asking never changes her data (nothing guessed or saved)
+FAIL cramps needs a valid severity
+FAIL answers ran to the end  — TypeError: C.answerCheckIn is not a function     at file:///home/user/shredbyqk/tests/cycle-companion.test.mjs:70:5
+FAIL a "companion" reminder kind exists
+FAIL companion reminder can be added  — INVALID_INPUT
+ok   no forbidden wording
+FAIL warm, first person from QK, and no medical claims  — {}
+ok   no sexual or adult content (the audience may include teenagers)
+17 FAILED of 22
