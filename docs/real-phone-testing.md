@@ -77,7 +77,7 @@ File failures with the device and version. Do not record real health data in scr
 
 ## Known limits of the automated tests
 - `npm run test:e2e:webkit` and `npm run test:e2e:firefox` run the same browser tests in WebKit and Firefox once those browsers are installed (`npx playwright install --with-deps webkit firefox`).
-  - As of 2026-11-25 they had **not** been run in the development environment. The network now allows Playwright's download hosts, but installing the browsers needs the product owner's permission in that session.
+  - **Run on 2026-11-25:** WebKit 26.6 and Firefox 155, every file separately (`npm run test:browsers`). All pass. Findings and fixes are in `docs/browser-test-report-2026-11-25.md`.
   - The pregnancy test also checks an iPhone SE-sized screen; `tests/mobile-layout.cjs` checks iPhone SE, iPhone 13 and Pixel 7 sizes. In Chromium these are emulated screen sizes, not Safari.
   - Desktop WebKit is close to Safari, but it is not iOS Safari.
 - The research dashboard is for researchers on a computer. It was laid out for desktop, and phone layout was not a goal.

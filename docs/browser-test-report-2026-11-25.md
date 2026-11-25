@@ -8,7 +8,10 @@
 - How it ran: `node tools/run-browser-suites.mjs <browser> <folder>` runs **every browser test file separately**. The npm scripts stop at the first failing file, so on its own a failure could hide the others.
 - Also run: the accessibility audit (`tests/a11y.cjs`) in each browser.
 
-**Results:** @RESULTS@
+**Results:** every browser test file passes in all three browsers. Per browser: 14 files and 312 checks, plus the 6-check accessibility audit, with 0 failures. In WebKit, the research dashboard files ran in the labelled local-http cookie mode (finding 3).
+- The pregnancy browser test was re-run after commit `0a09d05`. In the main run it failed once in WebKit: its privacy check counted in-memory `blob:` addresses, which never leave the device. It passes in all three browsers after the fix.
+- **Firefox:** secure dashboard sign-in over local http works, unlike WebKit.
+- **Node suites:** 658 app checks and 496 research checks, all passing.
 
 ## What WebKit is, and isn't
 - **WebKit is the engine inside Safari.** Playwright's Linux WebKit is the closest to Safari that can run here.
