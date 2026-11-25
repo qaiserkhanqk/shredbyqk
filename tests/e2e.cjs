@@ -197,8 +197,16 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.evaluate(() => { window.__shredPvtSeconds = 9; });
   await tap('#vPvt'); await p.click('#pvtStart');
   await p.click('#pvtArea', { position: { x: 60, y: 60 } }); // too early: counted as a false start
-  for (let i = 0; i < 3; i++) { await p.waitForFunction(() => /^\d+$/.test(document.querySelector('#pvtNum').textContent), null, { timeout: 7000 }).catch(() => {}); await p.waitForTimeout(220); await p.click('#pvtArea', { position: { x: 80, y: 80 } }); }
-  await p.waitForSelector('#pvtResult:not([hidden])', { timeout: 15000 }).catch(() => {});
+  // Tap every number that appears until the test ends. The delays are random (2–5 s), so how many
+  // numbers fit in 9 s varies: a fixed number of taps leaves the last one unanswered on fast draws, and
+  // the app then waits up to 30 s for it. ".go" marks a live number; the last result lingers 0.3 s
+  // after a tap and must not be tapped again (that would count as an early tap).
+  const pvtDeadline = Date.now() + 30000;
+  while (Date.now() < pvtDeadline && !(await p.isVisible('#pvtResult'))) {
+    const live = await p.waitForFunction(() => document.querySelector('#pvtArea').classList.contains('go') || !document.querySelector('#pvtResult').hidden, null, { timeout: 7000 }).then(() => true).catch(() => false);
+    if (!live || await p.isVisible('#pvtResult')) continue;
+    await p.waitForTimeout(220); await p.click('#pvtArea', { position: { x: 80, y: 80 } });
+  }
   const pvtTxt = await p.textContent('#pvtSummary');
   check('alertness: result shows average reaction and early taps', /Average reaction\s*\d+ ms/.test(pvtTxt) && /Early taps\s*[1-9]/.test(pvtTxt), pvtTxt.replace(/\s+/g, ' ').slice(0, 120));
   check('alertness: reaction times plausible (about 200–400 ms)', (() => { const m = pvtTxt.match(/Average reaction\s*(\d+)/); return m && +m[1] > 150 && +m[1] < 500; })());
