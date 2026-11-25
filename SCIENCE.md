@@ -9,7 +9,7 @@ Each rule in the app comes from a published principle. This file maps the code t
 | **External focus of attention** | Cues point at the environment or the result ("push the floor away", "spread the floor"), not at muscles ("squeeze your quads"). | Wulf, G. (2013). Attentional focus and motor learning: a review of 15 years. *Int Rev Sport Exerc Psychol*. |
 | **One cue at a time** | Only the single highest-priority fault is spoken per rep. | Working-memory limits during skilled movement; standard coaching practice. |
 | **Priority: safety first** | Rules are ranked 1 = joint safety, 2 = effectiveness, 3 = refinement. | Coaching triage |
-| **Faded / bandwidth feedback** | A fault is cued once, then only if it repeats 2 reps in a row, and at most 3× per set. Small errors inside a tolerance band are ignored. | Winstein & Schmidt (1990) on reduced feedback frequency. Sherwood (1988) on bandwidth knowledge of results. *Guidance hypothesis*: feedback on every rep creates dependence. |
+| **Immediate correction, then shorter cues** | Every faulty rep is corrected straight away, mid-rep where the fault can be seen during the movement, like an in-person coach. After two full cues the coach switches to a short shout ("Knees out!"), so feedback gets lighter as the lifter learns it. Small errors inside a tolerance band are ignored. Trade-off: research favours reducing feedback over time for long-term learning, so the short shout is a compromise; if lifters come to depend on the cues, switch back to cueing less often. | Winstein & Schmidt (1990) on reduced feedback frequency. Sherwood (1988) on bandwidth knowledge of results. *Guidance hypothesis*: feedback on every rep creates dependence. |
 | **Feedback after good trials** | When the client fixes a cued fault, the coach praises that exact fix ("That's the spot, shins vertical"). | Chiviacowsky & Wulf (2007), *Res Q Exerc Sport*. |
 | **Self-controlled feedback** | Tap QK mid-set to ask "how was that?" | Chiviacowsky & Wulf (2002). Learners who choose when to get feedback retain skills better. |
 | **Summary feedback (KR)** | After the set: reps, clean reps, form score vs last time, and *one* focus point. | Schmidt et al. (1989) on summary knowledge of results. |
@@ -20,6 +20,38 @@ Each rule in the app comes from a published principle. This file maps the code t
 - **Individual anthropometry.** The allowed squat forward lean is calculated from each client's own femur-to-torso ratio. Long femurs force more lean to keep the centre of mass over mid-foot, so one fixed number would be wrong for many people. Sources: Fry et al. (2003), *J Strength Cond Res*; Demers et al. (2018).
 - **Hip-thrust foot position** is judged by the client's shin angle at lockout (knee about 90°, shin vertical), not by a fixed distance. "Feet forward or back" is therefore personal to their leg length. Source: Contreras et al. (2015) on glute EMG in the hip thrust.
 - **Range of motion.** Depth and lockout cues favour training in the lengthened position. Sources: Kubo et al. (2019) on squat depth and glute hypertrophy; Pedrosa et al. (2022) on lengthened-partial training.
+- **Map my body: personal limits for every camera exercise (`js/bodymap.js`).** A one-minute guided calibration. Side-on: stand still, rise onto the toes, 3 slow squats, reach overhead, 2 slow hinges. Facing the camera: stand still, arms out and up, 2 slow squats. It measures:
+  - limb proportions (thigh-to-torso, arm-to-torso)
+  - how straight the knees, hips and elbows go standing relaxed, and the standing body line
+  - toe-rise height
+  - comfortable squat depth, shin angle at depth (an ankle-dorsiflexion proxy) and heel rise
+  - shoulder flexion and abduction range
+  - hinge range (trunk-to-thigh angle with soft knees, a hamstring-length proxy)
+  - knee width standing and at depth
+
+  `personalFor(pattern, body)` turns these into limits for each of the 20 movement patterns, so every one of the 66 camera exercises is judged against the lifter's body. Limits move only where the body explains it, and never ask for more range than the person showed:
+
+  | Pattern | What's personal | Why |
+  |---|---|---|
+  | Squat | Lean allowed, depth target and rep counting, knee-caving limit, lockout | Long femurs need more lean (Fry 2003; Demers 2018); limited dorsiflexion reduces depth and adds lean (Kim 2015; Macrum 2012; Dill 2014) |
+  | Lunge | Torso lean, depth | Same proportions and ankle effects |
+  | RDL / hinge | Depth target (new rule: only judged once the body map knows hamstring length), lockout | RDL depth ends where the spine would round, which hamstring length sets |
+  | Bench, push-up | Pressing depth from arm-to-torso length | Long arms travel further; short arms reach the chest with less elbow bend |
+  | Overhead press, dip, triceps, pull-down, row, curl | Lockout / full stretch against how straight their elbows go | Elbow extension varies (0° typical; a few degrees of hyperextension or a lack of full extension are both normal), so nobody is told to straighten past their joint |
+  | Raises | Height target if shoulder range is limited | Normal shoulder flexion/abduction ≈ 180° (AAOS) |
+  | Calf raise | Top height from their own toe rise | Plantarflexion range varies |
+  | Leg raise | Height from hamstring length | Straight-leg height is limited by the hamstrings |
+  | Leg extension / curl, hip thrust | Lockout against their straight knee / hip | Knee recurvatum and hip posture vary |
+  | Plank, push-up | Body line from their standing posture | Natural spinal curves differ |
+  | Fly, crunch | Nothing | Nothing measured changes what's correct |
+
+  Simulated people with long thighs, tight ankles, tight hamstrings, short arms and elbows that don't fully straighten show why this matters (`tests/bodymap.test.mjs`). With textbook numbers, some of their full-range reps never count, or they're told to "lock out" past what their joints allow. With their body map those reps count and are clean. They're still cued when they fall short of their own range.
+
+- **Squat: hips rising first.** Judged early in the drive up (40% of the way from the bottom to standing). If the torso has tipped forward more than 10° compared with the bottom position, the hips are rising ahead of the chest and the squat is turning into a good morning, which moves load to the lower back. Comparing with the lifter's own bottom position, not a fixed angle, keeps this fair for long femurs.
+- **Squat: heels lifting.** The heel's height above the toe, as a fraction of foot length, is compared with the lifter's own standing value at the start of the set (so camera tilt cancels out). A rise of more than 0.3 of foot length at the bottom is flagged. Only on free-standing squats, not on a leg press, hack squat or slant board.
+- **Bench: shoulder blades (scapular retraction).** A side-on 2D camera can't see the shoulder blades, so this is a proxy: if the shoulder point rises off the bench by more than 20% of upper-arm length between the bottom and lockout, the shoulders have rolled forward (protracted) instead of staying pinned. Treat it as a screen until it's validated on filmed lifts.
+- **Bench: leg drive.** A camera can't measure force through the feet. It can see whether the feet are set to drive: feet under or slightly behind the knees (knee angle under 140°) and on the floor (ankles below the bench line). Hips lifting off the bench by more than 10% of torso length during the press is flagged separately. Not applied on the decline press, where the feet are hooked.
+- **Motion graphics (`js/fx.js`).** When QK cues a fault, an animated graphic on the body shows the correction (knees pushed out, heel pressed down, chest leading, shoulders pinned, feet driving). It appears at the same moment as the voice, every time a fault is cued, and it shows the target rather than the error (external focus, Wulf 2013). A fixed fault gets a green check, and a clean rep a short green ring.
 - **Joint-safety faults** (knee valgus, lumbar hyperextension, sagging plank) get the highest priority and are never faded out.
 - **Posture screen.** The scan measures frontal-plane shoulder and pelvic tilt, knee alignment and weight shift. In side view it measures head position, neck angle, shoulder position and knee extension. Up to about 3° of asymmetry is treated as normal variation. The scan refuses to judge a non-neutral stance, because a lunge or raised arms would show up as false asymmetry.
 - **Smoothing and confidence gating.** Landmarks are exponentially smoothed. If landmark confidence is low, the coach says nothing: no feedback is better than wrong feedback.
@@ -132,7 +164,29 @@ A 5–15 minute session: rate tension (0–10) → slow breathing with optional 
 - The screen states that Sukoon is a wellbeing exercise, not treatment for anxiety disorders, depression or panic.
 - The before/after ratings are self-reported. The trend ("works best for you") needs at least 2 sessions per goal.
 
-## 11. Body check: heart rate, HRV and alertness with only the phone (`js/hr.js`, `js/vitals.js`)
+## 11. Technique sources and the exercise database
+
+- **Technique criteria follow the NSCA**: the *Exercise Technique Manual for Resistance Training* (4th ed., Human Kinetics 2022, 100 exercises with checklists) and *Essentials of Strength Training and Conditioning* (4th ed., Haff & Triplett 2016, ch. 15). These are the references certified strength coaches (CSCS) are trained on. They're copyrighted, so the app encodes their checkpoints as its own rules and wording rather than copying text. NASM's overhead-squat compensations are used only as vocabulary for camera-visible faults.
+- **Normal joint ranges** used in explanations follow AAOS / Norkin & White (shoulder flexion and abduction ≈ 180°, elbow extension 0°, knee extension 0°). Population data: CDC normal joint range of motion study (Soucie et al. 2010).
+- **Open exercise databases were reviewed and not used for form cues.**
+  - free-exercise-db is public domain (876 entries), but its instructions contain errors. For example, it says knees past the toes in a squat is wrong, which Fry et al. 2003 contradicts.
+  - wger is CC-BY-SA, so derived data would have to share alike.
+  - ExRx, ACE and ACSM are all rights reserved.
+  - The open data is suitable for exercise names and muscle metadata only.
+- **Imported exercises (`js/library-extra.js`).** 124 exercises from free-exercise-db (Unlicense, public domain).
+  - `tools/exercise-candidates.py` sorted its 622 strength and powerlifting entries into 324 pattern candidates by name.
+  - Each candidate was then reviewed by hand (`KEEP` list in `tools/import-exercises.py`). Left out:
+    - duplicates of existing exercises
+    - band, chain and speed variants
+    - Olympic and get-up movements
+    - alternating or one-arm presses, pulls and curls, which the camera's evenness and side-picking logic would miscount
+    - behind-the-neck pulls
+    - kneeling or overhead-cable curls and crunches, where the camera angle doesn't match the pattern
+  - Each kept exercise inherits its pattern's NSCA-based rules and the lifter's personal limits.
+  - Flags on each exercise scope the rules: free-standing squat, bench with feet down, or a rule that doesn't apply. For example, a preacher curl's arm rests on the pad at an angle, so the "elbow swing" check is off. That also fixed two existing false alarms, on the preacher curl and the conventional deadlift. A deadlift's knees bend by design, so "squatting, not hinging" no longer fires on it or on the kettlebell swing.
+- **Not yet verified:** NSCA text, wording against the manual itself (it couldn't be fetched); the exact ankle dorsiflexion cut-off (no consensus value was found, so the app uses a conservative 28° shin angle and doesn't quote a "typical" number).
+
+## 12. Body check: heart rate, HRV and alertness with only the phone (`js/hr.js`, `js/vitals.js`)
 
 No wearable is needed. All processing happens on the phone.
 
@@ -150,8 +204,9 @@ No wearable is needed. All processing happens on the phone.
 
 **Reproducing the camera check:** `python3 tools/make-pulse-video.py out.y4m 72 30` makes a fake fingertip video with a known heart rate and HRV; `node tests/camera-pulse.cjs out.y4m hrv` runs it through the app in Chromium.
 
-## 12. Known limits (honest list)
+## 13. Known limits (honest list)
 
 - A 2D camera can't see rotation well. One angle per exercise is the best it can do, so the setup instructions tell the client where to put the phone.
+- The body map is a bodyweight measurement. Under a heavy bar, depth and lean can differ, so re-map every few weeks. Some limits are estimates from 2D proportions (pressing depth from arm length); validate them on filmed lifts. Dip depth (limited by shoulder extension) isn't measured yet.
 - Thresholds are evidence-informed starting points. **They must be tuned on real client footage reviewed by QK**, and this is the most important next step.
 - The posture scan is a screen, not a diagnosis. Anyone with pain is told to see a physio.

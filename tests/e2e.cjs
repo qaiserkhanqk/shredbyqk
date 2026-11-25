@@ -62,7 +62,8 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
 
   // 2. Library + voice-guided hold
   await go('train'); await p.click('[data-muscle=Core]');
-  check('library: core filter', /15 exercises/.test(await p.textContent('#exCount')));
+  const coreN = await p.evaluate(async () => (await import('/js/library.js')).LIBRARY.filter(x => !x.rehab && x.muscles.includes('Core')).length);
+  check('library: core filter', new RegExp(`^${coreN} exercises`).test(await p.textContent('#exCount')) && coreN > 15, `${coreN}`);
 
   // 3. Live camera form check (fake camera, no person) starts without errors
   await p.click('[data-muscle=All]'); await p.click('[data-train=squat]'); await p.click('#startCam'); await p.waitForTimeout(5000);
@@ -182,6 +183,22 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.goto('https://shred.local/?calm=now'); await p.waitForTimeout(800);
   check('shortcut: ?calm=now opens the Sukoon rating', await p.isVisible('#calm') && await p.isVisible('#cBefore'));
 
+  // Imported exercises are searchable and open a camera form check.
+  await p.goto('https://shred.local/'); await go('train'); await p.fill('#exSearch', 'zercher');
+  check('library: imported exercise found by search', /Zercher Squat/.test(await p.textContent('#exGrid')));
+  await p.click('[data-train=xZercherSquat]');
+  check('library: imported exercise opens a camera form check', await p.isVisible('#startCam'));
+  await p.click('#setup', { position: { x: 5, y: 5 } }); await p.fill('#exSearch', '');
+
+  // Map my body: demo calibration → personal body map sheet.
+  await p.goto('https://shred.local/'); await go('body'); await tap('#bodyMapTile');
+  check('body map: intro explains the one-minute calibration', /Map my body/.test(await p.textContent('#rsheetBody')));
+  await p.click('[data-bm=demo]');
+  await p.waitForFunction(() => /QK now coaches your body/.test(document.querySelector('#rsheetBody')?.textContent || '') && !document.querySelector('#rsheet').hidden, null, { timeout: 90000 });
+  const bm = await p.textContent('#rsheetBody');
+  check('body map: fits several movements, with reasons', /Forward lean allowed/.test(bm) && /Hinge depth/.test(bm) && /Long thighs/.test(bm) && /Tight hamstrings/.test(bm));
+  await p.click('[data-bm=close]');
+
   // 11. Body check: alertness test (shortened for the test run) and camera pulse with no finger
   await p.goto('https://shred.local/'); await p.waitForTimeout(600);
   await go('vitals');
@@ -189,8 +206,16 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.evaluate(() => { window.__shredPvtSeconds = 9; });
   await tap('#vPvt'); await p.click('#pvtStart');
   await p.click('#pvtArea', { position: { x: 60, y: 60 } }); // too early: counted as a false start
-  for (let i = 0; i < 3; i++) { await p.waitForFunction(() => /^\d+$/.test(document.querySelector('#pvtNum').textContent), null, { timeout: 7000 }).catch(() => {}); await p.waitForTimeout(220); await p.click('#pvtArea', { position: { x: 80, y: 80 } }); }
-  await p.waitForSelector('#pvtResult:not([hidden])', { timeout: 15000 }).catch(() => {});
+  // Tap every number that appears until the test ends. The delays are random (2–5 s), so how many
+  // numbers fit in 9 s varies: a fixed number of taps leaves the last one unanswered on fast draws, and
+  // the app then waits up to 30 s for it. ".go" marks a live number; the last result lingers 0.3 s
+  // after a tap and must not be tapped again (that would count as an early tap).
+  const pvtDeadline = Date.now() + 30000;
+  while (Date.now() < pvtDeadline && !(await p.isVisible('#pvtResult'))) {
+    const live = await p.waitForFunction(() => document.querySelector('#pvtArea').classList.contains('go') || !document.querySelector('#pvtResult').hidden, null, { timeout: 7000 }).then(() => true).catch(() => false);
+    if (!live || await p.isVisible('#pvtResult')) continue;
+    await p.waitForTimeout(220); await p.click('#pvtArea', { position: { x: 80, y: 80 } });
+  }
   const pvtTxt = await p.textContent('#pvtSummary');
   check('alertness: result shows average reaction and early taps', /Average reaction\s*\d+ ms/.test(pvtTxt) && /Early taps\s*[1-9]/.test(pvtTxt), pvtTxt.replace(/\s+/g, ' ').slice(0, 120));
   check('alertness: reaction times plausible (about 200–400 ms)', (() => { const m = pvtTxt.match(/Average reaction\s*(\d+)/); return m && +m[1] > 150 && +m[1] < 500; })());

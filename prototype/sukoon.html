@@ -420,6 +420,39 @@ a.ghost { text-decoration: none; text-align: center; display: inline-flex; align
 .rep-fix .iconbtn { width: 36px; height: 36px; font: 700 1.2rem var(--f-data); }
 .week-text { white-space: pre-wrap; font: .82rem/1.5 var(--f-data); background: var(--surface-2); padding: 12px; border-radius: var(--r-sm); margin: 0; user-select: all; }
 
+/* Live fault banner: what's wrong + what to do, the instant QK sees it */
+.fault-banner { position: absolute; top: 112px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px);
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 16px; border-radius: 16px; text-align: center;
+  background: rgba(10,13,20,.88); border: 2px solid var(--bad); box-shadow: 0 0 24px rgba(255,90,95,.35); pointer-events: none; animation: fbIn .22s cubic-bezier(.2,.9,.3,1.3); }
+.fault-banner b { font: 800 1.05rem/1.1 var(--f-display); font-stretch: 112%; color: var(--bad); text-transform: uppercase; letter-spacing: .02em; }
+.fault-banner b::before { content: "✕ "; }
+.fault-banner span { font: 700 .95rem/1.2 var(--f-body); color: var(--good); }
+.fault-banner span::before { content: "→ "; }
+.fault-banner.fixed { border-color: var(--good); box-shadow: 0 0 24px rgba(61,220,151,.35); }
+.fault-banner.fixed b { color: var(--good); } .fault-banner.fixed b::before { content: "✓ "; }
+@keyframes fbIn { from { transform: translateX(-50%) scale(.85); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
+/* Fault markers on the recorded set: tap to jump to the moment */
+.fault-marks { display: flex; flex-direction: column; gap: 6px; }
+.fault-marks .eyebrow { margin-bottom: 2px; }
+.fault-marks button { display: flex; gap: 10px; align-items: center; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; cursor: pointer; }
+.fault-marks button .data { color: var(--bad); min-width: 3.2em; }
+.fault-marks button.ok .data { color: var(--good); }
+
+/* Body map */
+.bodymap-tile { border-color: rgba(69,195,255,.35); }
+.fit-note { display: flex; gap: 10px; align-items: center; justify-content: space-between; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; font-size: .88rem; }
+.fit-note.on { border-color: rgba(61,220,151,.4); }
+.fit-note b { color: var(--good); }
+.fit-note button { flex: none; }
+.bm-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.bm-grid div { background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 10px; text-align: center; }
+.bm-grid .num { font-size: 1.4rem; display: block; }
+.bm-grid small { color: var(--muted); font-size: .72rem; }
+.bm-find { border-left: 3px solid var(--z1); padding: 2px 0 2px 12px; }
+.bm-find.fix { border-left-color: var(--warn); }
+.bm-find b { display: block; margin-bottom: 2px; }
+.readout span.fit { color: var(--good); border-color: rgba(61,220,151,.4); }
+
 /* Body check */
 .vital-last { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .vital-last .num { font-size: 1.8rem; }

@@ -4,6 +4,7 @@
 //    movement reliably (rotation, carries, small wrist movements), so we never fake a form score.
 // Muscles: first entry is the main target.
 import { EXERCISES } from './exercises.js';
+import { EXTRA } from './library-extra.js';
 
 export const MUSCLES = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Forearms', 'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Core', 'Full body'];
 
@@ -11,10 +12,10 @@ const X = (id, name, muscles, equipment, pattern, extra = {}) => ({ id, name, mu
 
 export const LIBRARY = [
   // Chest
-  X('benchPress', 'Barbell Bench Press', ['Chest', 'Triceps', 'Shoulders'], 'Barbell', 'bench'),
-  X('dbBench', 'Dumbbell Bench Press', ['Chest', 'Triceps', 'Shoulders'], 'Dumbbells', 'bench'),
-  X('inclinePress', 'Incline Dumbbell Press', ['Chest', 'Shoulders', 'Triceps'], 'Dumbbells', 'bench'),
-  X('declinePress', 'Decline Bench Press', ['Chest', 'Triceps'], 'Barbell', 'bench'),
+  X('benchPress', 'Barbell Bench Press', ['Chest', 'Triceps', 'Shoulders'], 'Barbell', 'bench', { bench: 'feet' }),
+  X('dbBench', 'Dumbbell Bench Press', ['Chest', 'Triceps', 'Shoulders'], 'Dumbbells', 'bench', { bench: 'feet' }),
+  X('inclinePress', 'Incline Dumbbell Press', ['Chest', 'Shoulders', 'Triceps'], 'Dumbbells', 'bench', { bench: 'feet' }),
+  X('declinePress', 'Decline Bench Press', ['Chest', 'Triceps'], 'Barbell', 'bench', { bench: 'scap' }),
   X('machinePress', 'Machine Chest Press', ['Chest', 'Triceps'], 'Machine', 'bench', { setup: 'Side-on, camera at chest height, arms in frame.' }),
   X('pushUp', 'Push-up', ['Chest', 'Triceps', 'Core'], 'Bodyweight', 'pushUp'),
   X('inclinePushUp', 'Incline Push-up', ['Chest', 'Triceps'], 'Bench', 'pushUp'),
@@ -24,7 +25,7 @@ export const LIBRARY = [
   X('pecDeck', 'Pec Deck', ['Chest'], 'Machine', 'fly'),
 
   // Back
-  X('deadlift', 'Deadlift', ['Back', 'Glutes', 'Hamstrings'], 'Barbell', 'rdl', { setup: 'Side-on, camera at hip height, bar and whole body in frame.' }),
+  X('deadlift', 'Deadlift', ['Back', 'Glutes', 'Hamstrings'], 'Barbell', 'rdl', { skipRules: ['rdl_squat'], setup: 'Side-on, camera at hip height, bar and whole body in frame.' }),
   X('bentRow', 'Barbell Bent-over Row', ['Back', 'Biceps'], 'Barbell', 'row'),
   X('dbRow', 'One-arm Dumbbell Row', ['Back', 'Biceps'], 'Dumbbell', 'row'),
   X('cableRow', 'Seated Cable Row', ['Back', 'Biceps'], 'Cable', 'row'),
@@ -51,20 +52,20 @@ export const LIBRARY = [
   X('curl', 'Dumbbell Curl', ['Biceps', 'Forearms'], 'Dumbbells', 'curl'),
   X('barbellCurl', 'Barbell Curl', ['Biceps', 'Forearms'], 'Barbell', 'curl'),
   X('hammerCurl', 'Hammer Curl', ['Biceps', 'Forearms'], 'Dumbbells', 'curl'),
-  X('preacherCurl', 'Preacher Curl', ['Biceps'], 'EZ bar', 'curl'),
+  X('preacherCurl', 'Preacher Curl', ['Biceps'], 'EZ bar', 'curl', { skipRules: ['cu_swing'] }), // arm rests on the pad at an angle
   X('cableCurl', 'Cable Curl', ['Biceps'], 'Cable', 'curl'),
   X('pushdown', 'Triceps Pushdown', ['Triceps'], 'Cable', 'triExt'),
   X('ohExtension', 'Overhead Triceps Extension', ['Triceps'], 'Dumbbell', 'triExt'),
   X('skullCrusher', 'Skull Crusher', ['Triceps'], 'EZ bar', 'triExt', { setup: 'Side-on, camera at bench height.' }),
   X('benchDip', 'Bench Dip', ['Triceps', 'Chest'], 'Bench', 'dip'),
-  X('closeGrip', 'Close-grip Bench Press', ['Triceps', 'Chest'], 'Barbell', 'bench'),
+  X('closeGrip', 'Close-grip Bench Press', ['Triceps', 'Chest'], 'Barbell', 'bench', { bench: 'feet' }),
   X('wristCurl', 'Wrist Curl', ['Forearms'], 'Dumbbells', null, { guide: 'Forearms on your thighs. Curl the weight with your wrists only, full range, slow on the way down.' }),
   X('farmerCarry', 'Farmer\'s Carry', ['Forearms', 'Core', 'Full body'], 'Dumbbells', null, { hold: 40, guide: 'Heavy weights, stand tall, short quick steps, shoulders down and back.' }),
 
   // Quads
-  X('squat', 'Back Squat', ['Quads', 'Glutes', 'Core'], 'Barbell', 'squat'),
-  X('frontSquat', 'Front Squat', ['Quads', 'Glutes', 'Core'], 'Barbell', 'squat'),
-  X('gobletSquat', 'Goblet Squat', ['Quads', 'Glutes'], 'Dumbbell', 'squat'),
+  X('squat', 'Back Squat', ['Quads', 'Glutes', 'Core'], 'Barbell', 'squat', { free: true }),
+  X('frontSquat', 'Front Squat', ['Quads', 'Glutes', 'Core'], 'Barbell', 'squat', { free: true }),
+  X('gobletSquat', 'Goblet Squat', ['Quads', 'Glutes'], 'Dumbbell', 'squat', { free: true }),
   X('legPress', 'Leg Press', ['Quads', 'Glutes'], 'Machine', 'squat', { setup: 'Side-on to the machine, hips, knees and ankles in frame.' }),
   X('hackSquat', 'Hack Squat', ['Quads', 'Glutes'], 'Machine', 'squat'),
   X('lunge', 'Walking Lunge', ['Quads', 'Glutes'], 'Dumbbells', 'lunge'),
@@ -86,7 +87,7 @@ export const LIBRARY = [
   X('hipThrust', 'Hip Thrust', ['Glutes', 'Hamstrings'], 'Barbell', 'hipThrust'),
   X('gluteBridge', 'Glute Bridge', ['Glutes', 'Hamstrings'], 'Bodyweight', 'hipThrust', { setup: 'Lying side-on to the camera, camera on the floor about two metres away.' }),
   X('singleLegBridge', 'Single-leg Glute Bridge', ['Glutes'], 'Bodyweight', 'hipThrust', { setup: 'Lying side-on to the camera, working leg nearest the camera.' }),
-  X('kbSwing', 'Kettlebell Swing', ['Glutes', 'Hamstrings', 'Full body'], 'Kettlebell', 'rdl', { setup: 'Side-on, camera at hip height, whole body in frame.' }),
+  X('kbSwing', 'Kettlebell Swing', ['Glutes', 'Hamstrings', 'Full body'], 'Kettlebell', 'rdl', { skipRules: ['rdl_squat'], setup: 'Side-on, camera at hip height, whole body in frame.' }),
   X('cableKickback', 'Cable Kickback', ['Glutes'], 'Cable', null, { guide: 'Brace your core and drive your heel back without arching your lower back. Squeeze for a second.' }),
   X('hipAbduction', 'Hip Abduction', ['Glutes'], 'Machine', null, { guide: 'Push your knees out, pause for a second, and control the way back in.' }),
   X('bandedWalk', 'Banded Lateral Walk', ['Glutes'], 'Band', null, { guide: 'Stay in a half squat. Step wide, keep tension on the band, toes forward.' }),
@@ -110,7 +111,7 @@ export const LIBRARY = [
   X('mountainClimber', 'Mountain Climbers', ['Core', 'Full body'], 'Bodyweight', null, { hold: 30, guide: 'Hands under shoulders, hips level, drive your knees to your chest quickly.' }),
 
   // Full body
-  X('thruster', 'Thruster', ['Full body', 'Quads', 'Shoulders'], 'Dumbbells', 'squat'),
+  X('thruster', 'Thruster', ['Full body', 'Quads', 'Shoulders'], 'Dumbbells', 'squat', { free: true }),
   X('burpee', 'Burpee', ['Full body'], 'Bodyweight', null, { guide: 'Chest to the floor, jump your feet in, explode up. Land softly.' }),
   X('jumpSquat', 'Jump Squat', ['Full body', 'Quads', 'Glutes'], 'Bodyweight', 'squat'),
   // ---- Rehab & prehab exercises (used by the Rehab clinic programmes; rehab: true keeps them grouped) ----
@@ -166,6 +167,8 @@ export const LIBRARY = [
   X('calfStretch', 'Calf Stretch', ['Calves'], 'Wall', null, { rehab: true, hold: 30, guide: 'Hands on a wall, the back leg straight with the heel down. Lean in until you feel a stretch. Then repeat with the back knee bent.' }),
   X('plantarStretch', 'Plantar Fascia Stretch', ['Calves'], 'Bodyweight', null, { rehab: true, hold: 30, guide: 'Sit, cross the foot over your knee, pull your toes back towards you until you feel a stretch under the arch. First thing in the morning helps most.' }),
   X('towelHeelRaise', 'High-load Heel Raise (towel under toes)', ['Calves'], 'Step', 'calf', { rehab: true, setup: 'Side-on to the camera, toes on a rolled towel on a step. 3 seconds up, 2 at the top, 3 down.' }),
+  // ---- From free-exercise-db (public domain), each hand-matched to a camera-checked pattern ----
+  ...EXTRA.map(([id, name, muscles, equipment, pattern, extra]) => X(id, name, muscles, equipment, pattern, extra)),
 ];
 
 export const LIB = Object.fromEntries(LIBRARY.map(x => [x.id, x]));
@@ -174,7 +177,7 @@ export const LIB = Object.fromEntries(LIBRARY.map(x => [x.id, x]));
 export function exFor(id) {
   const item = LIB[id]; if (!item?.pattern) return null;
   const base = EXERCISES[item.pattern];
-  return { ...base, name: item.name, setup: item.setup || base.setup, patternKey: item.pattern, libId: id };
+  return { ...base, name: item.name, setup: item.setup || base.setup, patternKey: item.pattern, libId: id, free: item.free, bench: item.bench, skipRules: item.skipRules };
 }
 
 export const tracked = id => !!LIB[id]?.pattern;

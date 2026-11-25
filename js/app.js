@@ -16,7 +16,9 @@ import { readiness, recommendToday, sessionLoad, weekStats, loadSpike, dayKey } 
 import { cueList, saveClip, getClip, deleteClip, listClipIds, startRecording, exportClips } from './studio.js';
 import { SessionRecorder, ErrorLog, downloadJSON, APP_VERSION } from './diagnostics.js';
 import { LIBRARY, LIB, MUSCLES, exFor } from './library.js';
-import { HipThrustDemo, WalkDemo, DEMO_W, DEMO_H } from './demo.js';
+import { HipThrustDemo, SquatDemo, BenchDemo, WalkDemo, BodyMapDemo, BODYMAP_SECS, BODYMAP_DEMO_STEPS, DEMO_W, DEMO_H } from './demo.js';
+import { analyseBodyMap, personalFor, explainBodyMap, fitLines } from './bodymap.js';
+import { FormFX, drawDepthArc } from './fx.js';
 import { initCalm, renderCalm, startCalmNow } from './calm.js';
 import { WEIGHTED, lastLoad, lastLoadText, weekSummary } from './share.js';
 import { initVitals, renderVitals } from './vitals.js';
@@ -271,7 +273,13 @@ function openSetup(k) {
   }
   $('#startCam').hidden = !ex; $('#videoFile').parentElement.hidden = !ex; $('#recordChk').parentElement.hidden = !ex;
   $('#startGuided').hidden = !!ex;
-  $('#startDemo').hidden = k !== 'hipThrust';
+  $('#startDemo').hidden = !['hipThrust', 'squat', 'benchPress'].includes(k);
+  const fit = !!ex, mapped = S.profile.body?.ok, lines = mapped && ex ? fitLines(ex.patternKey, S.profile.body) : [];
+  $('#fitNote').hidden = !fit; $('#fitNote').classList.toggle('on', !!mapped);
+  $('#fitNote').innerHTML = mapped ? `<span><b>✓ Fit to your body.</b> ${lines.length ? esc(lines.join('. ')) + '.' : 'Your body matches the standard limits for this one.'}</span><button class="ghost" type="button" id="fitView">View</button>`
+    : `<span>QK uses standard limits until it maps your body (1 min).</span><button class="ghost" type="button" id="fitMap">Map my body</button>`;
+  $('#fitView')?.addEventListener('click', () => { $('#setup').hidden = true; showBodyMap(S.profile.body); });
+  $('#fitMap')?.addEventListener('click', () => { $('#setup').hidden = true; showBodyMapIntro(); });
   $('#loadWrap').hidden = !vbtOn();
   $('#setupLast').textContent = lastLoadText(lastLoad(S.sessions, k));
   $('#setup').hidden = false;
@@ -286,6 +294,7 @@ $('#videoFile').onchange = e => { const f = e.target.files[0]; e.target.value = 
 /* ---------- Live session (form check + gait capture) ---------- */
 let live = null, fb = null, engine = null, stream = null, recorder = null, chunks = [], facing = 'user', raf = 0;
 const smooth = new Smoother(0.55);
+const fx = new FormFX();
 const motion = new MotionTracker();
 
 // Keep the screen on during a set and the rest after it, so the phone doesn't lock mid-session.
@@ -305,14 +314,14 @@ async function startLive({ mode, source, file }) {
   const ex = mode === 'form' ? curEx() : null;
   live = { mode, source, frames: [], t0: null, lost: 0, wrong: 0, demo: null, done: false, steps: 0, mPerPx: null, standFrames: [], times: [] };
   bar.reset(); recorder2.start({ kind: mode, exercise: mode === 'form' ? exKey : undefined, gaitMode: mode === 'gait' ? gaitMode : undefined, source, loadKg: mode === 'form' ? parseFloat($('#loadKg').value) || null : undefined });
-  engine = null; fb = null; smooth.reset(); motion.reset();
+  engine = null; fb = null; smooth.reset(); motion.reset(); fx.reset(); comp = null; recorder = null; $('#faultBanner').hidden = true;
   $('#formMeters').hidden = mode !== 'form'; $('#gaitMeters').hidden = mode === 'form';
   $('#repBig').hidden = mode !== 'form'; $('#cueHint').hidden = mode !== 'form';
   $('#repNum').textContent = '0'; $('#repLbl').textContent = ex?.hold ? 'seconds' : 'reps'; $('#dots').innerHTML = ''; $('#cleanCt').textContent = '0 clean'; $('#vlKnob').style.left = '0%'; $('#vlTxt').textContent = 'fresh';
-  $('#gSteps').textContent = '0'; $('#gProg').style.width = '0';
-  const testName = { rom: TEST.rom?.label || 'Measurement', gait: `Gait · ${gaitMode === 'run' ? 'running' : 'walking'}`, jump: 'Jump test', sls: 'Single-leg squat knee test' };
+  $('#gSteps').textContent = '0'; $('#gProg').style.width = '0'; $('#gStepsLbl').textContent = mode === 'gait' ? 'Steps seen' : 'Time';
+  const testName = { rom: TEST.rom?.label || 'Measurement', gait: `Gait · ${gaitMode === 'run' ? 'running' : 'walking'}`, jump: 'Jump test', sls: 'Single-leg squat knee test', bodymap: 'Map my body' };
   $('#liveEyebrow').textContent = mode === 'form' ? ex.name : testName[mode];
-  $('#liveTitle').textContent = mode === 'form' ? `Set ${setsToday(exKey) + 1}${source === 'demo' ? ' · demo' : ''}` : (source === 'demo' ? 'Demo walker' : source === 'file' ? 'Analysing your video (precise mode)' : mode === 'gait' ? 'Walk naturally for 10 seconds' : mode === 'jump' ? 'Up to 3 jumps' : mode === 'rom' ? `${TEST.rom.secs} seconds` : 'Left leg first, then right');
+  $('#liveTitle').textContent = mode === 'form' ? `Set ${setsToday(exKey) + 1}${source === 'demo' ? ' · demo' : ''}` : (mode === 'bodymap' ? 'Stand still, side-on' : source === 'demo' ? 'Demo walker' : source === 'file' ? 'Analysing your video (precise mode)' : mode === 'gait' ? 'Walk naturally for 10 seconds' : mode === 'jump' ? 'Up to 3 jumps' : mode === 'rom' ? `${TEST.rom.secs} seconds` : 'Left leg first, then right');
   $('#endLive').textContent = mode === 'form' ? 'End set' : 'Stop';
   $('#flipCam').hidden = source !== 'camera';
   $('#calBtn').hidden = !(mode === 'form' && vbtOn() && source !== 'demo');
@@ -324,7 +333,7 @@ async function startLive({ mode, source, file }) {
 
   try {
     if (source === 'demo') {
-      video.hidden = true; live.demo = mode === 'form' ? new HipThrustDemo() : new WalkDemo();
+      video.hidden = true; live.demo = mode === 'bodymap' ? new BodyMapDemo() : mode !== 'form' ? new WalkDemo() : ex.patternKey === 'squat' ? new SquatDemo() : ex.patternKey === 'bench' ? new BenchDemo() : new HipThrustDemo();
       canvas.width = DEMO_W; canvas.height = DEMO_H;
     } else {
       video.hidden = false;
@@ -335,9 +344,7 @@ async function startLive({ mode, source, file }) {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: mode === 'form' ? 30 : 60 } }, audio: false });
         video.removeAttribute('src'); video.srcObject = stream;
         $('#viewport').classList.toggle('mirror', facing === 'user');
-        if (mode === 'form' && $('#recordChk').checked && window.MediaRecorder) {
-          chunks = []; recorder = new MediaRecorder(stream); recorder.ondataavailable = e => e.data.size && chunks.push(e.data); recorder.start(1000); $('#recBadge').hidden = false;
-        }
+
       }
       await video.play();
       // Uploaded videos don't need real-time speed, so they use the most precise model.
@@ -345,6 +352,7 @@ async function startLive({ mode, source, file }) {
       live.lm = await getVideoLandmarker(live.model);
       $('#status').textContent = '';
     }
+    if (mode === 'form' && source !== 'file' && $('#recordChk').checked) startComposite(source === 'demo' ? canvas : video);
   } catch (err) {
     console.warn(err);
     $('#status').textContent = source === 'file' ? 'That video couldn\'t be played. Try an MP4 or MOV.' : 'Camera blocked. Allow camera access for this site in your browser settings, then try again.';
@@ -363,6 +371,45 @@ function countdown(n) {
     const step = () => { if (!live) return res(); if (n === 0) { el.hidden = true; return res(); } el.textContent = n--; setTimeout(step, 900); };
     step();
   });
+}
+
+/* Recording: the camera image with the skeleton and coaching graphics burned in, so the replay
+   shows exactly what QK saw and said. Recorded from a canvas, so it never leaves the phone. */
+let comp = null;
+function startComposite(src) {
+  const c = document.createElement('canvas'), sw = src.videoWidth || src.width, sh = src.videoHeight || src.height;
+  const k = Math.min(1, 720 / Math.max(sw, sh)); c.width = Math.round(sw * k); c.height = Math.round(sh * k);
+  if (!window.MediaRecorder || !c.captureStream) return;
+  try {
+    chunks = []; recorder = new MediaRecorder(c.captureStream(30));
+    recorder.ondataavailable = e => e.data.size && chunks.push(e.data); recorder.start(1000);
+    comp = { c, ctx: c.getContext('2d'), src, mirror: $('#viewport').classList.contains('mirror') };
+    live.recT0 = performance.now(); live.marks = []; $('#recBadge').hidden = false;
+  } catch (e) { console.warn(e); recorder = null; comp = null; }
+}
+function drawComposite() {
+  if (!comp || !recorder || recorder.state !== 'recording') return;
+  const { c, ctx, src, mirror } = comp, ov = $('#overlay');
+  ctx.save(); if (mirror) { ctx.translate(c.width, 0); ctx.scale(-1, 1); }
+  if (src.tagName === 'VIDEO') ctx.drawImage(src, 0, 0, c.width, c.height); else { ctx.fillStyle = '#07090f'; ctx.fillRect(0, 0, c.width, c.height); }
+  ctx.drawImage(ov, 0, 0, c.width, c.height); ctx.restore();
+}
+// Every correction is marked on the recording so the lifter can jump straight to it afterwards.
+function markFault(rule, fixed) {
+  if (!live?.marks || !rule) return;
+  live.marks.push({ t: (performance.now() - live.recT0) / 1000, label: fixed ? (rule.yes || `Fixed: ${rule.tag || rule.cue}`) : (rule.wrong || rule.cue), fix: fixed ? '' : (rule.tag || ''), ok: !!fixed });
+}
+
+let bannerT;
+function showBanner(rule, fixed) {
+  const el = $('#faultBanner'); if (!rule) return;
+  $('#fbWrong').textContent = fixed ? (rule.yes || 'Fixed') : (rule.wrong || rule.tag || 'Check your form');
+  $('#fbFix').textContent = fixed ? '' : (rule.tag || rule.cue);
+  $('#fbFix').hidden = fixed;
+  el.classList.toggle('fixed', !!fixed); el.hidden = false;
+  el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
+  clearTimeout(bannerT); bannerT = setTimeout(() => { el.hidden = true; }, fixed ? 1800 : 2600);
+  if (!fixed && live) live.badUntil = performance.now() + 1500;
 }
 
 let lastTs = -1;
@@ -386,6 +433,7 @@ function loop(now) {
     }
   }
   if (px) { live.times.push(t); live.mode === 'form' ? formFrame(px, ctx, t) : testFrame(px, ctx, t); }
+  drawComposite();
   if (!live || live.done) return;
   if (live.source === 'file' && video.ended) return live.mode === 'form' ? endSet() : finishTest();
   if (live.demo?.done && live.mode === 'form' && !live.ending) { live.ending = true; setTimeout(() => live && endSet(), 1500); }
@@ -395,9 +443,13 @@ function loop(now) {
 const fmtA = v => (v == null || Number.isNaN(v) ? '–' : Math.round(v) + '°');
 function formFrame(px, ctx, t) {
   const ex = curEx(), view = viewOf(px);
-  if (!engine) { engine = new RepEngine(ex, ex.view === 'either' ? view : ex.view); fb = new FeedbackCoach(); }
+  if (!engine) {
+    // Every camera exercise is judged against the lifter's own body map (not the demo athlete's).
+    live.P = live.source !== 'demo' ? personalFor(ex.patternKey, S.profile.body) : null;
+    engine = new RepEngine(ex, ex.view === 'either' ? view : ex.view, live.P); fb = new FeedbackCoach();
+  }
   const raw = ex.metrics(px, engine.view), m = { ...raw };
-  for (const k of ['knee', 'hip', 'elbow', 'torsoLean']) if (raw[k] != null) m[k] = smooth.push(k, raw[k]);
+  for (const k of ['knee', 'hip', 'elbow', 'torsoLean', 'heelLift', 'shY', 'hipY']) if (raw[k] != null) m[k] = smooth.push(k, raw[k]);
 
   // Confidence gate: low-confidence landmarks give wrong angles, so stay quiet instead.
   if (raw.s.conf < 0.55) {
@@ -437,15 +489,25 @@ function formFrame(px, ctx, t) {
       $('#vlTxt').textContent = ev.vl < .1 ? 'fresh' : ev.vl < .25 ? `−${Math.round(ev.vl * 100)}%` : `−${Math.round(ev.vl * 100)}% · near failure`;
       if (vbtOn() && live.mPerPx) { const v = bar.closeRep(); if (v) { live.lastV = v; $('#vlTxt').textContent = `${v.mcv.toFixed(2)} m/s`; } }
     }
-    if (ev.faults.length) flagged = true;
-    const line = ev.type === 'rep' ? fb.onRep(ev) : fb.onContinuousFault(ev.faults[0]);
+    if (ev.faults.length && ev.type !== 'rep') flagged = true;
+    const awaiting = fb.awaitingFix;
+    const line = ev.type === 'live' ? fb.onLive(ev.faults[0]) : ev.type === 'rep' ? fb.onRep(ev) : fb.onContinuousFault(ev.faults[0]);
     if (line) say(line.text, line);
+    // On screen, at the same moment as the voice: what's wrong, what to do, and the graphic on the body.
+    const cued = line?.id && ev.faults.find(f => line.id === f.id || line.id === f.id + '_short');
+    if (line?.id?.startsWith('yes_')) { fx.fixed(awaiting, t); showBanner(awaiting, true); markFault(awaiting, true); }
+    else if (cued) { fx.cue(cued, t); showBanner(cued); markFault(cued); }
+    else if (ev.type === 'rep' && !ev.faults.length) fx.clean(t);
   }
   motion.draw(ctx);
   const s = raw.s;
+  if (live.badUntil > performance.now()) flagged = true; // skeleton stays red while the fault is on screen
   drawPose(ctx, px, { color: flagged ? '#ff5a5f' : '#7c6cff', labels: [{ at: s.kn, value: m.knee }, { at: s.hip, value: m.hip }, ...(ex.primary === 'elbow' ? [{ at: s.el, value: m.elbow }] : [])] });
+  if (ex.primary === 'knee') drawDepthArc(ctx, s.kn, s.hip, s.an, m.knee, { start: ex.upT + 10, target: 100 });
+  else if (ex.primary === 'elbow') drawDepthArc(ctx, s.el, s.sh, s.wr, m.elbow, { start: ex.upT + 15, target: 95 });
+  fx.draw(ctx, px, s, t, { mirror: $('#viewport').classList.contains('mirror') });
   const keys = ex.primary === 'elbow' ? ['elbow', 'hip'] : ['hip', 'knee'];
-  $('#readout').innerHTML = keys.map(k => `<span>${k} ${fmtA(m[k])}</span>`).join('') + (live.lastV ? `<span>${live.lastV.mcv.toFixed(2)} m/s</span>` : '') + `<span class="muted">${engine.view} view</span>`;
+  $('#readout').innerHTML = keys.map(k => `<span>${k} ${fmtA(m[k])}</span>`).join('') + (live.lastV ? `<span>${live.lastV.mcv.toFixed(2)} m/s</span>` : '') + `<span class="muted">${engine.view} view</span>` + (live.P ? '<span class="fit">fit to your body</span>' : '');
 }
 
 // A border flash per rep: green clean, red fault. Readable from across the room, unlike numbers.
@@ -507,7 +569,17 @@ function endSet() {
   }
   if (reps) { stopRest(); $('#restBtn').click(); } // rest starts by itself
   const pb = $('#playback'); pb.hidden = true;
-  if (wasRec) setTimeout(() => { if (!chunks.length) return; pb.src = URL.createObjectURL(new Blob(chunks, { type: chunks[0].type || 'video/webm' })); pb.hidden = false; }, 400);
+  const marks = live?.marks || [], fm = $('#faultMarks'); fm.hidden = true;
+  if (wasRec) setTimeout(() => {
+    if (!chunks.length) return; pb.src = URL.createObjectURL(new Blob(chunks, { type: chunks[0].type || 'video/webm' })); pb.hidden = false;
+    if (marks.length) {
+      const mmss = x => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, '0')}`;
+      fm.innerHTML = `<span class="eyebrow">Watch it back · ${marks.filter(m => !m.ok).length} correction${marks.filter(m => !m.ok).length === 1 ? '' : 's'}</span>` +
+        marks.map(m => `<button type="button" class="${m.ok ? 'ok' : ''}" data-seek="${m.t}"><span class="data">${mmss(m.t)}</span><span><b>${esc(m.label)}</b>${m.fix ? `<br><span class="muted small">${esc(m.fix)}</span>` : ''}</span></button>`).join('');
+      fm.hidden = false;
+      fm.onclick = e => { const b = e.target.closest('[data-seek]'); if (!b) return; pb.currentTime = Math.max(0, +b.dataset.seek - 1.5); pb.play(); pb.scrollIntoView({ block: 'center', behavior: 'smooth' }); };
+    }
+  }, 400);
   live = null;
 }
 
@@ -617,9 +689,23 @@ function endGuided() {
 
 /* ---------- Movement tests: gait, jump, single-leg squat ---------- */
 let gaitMode = 'walk', testMode = 'gait';
+// What QK says and shows for each body-map step.
+const BM_STEP = {
+  stand: ['', 'Stand still, side-on'],
+  toes: ['Rise up onto your toes as high as you can, and hold.', 'Up on your toes'],
+  squat: ['Now three slow squats. As deep as is comfortable, heels down.', '3 slow squats'],
+  reach: ['Stand tall and reach both arms straight up, as high as you can.', 'Arms overhead'],
+  hinge: ['Soft knees. Slide your hands down your thighs as far as you can with a flat back, then stand. Twice.', '2 slow hinges'],
+  face: ['Now turn and face me. Stand still.', 'Face the camera'],
+  arms: ['Raise your arms out to the sides and up, as high as you can.', 'Arms out and up'],
+  fsquat: ['Two more slow squats, facing me.', '2 slow squats, facing me'],
+};
 const TEST = {
   gait: { secs: 10, label: 'Record 10 seconds', minFps: 25, view: null, intro: () => gaitMode === 'run' ? 'Start running at an easy pace. Recording starts after the countdown.' : 'Walk naturally. Recording starts after the countdown.' },
   jump: { secs: 15, label: 'Record jumps (15 s)', minFps: 50, view: 'side', intro: () => 'Hands on hips. Stand still for a second, then jump as high as you can. Three jumps with a short rest.' },
+  bodymap: { secs: 62, label: 'Map my body', minFps: 15, view: null, intro: () => 'Let\'s map your body. Stand side-on to me, whole body in view, arms by your sides, and stay still.',
+    // [seconds, step]. The demo athlete runs a faster timeline (BODYMAP_DEMO_STEPS in demo.js).
+    steps: demo => demo ? BODYMAP_DEMO_STEPS : [[0, 'stand'], [5, 'toes'], [10, 'squat'], [25, 'reach'], [31, 'hinge'], [41, 'face'], [45, 'arms'], [51, 'fsquat']] },
   sls: { secs: 30, label: 'Record knee test (30 s)', minFps: 25, view: 'front', intro: () => 'Stand on your left leg and do five slow squats.' },
 };
 $$('[data-gmode]').forEach(b => b.onclick = () => { gaitMode = b.dataset.gmode; $$('[data-gmode]').forEach(x => x.classList.toggle('on', x === b)); });
@@ -631,6 +717,56 @@ $$('[data-test]').forEach(b => b.onclick = () => {
   $('#gaitDemo').hidden = testMode !== 'gait';
   $('#gaitResult').hidden = true; renderTestHistory();
 });
+/* ---------- Map my body ---------- */
+$('#bodyMapTile').onclick = () => S.profile.body?.ok ? showBodyMap(S.profile.body) : showBodyMapIntro();
+function showBodyMapIntro() {
+  openSheet(`<div><span class="eyebrow">1 minute · on camera</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Map my body</h2></div>
+    <p class="muted" style="margin:0">Everyone's built differently. Long thighs need more forward lean, tight hamstrings limit a hinge, and some elbows never fully straighten. QK measures yours, then judges every exercise against <b>your</b> body instead of one textbook number.</p>
+    <ol class="steps"><li>Phone at hip height, 2–3 metres away. Whole body in view.</li><li>Side-on: stand still, rise onto your toes, 3 slow squats, reach overhead, 2 slow hinges.</li><li>Facing the camera: stand still, arms out and up, 2 slow squats. QK talks you through each step.</li></ol>
+    <button class="cta" type="button" data-bm="start">Start (1 min)</button>
+    <div class="btn-row"><button class="ghost" type="button" data-bm="demo">Watch a demo</button><button class="ghost" type="button" data-bm="close">Not now</button></div>`);
+}
+function startBodyMap(demo) { closeSheet(); $('#setup').hidden = true; startLive({ mode: 'bodymap', source: demo ? 'demo' : 'camera' }); }
+function renderBodyMapTile() {
+  const b = S.profile.body;
+  $('#bodyMapTitle').textContent = b?.ok ? 'Your body map' : 'Map my body';
+  $('#bodyMapSub').textContent = b?.ok ? (b.v >= 2 ? `Mapped ${new Date(b.at).toLocaleDateString()}. Every exercise is judged against your proportions and mobility.` : 'Re-map (1 min) so QK can fit every exercise to you, not just squats.') : 'One minute on camera. QK learns your proportions and mobility, then judges every exercise against your body, not a textbook.';
+}
+function finishBodyMap(frames, demo) {
+  const b = analyseBodyMap(frames);
+  tab('body');
+  if (!b.ok) {
+    say(b.issues[0], { id: 'bm_fail_' + Date.now(), priority: 'high' });
+    return openSheet(`<div><span class="eyebrow">Map my body</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Let's try that again</h2></div><p class="muted" style="margin:0">${esc(b.issues[0])}</p><div class="btn-row"><button class="ghost" type="button" data-bm="close">Not now</button><button class="cta" type="button" data-bm="again">Try again</button></div>`);
+  }
+  b.demo = demo || undefined;
+  if (!demo) { S.profile.body = b; persist(); renderBodyMapTile(); }
+  const P = personalFor('squat', b), fixes = explainBodyMap(b).filter(x => x.fix);
+  say(`Body mapped. ${demo ? 'This is a demo lifter. ' : ''}From now on I'll judge every exercise against your own body. ${P.sqLean > 50 ? 'You have long thighs, so leaning forward more is normal for you.' : ''} ${fixes.length ? 'One thing to work on: ' + fixes[0].title.toLowerCase() + '.' : ''}`, { id: 'bm_done_' + Date.now(), priority: 'high' });
+  showBodyMap(b);
+}
+function showBodyMap(b) {
+  const P = personalFor('squat', b), find = explainBodyMap(b);
+  // Which exercises it changed, grouped by movement, so the lifter sees it applies everywhere.
+  const GROUPS = [['squat', 'Squats'], ['lunge', 'Lunges'], ['rdl', 'Hinges'], ['bench', 'Bench'], ['pushUp', 'Push-ups'], ['press', 'Overhead press'], ['dip', 'Dips'], ['triExt', 'Triceps'], ['curl', 'Curls'], ['row', 'Rows'], ['vPull', 'Pull-downs'], ['raise', 'Raises'], ['calf', 'Calf raises'], ['legRaise', 'Leg raises'], ['kneeExt', 'Leg extension'], ['kneeFlex', 'Leg curl'], ['hipThrust', 'Hip thrust'], ['plank', 'Plank']];
+  const changed = GROUPS.map(([k, n]) => [n, fitLines(k, b)]).filter(([, l]) => l.length);
+  openSheet(`<div><span class="eyebrow">${b.demo ? 'Demo lifter · not saved' : 'Your body map'}</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">QK now coaches your body</h2></div>
+    <div class="bm-grid">
+      <div><span class="num">${b.femurTorso}</span><small>thigh : torso</small></div>
+      <div><span class="num">${b.kneeMin}°</span><small>your best depth</small></div>
+      <div><span class="num">${b.shinAtDepth}°</span><small>ankle bend</small></div>
+      ${b.hingeMin != null ? `<div><span class="num">${b.hingeMin}°</span><small>hinge</small></div>` : ''}
+      ${b.shoulderFlex != null ? `<div><span class="num">${b.shoulderFlex}°</span><small>overhead reach</small></div>` : ''}
+      ${b.elbowStraight != null ? `<div><span class="num">${b.elbowStraight}°</span><small>elbow straight</small></div>` : ''}
+    </div>
+    <div class="card stack" style="padding:12px 14px;gap:8px"><span class="eyebrow">Fitted to you · ${changed.length} movement${changed.length === 1 ? '' : 's'}</span>${changed.map(([n, l]) => `<div><b class="small">${esc(n)}</b>${l.map(x => `<div class="muted small">${esc(x)}</div>`).join('')}</div>`).join('') || '<span class="muted small">Your body matches the standard limits for every movement.</span>'}<span class="muted small">Every other limit stays at the standard, which already suits your body.</span></div>
+    ${find.map(f => `<div class="bm-find ${f.fix ? 'fix' : ''}"><b>${esc(f.title)}</b><span class="muted small">${esc(f.detail)}</span></div>`).join('')}
+    <p class="muted small" style="margin:0">Re-map every few weeks: as your mobility improves, QK raises the bar with you.</p>
+    <div class="btn-row"><button class="ghost" type="button" data-bm="again">${b.demo ? 'Map my body' : 'Re-map'}</button><button class="cta" type="button" data-bm="close">Done</button></div>`);
+}
+$('#rsheetBody').addEventListener('click', e => { const b = e.target.closest('[data-bm]'); if (!b) return; const a = b.dataset.bm; if (a === 'again') showBodyMapIntro(); else if (a === 'start') startBodyMap(); else if (a === 'demo') startBodyMap(true); else closeSheet(); });
+renderBodyMapTile();
+
 $('#testLive').onclick = () => startLive({ mode: testMode, source: 'camera' });
 $('#gaitDemo').onclick = () => startLive({ mode: 'gait', source: 'demo' });
 $('#gaitFile').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) startLive({ mode: testMode, source: 'file', file: f }); };
@@ -641,6 +777,14 @@ function testFrame(px, ctx, t) {
   if (live.mode === 'gait') { footTrails.L.push(px[31], 1); footTrails.R.push(px[32], 1); footTrails.L.draw(ctx); footTrails.R.draw(ctx); }
   drawPose(ctx, px, { color: '#45c3ff' });
   const cfg = TEST[live.mode], el = (t - (live.source === 'file' ? 0 : live.t0)) / 1000;
+  if (live.mode === 'bodymap' && live.source !== 'file') {
+    const steps = cfg.steps(live.source === 'demo'), i = steps.filter(x => el >= x[0]).length - 1, [line, label] = BM_STEP[steps[i][1]];
+    if (i !== live.step) { live.step = i; $('#liveTitle').textContent = `Step ${i + 1} of ${steps.length} · ${label}`; if (line) say(line, { id: 'bm_' + steps[i][1], priority: 'now' }); }
+    $('#gProg').style.width = Math.min(100, el / (live.source === 'demo' ? BODYMAP_SECS : cfg.secs) * 100) + '%';
+    if (el >= (live.source === 'demo' ? BODYMAP_SECS : cfg.secs)) return finishTest();
+    $('#gSteps').textContent = Math.round(el) + ' s';
+    return;
+  }
   if (live.source !== 'file') {
     $('#gProg').style.width = Math.min(100, el / cfg.secs * 100) + '%';
     if (live.mode === 'sls' && el >= cfg.secs / 2 && !live.switched) { live.switched = true; say('Switch. Now your right leg, five slow squats.', { id: 'sls_switch', priority: 'high' }); }
@@ -663,6 +807,7 @@ function finishTest() {
   // Quality gate first: a bad recording gives a bad answer, so say what to fix instead.
   const q = demo ? { ok: true, score: 100, issues: [], fps: 30 } : assessQuality(frames, { w, h, minFps: cfg.minFps, view: cfg.view, viewOf, joints: mode === 'jump' ? [23, 24, 25, 26, 27, 28, 29, 30, 31, 32] : undefined });
   if (mode === 'rom') { recorder2.finish({ mode, quality: q }); return finishRom(frames, q); }
+  if (mode === 'bodymap') { recorder2.finish({ mode, quality: q }); return finishBodyMap(frames, demo); }
   const mPerPx = scaleFromHeight(frames.slice(0, 20), (S.profile.heightCm || 0) / 100);
   const r = mode === 'gait' ? analyseGait(frames, { mode: gaitMode }) : mode === 'jump' ? analyseJumps(frames, { mPerPx }) : analyseSingleLegSquat(frames);
   recorder2.finish({ mode, quality: q, result: summarise(mode, r) });
