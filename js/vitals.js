@@ -200,7 +200,7 @@ function drawWave(g, cv, s) {
   const W = cv.width, H = cv.height, last = s.filter(p => p.t > s.at(-1).t - 4);
   if (last.length < 3) return;
   const m = last.reduce((a, p) => a + p.v, 0) / last.length, span = Math.max(1, ...last.map(p => Math.abs(p.v - m)));
-  g.clearRect(0, 0, W, H); g.strokeStyle = '#7c6cff'; g.lineWidth = 2; g.beginPath();
+  g.clearRect(0, 0, W, H); g.strokeStyle = '#9FD0B6'; g.lineWidth = 2; g.beginPath();
   last.forEach((p, i) => { const x = (p.t - last[0].t) / 4 * W, y = H / 2 + (p.v - m) / span * H * 0.4; i ? g.lineTo(x, y) : g.moveTo(x, y); });
   g.stroke();
 }

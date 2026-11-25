@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0a0d14">
+  <meta name="theme-color" content="#F2F4EF">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <title>Shred by QK</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
@@ -17,7 +17,7 @@
 <body>
 <div class="stage-bg"></div>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <defs><linearGradient id="zoneStroke" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#45c3ff"/><stop offset=".55" stop-color="#7c6cff"/><stop offset="1" stop-color="#ff6b4a"/></linearGradient></defs>
+  <defs><linearGradient id="zoneStroke" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7DB59B"/><stop offset=".55" stop-color="#2F7568"/><stop offset="1" stop-color="#D99A5B"/></linearGradient></defs>
 </svg>
 
 <template id="orb-tpl"><button class="orb" data-orb type="button" aria-label="Coach QK"><span class="halo"></span><span class="core"><span class="mono">QK</span><img alt="" hidden></span><span class="wave"><b></b><b></b><b></b><b></b></span></button></template>
@@ -279,10 +279,10 @@
       <div class="rings">
         <svg viewBox="0 0 150 150" role="img" id="ringsSvg" aria-label="Weekly progress rings">
           <g fill="none" stroke-linecap="round" transform="rotate(-90 75 75)">
-            <circle cx="75" cy="75" r="64" stroke="#1a2130" stroke-width="13"/><circle cx="75" cy="75" r="47" stroke="#1a2130" stroke-width="13"/><circle cx="75" cy="75" r="30" stroke="#1a2130" stroke-width="13"/>
-            <circle class="ring-arc" id="ring1" cx="75" cy="75" r="64" stroke="#ff6b4a" stroke-width="13"/>
-            <circle class="ring-arc" id="ring2" cx="75" cy="75" r="47" stroke="#7c6cff" stroke-width="13"/>
-            <circle class="ring-arc" id="ring3" cx="75" cy="75" r="30" stroke="#45c3ff" stroke-width="13"/>
+            <circle cx="75" cy="75" r="64" style="stroke:var(--surface-2)" stroke-width="13"/><circle cx="75" cy="75" r="47" style="stroke:var(--surface-2)" stroke-width="13"/><circle cx="75" cy="75" r="30" style="stroke:var(--surface-2)" stroke-width="13"/>
+            <circle class="ring-arc" id="ring1" cx="75" cy="75" r="64" style="stroke:var(--z3)" stroke-width="13"/>
+            <circle class="ring-arc" id="ring2" cx="75" cy="75" r="47" style="stroke:var(--z2)" stroke-width="13"/>
+            <circle class="ring-arc" id="ring3" cx="75" cy="75" r="30" style="stroke:var(--z1)" stroke-width="13"/>
           </g>
         </svg>
         <div class="legend">
@@ -494,7 +494,7 @@
     </div>
     <div class="card kv" id="sTable"></div>
     <div class="card rest" id="restCard">
-      <svg viewBox="0 0 76 76" aria-hidden="true"><circle cx="38" cy="38" r="32" fill="none" stroke="#1a2130" stroke-width="8"/><circle id="restArc" cx="38" cy="38" r="32" fill="none" stroke="url(#zoneStroke)" stroke-width="8" stroke-linecap="round" stroke-dasharray="201" stroke-dashoffset="0" transform="rotate(-90 38 38)"/></svg>
+      <svg viewBox="0 0 76 76" aria-hidden="true"><circle cx="38" cy="38" r="32" fill="none" style="stroke:var(--surface-2)" stroke-width="8"/><circle id="restArc" cx="38" cy="38" r="32" fill="none" stroke="url(#zoneStroke)" stroke-width="8" stroke-linecap="round" stroke-dasharray="201" stroke-dashoffset="0" transform="rotate(-90 38 38)"/></svg>
       <div style="flex:1"><span class="eyebrow">Rest</span><div class="num" id="restClock">2:00</div><span class="muted small" id="restWhy"></span></div>
       <button class="ghost" type="button" id="restBtn">Start</button>
     </div>
@@ -529,7 +529,7 @@
     <div class="live-top"><div><span class="eyebrow">Body check</span><div class="set" id="mTitle"></div></div><button type="button" class="linkbtn" id="mCancel">Cancel</button></div>
     <div class="calm-stage">
       <div class="stack" id="mLive" style="align-items:center;text-align:center">
-        <div class="m-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="40" fill="none" stroke="#1a2130" stroke-width="7"/><circle id="mArc" cx="50" cy="50" r="40" fill="none" stroke="url(#zoneStroke)" stroke-width="7" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="251" transform="rotate(-90 50 50)"/></svg><video id="mVideo" playsinline muted></video></div>
+        <div class="m-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="40" fill="none" style="stroke:var(--surface-2)" stroke-width="7"/><circle id="mArc" cx="50" cy="50" r="40" fill="none" stroke="url(#zoneStroke)" stroke-width="7" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="251" transform="rotate(-90 50 50)"/></svg><video id="mVideo" playsinline muted></video></div>
         <canvas id="mWave" width="300" height="70"></canvas>
         <p id="mStatus" style="margin:0;font-weight:600"></p>
         <p class="muted small" id="mTip" style="margin:0"></p>

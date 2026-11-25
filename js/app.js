@@ -502,7 +502,7 @@ function formFrame(px, ctx, t) {
   motion.draw(ctx);
   const s = raw.s;
   if (live.badUntil > performance.now()) flagged = true; // skeleton stays red while the fault is on screen
-  drawPose(ctx, px, { color: flagged ? '#ff5a5f' : '#7c6cff', labels: [{ at: s.kn, value: m.knee }, { at: s.hip, value: m.hip }, ...(ex.primary === 'elbow' ? [{ at: s.el, value: m.elbow }] : [])] });
+  drawPose(ctx, px, { color: flagged ? '#E46E66' : '#9FD0B6', labels: [{ at: s.kn, value: m.knee }, { at: s.hip, value: m.hip }, ...(ex.primary === 'elbow' ? [{ at: s.el, value: m.elbow }] : [])] });
   if (ex.primary === 'knee') drawDepthArc(ctx, s.kn, s.hip, s.an, m.knee, { start: ex.upT + 10, target: 100 });
   else if (ex.primary === 'elbow') drawDepthArc(ctx, s.el, s.sh, s.wr, m.elbow, { start: ex.upT + 15, target: 95 });
   fx.draw(ctx, px, s, t, { mirror: $('#viewport').classList.contains('mirror') });
@@ -537,7 +537,7 @@ function endSet() {
   $('#sReps').textContent = hold ? `${reps} s` : reps; $('#sClean').textContent = hold ? `${good} s in good position` : `${good} clean`;
   $('#sCompare').textContent = !reps ? 'No reps counted. Check the camera angle in the setup tips.' : prevScore == null ? 'First set logged. Next time you\'ll see your progress here.' : score > prevScore ? `Up from ${prevScore}% last time.` : `Last time: ${prevScore}%.`;
   const L = 2 * Math.PI * 50;
-  $('#scoreRing').innerHTML = `<circle cx="60" cy="60" r="50" fill="none" stroke="#1a2130" stroke-width="11"/><circle cx="60" cy="60" r="50" fill="none" stroke="url(#zoneStroke)" stroke-width="11" stroke-linecap="round" stroke-dasharray="${L}" stroke-dashoffset="${L * (1 - score / 100)}" transform="rotate(-90 60 60)"/><text x="60" y="64" text-anchor="middle" fill="#edf0f6" font-family="Archivo, sans-serif" font-weight="800" font-size="26">${score}%</text><text x="60" y="81" text-anchor="middle" fill="#8c95a8" font-family="Figtree, sans-serif" font-size="10">form score</text>`;
+  $('#scoreRing').innerHTML = `<circle cx="60" cy="60" r="50" fill="none" style="stroke:var(--surface-2)" stroke-width="11"/><circle cx="60" cy="60" r="50" fill="none" stroke="url(#zoneStroke)" stroke-width="11" stroke-linecap="round" stroke-dasharray="${L}" stroke-dashoffset="${L * (1 - score / 100)}" transform="rotate(-90 60 60)"/><text x="60" y="64" text-anchor="middle" style="fill:var(--text)" font-family="Archivo, sans-serif" font-weight="800" font-size="26">${score}%</text><text x="60" y="81" text-anchor="middle" style="fill:var(--muted)" font-family="Figtree, sans-serif" font-size="10">form score</text>`;
   $('#scoreRing').setAttribute('aria-label', `Form score ${score} percent`);
   const top = faults[0]?.rule;
   $('#sFocusBox').hidden = !reps;
@@ -775,7 +775,7 @@ const footTrails = { L: new MotionTracker(40), R: new MotionTracker(40) };
 function testFrame(px, ctx, t) {
   live.frames.push({ t, px }); recorder2.push(t, px);
   if (live.mode === 'gait') { footTrails.L.push(px[31], 1); footTrails.R.push(px[32], 1); footTrails.L.draw(ctx); footTrails.R.draw(ctx); }
-  drawPose(ctx, px, { color: '#45c3ff' });
+  drawPose(ctx, px, { color: '#9FD0B6' });
   const cfg = TEST[live.mode], el = (t - (live.source === 'file' ? 0 : live.t0)) / 1000;
   if (live.mode === 'bodymap' && live.source !== 'file') {
     const steps = cfg.steps(live.source === 'demo'), i = steps.filter(x => el >= x[0]).length - 1, [line, label] = BM_STEP[steps[i][1]];
@@ -878,7 +878,7 @@ function gaitHTML(r, demo) {
       <div class="metric-grid">${r.metrics.map(metric).join('')}</div>
     </div>
     ${r.curves?.L?.length ? `<div class="card gait-chart stack"><span class="eyebrow">Knee bend through one stride</span>${kneeChart(r.curves, r.mode)}
-      <div class="legend-inline"><span><i style="background:var(--z1)"></i>Left</span><span><i style="background:var(--z3)"></i>Right</span><span><i style="background:rgba(124,108,255,.35);height:8px"></i>Typical range</span></div></div>` : ''}
+      <div class="legend-inline"><span><i style="background:var(--z1)"></i>Left</span><span><i style="background:var(--z3)"></i>Right</span><span><i style="background:rgba(var(--z2-rgb),.35);height:8px"></i>Typical range</span></div></div>` : ''}
     <div class="stack">${r.findings.map(f => `<div class="finding ${f.ok ? 'ok' : ''}"><b>${esc(f.title)}</b><p>${esc(f.why)}</p>${f.fix.length ? `<div class="fixes">${f.fix.map(x => `<span>${esc(x)}</span>`).join('')}</div>` : ''}</div>`).join('')}</div>
     <p class="muted small" style="margin:0">A movement screen, not a clinical gait lab. Pain or a recent injury? See a physio.</p>`;
 }
@@ -891,11 +891,11 @@ function kneeChart(curves, mode) {
   const ny = x => { for (let i = 1; i < norm.length; i++) if (x <= norm[i][0]) { const [x0, y0] = norm[i - 1], [x1, y1] = norm[i]; return y0 + (y1 - y0) * (x - x0) / (x1 - x0); } return norm[norm.length - 1][1]; };
   const band = Array.from({ length: 51 }, (_, i) => ny(i * 2));
   let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Knee angle through the gait cycle, left and right">`;
-  for (let v = 0; v <= max; v += mode === 'run' ? 40 : 20) s += `<line x1="${l}" x2="${W - r}" y1="${Y(v)}" y2="${Y(v)}" stroke="#1f2738"/><text x="${l - 6}" y="${Y(v) + 4}" text-anchor="end" fill="#8c95a8" font-size="10" font-family="IBM Plex Mono, monospace">${v}°</text>`;
-  [0, 25, 50, 75, 100].forEach(p => { s += `<text x="${X(p / 2)}" y="${H - 6}" text-anchor="middle" fill="#8c95a8" font-size="10" font-family="IBM Plex Mono, monospace">${p}%</text>`; });
-  s += `<path d="${band.map((v, i) => `${i ? 'L' : 'M'}${X(i)} ${Y(Math.min(max, v + 8))}`).join(' ')} ${band.map((v, i) => `L${X(50 - i)} ${Y(Math.max(0, band[50 - i] - 8))}`).join(' ')} Z" fill="rgba(124,108,255,.2)"/>`;
+  for (let v = 0; v <= max; v += mode === 'run' ? 40 : 20) s += `<line x1="${l}" x2="${W - r}" y1="${Y(v)}" y2="${Y(v)}" style="stroke:var(--line)"/><text x="${l - 6}" y="${Y(v) + 4}" text-anchor="end" style="fill:var(--muted)" font-size="10" font-family="IBM Plex Mono, monospace">${v}°</text>`;
+  [0, 25, 50, 75, 100].forEach(p => { s += `<text x="${X(p / 2)}" y="${H - 6}" text-anchor="middle" style="fill:var(--muted)" font-size="10" font-family="IBM Plex Mono, monospace">${p}%</text>`; });
+  s += `<path d="${band.map((v, i) => `${i ? 'L' : 'M'}${X(i)} ${Y(Math.min(max, v + 8))}`).join(' ')} ${band.map((v, i) => `L${X(50 - i)} ${Y(Math.max(0, band[50 - i] - 8))}`).join(' ')} Z" style="fill:rgba(var(--z2-rgb),.2)"/>`;
   const line = (c, col) => c.length ? `<path d="${c.map((v, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)} ${Y(Math.max(0, Math.min(max, v))).toFixed(1)}`).join(' ')}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>` : '';
-  s += line(curves.L, '#45c3ff') + line(curves.R, '#ff6b4a') + '</svg>';
+  s += line(curves.L, '#5FB39D') + line(curves.R, '#D99A5B') + '</svg>';
   return s;
 }
 
@@ -932,7 +932,7 @@ $('#calcBf').onclick = () => {
   S.scans.push({ at: Date.now(), bf, weight: wt || null, lean, water: v('#bWater') || null, muscle: v('#bMuscle') || null }); persist();
   const prev = S.scans.filter(s => s.bf).slice(-2, -1)[0];
   const off = 176 * (1 - Math.min(40, bf) / 40);
-  $('#bfOut').innerHTML = `<div class="gauge"><svg viewBox="0 0 132 80" role="img" aria-label="Body fat ${bf.toFixed(1)} percent"><path d="M10 72a56 56 0 0 1 112 0" fill="none" stroke="#1a2130" stroke-width="12" stroke-linecap="round"/><path d="M10 72a56 56 0 0 1 112 0" fill="none" stroke="url(#zoneStroke)" stroke-width="12" stroke-linecap="round" stroke-dasharray="176" stroke-dashoffset="${off}"/><text x="66" y="62" text-anchor="middle" fill="#edf0f6" font-family="Archivo, sans-serif" font-weight="800" font-size="24">${bf.toFixed(1)}%</text><text x="66" y="76" text-anchor="middle" fill="#8c95a8" font-family="Figtree, sans-serif" font-size="9">body fat</text></svg>
+  $('#bfOut').innerHTML = `<div class="gauge"><svg viewBox="0 0 132 80" role="img" aria-label="Body fat ${bf.toFixed(1)} percent"><path d="M10 72a56 56 0 0 1 112 0" fill="none" style="stroke:var(--surface-2)" stroke-width="12" stroke-linecap="round"/><path d="M10 72a56 56 0 0 1 112 0" fill="none" stroke="url(#zoneStroke)" stroke-width="12" stroke-linecap="round" stroke-dasharray="176" stroke-dashoffset="${off}"/><text x="66" y="62" text-anchor="middle" style="fill:var(--text)" font-family="Archivo, sans-serif" font-weight="800" font-size="24">${bf.toFixed(1)}%</text><text x="66" y="76" text-anchor="middle" style="fill:var(--muted)" font-family="Figtree, sans-serif" font-size="9">body fat</text></svg>
     <span class="small"><b>${bfCategory(bf, p.sex)}</b><br><span class="muted">${prev ? `${bf < prev.bf ? 'Down' : 'Up'} ${Math.abs(bf - prev.bf).toFixed(1)}% since last time.` : 'Re-measure every two weeks, same time of day.'}</span></span></div>
     ${lean ? `<div class="comp" style="margin-top:12px"><div><span class="num">${lean.toFixed(1)}</span><small>lean kg</small></div><div><span class="num">${(wt - lean).toFixed(1)}</span><small>fat kg</small></div><div><span class="num">${v('#bWater') || '–'}</span><small>water % · scale</small></div></div>` : ''}`;
   say(`Body fat is about ${Math.round(bf)} percent, in the ${bfCategory(bf, p.sex).toLowerCase()} range.`, { id: 'bf_' + Date.now(), priority: 'high' });
@@ -942,12 +942,12 @@ $('#calcBf').onclick = () => {
 function lineChart(vals, { min, max, suffix = '', labels }) {
   const W = 360, H = 150, l = 34, r = 12, t = 14, b = 24, n = vals.length;
   const X = i => l + (n === 1 ? 0 : i * (W - l - r) / (n - 1)), Y = v => t + (1 - (v - min) / (max - min || 1)) * (H - t - b);
-  let s = `<svg viewBox="0 0 ${W} ${H}" role="img"><defs><linearGradient id="fillG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7c6cff" stop-opacity=".35"/><stop offset="1" stop-color="#7c6cff" stop-opacity="0"/></linearGradient></defs>`;
-  const ticks = 3; for (let k = 0; k <= ticks; k++) { const v = min + (max - min) * k / ticks; s += `<line x1="${l}" x2="${W - r}" y1="${Y(v)}" y2="${Y(v)}" stroke="#1f2738"/><text x="${l - 8}" y="${Y(v) + 4}" text-anchor="end" fill="#8c95a8" font-size="10" font-family="IBM Plex Mono, monospace">${Math.round(v)}${suffix}</text>`; }
-  labels.forEach((lb, i) => { if (n <= 8 || i % Math.ceil(n / 6) === 0 || i === n - 1) s += `<text x="${X(i)}" y="${H - 6}" text-anchor="middle" fill="#8c95a8" font-size="10" font-family="IBM Plex Mono, monospace">${lb}</text>`; });
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img"><defs><linearGradient id="fillG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--z2)" stop-opacity=".35"/><stop offset="1" style="stop-color:var(--z2)" stop-opacity="0"/></linearGradient></defs>`;
+  const ticks = 3; for (let k = 0; k <= ticks; k++) { const v = min + (max - min) * k / ticks; s += `<line x1="${l}" x2="${W - r}" y1="${Y(v)}" y2="${Y(v)}" style="stroke:var(--line)"/><text x="${l - 8}" y="${Y(v) + 4}" text-anchor="end" style="fill:var(--muted)" font-size="10" font-family="IBM Plex Mono, monospace">${Math.round(v)}${suffix}</text>`; }
+  labels.forEach((lb, i) => { if (n <= 8 || i % Math.ceil(n / 6) === 0 || i === n - 1) s += `<text x="${X(i)}" y="${H - 6}" text-anchor="middle" style="fill:var(--muted)" font-size="10" font-family="IBM Plex Mono, monospace">${lb}</text>`; });
   const path = vals.map((v, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(' ');
   s += `<path d="${path} L${X(n - 1)} ${H - b} L${X(0)} ${H - b} Z" fill="url(#fillG)"/><path d="${path}" fill="none" stroke="url(#zoneStroke)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
-  s += `<circle cx="${X(n - 1)}" cy="${Y(vals[n - 1])}" r="9" fill="#ff6b4a" fill-opacity=".25"/><circle cx="${X(n - 1)}" cy="${Y(vals[n - 1])}" r="4.5" fill="#edf0f6"/></svg>`;
+  s += `<circle cx="${X(n - 1)}" cy="${Y(vals[n - 1])}" r="9" style="fill:var(--z3)" fill-opacity=".25"/><circle cx="${X(n - 1)}" cy="${Y(vals[n - 1])}" r="4.5" style="fill:var(--text)"/></svg>`;
   return s;
 }
 
@@ -1383,7 +1383,7 @@ function renderLoad() {
   $('#loadDelta').style.color = sp.spike ? 'var(--warn)' : 'var(--muted)';
   if (!S.loads.length) return;
   const max = Math.max(...weeks, 1), W = 360, H = 130, bw = (W - 40) / 8;
-  $('#loadChart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Weekly training load, last 8 weeks">${weeks.map((v, i) => { const h = v / max * (H - 30); return `<rect x="${30 + i * bw + 4}" y="${H - 20 - h}" width="${bw - 8}" height="${h}" rx="5" fill="${i === 7 ? (sp.spike ? '#ffb547' : 'url(#zoneStroke)') : '#2a3348'}"/><text x="${30 + i * bw + bw / 2}" y="${H - 5}" text-anchor="middle" fill="#8c95a8" font-size="10" font-family="IBM Plex Mono, monospace">${i === 7 ? 'now' : '-' + (7 - i) + 'w'}</text>`; }).join('')}</svg>`;
+  $('#loadChart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Weekly training load, last 8 weeks">${weeks.map((v, i) => { const h = v / max * (H - 30); return `<rect x="${30 + i * bw + 4}" y="${H - 20 - h}" width="${bw - 8}" height="${h}" rx="5" style="fill:${i === 7 ? (sp.spike ? 'var(--warn)' : 'url(#zoneStroke)') : 'var(--surface-2)'}"/><text x="${30 + i * bw + bw / 2}" y="${H - 5}" text-anchor="middle" style="fill:var(--muted)" font-size="10" font-family="IBM Plex Mono, monospace">${i === 7 ? 'now' : '-' + (7 - i) + 'w'}</text>`; }).join('')}</svg>`;
   $('#loadNote').textContent = (sp.spike ? 'This week is well above your usual. Big jumps raise injury risk, so build up gradually. ' : '') + (wk.monotony > 2 ? 'Most days are the same effort. Mix in some easier days.' : 'Effort × minutes for each session you rate.');
 }
 

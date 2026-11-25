@@ -40,7 +40,7 @@ export function getImageLandmarker(model = 'heavy') {
 export const liveModelName = () => preferredLiveModel();
 
 export function drawPose(ctx, px, opts = {}) {
-  const { good = '#c6ff3d', color = good, labels = [] } = opts;
+  const { good = '#9FD0B6', color = good, labels = [] } = opts;
   ctx.lineWidth = Math.max(3, ctx.canvas.width / 220);
   ctx.strokeStyle = color; ctx.lineCap = 'round';
   for (const [a, b] of SKELETON) {
@@ -58,7 +58,7 @@ export function drawPose(ctx, px, opts = {}) {
     if (!l.at || l.value == null || Number.isNaN(l.value)) continue;
     const txt = l.text ?? `${Math.round(l.value)}°`;
     const w = ctx.measureText(txt).width + 12;
-    ctx.fillStyle = l.bad ? 'rgba(255,90,95,.92)' : 'rgba(10,13,20,.78)';
+    ctx.fillStyle = l.bad ? 'rgba(228,110,102,.92)' : 'rgba(11,19,17,.78)';
     ctx.fillRect(l.at.x + 10, l.at.y - fs, w, fs * 1.35);
     ctx.fillStyle = '#fff';
     ctx.fillText(txt, l.at.x + 16, l.at.y + fs * 0.1);

@@ -36,15 +36,15 @@ export class HipThrustDemo {
     const P = this.P; if (!P) return;
     const s = 2, X = p => p.x * s, Y = p => p.y * s + 10;
     const g = ctx.createRadialGradient(400, 500, 10, 400, 500, 440);
-    g.addColorStop(0, 'rgba(124,108,255,.16)'); g.addColorStop(1, 'rgba(124,108,255,0)');
+    g.addColorStop(0, 'rgba(95,179,157,.16)'); g.addColorStop(1, 'rgba(95,179,157,0)');
     ctx.fillStyle = g; ctx.fillRect(0, 0, DEMO_W, DEMO_H);
-    ctx.strokeStyle = '#1e2638'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, Y({ y: 250 })); ctx.lineTo(DEMO_W, Y({ y: 250 })); ctx.stroke();
-    ctx.fillStyle = '#1a2130'; ctx.beginPath(); ctx.roundRect?.(X({ x: 40 }), Y({ y: 170 }), 160, 160, 16); ctx.fill();
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#262f44';
+    ctx.strokeStyle = '#1A2823'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, Y({ y: 250 })); ctx.lineTo(DEMO_W, Y({ y: 250 })); ctx.stroke();
+    ctx.fillStyle = '#16231F'; ctx.beginPath(); ctx.roundRect?.(X({ x: 40 }), Y({ y: 170 }), 160, 160, 16); ctx.fill();
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#22312B';
     const limb = (pts, w) => { ctx.lineWidth = w * s; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(X(p), Y(p)) : ctx.moveTo(X(p), Y(p))); ctx.stroke(); };
     limb([P.S, P.H], 30); limb([P.H, P.K], 24); limb([P.K, P.A], 18); limb([P.A, P.toe], 10); limb([P.S, P.elbow, P.hand], 12);
-    ctx.fillStyle = '#262f44'; ctx.beginPath(); ctx.arc(X(P.head), Y(P.head), 34, 0, 7); ctx.fill();
-    ctx.strokeStyle = '#3a4460'; ctx.lineWidth = 12; ctx.beginPath(); ctx.arc(X(P.H), Y({ y: P.H.y - 26 }), 52, 0, 7); ctx.stroke();
+    ctx.fillStyle = '#22312B'; ctx.beginPath(); ctx.arc(X(P.head), Y(P.head), 34, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#34463E'; ctx.lineWidth = 12; ctx.beginPath(); ctx.arc(X(P.H), Y({ y: P.H.y - 26 }), 52, 0, 7); ctx.stroke();
   }
 }
 
@@ -95,12 +95,12 @@ export class SquatDemo {
   }
   drawScene(ctx) {
     const P = this.P; if (!P) return;
-    backdrop(ctx, 380, 420, 'rgba(124,108,255,.16)');
+    backdrop(ctx, 380, 420, 'rgba(95,179,157,.16)');
     floorLine(ctx, FLOOR + 2);
     body(ctx, P, { torso: 46, thigh: 34, shin: 24 });
     // barbell on the upper back
-    ctx.fillStyle = '#3a4460'; ctx.beginPath(); ctx.arc(P.bar.x, P.bar.y, 46, 0, 7); ctx.fill();
-    ctx.fillStyle = '#4b5675'; ctx.beginPath(); ctx.arc(P.bar.x, P.bar.y, 10, 0, 7); ctx.fill();
+    ctx.fillStyle = '#34463E'; ctx.beginPath(); ctx.arc(P.bar.x, P.bar.y, 46, 0, 7); ctx.fill();
+    ctx.fillStyle = '#4A5D54'; ctx.beginPath(); ctx.arc(P.bar.x, P.bar.y, 10, 0, 7); ctx.fill();
   }
 }
 
@@ -182,13 +182,13 @@ export class BodyMapDemo {
     return this.px;
   }
   drawScene(ctx) {
-    backdrop(ctx, 360, 420, 'rgba(69,195,255,.12)'); floorLine(ctx, FLOOR + 2);
+    backdrop(ctx, 360, 420, 'rgba(159,208,182,.12)'); floorLine(ctx, FLOOR + 2);
     if (this.P) body(ctx, this.P, { torso: 46, thigh: 34, shin: 24 });
     else {
-      const p = this.px; ctx.strokeStyle = '#262f44'; ctx.lineCap = 'round';
+      const p = this.px; ctx.strokeStyle = '#22312B'; ctx.lineCap = 'round';
       const limb = (ids, w) => { ctx.lineWidth = w; ctx.beginPath(); ids.forEach((i, k) => k ? ctx.lineTo(p[i].x, p[i].y) : ctx.moveTo(p[i].x, p[i].y)); ctx.stroke(); };
       limb([11, 12, 24, 23, 11], 40); limb([23, 25, 27], 40); limb([24, 26, 28], 40); limb([11, 13, 15], 22); limb([12, 14, 16], 22);
-      ctx.fillStyle = '#262f44'; ctx.beginPath(); ctx.arc(p[0].x, p[0].y, 30, 0, 7); ctx.fill();
+      ctx.fillStyle = '#22312B'; ctx.beginPath(); ctx.arc(p[0].x, p[0].y, 30, 0, 7); ctx.fill();
     }
   }
 }
@@ -222,13 +222,13 @@ export class BenchDemo {
   }
   drawScene(ctx) {
     const P = this.P; if (!P) return;
-    backdrop(ctx, 360, 440, 'rgba(69,195,255,.12)');
+    backdrop(ctx, 360, 440, 'rgba(159,208,182,.12)');
     floorLine(ctx, FLOOR + 2);
-    ctx.fillStyle = '#1a2130'; ctx.beginPath(); ctx.roundRect?.(150, BENCH_Y, 330, 26, 10); ctx.fill();
+    ctx.fillStyle = '#16231F'; ctx.beginPath(); ctx.roundRect?.(150, BENCH_Y, 330, 26, 10); ctx.fill();
     ctx.fillRect(200, BENCH_Y + 20, 18, FLOOR - BENCH_Y - 20); ctx.fillRect(420, BENCH_Y + 20, 18, FLOOR - BENCH_Y - 20);
     body(ctx, P, { torso: 46, thigh: 32, shin: 22 });
-    ctx.fillStyle = '#3a4460'; ctx.beginPath(); ctx.arc(P.hand.x, P.hand.y, 52, 0, 7); ctx.fill();
-    ctx.fillStyle = '#4b5675'; ctx.beginPath(); ctx.arc(P.hand.x, P.hand.y, 11, 0, 7); ctx.fill();
+    ctx.fillStyle = '#34463E'; ctx.beginPath(); ctx.arc(P.hand.x, P.hand.y, 52, 0, 7); ctx.fill();
+    ctx.fillStyle = '#4A5D54'; ctx.beginPath(); ctx.arc(P.hand.x, P.hand.y, 11, 0, 7); ctx.fill();
   }
 }
 
@@ -251,12 +251,12 @@ function backdrop(ctx, x, y, col) {
   g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = g; ctx.fillRect(0, 0, DEMO_W, DEMO_H);
 }
-function floorLine(ctx, y) { ctx.strokeStyle = '#1e2638'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(DEMO_W, y); ctx.stroke(); }
+function floorLine(ctx, y) { ctx.strokeStyle = '#1A2823'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(DEMO_W, y); ctx.stroke(); }
 function body(ctx, P, w) {
-  ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#262f44';
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#22312B';
   const limb = (pts, lw) => { ctx.lineWidth = lw; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.stroke(); };
   limb([P.S, P.H], w.torso * 1.4); limb([P.H, P.K], w.thigh * 1.4); limb([P.K, P.A], w.shin * 1.4); limb([P.heel, P.toe], 16); limb([P.S, P.elbow, P.hand], 22);
-  ctx.fillStyle = '#262f44'; ctx.beginPath(); ctx.arc(P.head.x, P.head.y, 30, 0, 7); ctx.fill();
+  ctx.fillStyle = '#22312B'; ctx.beginPath(); ctx.arc(P.head.x, P.head.y, 30, 0, 7); ctx.fill();
 }
 // Pixel-space pose → 33 MediaPipe-style landmarks (far side hidden, like a real side-on camera).
 function toPxLandmarks(P) {
@@ -276,14 +276,14 @@ export class WalkDemo {
   drawScene(ctx) {
     const px = this.px; if (!px) return;
     const g = ctx.createRadialGradient(330, 560, 10, 330, 560, 420);
-    g.addColorStop(0, 'rgba(69,195,255,.14)'); g.addColorStop(1, 'rgba(69,195,255,0)');
+    g.addColorStop(0, 'rgba(159,208,182,.14)'); g.addColorStop(1, 'rgba(159,208,182,0)');
     ctx.fillStyle = g; ctx.fillRect(0, 0, DEMO_W, DEMO_H);
     // treadmill belt
     const beltY = Math.max(px[29].y, px[30].y, px[31].y, px[32].y) + 6;
-    ctx.fillStyle = '#161c2b'; ctx.beginPath(); ctx.roundRect?.(90, beltY, 520, 22, 11); ctx.fill();
-    ctx.strokeStyle = '#262f44'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.fillStyle = '#13201C'; ctx.beginPath(); ctx.roundRect?.(90, beltY, 520, 22, 11); ctx.fill();
+    ctx.strokeStyle = '#22312B'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     const limb = (ids, w) => { ctx.lineWidth = w; ctx.beginPath(); ids.forEach((i, k) => k ? ctx.lineTo(px[i].x, px[i].y) : ctx.moveTo(px[i].x, px[i].y)); ctx.stroke(); };
     limb([12, 14, 16], 20); limb([24, 26, 28, 32], 36); limb([11, 23], 56); limb([23, 25, 27, 31], 40); limb([11, 13, 15], 22);
-    ctx.fillStyle = '#262f44'; ctx.beginPath(); ctx.arc(px[0].x - 6, px[0].y, 30, 0, 7); ctx.fill();
+    ctx.fillStyle = '#22312B'; ctx.beginPath(); ctx.arc(px[0].x - 6, px[0].y, 30, 0, 7); ctx.fill();
   }
 }
