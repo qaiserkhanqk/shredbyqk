@@ -1,0 +1,16 @@
+ok   flag off: no midlife card even with perimenopause ticked
+ok   flag off: no midlife symptom categories in settings
+ok   flag on, perimenopause not ticked: no midlife card
+ok   flag on, perimenopause not ticked: midlife categories hidden
+FAIL perimenopause ticked: the midlife card appears with its intro
+FAIL warning signs are listed
+FAIL marked as awaiting clinician review
+FAIL sources link to the published papers (8 or more)
+FAIL the midlife symptom categories appear in settings, off by default
+FAIL run completed  — page.check: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-cat=hotFlushes]')[22m
+
+    at /home/user/shredbyqk/tests/cycle-ui-midlife.cjs:48:15
+ok   no JavaScript errors
+6 FAILED of 11

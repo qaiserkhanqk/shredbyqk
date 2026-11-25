@@ -1,0 +1,36 @@
+FAIL module js/cycle/midlife.js exists  — Cannot find module '/home/user/shredbyqk/js/cycle/midlife.js' imported from /home/user/shredbyqk/tests/cycle-midlife.test.mjs
+FAIL a separate flag, off by default
+FAIL six midlife symptom categories exist  — hotFlushes,focus,aches,heartRacing,dryness,bladder
+FAIL they are grouped as "midlife" (shown only in perimenopause mode)
+FAIL each uses none / mild / moderate / severe, moderate or severe being notable
+FAIL each explanation says what it is in plain words
+FAIL hot flushes include night sweats
+FAIL heart racing says to get urgent help for chest pain, breathlessness or fainting
+FAIL off until switched on, like every category
+FAIL symptoms ran to the end  — Error: cycle:INVALID_INPUT     at Module.setCategory (file:///home/user/shredbyqk/js/cycle/model.js:79:35)
+ok   nothing unless she marked perimenopause or menopause
+FAIL STRAW+10 numbers are the published ones, kept in one place
+FAIL steady cycles: no variability observation  — null
+FAIL one odd cycle (28, 36, 29) is a single episode, not described as persistent
+FAIL a difference of 7+ days that recurs within 10 cycles is described
+FAIL the description gives her own cycle lengths and the published criterion, with the source
+ok   it never says she IS in perimenopause or menopause (no diagnosis)
+FAIL it says other things can cause it
+FAIL a single change that has not recurred is not described as persistent  — {}
+FAIL 60+ days without a logged period (64-day cycle, no end logged → 63 days) is described  — {}
+FAIL a gap she marked as a missed log is not counted
+FAIL 12+ months since the last logged period: milestone, explained as looked back on
+FAIL and it says any bleeding from now on should be checked by a doctor
+FAIL under 12 months: counts the months, no milestone
+FAIL bleeding logged after 12+ months without a period: a prominent "see a doctor" warning
+FAIL spotting after 12+ months counts too
+FAIL not applicable with "hormonalContraception": no bleeding-pattern observations, and it says why  — null
+FAIL not applicable with "other": no bleeding-pattern observations, and it says why  — null
+FAIL not applicable while pregnant
+FAIL warning signs always included
+FAIL marked as awaiting clinician review
+FAIL sources are listed with DOI links (at least 8)  — []
+ok   no hormone, medicine or dose advice
+ok   no forbidden wording (output policy)
+FAIL the intro says experiences vary widely and she is the expert in her own experience
+31 FAILED of 35
