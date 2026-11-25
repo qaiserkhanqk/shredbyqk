@@ -10,9 +10,9 @@ const html = read('index.html');
 const screen = between(html, '<!-- SUKOON (calm) -->', '<!-- TESTS -->')
   .replace(/\s*<button type="button" class="back" data-back>.*?<\/button>/, '')
   .replace('<section class="screen" id="calm">', '<section class="screen on" id="calm">');
-const live = between(html, '<!-- Sukoon live session -->', '<!-- Welcome -->');
+const live = between(html, '<!-- Sukoon live session -->', '<!-- Welcome -->').replace(between(html, '<!-- Alertness test -->', '<!-- Welcome -->'), '');
 const css = read('css/styles.css');
-const js = [read('js/sukoon.js'), read('js/calm.js')].join('\n')
+const js = [read('js/hr.js'), read('js/sukoon.js'), read('js/vitals.js'), read('js/calm.js')].join('\n')
   .replace(/^import .*$/gm, '').replace(/^export /gm, '');
 if (/\bimport\b.*from/.test(js)) throw new Error('unresolved import left in bundle');
 

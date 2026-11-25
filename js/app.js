@@ -21,6 +21,8 @@ import { analyseBodyMap, personalFor, explainBodyMap, fitLines } from './bodymap
 import { FormFX, drawDepthArc } from './fx.js';
 import { initCalm, renderCalm, startCalmNow } from './calm.js';
 import { WEIGHTED, lastLoad, lastLoadText, weekSummary } from './share.js';
+import { initVitals, renderVitals } from './vitals.js';
+import { vitalNotes } from './hr.js';
 import { landmarksFrom, analyse, render, navyBodyFat, bfCategory, stanceProblem } from './bodyscan.js';
 
 const $ = s => document.querySelector(s);
@@ -35,6 +37,7 @@ const persist = () => {
 };
 ErrorLog.install();
 initCalm({ S, persist: () => persist(), toast: m => toast(m) });
+initVitals({ S, persist: () => persist(), toast: m => toast(m) });
 const recorder2 = new SessionRecorder();
 const bar = new BarTracker();
 const VBT_EQUIP = ['Barbell', 'Dumbbell', 'Dumbbells', 'EZ bar', 'Kettlebell'];
@@ -62,12 +65,13 @@ function mountOrbs() {
 /* ---------- Navigation ---------- */
 function tab(id) {
   $$('.screen').forEach(s => s.classList.toggle('on', s.id === id));
-  const tabFor = ['gait', 'scan', 'rehab', 'calm'].includes(id) ? 'body' : id;
+  const tabFor = ['gait', 'scan', 'rehab', 'calm', 'vitals'].includes(id) ? 'body' : id;
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tabFor));
   if (id === 'today') renderToday();
   if (id === 'progress') { renderProgress(); renderLoad(); renderToday(); $('#youName').textContent = S.profile.name || 'You'; }
   if (id === 'rehab') renderRehab();
   if (id === 'calm') renderCalm();
+  if (id === 'vitals') renderVitals();
   if (id === 'scan') $('#hipWrap').hidden = S.profile.sex === 'male';
   window.scrollTo(0, 0);
 }
@@ -1296,7 +1300,9 @@ function renderReady() {
   $$('[data-feel]').forEach(b => b.classList.toggle('on', !!c && c.feel === b.dataset.feel));
   $('#readyTitle').textContent = c ? rec.title : '';
   $('#readyScore').textContent = c ? readiness(c, hist).score + '/100' : '';
-  $('#readyReasons').innerHTML = c ? rec.reasons.map(r => '<li>' + esc(r) + '</li>').join('') : '';
+  // Today's camera HRV and alertness test, compared with the client's own normal, add to the reasons.
+  const vn = vitalNotes(S.vitals, Date.now()).map(n => n.text);
+  $('#readyReasons').innerHTML = c ? [...rec.reasons, ...vn].map(r => '<li>' + esc(r) + '</li>').join('') : '';
   $('#morningCheck').textContent = c ? 'Change or add detail' : 'Add more detail';
 }
 const scale7 = (id, label, lo, hi, v = 3) => `<label class="field slider">${label} <span class="val" id="${id}v">${v}</span><input type="range" min="1" max="7" value="${v}" id="${id}"><span class="muted small" style="display:flex;justify-content:space-between"><span>${lo}</span><span>${hi}</span></span></label>`;

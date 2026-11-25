@@ -186,7 +186,25 @@ A 5–15 minute session: rate tension (0–10) → slow breathing with optional 
   - Flags on each exercise scope the rules: free-standing squat, bench with feet down, or a rule that doesn't apply. For example, a preacher curl's arm rests on the pad at an angle, so the "elbow swing" check is off. That also fixed two existing false alarms, on the preacher curl and the conventional deadlift. A deadlift's knees bend by design, so "squatting, not hinging" no longer fires on it or on the kettlebell swing.
 - **Not yet verified:** NSCA text, wording against the manual itself (it couldn't be fetched); the exact ankle dorsiflexion cut-off (no consensus value was found, so the app uses a conservative 28° shin angle and doesn't quote a "typical" number).
 
-## 12. Known limits (honest list)
+## 12. Body check: heart rate, HRV and alertness with only the phone (`js/hr.js`, `js/vitals.js`)
+
+No wearable is needed. All processing happens on the phone.
+
+| Measure | How | Accuracy (published) | Our own check |
+|---|---|---|---|
+| **Heart rate** (15 s) | Fingertip over the back camera, flash on where the browser allows. Each beat darkens the red image; beats are found, timed and averaged. Noisy or irregular recordings are rejected, not reported. | Fingertip camera apps: within about 2–4.5 bpm of ECG ([Coppetti 2017](https://doi.org/10.1177/2047487317702044)); within about 1 bpm with a regular rhythm, worse with an irregular one ([Pipitprapat 2018](https://doi.org/10.1080/07853890.2018.1531144)). Face-scanning apps were worse (7–8 bpm), so only the fingertip method is used. | Synthetic signals 48–165 bpm: within ±2 bpm. Fake-camera videos through the real browser: 52, 64, 72, 110 bpm read 52, 64, 73, 110. |
+| **HRV, RMSSD** (1 min, morning) | Same recording for 60 s. Each beat is timed by matching an average beat shape across the whole waveform, refined between frames, because a single peak sample is too noisy at 30 fps. Readings with more than 10% irregular beats are rejected. | Phone-camera HRV correlates strongly with ECG but reads high ([Comfort 2026](https://doi.org/10.1007/s00406-026-02239-5)). A 60 s recording is long enough: ECG RMSSD from 30 s already agrees well with 5 minutes, and 120 s almost perfectly ([Munoz 2015](https://doi.org/10.1371/journal.pone.0138921)). | Reads 0–11 ms high, most when HRV is low, because of frame timing and camera noise. **So it is only ever compared with the person's own last 30 days (normal = within 1 SD, after 5 readings), never with norms or other devices.** |
+| **Alertness** (3 min) | PVT-B: numbers start counting at random every 2–5 s; tap as fast as possible. Lapse = 355 ms or slower; false start = early tap or under 100 ms. Response speed (1/RT) is the main measure. | The 3-minute phone PVT tracked 38 h of sleep loss against the 10-minute lab test ([Grant 2017](https://doi.org/10.3758/s13428-016-0763-8)); negligible practice effect over 16 repeats ([Basner 2018](https://doi.org/10.1093/sleep/zsx187)). Night shifts slowed doctors from 257 to 283 ms ([Weetman 2024](https://doi.org/10.1136/oemed-2023-109311)). | Screens add device-specific delay, so results are only compared on the same phone. The shorter adaptive version (PVT-BA) needs a published algorithm we don't have, so the validated 3 minutes is kept. |
+
+**Where it's used:** the Body check screen; the Today readiness card adds today's HRV and alertness against the client's normal; Sukoon can measure heart rate before and after.
+
+**Cyclic sighing** (Sukoon breathing style): 2 s breath in, 1 s top-up breath in, 6 s slow breath out (about 6.7 breaths/min). Five minutes a day improved mood more than mindfulness meditation in a Stanford RCT ([Balban 2023](https://doi.org/10.1016/j.xcrm.2022.100895)); one trial, not yet independently repeated.
+
+**Safety:** nothing here diagnoses. The app tells people to see a doctor if resting heart rate is often above 100 or below 40 without a reason, or if they feel their heart racing or skipping.
+
+**Reproducing the camera check:** `python3 tools/make-pulse-video.py out.y4m 72 30` makes a fake fingertip video with a known heart rate and HRV; `node tests/camera-pulse.cjs out.y4m hrv` runs it through the app in Chromium.
+
+## 13. Known limits (honest list)
 
 - A 2D camera can't see rotation well. One angle per exercise is the best it can do, so the setup instructions tell the client where to put the phone.
 - The body map is a bodyweight measurement. Under a heavy bar, depth and lean can differ, so re-map every few weeks. Some limits are estimates from 2D proportions (pressing depth from arm length); validate them on filmed lifts. Dip depth (limited by shoulder extension) isn't measured yet.

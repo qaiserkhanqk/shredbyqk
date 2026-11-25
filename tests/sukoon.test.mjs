@@ -1,5 +1,5 @@
 // Sukoon calm-session logic. Run: node tests/sukoon.test.mjs
-import { GOALS, AYAH_COUNT, SURAH, EVIDENCE, RECITERS, playlist, ayahUrl, ayahUrls, silentWav, binauralPair, breathAt, breathsPerMin, needsSupport, summarize } from '../js/sukoon.js';
+import { PATTERNS, GOALS, AYAH_COUNT, SURAH, EVIDENCE, RECITERS, playlist, ayahUrl, ayahUrls, silentWav, binauralPair, breathAt, breathsPerMin, needsSupport, summarize } from '../js/sukoon.js';
 let fails = 0;
 const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? '  — ' + detail : ''}`); if (!ok) fails++; };
 
@@ -35,6 +35,11 @@ check('pacer: breathe in for the first 5 s', breathAt(0).phase === 'in' && breat
 check('pacer: breathe out from 5 s to 10 s', breathAt(5).phase === 'out' && breathAt(9.9).phase === 'out' && breathAt(10).phase === 'in');
 check('pacer: circle fullest at end of inhale, smallest at end of exhale', breathAt(4.999).scale > 0.99 && breathAt(9.999).scale < 0.01 && Math.abs(breathAt(2.5).scale - 0.5) < 1e-9);
 
+const sg = PATTERNS.sigh;
+check('cyclic sighing: 2 s in, 1 s top-up, 6 s long breath out', breathAt(1, sg).phase === 'in' && breathAt(2.5, sg).phase === 'top' && breathAt(4, sg).phase === 'out' && breathAt(9.1, sg).phase === 'in');
+check('cyclic sighing: lungs 80% full after first breath, 100% after top-up', Math.abs(breathAt(1.999, sg).scale - 0.8) < 0.01 && breathAt(2.999, sg).scale > 0.99 && breathAt(8.999, sg).scale < 0.01);
+check('cyclic sighing: about 6.7 breaths a minute', breathsPerMin(sg) === 6.7 && breathsPerMin(PATTERNS.slow) === 6);
+check('summary: average heart-rate change from sessions with both readings', summarize([{ before: 6, after: 3, hr: { before: 84, after: 72 } }, { before: 5, after: 4, hr: { before: 80, after: 74 } }, { before: 5, after: 4 }]).hrDrop === 9);
 check('support shown at tension 9 and 10 only', needsSupport(9) && needsSupport(10) && !needsSupport(8));
 const now = Date.now(), ses = [
   { at: now, goal: 'anxiety', before: 7, after: 4 }, { at: now, goal: 'anxiety', before: 6, after: 3 },

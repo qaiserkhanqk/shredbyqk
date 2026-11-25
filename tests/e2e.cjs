@@ -23,7 +23,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   // Centre an element before tapping it, so the fixed tab bar never covers it.
   const tap = async sel => { await p.$eval(sel, el => el.scrollIntoView({ block: 'center' })); await p.click(sel); };
   const go = async id => {
-    if (['gait', 'scan', 'rehab', 'calm'].includes(id)) { await go('body'); await p.click(`[data-go=${id}]`); }
+    if (['gait', 'scan', 'rehab', 'calm', 'vitals'].includes(id)) { await go("body"); await p.click(`#body [data-go=${id}]`); }
     else await p.click(`.tabs [data-tab=${id}]`);
   };
   await p.goto('https://shred.local/');
@@ -189,6 +189,44 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   const bm = await p.textContent('#rsheetBody');
   check('body map: fits several movements, with reasons', /Forward lean allowed/.test(bm) && /Hinge depth/.test(bm) && /Long thighs/.test(bm) && /Tight hamstrings/.test(bm));
   await p.click('[data-bm=close]');
+
+  // 11. Body check: alertness test (shortened for the test run) and camera pulse with no finger
+  await p.goto('https://shred.local/'); await p.waitForTimeout(600);
+  await go('vitals');
+  check('body check: three measurements offered', await p.isVisible('#vHr') && await p.isVisible('#vHrv') && await p.isVisible('#vPvt'));
+  await p.evaluate(() => { window.__shredPvtSeconds = 9; });
+  await tap('#vPvt'); await p.click('#pvtStart');
+  await p.click('#pvtArea', { position: { x: 60, y: 60 } }); // too early: counted as a false start
+  for (let i = 0; i < 3; i++) { await p.waitForFunction(() => /^\d+$/.test(document.querySelector('#pvtNum').textContent), null, { timeout: 7000 }).catch(() => {}); await p.waitForTimeout(220); await p.click('#pvtArea', { position: { x: 80, y: 80 } }); }
+  await p.waitForSelector('#pvtResult:not([hidden])', { timeout: 15000 }).catch(() => {});
+  const pvtTxt = await p.textContent('#pvtSummary');
+  check('alertness: result shows average reaction and early taps', /Average reaction\s*\d+ ms/.test(pvtTxt) && /Early taps\s*[1-9]/.test(pvtTxt), pvtTxt.replace(/\s+/g, ' ').slice(0, 120));
+  check('alertness: reaction times plausible (about 200–400 ms)', (() => { const m = pvtTxt.match(/Average reaction\s*(\d+)/); return m && +m[1] > 150 && +m[1] < 500; })());
+  await p.click('#pvtDone');
+  check('alertness: saved and shown on Body check', /\d+ ms/.test(await p.textContent('#vPvtLast')));
+  await tap('#vHr'); await p.waitForTimeout(2500);
+  check('camera pulse: asks for a fingertip when none is on the camera', await p.isVisible('#measure') && /fingertip|camera/i.test(await p.textContent('#mStatus')), await p.textContent('#mStatus'));
+  await p.waitForSelector('#mTap:not([hidden])', { timeout: 12000 }).catch(() => {});
+  check('camera pulse: after 8 s with no finger, explains and offers tap-along', await p.isVisible('#mTap') && /finger|dark/i.test(await p.textContent('#mStatus')), await p.textContent('#mStatus'));
+  await p.click('#mTap');
+  for (let i = 0; i < 12; i++) { await p.click('#tpArea'); await p.waitForTimeout(750); }
+  await p.waitForSelector('#tpDone:not([hidden])', { timeout: 12000 }).catch(() => {});
+  const tapBpm = parseInt(await p.textContent('#tpCount'));
+  check('tap-along pulse: 12 taps 750 ms apart → about 80 bpm', Math.abs(tapBpm - 80) <= 3, `${tapBpm}`);
+  await p.click('#tpDone');
+  check('tap-along pulse: saved to Body check', /\d+ bpm/.test(await p.textContent('#vHrLast')));
+  await tap('#vHr'); await p.waitForTimeout(1500); await p.click('#mCancel');
+  check('camera pulse: cancel closes it', !(await p.isVisible('#measure')));
+
+  // 12. Sukoon: cyclic sighing style
+  await go('calm'); await tap('#calmSettings'.replace('#calmSettings', 'details.card:has(#calmSettings) summary'));
+  await p.selectOption('#cBreath', 'sigh');
+  await tap('#calmNow'); await p.click('#cBefore [data-v="4"]'); await p.waitForTimeout(400);
+  check('cyclic sighing: pacer says breathe in through the nose', /through your nose/.test(await p.textContent('#calmWord')), await p.textContent('#calmWord'));
+  await p.waitForTimeout(2300);
+  check('cyclic sighing: then the top-up breath', /Top up/.test(await p.textContent('#calmWord')), await p.textContent('#calmWord'));
+  await p.click('#calmEnd'); await p.click('#cSave');
+
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();
   console.log(fails ? `${fails} FAILED` : 'ALL PASS'); process.exit(fails ? 1 : 0);
