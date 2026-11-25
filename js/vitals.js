@@ -8,7 +8,7 @@ let ctx; // { S, persist, toast }
 
 export function initVitals(c) {
   ctx = c; ctx.S.vitals ||= [];
-  $('#vHr').onclick = async () => { const r = await measureCamera({ mode: 'hr' }); if (r) { save({ kind: 'hr', bpm: r.bpm }); renderVitals(); } };
+  $('#vHr').onclick = async () => { const r = await measureCamera({ mode: 'hr' }); if (r) { save({ kind: 'hr', bpm: r.bpm, source: r.source || 'camera' }); renderVitals(); } };
   $('#vHrv').onclick = async () => { const r = await measureCamera({ mode: 'hrv' }); if (r) { save({ kind: 'hrv', rmssd: r.rmssd, ln: r.ln, bpm: r.bpm }); renderVitals(); } };
   $('#vPvt').onclick = () => runPvt();
 }
@@ -51,6 +51,10 @@ export function measureCamera({ mode = 'hr', title } = {}) {
       else { $('#mStatus').textContent = r.reason; $('#mRetry').hidden = false; $('#mRetry').onclick = () => { ov.hidden = true; measureCamera({ mode, title }).then(resolve); }; }
     };
     $('#mCancel').onclick = () => finish(undefined);
+    $('#mTap').hidden = true;
+    // Hand over to tap-along: stop the camera without ending the measurement, then return the tap result instead.
+    $('#mTap').onclick = () => { if (mode !== 'hr' || done) return; done = true; cancelAnimationFrame(raf); stream?.getTracks().forEach(t => t.stop()); ov.hidden = true; tapPulse().then(resolve); };
+    $('#mTap').textContent = mode === 'hr' ? 'Can\'t get a reading? Tap along with your pulse instead' : '';
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 30 } }, audio: false });
     } catch {
@@ -64,17 +68,24 @@ export function measureCamera({ mode = 'hr', title } = {}) {
     try { if (track.getCapabilities?.().torch) { await track.applyConstraints({ advanced: [{ torch: true }] }); torch = true; } } catch {}
     $('#mLight').hidden = torch;
     const v = $('#mVideo'); v.srcObject = stream; await v.play().catch(() => {});
+    // iPhone: frames read before the camera has started are blank, so wait until the video has a size.
+    if (!v.videoWidth) await new Promise(res => { const t = setTimeout(res, 3000); v.addEventListener('loadeddata', () => { clearTimeout(t); res(); }, { once: true }); });
     // Average many pixels: each pixel is noisy, the mean of thousands is not.
     const PW = 64, PH = 48, c = document.createElement('canvas'); c.width = PW; c.height = PH; const cx = c.getContext('2d', { willReadFrequently: true }); cx.imageSmoothingQuality = 'high';
     $('#mStatus').textContent = 'Cover the back camera with your fingertip. Press gently.';
     // Time each frame by when the camera captured it, not when the browser handed it over: callback timing
     // jitters by several ms, which would add false beat-to-beat variability (inflating HRV).
     // Safari and Chrome report these differently, so the capture time is used only when it is clearly on the same clock.
-    let chan = null, frames = 0, firstAt = performance.now();
+    let chan = null, frames = 0, firstAt = performance.now(), lastFrameAt = firstAt, useRaf = !v.requestVideoFrameCallback;
+    const next = () => useRaf ? requestAnimationFrame(frame) : v.requestVideoFrameCallback(frame);
+    // If the browser's per-frame callback never fires (seen on some iPhones), fall back to the screen refresh loop.
+    const watchdog = setInterval(() => { if (done) return clearInterval(watchdog); if (!useRaf && performance.now() - lastFrameAt > 1500) { useRaf = true; raf = requestAnimationFrame(frame); } }, 500);
     const frame = (cbNow, meta) => {
       if (done) return;
       const pn = performance.now(), ct = meta?.captureTime;
       const now = (Number.isFinite(ct) && Math.abs(ct - pn) < 1000 ? ct : pn) / 1000;
+      lastFrameAt = pn;
+      if (!v.videoWidth) { raf = next(); return; }
       frames++;
       cx.drawImage(v, 0, 0, PW, PH);
       const d = cx.getImageData(0, 0, PW, PH).data; let r = 0, gg = 0, b = 0;
@@ -102,13 +113,38 @@ export function measureCamera({ mode = 'hr', title } = {}) {
         lostSince ??= now;
         if (now - lostSince > 1) { fingerSince = null; samples = []; chan = null; setProg(0); $('#mStatus').textContent = 'Finger moved. Cover the camera again and it starts over.'; }
       } else if (pn - firstAt > 8000) {
-        $('#mStatus').textContent = rgb.r < 40 ? 'Too dark. Cover both the camera and the flash, or face a bright lamp.' : 'Not enough light shining through your fingertip. Cover the camera fully, with the flash under your finger too.';
+        $('#mStatus').textContent = rgb.r < 20 ? 'Too dark. Face a bright lamp or window so light shines through your fingertip.' : 'No fingertip found. Cover the whole camera with the pad of your finger.';
+        $('#mTap').hidden = mode !== 'hr';
       }
-      raf = v.requestVideoFrameCallback ? v.requestVideoFrameCallback(frame) : requestAnimationFrame(frame);
+      raf = next();
     };
-    raf = v.requestVideoFrameCallback ? v.requestVideoFrameCallback(frame) : requestAnimationFrame(frame);
+    raf = next();
   });
 }
+// Backup when the camera can't see a pulse: feel your pulse (wrist or neck) and tap the screen on every beat for 15 s.
+// Counting your own pulse is how nurses measure it, so this is accurate if you tap every beat.
+function tapPulse() {
+  return new Promise(resolve => {
+    const ov = $('#tapPulse'), area = $('#tpArea'); let taps = [], timer = 0;
+    $('#tpCount').textContent = 'Tap to start'; $('#tpDone').hidden = true; area.hidden = false; ov.hidden = false;
+    const done = r => { clearTimeout(timer); ov.hidden = true; resolve(r); };
+    $('#tpCancel').onclick = () => done(null);
+    area.onpointerdown = e => {
+      e.preventDefault(); taps.push(e.timeStamp);
+      try { navigator.vibrate?.(15); } catch {}
+      if (taps.length === 1) timer = setTimeout(() => {
+        area.hidden = true;
+        const ibi = taps.slice(1).map((t, i) => t - taps[i]).filter(x => x > 300 && x < 2000);
+        if (ibi.length < 8) { $('#tpCount').textContent = 'Not enough taps. Try again, tapping every beat.'; setTimeout(() => done(null), 2000); return; }
+        const bpm = Math.round(60000 / (ibi.sort((a, b) => a - b)[ibi.length >> 1]));
+        $('#tpCount').textContent = `${bpm} bpm`; $('#tpDone').hidden = false;
+        $('#tpDone').onclick = () => done({ ok: true, bpm, source: 'taps' });
+      }, 15000);
+      $('#tpCount').textContent = `${taps.length} beat${taps.length > 1 ? 's' : ''}`;
+    };
+  });
+}
+
 function setProg(f) { $('#mArc').style.strokeDashoffset = 251 * (1 - Math.max(0, Math.min(1, f))); }
 function drawWave(g, cv, s) {
   const W = cv.width, H = cv.height, last = s.filter(p => p.t > s.at(-1).t - 4);

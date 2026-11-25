@@ -516,6 +516,7 @@
         <p class="muted small num" id="mSignal" style="margin:0;font-size:.72rem"></p>
         <p class="muted small" id="mLight" hidden style="margin:0">This phone's browser can't switch the flash on. Face a lamp or window so light shines through your fingertip.</p>
         <button class="ghost" type="button" id="mRetry" hidden>Try again</button>
+        <button class="linkbtn" type="button" id="mTap" hidden></button>
       </div>
       <div class="stack" id="mResult" hidden style="align-items:center;text-align:center">
         <div class="num m-value" id="mValue"></div>
@@ -523,6 +524,16 @@
         <button class="cta" type="button" id="mDone">Done</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Tap-along pulse (backup when the camera can't see a pulse) -->
+<div class="live" id="tapPulse" hidden>
+  <div class="live-inner">
+    <div class="live-top"><div><span class="eyebrow">Heart rate · 15 seconds</span><div class="set">Tap along with your pulse</div></div><button type="button" class="linkbtn" id="tpCancel">Cancel</button></div>
+    <p class="muted small" style="margin:0">Find your pulse on the inside of your wrist (below the thumb) or the side of your neck. Tap the box on every beat. It stops after 15 seconds.</p>
+    <div class="pvt-area" id="tpArea"></div>
+    <div class="stack" style="align-items:center;text-align:center"><div class="num m-value" id="tpCount"></div><button class="cta" type="button" id="tpDone" hidden>Done</button></div>
   </div>
 </div>
 
