@@ -33,7 +33,7 @@ function common(p) {
 // Demers et al. 2018). Long-femur lifters MUST lean more to keep the bar over mid-foot,
 // so the allowed lean scales with their own proportions instead of one number for everyone.
 // Free-standing squats only: these rules don't apply on a leg press, hack squat or slant board.
-const FREE_SQUATS = ['squat', 'frontSquat', 'gobletSquat', 'thruster'];
+export const FREE_SQUATS = ['squat', 'frontSquat', 'gobletSquat', 'thruster'];
 // Flat or incline pressing with feet on the floor (decline has the feet hooked; machines have no bench).
 const FEET_DOWN_PRESS = ['benchPress', 'dbBench', 'inclinePress', 'closeGrip'];
 const BENCH_PRESS = [...FEET_DOWN_PRESS, 'declinePress'];
@@ -57,17 +57,17 @@ export const EXERCISES = {
       return m;
     },
     bottom: [
-      { id: 'sq_valgus', view: 'front', priority: 1, test: m => m.kneeGap < m.ankleGap * 0.8,
+      { id: 'sq_valgus', view: 'front', priority: 1, test: (m, c) => m.kneeGap < m.ankleGap * (c?.P?.sqValgus ?? 0.8),
         cue: 'Spread the floor apart with your feet.', yes: 'Yes, knees tracking out. That\'s it.', tag: 'Knees out',
         why: 'Knees caving in (valgus) shifts load onto the inner knee ligaments.' },
       { id: 'sq_heels', view: 'side', only: FREE_SQUATS, priority: 2,
         test: (m, c) => m.heelLift != null && c?.base?.heelLift != null && m.heelLift - c.base.heelLift > 0.3,
         cue: 'Keep your whole foot down and push the floor away through your heels.', yes: 'Heels down. Much better.', tag: 'Heels down',
         why: 'When the heels lift, the weight rolls onto the toes and the knees take load the hips should share.' },
-      { id: 'sq_chest', view: 'side', priority: 2, test: m => m.torsoLean > squatLeanLimit(m),
+      { id: 'sq_chest', view: 'side', priority: 2, test: (m, c) => m.torsoLean > (c?.P?.sqLean ?? squatLeanLimit(m)),
         cue: 'Show the logo on your shirt to the wall in front.', yes: 'Better, chest stayed proud.', tag: 'Chest up',
         why: 'Leaning past what your limb proportions need moves load to the lower back.' },
-      { id: 'sq_depth', priority: 3, test: m => m.knee > 105,
+      { id: 'sq_depth', priority: 3, test: (m, c) => m.knee > (c?.P?.sqDepth ?? 105),
         cue: 'Sit down between your heels, a little deeper.', yes: 'Great depth.', tag: 'Deeper',
         why: 'Deeper squats train the glutes and quads through a longer range (Kubo 2019).' },
     ],
@@ -449,8 +449,10 @@ export const allRules = ex => [...(ex.bottom || []), ...(ex.ascent || []), ...(e
  * Feed it smoothed metrics + a timestamp (ms) every frame; it returns events.
  */
 export class RepEngine {
-  constructor(ex, view) {
-    this.ex = ex; this.view = view;
+  /** @param P personal thresholds from the lifter's body map (bodymap.js), or null for defaults */
+  constructor(ex, view, P = null) {
+    this.ex = ex; this.view = view; this.P = P;
+    this.downT = P?.downT ?? ex.downT;
     this.phase = 'top'; this.reps = 0; this.goodReps = 0;
     this.bottomSnap = null; this.topSnap = null; this.alwaysCount = {};
     this.faultTally = {}; this.tempo = []; // [{ecc, con}] seconds per rep
@@ -461,7 +463,7 @@ export class RepEngine {
 
   // `only` limits a rule to some library exercises (e.g. heel rise is meaningless on a leg press).
   rules(list) { return (list || []).filter(r => (!r.view || r.view === this.view) && (!r.only || !this.ex.libId || r.only.includes(this.ex.libId))); }
-  ctx() { return { base: this.base, bottom: this.bottomSnap, top: this.topSnap, ascent: this.ascentSnap }; }
+  ctx() { return { base: this.base, bottom: this.bottomSnap, top: this.topSnap, ascent: this.ascentSnap, P: this.P }; }
 
   // Velocity loss within a set (Sánchez-Medina & González-Badillo 2011): slowing of the lifting
   // phase vs the fastest of the first reps tracks how close the set is to failure.
@@ -478,7 +480,7 @@ export class RepEngine {
 
     if (this.phase === 'top') {
       if (!this.topSnap || v > this.topSnap[ex.primary]) { this.topSnap = { ...m }; this.tLeaveTop = t; }
-      if (v < ex.downT) { this.base ||= { ...this.topSnap }; this.phase = 'bottom'; this.bottomSnap = { ...m }; this.tBottom = t; this.ascentSnap = null; this.liveSeen = new Set(); this.liveCount = {}; }
+      if (v < this.downT) { this.base ||= { ...this.topSnap }; this.phase = 'bottom'; this.bottomSnap = { ...m }; this.tBottom = t; this.ascentSnap = null; this.liveSeen = new Set(); this.liveCount = {}; }
     } else {
       if (v < this.bottomSnap[ex.primary]) { this.bottomSnap = { ...m }; this.tBottom = t; this.ascentSnap = null; }
       const b = this.bottomSnap[ex.primary];

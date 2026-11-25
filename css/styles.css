@@ -432,3 +432,18 @@ a.ghost { text-decoration: none; text-align: center; display: inline-flex; align
 .fault-marks button { display: flex; gap: 10px; align-items: center; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; cursor: pointer; }
 .fault-marks button .data { color: var(--bad); min-width: 3.2em; }
 .fault-marks button.ok .data { color: var(--good); }
+
+/* Body map */
+.bodymap-tile { border-color: rgba(69,195,255,.35); }
+.fit-note { display: flex; gap: 10px; align-items: center; justify-content: space-between; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; font-size: .88rem; }
+.fit-note.on { border-color: rgba(61,220,151,.4); }
+.fit-note b { color: var(--good); }
+.fit-note button { flex: none; }
+.bm-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.bm-grid div { background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 10px; text-align: center; }
+.bm-grid .num { font-size: 1.4rem; display: block; }
+.bm-grid small { color: var(--muted); font-size: .72rem; }
+.bm-find { border-left: 3px solid var(--z1); padding: 2px 0 2px 12px; }
+.bm-find.fix { border-left-color: var(--warn); }
+.bm-find b { display: block; margin-bottom: 2px; }
+.readout span.fit { color: var(--good); border-color: rgba(61,220,151,.4); }

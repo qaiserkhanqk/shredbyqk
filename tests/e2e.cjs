@@ -173,6 +173,14 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.goto('https://shred.local/?calm=now'); await p.waitForTimeout(800);
   check('shortcut: ?calm=now opens the Sukoon rating', await p.isVisible('#calm') && await p.isVisible('#cBefore'));
 
+  // Map my body: demo calibration → personal body map sheet.
+  await p.goto('https://shred.local/'); await go('body'); await tap('#bodyMapTile');
+  check('body map: intro explains the 30-second calibration', /Map my body/.test(await p.textContent('#rsheetBody')));
+  await p.click('[data-bm=demo]');
+  await p.waitForFunction(() => /QK now coaches your body/.test(document.querySelector('#rsheetBody')?.textContent || '') && !document.querySelector('#rsheet').hidden, null, { timeout: 60000 });
+  const bm = await p.textContent('#rsheetBody');
+  check('body map: shows personal lean and depth limits with reasons', /Forward lean allowed/.test(bm) && /Long thighs/.test(bm) && /Tight ankles/.test(bm));
+  await p.click('[data-bm=close]');
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();
   console.log(fails ? `${fails} FAILED` : 'ALL PASS'); process.exit(fails ? 1 : 0);

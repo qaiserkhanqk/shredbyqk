@@ -20,6 +20,12 @@ Each rule in the app comes from a published principle. This file maps the code t
 - **Individual anthropometry.** The allowed squat forward lean is calculated from each client's own femur-to-torso ratio. Long femurs force more lean to keep the centre of mass over mid-foot, so one fixed number would be wrong for many people. Sources: Fry et al. (2003), *J Strength Cond Res*; Demers et al. (2018).
 - **Hip-thrust foot position** is judged by the client's shin angle at lockout (knee about 90°, shin vertical), not by a fixed distance. "Feet forward or back" is therefore personal to their leg length. Source: Contreras et al. (2015) on glute EMG in the hip thrust.
 - **Range of motion.** Depth and lockout cues favour training in the lengthened position. Sources: Kubo et al. (2019) on squat depth and glute hypertrophy; Pedrosa et al. (2022) on lengthened-partial training.
+- **Map my body: personal thresholds (`js/bodymap.js`).** A 30-second calibration (side-on: stand, 3 slow bodyweight squats; then facing the camera: 2 more) measures the lifter's thigh-to-torso ratio, comfortable depth, shin angle at depth (an ankle dorsiflexion proxy) with heel rise, and knee width standing and at the bottom. Limited ankle dorsiflexion reduces squat depth and increases trunk lean (Kim et al. 2015; Macrum et al. 2012); longer femurs relative to the torso require more lean (Fry 2003; Demers 2018). Thresholds then move only where the body explains it:
+  - lean allowed = the larger of the proportion-based limit and their own bodyweight lean + 6°, capped at 62°
+  - depth target = their comfortable depth + 10°, never stricter than the standard 105°; rep counting follows the same range
+  - knee caving = 85% of their own standing knee-to-ankle width, never looser than the standard 80%
+
+  A simulated long-thigh, tight-ankle lifter shows why this matters: with textbook numbers none of their reps even count. With their body map every rep counts, and they're still cued when they cut depth or lean past their own limits (`tests/bodymap.test.mjs`).
 - **Squat: hips rising first.** Judged early in the drive up (40% of the way from the bottom to standing). If the torso has tipped forward more than 10° compared with the bottom position, the hips are rising ahead of the chest and the squat is turning into a good morning, which moves load to the lower back. Comparing with the lifter's own bottom position, not a fixed angle, keeps this fair for long femurs.
 - **Squat: heels lifting.** The heel's height above the toe, as a fraction of foot length, is compared with the lifter's own standing value at the start of the set (so camera tilt cancels out). A rise of more than 0.3 of foot length at the bottom is flagged. Only on free-standing squats, not on a leg press, hack squat or slant board.
 - **Bench: shoulder blades (scapular retraction).** A side-on 2D camera can't see the shoulder blades, so this is a proxy: if the shoulder point rises off the bench by more than 20% of upper-arm length between the bottom and lockout, the shoulders have rolled forward (protracted) instead of staying pinned. Treat it as a screen until it's validated on filmed lifts.
@@ -140,5 +146,6 @@ A 5–15 minute session: rate tension (0–10) → slow breathing with optional 
 ## 11. Known limits (honest list)
 
 - A 2D camera can't see rotation well. One angle per exercise is the best it can do, so the setup instructions tell the client where to put the phone.
+- The body map is a bodyweight measurement. Under a heavy bar, depth and lean can differ; re-map every few weeks. It currently personalises free squats only. Bench, hinge and lunge still use standard thresholds plus each set's own start position.
 - Thresholds are evidence-informed starting points. **They must be tuned on real client footage reviewed by QK**, and this is the most important next step.
 - The posture scan is a screen, not a diagnosis. Anyone with pain is told to see a physio.

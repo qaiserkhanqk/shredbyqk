@@ -8,6 +8,13 @@ All video is processed **on the phone** (MediaPipe Pose) and nothing is uploaded
 - **84 exercises for every muscle group:** chest, back, shoulders, biceps, triceps, forearms, quads, hamstrings, glutes, calves, core and full body. Search them, or filter by muscle.
   - **66 have a live camera form check**, built on 20 movement patterns: squat, hinge, lunge, hip thrust, bench and press, push-up, dip, fly, row, vertical pull, curl, triceps extension, raises, calf raise, crunch, leg raise, leg extension, leg curl and plank hold.
   - **18 are voice-coached for tempo** (twists, carries, wrist curls and similar). A phone camera can't judge these reliably, so the app says so instead of showing a fake form score.
+- **Map my body (30 s):** stand side-on, do 3 slow bodyweight squats, turn to face the camera and do 2 more. QK measures:
+  - thigh-to-torso proportions
+  - the depth you can comfortably reach
+  - ankle mobility (shin angle, heel rise)
+  - your natural knee alignment
+
+  From then on, squats are judged against **your** body. Long thighs get more forward lean allowed. Depth and rep counting follow your own range, so a stiff lifter's reps still count. Knee caving is measured from your own standing alignment. Each finding is explained in plain words, with fixes such as heel plates or ankle and hip work. Re-map as mobility improves.
 - **Live form check:**
   - **Corrects you mid-rep, like a coach beside you.** Posture faults (knees caving, heels lifting, leaning, hips shooting up, no leg drive) are called out the moment they appear, interrupting whatever QK was saying. A red banner shows what's wrong and the fix, and the skeleton turns red. End-of-rep faults (depth, lockout, shoulders at the top) are cued as soon as the rep finishes. After two full cues QK switches to a short shout ("Knees out!").
   - Joint angles are drawn on the client's body, with a live depth gauge at the working joint.
@@ -96,6 +103,7 @@ This simulates a full hip-thrust set (checks the coach's cueing logic) and a wal
 | `js/angles.js` | Joint-angle geometry, side and view detection, smoothing |
 | `js/exercises.js` | 20 movement patterns: metrics, fault rules, rep/tempo/velocity engine |
 | `js/library.js` | 84 exercises mapped to patterns, muscles and equipment |
+| `js/bodymap.js` | Map my body: measures proportions and mobility, turns them into personal thresholds |
 | `js/fx.js` | Motion graphics drawn on the body for each cued fault, and the depth gauge |
 | `js/feedback.js` | Motor-learning feedback scheduler: what to say and when to stay quiet |
 | `js/coach.js` | Avatar plus voice: recorded clip, then cloned TTS, then device voice |

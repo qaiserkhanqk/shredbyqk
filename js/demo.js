@@ -104,20 +104,70 @@ export class SquatDemo {
   }
 }
 
-function squatPose(d, hipsFirst, heel) {
-  const toe = { x: 410, y: FLOOR }, foot = 62, shin = 130, thigh = 136, torso = 150;
+// Side-on squat pose. B describes the body: segment lengths (px) and how far each segment tilts at
+// full depth, so different bodies (long thighs, tight ankles) can be simulated.
+export const AVG_BODY = { foot: 62, shin: 130, thigh: 136, torso: 150, shinDeg: 30, thighDeg: 84, leanDeg: 38 };
+export function squatPose(d, hipsFirst, heel, B = AVG_BODY) {
+  const toe = { x: 410, y: FLOOR }, { foot, shin, thigh, torso } = B;
   const phi = rad(26 * heel); // foot pivots about the toe when the heels lift
   const he = { x: toe.x - foot * Math.cos(phi), y: FLOOR - foot * Math.sin(phi) };
   const A = { x: he.x + 14 * Math.cos(phi) + 6 * Math.sin(phi), y: he.y - 22 };
-  const ts = rad(30 * d), tt = rad(84 * d);
+  const ts = rad(B.shinDeg * d), tt = rad(B.thighDeg * d);
   const K = { x: A.x + shin * Math.sin(ts), y: A.y - shin * Math.cos(ts) };
   const H = { x: K.x - thigh * Math.sin(tt), y: K.y - thigh * Math.cos(tt) };
-  const lean = rad(38 * d + (hipsFirst ? 34 * Math.sin(Math.PI * (1 - d)) : 0));
+  const lean = rad(B.leanDeg * d + (hipsFirst ? 34 * Math.sin(Math.PI * (1 - d)) : 0));
   const S = { x: H.x + torso * Math.sin(lean), y: H.y - torso * Math.cos(lean) };
   const head = { x: S.x + 30 * Math.sin(lean) + 10, y: S.y - 34 * Math.cos(lean) - 6 };
   const bar = { x: S.x - 8 * Math.cos(lean), y: S.y + 4 };
   const elbow = { x: S.x - 30, y: S.y + 34 }, hand = { x: bar.x + 4, y: bar.y - 2 };
   return { S, H, K, A, head, toe, heel: he, elbow, hand, bar };
+}
+
+// Facing-the-camera squat, as 33 pixel landmarks. knees: how far the knees move out (+) or cave in (−)
+// at full depth, in px per side.
+export function frontSquatLandmarks(d, { knees = 10, cx = DEMO_W / 2 } = {}) {
+  const c = (x, y) => ({ x, y, v: 1 }), px = Array.from({ length: 33 }, () => c(cx, 300));
+  const ankY = FLOOR - 22, kneeY = ankY - 130 + 6 * d, hipY = ankY - 266 + 120 * d, shY = hipY - 150 + 12 * d;
+  const side = (k, sh, el, wr, hp, kn, an, hl, ft, sg) => {
+    px[sh] = c(cx + sg * 62, shY); px[el] = c(cx + sg * 80, shY + 70 - 40 * d); px[wr] = c(cx + sg * 70, shY + 130 - 90 * d);
+    px[hp] = c(cx + sg * 38, hipY); px[kn] = c(cx + sg * (44 + knees * d), kneeY); px[an] = c(cx + sg * 46, ankY);
+    px[hl] = c(cx + sg * 44, FLOOR - 4); px[ft] = c(cx + sg * 56, FLOOR);
+  };
+  side(0, 11, 13, 15, 23, 25, 27, 29, 31, -1); side(1, 12, 14, 16, 24, 26, 28, 30, 32, 1);
+  px[0] = c(cx, shY - 60); px[7] = c(cx - 18, shY - 58); px[8] = c(cx + 18, shY - 58);
+  return px;
+}
+
+/* ---------- Body-map demo: the 30-second calibration ----------
+   A lifter with long thighs and tight ankles: stands side-on, 3 slow squats, turns, 2 more. */
+export const BODYMAP_SECS = 31;
+const DEMO_BODY = { foot: 62, shin: 124, thigh: 150, torso: 138, shinDeg: 22, thighDeg: 42, leanDeg: 50 };
+export class BodyMapDemo {
+  constructor(B = DEMO_BODY) { this.B = B; this.t0 = null; this.done = false; }
+  frame(now) {
+    if (this.t0 == null) this.t0 = now;
+    const t = (now - this.t0) / 1000, sq = x => Math.sin(Math.PI * Math.min(1, Math.max(0, x))) ** 2;
+    this.view = t < 16 ? 'side' : 'front';
+    if (t >= BODYMAP_SECS) this.done = true;
+    if (this.view === 'side') {
+      const d = t < 3.5 ? 0 : sq(((t - 3.5) % 4) / 3.4) * (t < 15.5 ? 1 : 0);
+      this.P = squatPose(d, false, 0.6 * d, this.B); this.px = toPxLandmarks(this.P);
+    } else {
+      const d = t < 20 ? 0 : sq(((t - 20) % 4.5) / 3.8) * (t < 29 ? 1 : 0);
+      this.P = null; this.px = frontSquatLandmarks(d, { knees: -14 });
+    }
+    return this.px;
+  }
+  drawScene(ctx) {
+    backdrop(ctx, 360, 420, 'rgba(69,195,255,.12)'); floorLine(ctx, FLOOR + 2);
+    if (this.P) body(ctx, this.P, { torso: 46, thigh: 34, shin: 24 });
+    else {
+      const p = this.px; ctx.strokeStyle = '#262f44'; ctx.lineCap = 'round';
+      const limb = (ids, w) => { ctx.lineWidth = w; ctx.beginPath(); ids.forEach((i, k) => k ? ctx.lineTo(p[i].x, p[i].y) : ctx.moveTo(p[i].x, p[i].y)); ctx.stroke(); };
+      limb([11, 12, 24, 23, 11], 40); limb([23, 25, 27], 40); limb([24, 26, 28], 40); limb([11, 13, 15], 22); limb([12, 14, 16], 22);
+      ctx.fillStyle = '#262f44'; ctx.beginPath(); ctx.arc(p[0].x, p[0].y, 30, 0, 7); ctx.fill();
+    }
+  }
 }
 
 /* ---------- Bench press demo (side-on, head on the left) ----------

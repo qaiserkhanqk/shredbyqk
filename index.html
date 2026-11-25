@@ -77,6 +77,7 @@
   <!-- BODY hub -->
   <section class="screen" id="body">
     <div class="page-head"><div><span class="eyebrow">Body</span><h1 class="display h1">What do you need?</h1></div></div>
+    <button type="button" class="tile bodymap-tile" id="bodyMapTile"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4" r="2"/><path d="M12 6v7M8 9h8M12 13l-3 7M12 13l3 7"/><circle cx="12" cy="13" r="1"/><circle cx="9" cy="20" r="1"/><circle cx="15" cy="20" r="1"/></svg></span><span><b id="bodyMapTitle">Map my body</b><span id="bodyMapSub">30 seconds on camera. QK learns your proportions, depth and mobility, then coaches your body, not a textbook.</span></span></button>
     <button type="button" class="tile" data-go="rehab"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.5-9-9.5C1.6 7.6 4.2 4 7.8 4c1.8 0 3.2 1 4.2 2.4C13 5 14.4 4 16.2 4 19.8 4 22.4 7.6 21 11.5 19 16.5 12 21 12 21z"/><path d="M9 12h6M12 9v6"/></svg></span><span><b>Fix a pain or injury</b><span>Back, shoulder, knee, ankle and more. A safe, step-by-step plan.</span></span></button>
     <button type="button" class="tile" data-go="gait"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round"><path d="M8 4c2 0 3 2 3 4s-1 5-3 5-3-3-3-5 1-4 3-4zM16 9c2 0 3 2 3 4s-1 4-3 4-3-2-3-4 1-4 3-4z"/></svg></span><span><b>Test how you move</b><span>Walking and running, jump height, knee control.</span></span></button>
     <button type="button" class="tile" data-go="scan"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="12" r="3"/></svg></span><span><b>Posture &amp; body fat</b><span>A photo check of how you stand, plus body fat.</span></span></button>
@@ -363,6 +364,7 @@
     <div class="grab"></div>
     <div><span class="eyebrow" id="setupEyebrow"></span><h2 class="display h2" id="setupTitle" style="margin-top:6px;font-size:1.4rem">Set up your phone</h2></div>
     <ol class="steps" id="setupSteps"></ol>
+    <div class="fit-note" id="fitNote" hidden></div>
     <p class="muted small" id="setupLast" style="margin:0"></p>
     <div class="grid2" id="loadWrap" hidden>
       <label class="field">Weight (kg) for bar speed<input id="loadKg" type="number" inputmode="decimal" placeholder="e.g. 80"></label>
@@ -412,7 +414,7 @@
       <div class="meter"><div class="row"><span class="eyebrow">Rep speed</span><span class="data muted small" id="vlTxt">fresh</span></div><div class="speed"><i id="vlKnob"></i></div></div>
     </div>
     <div class="meters" id="gaitMeters" hidden>
-      <div class="meter"><div class="row"><span class="eyebrow">Steps seen</span></div><div class="num" style="font-size:1.6rem" id="gSteps">0</div></div>
+      <div class="meter"><div class="row"><span class="eyebrow" id="gStepsLbl">Steps seen</span></div><div class="num" style="font-size:1.6rem" id="gSteps">0</div></div>
       <div class="meter"><div class="row"><span class="eyebrow">Recording</span></div><div class="bar" style="margin-top:8px"><i id="gProg" style="width:0"></i></div></div>
     </div>
     <div class="live-actions">
