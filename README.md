@@ -4,6 +4,14 @@ An AI coaching app with QK's avatar. It watches each client's form through the p
 
 All video is processed **on the phone** (MediaPipe Pose) and nothing is uploaded. This matters for privacy and GDPR, and it means there are no server costs per minute of video.
 
+## Design: one clear next step
+
+The app is built so a new client is never faced with a wall of features:
+- **First run asks three things:** name, what they want help with first (get fitter, recover from pain, feel calmer), and training days.
+- **Today shows one next step**, chosen by `js/today.js`: rehab morning check → recovery day → wind down after training → rehab session → today's workout (lighter if needed) → rest day. One button, one line saying why.
+- **Three tabs:** Today, Train, Me. Rehab, movement tests, posture, Body check and Sukoon sit under **All tools**, ordered by what the client came for. Calm now and Body check are also one tap from Today.
+- After the morning check-in, the feel buttons fold into one line, so the next step is what stands out.
+
 ## Features
 - **208 gym exercises for every muscle group** (plus 45 rehab exercises): chest, back, shoulders, biceps, triceps, forearms, quads, hamstrings, glutes, calves, core and full body. Search them, or filter by muscle.
   - **190 have a live camera form check**, built on 20 movement patterns: squat, hinge, lunge, hip thrust, bench and press, push-up, dip, fly, row, vertical pull, curl, triceps extension, raises, calf raise, crunch, leg raise, leg extension, leg curl and plank hold.

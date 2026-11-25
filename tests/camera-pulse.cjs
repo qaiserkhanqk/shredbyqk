@@ -9,8 +9,8 @@ const T = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javasc
   await ctx.route('https://shred.local/**', r => { let p = new URL(r.request().url()).pathname; if (p === '/') p = '/index.html'; const f = path.join(ROOT, p);
     if (!fs.existsSync(f)) return r.fulfill({ status: 404, body: '' }); r.fulfill({ status: 200, body: fs.readFileSync(f), headers: { 'content-type': T[path.extname(f)] || 'application/octet-stream' } }); });
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
-  await p.goto('https://shred.local/'); await p.fill('#welcomeName', 'T'); await p.click('#welcomeBtn');
-  await p.click('.tabs [data-tab=body]'); await p.click('#body [data-go=vitals]');
+  await p.goto('https://shred.local/'); await p.fill('#welcomeName', 'T'); await p.click('#welcomeBtn'); await p.click('[data-focus=train]'); await p.click('#obSkip');
+  await p.click('#today [data-go=body]'); await p.click('#body [data-go=vitals]');
   await p.click(MODE === 'hrv' ? '#vHrv' : '#vHr');
   const ok = await p.waitForSelector('#mResult:not([hidden])', { timeout: MODE === 'hrv' ? 90000 : 40000 }).then(() => true).catch(() => false);
   const st = await p.evaluate(() => { const s = window.__shredLastPulse || []; const dt = s.slice(1).map((x, i) => (x.t - s[i].t) * 1000); const dup = s.slice(1).filter((x, i) => x.v === s[i].v).length; dt.sort((a, b) => a - b); return { n: s.length, fps: (s.length / ((s.at(-1)?.t - s[0]?.t) || 1)).toFixed(1), dtMin: dt[0]?.toFixed(1), dtMed: dt[dt.length >> 1]?.toFixed(1), dtMax: dt.at(-1)?.toFixed(1), dup }; }); console.log(JSON.stringify(st)); if (process.env.DUMP) fs.writeFileSync(process.env.DUMP, JSON.stringify(await p.evaluate(() => window.__shredLastPulse)));
