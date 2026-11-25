@@ -33,36 +33,40 @@
   <!-- TODAY -->
   <section class="screen on" id="today">
     <div class="hero">
-      <span class="orb-slot" data-size="84" id="heroOrb"></span>
+      <span class="orb-slot" data-size="64" id="heroOrb"></span>
       <div><span class="eyebrow" id="dateLine"></span><h1 class="display h1" id="hello">Welcome.</h1></div>
-    </div>
-    <div class="bubble">
-      <div class="who"><span class="eyebrow">QK</span><button class="linkbtn" id="listenBtn" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Listen</button></div>
-      <span id="nudge"></span>
     </div>
 
     <div class="card stack" id="readyCard">
-      <div><span class="eyebrow">How do you feel today?</span></div>
+      <div class="ready-q"><span class="eyebrow">How do you feel today?</span><button type="button" class="linkbtn" id="readyChange" hidden>Change</button></div>
       <div class="feel" role="group" aria-label="How do you feel today?">
         <button type="button" data-feel="great"><b>Great</b><span>Fresh, slept well</span></button>
         <button type="button" data-feel="ok"><b>OK</b><span>A bit tired</span></button>
         <button type="button" data-feel="rough"><b>Rough</b><span>Sore or drained</span></button>
       </div>
       <div id="readyResult" hidden><b id="readyTitle"></b> <span class="ready-score num" id="readyScore"></span><ul class="issues" id="readyReasons" style="margin-top:6px"></ul></div>
-      <div class="btn-row"><button type="button" class="linkbtn" id="morningCheck">Add more detail</button><button type="button" class="linkbtn" data-go="vitals">Measure HRV and alertness</button></div>
+      <button type="button" class="linkbtn" id="morningCheck">Add more detail</button>
     </div>
 
-    <div class="card">
-      <div class="card-head"><div><span class="eyebrow" id="sessionMeta">Today</span><h2 class="display h2">Glute Builder</h2><span class="muted small">About 38 min · 4 exercises</span></div></div>
-      <div class="stack" style="margin:4px 0 8px">
-        <button class="cta" type="button" data-train="hipThrust"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Train with QK</button>
-        <div class="btn-row"><button class="ghost" type="button" id="checkinBtn">Log a session</button><button class="ghost" type="button" id="logSession">Rate effort</button></div>
-      </div>
-      <div id="todayList"></div>
+    <div class="card next" id="nextCard">
+      <span class="eyebrow" id="nextEyebrow"></span>
+      <h2 class="display h2" id="nextTitle"></h2>
+      <p id="nextSub"></p>
+      <button class="cta" type="button" id="nextBtn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><span id="nextCta"></span></button>
+      <button class="linkbtn" type="button" id="nextAlt" hidden></button>
+      <details id="todayDetails"><summary>Today's exercises<span class="muted small" id="sessionMeta"></span></summary>
+        <div id="todayList"></div>
+      </details>
+      <div class="qk-says"><span class="eyebrow">QK</span><span id="nudge"></span><button class="linkbtn" id="listenBtn" type="button" aria-label="Listen to QK"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Listen</button></div>
     </div>
 
-    <button type="button" class="card rehab-today" id="rehabToday" hidden></button>
-
+    <div class="quick" role="group" aria-label="Quick tools">
+      <button type="button" class="quick-btn" data-go="calm-now"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>Calm now</button>
+      <button type="button" class="quick-btn" data-go="vitals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-5 4 10 2-5h6"/></svg>Body check</button>
+      <button type="button" class="quick-btn" data-go="body"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>All tools</button>
+    </div>
+    <p class="log-line">Trained without the app? <button class="linkbtn" type="button" id="checkinBtn">Log it</button> · <button class="linkbtn" type="button" id="logSession">Rate effort</button></p>
+    <button type="button" id="rehabToday" hidden></button>
   </section>
 
   <!-- TRAIN -->
@@ -76,7 +80,8 @@
 
   <!-- BODY hub -->
   <section class="screen" id="body">
-    <div class="page-head"><div><span class="eyebrow">Body</span><h1 class="display h1">What do you need?</h1></div></div>
+    <button type="button" class="back" data-home>‹ Today</button>
+    <div class="page-head"><div><span class="eyebrow">Tools</span><h1 class="display h1">What do you need?</h1></div></div>
     <button type="button" class="tile" data-go="rehab"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.5-9-9.5C1.6 7.6 4.2 4 7.8 4c1.8 0 3.2 1 4.2 2.4C13 5 14.4 4 16.2 4 19.8 4 22.4 7.6 21 11.5 19 16.5 12 21 12 21z"/><path d="M9 12h6M12 9v6"/></svg></span><span><b>Fix a pain or injury</b><span>Back, shoulder, knee, ankle and more. A safe, step-by-step plan.</span></span></button>
     <button type="button" class="tile" data-go="gait"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round"><path d="M8 4c2 0 3 2 3 4s-1 5-3 5-3-3-3-5 1-4 3-4zM16 9c2 0 3 2 3 4s-1 4-3 4-3-2-3-4 1-4 3-4z"/></svg></span><span><b>Test how you move</b><span>Walking and running, jump height, knee control.</span></span></button>
     <button type="button" class="tile" data-go="scan"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="12" r="3"/></svg></span><span><b>Posture &amp; body fat</b><span>A photo check of how you stand, plus body fat.</span></span></button>
@@ -86,7 +91,7 @@
 
   <!-- BODY CHECK (vitals) -->
   <section class="screen" id="vitals">
-    <button type="button" class="back" data-back>‹ Body</button>
+    <button type="button" class="back" data-back>‹ Tools</button>
     <div class="page-head"><div><span class="eyebrow">Body check</span><h1 class="display h1">How's your system today?</h1></div></div>
     <p class="muted" style="margin:0">Uses only your phone's camera and screen. Readings are compared with your own normal, never with other people.</p>
     <div class="card stack vital-card">
@@ -118,7 +123,7 @@
 
   <!-- SUKOON (calm) -->
   <section class="screen" id="calm">
-    <button type="button" class="back" data-back>‹ Body</button>
+    <button type="button" class="back" data-back>‹ Tools</button>
     <div class="page-head"><div><span class="eyebrow">Sukoon</span><h1 class="display h1">Calm your mind</h1></div></div>
     <button class="cta calm-now" type="button" id="calmNow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>Calm now</button>
     <p class="muted" style="margin:0">Or pick what you're feeling. You'll breathe slowly, listen to a short recitation, then make a dua from the Sunnah.</p>
@@ -140,7 +145,7 @@
 
   <!-- TESTS -->
   <section class="screen" id="gait">
-    <button type="button" class="back" data-back>‹ Body</button>
+    <button type="button" class="back" data-back>‹ Tools</button>
     <div class="page-head"><div><span class="eyebrow">Movement tests</span><h1 class="display h1">Test how you move</h1></div></div>
     <div class="mode-switch three" role="group" aria-label="Choose a test">
       <button type="button" class="on" data-test="gait">Gait</button>
@@ -192,7 +197,7 @@
 
   <!-- SCAN -->
   <section class="screen" id="scan">
-    <button type="button" class="back" data-back>‹ Body</button>
+    <button type="button" class="back" data-back>‹ Tools</button>
     <div class="page-head"><div><span class="eyebrow">Body scan</span><h1 class="display h1">How you stand</h1></div></div>
     <div class="card stack">
       <p class="muted small" style="margin:0">Stand relaxed with arms by your sides and your whole body in frame, in fitted clothes. Do one photo facing the camera and one side-on.</p>
@@ -240,7 +245,7 @@
 
   <!-- REHAB CLINIC -->
   <section class="screen" id="rehab">
-    <button type="button" class="back" data-back>‹ Body</button>
+    <button type="button" class="back" data-back>‹ Tools</button>
     <div class="page-head"><div><span class="eyebrow">Rehab clinic</span><h1 class="display h1" id="rehabTitle">Recover with a plan</h1></div></div>
     <div id="rehabStart" class="stack">
       <div class="card stack">
@@ -385,8 +390,7 @@
   <nav aria-label="Main">
     <button type="button" class="on" data-tab="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg>Today</button>
     <button type="button" data-tab="train"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11"/></svg>Train</button>
-    <button type="button" data-tab="body"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.5-9-9.5C1.6 7.6 4.2 4 7.8 4c1.8 0 3.2 1 4.2 2.4C13 5 14.4 4 16.2 4 19.8 4 22.4 7.6 21 11.5 19 16.5 12 21 12 21z"/></svg>Body</button>
-    <button type="button" data-tab="progress"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>You</button>
+    <button type="button" data-tab="progress"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>Me</button>
   </nav>
 </div>
 
@@ -555,9 +559,27 @@
 <div class="welcome" id="welcome">
   <span class="orb-slot" data-size="132"></span>
   <h1 class="big"><i>SHRED</i></h1>
-  <p>Your coach in your pocket. QK watches your form, counts your reps and talks you through every set.</p>
-  <label class="field" id="welcomeNameWrap" style="width:100%;max-width:320px;text-align:left">What should QK call you?<input id="welcomeName" placeholder="Your first name" autocomplete="given-name"></label>
-  <button class="cta" type="button" id="welcomeBtn">Start</button>
+  <p id="obIntro">Your coach in your pocket. QK watches your form, counts your reps and talks you through every set.</p>
+  <div class="ob" id="ob1">
+    <label class="field" id="welcomeNameWrap" style="width:100%;text-align:left">What should QK call you?<input id="welcomeName" placeholder="Your first name" autocomplete="given-name"></label>
+    <button class="cta" type="button" id="welcomeBtn">Next</button>
+  </div>
+  <div class="ob" id="ob2" hidden>
+    <h2 class="display h2">What do you want help with first?</h2>
+    <div class="ob-pick" role="group" aria-label="What do you want help with first?">
+      <button type="button" data-focus="train"><b>Get stronger and fitter</b><span>Workouts with live form coaching</span></button>
+      <button type="button" data-focus="recover"><b>Recover from pain or an injury</b><span>A safe, step-by-step rehab plan</span></button>
+      <button type="button" data-focus="calm"><b>Feel calmer and sleep better</b><span>Breathing, Quran and dua</span></button>
+    </div>
+    <p class="note" style="margin:0">Everything else stays one tap away.</p>
+  </div>
+  <div class="ob" id="ob3" hidden>
+    <h2 class="display h2">Which days will you train?</h2>
+    <p class="note" style="margin:0">Pick the days you can really make. People who plan their days are far more likely to keep going.</p>
+    <div class="days" id="obDays"></div>
+    <button class="cta" type="button" id="obDone">Done</button>
+    <button class="linkbtn" type="button" id="obSkip">Skip for now</button>
+  </div>
   <p class="note">Camera footage is analysed on your phone and never uploaded.</p>
 </div>
 

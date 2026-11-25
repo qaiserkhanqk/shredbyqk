@@ -1,8 +1,18 @@
 // Records a walkthrough video and screenshots of the real app at phone size, for the demo page.
-// Usage: node tools/record-demo.cjs OUT_DIR    (needs Playwright + Chromium)
+// Usage: node tools/record-demo.cjs OUT_DIR [VOICE_DIR]    (needs Playwright, Chromium and ffmpeg)
+// VOICE_DIR: QK's recorded narration, one file per line of tools/demo-narration.json, named by its number
+// (01.m4a, 02.mp3, 03 today.wav …). Each step waits until QK finishes speaking, and his voice is mixed onto demo.mp4.
 // The client "Sara" and her history are example data, seeded so the progress screens have something to show.
 const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
-const ROOT = path.resolve(__dirname, '..'), OUT = path.resolve(process.argv[2] || 'demo-out');
+const { execFileSync } = require('child_process');
+const ROOT = path.resolve(__dirname, '..'), OUT = path.resolve(process.argv[2] || 'demo-out'), VOICE = process.argv[3] && path.resolve(process.argv[3]);
+const NARR = JSON.parse(fs.readFileSync(path.join(__dirname, 'demo-narration.json'), 'utf8'));
+const clips = {}, clipLen = {};
+if (VOICE) for (const f of fs.readdirSync(VOICE)) {
+  const m = f.match(/^(\d{2})/); if (!m || !/\.(m4a|mp3|wav|aac|ogg|opus|caf|mp4)$/i.test(f)) continue;
+  clips[m[1]] = path.join(VOICE, f);
+  clipLen[m[1]] = parseFloat(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', clips[m[1]]]).toString()) || 0;
+}
 fs.mkdirSync(OUT, { recursive: true });
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.task': 'application/octet-stream', '.webmanifest': 'application/manifest+json', '.mp3': 'audio/mpeg' };
 
@@ -10,7 +20,7 @@ const DAY = 864e5, now = Date.now();
 const ago = (d, h = 18) => { const x = new Date(now - d * DAY); x.setHours(h, 0, 0, 0); return x.getTime(); };
 const seed = {
   profile: { name: 'Sara', sex: 'female', heightCm: 168, weeklyGoal: 4 },
-  plan: { days: [1, 3, 5, 6], time: '6:30pm', place: 'the gym' },
+  plan: { days: [...new Set([1, 3, 5, 6, new Date().getDay()])], time: '6:30pm', place: 'the gym' }, // today is always a training day in the demo
   sessions: [
     ...[13, 11, 9, 6, 4, 2].flatMap((d, i) => [0, 1, 2].map(k => ({ at: ago(d) + k * 4e5, ex: 'hipThrust', name: 'Barbell hip thrust', reps: 10, good: 6 + Math.min(4, i >> 1) + (k === 2 ? 0 : 0), faults: k === 0 && i < 3 ? { ht_feet_far: 2 } : {}, kg: 50 + i * 2.5 }))),
     ...[12, 8, 5, 1].flatMap((d, i) => [0, 1].map(k => ({ at: ago(d) + k * 4e5, ex: 'squat', name: 'Back squat', reps: 8, good: 5 + i, faults: i < 2 ? { sq_valgus: 2 } : {}, kg: 40 + i * 2.5 }))),
@@ -35,90 +45,92 @@ const seed = {
   for (const h of ['everyayah.com', 'verses.quran.com', 'verses.quran.foundation']) await ctx.route(`https://${h}/**`, r => r.abort());
   await ctx.addInitScript(s => { if (!localStorage.getItem('shred_qk_v1')) localStorage.setItem('shred_qk_v1', s); try { localStorage.setItem('qk_muted', '1'); } catch {} }, JSON.stringify(seed));
   const p = await ctx.newPage();
+  const t0 = Date.now(); // the video starts with the page
   const wait = ms => p.waitForTimeout(ms);
+  const timeline = [];
   // A caption bar drawn over the app, so the video explains itself.
-  const caption = async (step, text) => p.evaluate(([s, t]) => {
+  const showCaption = async (step, text) => p.evaluate(([s, t]) => {
     let el = document.getElementById('__cap');
     if (!el) { el = document.createElement('div'); el.id = '__cap'; el.style.cssText = 'position:fixed;left:10px;right:10px;bottom:96px;z-index:999;background:rgba(10,13,20,.92);border:1px solid #7c6cff;border-radius:16px;padding:10px 14px;font:600 14px/1.35 Figtree,system-ui;color:#edf0f6;box-shadow:0 8px 30px rgba(0,0,0,.5);pointer-events:none;transition:opacity .3s'; document.body.appendChild(el); }
     el.innerHTML = `<span style="display:block;font:700 10px/1 Figtree;letter-spacing:.14em;text-transform:uppercase;color:#45c3ff;margin-bottom:4px">${s}</span>${t}`; el.style.opacity = 1;
   }, [step, text]);
+  // Show line `id` of the narration; if QK's recording exists, stay on it at least as long as he speaks.
+  const narr = async (id, minMs) => {
+    const n = NARR.find(x => x.id === id);
+    await showCaption(n.step, n.caption);
+    timeline.push({ id, at: Date.now() - t0 });
+    await wait(Math.max(minMs, (clipLen[id] || 0) * 1000 + 400));
+  };
   const hideCap = () => p.evaluate(() => { const el = document.getElementById('__cap'); if (el) el.style.opacity = 0; });
   const shot = async name => { await hideCap(); await wait(250); await p.screenshot({ path: path.join(OUT, name + '.png') }); };
   const tap = async sel => { await p.$eval(sel, el => el.scrollIntoView({ block: 'center', behavior: 'instant' })); await p.click(sel); };
 
   await p.goto('https://shred.local/'); await wait(1200);
 
-  // 1. Today
-  await caption('1 · Today', 'Each morning: one tap on how you feel. QK decides: train as planned, go lighter, or recover.');
-  await wait(2500); await tap('[data-feel=great]'); await wait(2500);
-  await shot('01-today');
-  await caption('1 · Today', 'Today\'s workout from QK, ready to start.');
-  await p.evaluate(() => window.scrollTo({ top: 420, behavior: 'smooth' })); await wait(2500);
+  // 1. Today: one tap, then one next step
+  await narr('01', 2500); await tap('[data-feel=great]'); await wait(1200);
+  await narr('02', 3000); await shot('01-today');
+  await p.click('#nextBtn'); await wait(800);
 
   // 2. Train: live form coaching with the demo athlete
-  await p.click('.tabs [data-tab=train]'); await wait(600);
-  await caption('2 · Train', '84 exercises. 66 have a live camera form check.'); await wait(2500);
-  await shot('02-library');
-  await tap('.ex-card.feature'); await wait(800);
-  await caption('2 · Train', 'QK explains where to put the phone.'); await wait(2200);
-  await p.fill('#loadKg', '60'); await shot('03-setup');
+  await narr('03', 2500); await p.fill('#loadKg', '60'); await shot('03-setup');
   await p.click('#startDemo');
-  await caption('2 · Live coaching', 'The camera tracks 33 body points. QK counts reps and speaks one correction at a time.');
-  await wait(9000); await shot('04-live');
-  await caption('2 · Live coaching', 'Feet too far forward → QK cues it → the fix is praised. Rep speed shows fatigue.');
-  await p.waitForSelector('#summary:not([hidden])', { timeout: 60000 }); await wait(800);
-  await caption('2 · Set summary', 'Form score, one thing to fix next set, weight vs last time, and the rest timer starts by itself.');
-  await wait(3500); await shot('05-summary');
-  await p.evaluate(() => document.querySelector('#summary .live-inner').scrollTo({ top: 600, behavior: 'smooth' })); await wait(2500);
-  await p.click('#doneBtn'); await wait(600);
+  await narr('04', 7000); await shot('04-live');
+  await narr('05', 4000);
+  await p.waitForSelector('#summary:not([hidden])', { timeout: 60000 }); await wait(600);
+  await narr('06', 4000); await shot('05-summary');
+  await p.click('#doneBtn'); await wait(500);
+  await p.click('.tabs [data-tab=train]'); await wait(600);
+  await narr('07', 2800); await shot('02-library');
 
-  // 3. Body hub
-  await p.click('.tabs [data-tab=body]'); await wait(600);
-  await caption('3 · Body', 'Recovery, testing and calm in one place.'); await wait(2500); await shot('06-body');
-  await p.click('#body [data-go=rehab]'); await wait(700);
-  await p.click('[data-area=Knee]'); await wait(600);
-  await caption('3 · Rehab clinic', '18 injuries. A safety screen first, then a step-by-step plan that progresses on measured results.');
-  await wait(3500); await shot('07-rehab');
-  await p.click('#rehab [data-back]'); await wait(500);
-
-  await p.click('#body [data-go=vitals]'); await wait(700);
-  await caption('3 · Body check', 'Heart rate and HRV with a fingertip on the camera, plus a 3-minute alertness test. Compared with your own normal.');
-  await wait(3500); await shot('08-body-check');
-  await p.evaluate(() => window.scrollTo({ top: 520, behavior: 'smooth' })); await wait(2200);
-  await p.evaluate(() => window.scrollTo({ top: 0 })); await p.click('#vitals [data-back]'); await wait(500);
+  // 3. Tools
+  await p.click('.tabs [data-tab=today]'); await wait(500); await tap('#today [data-go=body]'); await wait(600);
+  await narr('08', 2800); await shot('06-body');
+  await p.click('#body [data-go=rehab]'); await wait(600); await p.click('[data-area=Knee]'); await wait(400);
+  await narr('09', 3200); await shot('07-rehab');
+  await p.click('#rehab [data-back]'); await wait(400);
+  await p.click('#body [data-go=vitals]'); await wait(600);
+  await narr('10', 3200); await shot('08-body-check');
+  await p.click('#vitals [data-back]'); await wait(400);
 
   // 4. Sukoon
-  await p.click('#body [data-go=calm]'); await wait(700);
-  await caption('4 · Sukoon', 'Calm your mind: slow breathing, a short Quran recitation, then a dua from the Sunnah.');
-  await wait(3000); await shot('09-sukoon');
-  await p.click('#calmNow'); await wait(800);
-  await caption('4 · Sukoon', 'One tap to rate how tense you feel.'); await wait(2000); await shot('10-sukoon-rate');
-  await p.click('#cBefore [data-v="7"]'); await wait(500);
-  await caption('4 · Sukoon', 'Breathe with the circle, or close your eyes and follow the chime.');
-  await wait(5500); await shot('11-sukoon-breathe');
-  await p.click('#calmSkip'); await wait(1200);
-  await caption('4 · Sukoon', 'Then listen: the recitation plays verse by verse (shown here offline, with the Quran.com link).');
-  await wait(3000);
-  await p.click('#calmSkip'); await wait(800);
-  await caption('4 · Sukoon', 'A dua from the Sunnah, with its source.'); await wait(3000); await shot('12-sukoon-dua');
-  await p.click('#calmSkip'); await wait(700);
-  await p.click('#cAfter [data-v="4"]'); await wait(1500);
-  await caption('4 · Sukoon', 'Tension tracked before and after, so you see what works for you.');
-  await p.evaluate(() => document.querySelector('#calmHistory').scrollIntoView({ block: 'center', behavior: 'smooth' })); await wait(3000);
-  await shot('13-sukoon-history');
+  await p.click('#body [data-go=calm]'); await wait(600);
+  await narr('11', 2500); await shot('09-sukoon');
+  await p.click('#calmNow'); await wait(700);
+  await narr('12', 1800); await shot('10-sukoon-rate');
+  await p.click('#cBefore [data-v="7"]'); await wait(400);
+  await narr('13', 5500); await shot('11-sukoon-breathe');
+  await p.click('#calmSkip'); await wait(900);
+  await narr('14', 2800);
+  await p.click('#calmSkip'); await wait(600);
+  await narr('15', 3000); await shot('12-sukoon-dua');
+  await p.click('#calmSkip'); await wait(600); await p.click('#cAfter [data-v="4"]'); await wait(1000);
+  await p.evaluate(() => document.querySelector('#calmHistory').scrollIntoView({ block: 'center', behavior: 'smooth' }));
+  await narr('16', 3000); await shot('13-sukoon-history');
 
-  // 5. You
-  await p.click('.tabs [data-tab=progress]'); await wait(800);
-  await caption('5 · You', 'Weekly progress, form score trend and training load.'); await wait(3000); await shot('14-you');
-  await p.evaluate(() => document.querySelector('#sendWeek').scrollIntoView({ block: 'center', behavior: 'smooth' })); await wait(1200);
+  // 5. Me
+  await p.click('.tabs [data-tab=progress]'); await wait(700);
+  await narr('17', 2800); await shot('14-you');
+  await p.evaluate(() => document.querySelector('#sendWeek').scrollIntoView({ block: 'center', behavior: 'smooth' })); await wait(900);
   await p.evaluate(() => { navigator.share = undefined; navigator.clipboard.writeText = () => Promise.reject(new Error('demo')); });
-  await p.click('#sendWeek'); await wait(800);
-  await caption('5 · You', 'One tap sends QK a summary of your week. Text only, never video.'); await wait(3500);
-  await p.evaluate(() => document.querySelector('#weekText').scrollIntoView({ block: 'center', behavior: 'smooth' })); await wait(1500);
-  await shot('15-send-week');
-  await caption('Shred by QK', 'Your coach in your pocket. Form, recovery, calm and accountability.'); await wait(3000);
+  await p.click('#sendWeek'); await wait(600);
+  await p.evaluate(() => document.querySelector('#weekText').scrollIntoView({ block: 'center', behavior: 'smooth' }));
+  await narr('18', 3500); await shot('15-send-week');
+  await p.click('.tabs [data-tab=today]'); await wait(500);
+  await narr('19', 3000);
 
   const vid = await p.video().path(); await ctx.close(); await b.close();
   fs.renameSync(vid, path.join(OUT, 'demo.webm'));
-  console.log('done', OUT);
+  fs.writeFileSync(path.join(OUT, 'timeline.json'), JSON.stringify(timeline, null, 1));
+
+  // Mix QK's lines onto the video, each starting when its caption appears.
+  const mp4 = path.join(OUT, 'demo.mp4'), used = timeline.filter(t => clips[t.id]);
+  const args = ['-y', '-loglevel', 'error', '-i', path.join(OUT, 'demo.webm'), ...used.flatMap(t => ['-i', clips[t.id]])];
+  if (used.length) {
+    const f = used.map((t, i) => `[${i + 1}:a]adelay=${t.at}|${t.at},aresample=48000[a${i}]`).join(';') + ';' + used.map((_, i) => `[a${i}]`).join('') + `amix=inputs=${used.length}:normalize=0[a]`;
+    args.push('-filter_complex', f, '-map', '0:v', '-map', '[a]', '-c:a', 'aac', '-b:a', '128k');
+  } else args.push('-an');
+  args.push('-c:v', 'libx264', '-preset', 'slow', '-crf', '26', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', mp4);
+  execFileSync('ffmpeg', args);
+  console.log(`done: ${mp4} (${used.length} of ${NARR.length} narration lines from QK)`);
 })();

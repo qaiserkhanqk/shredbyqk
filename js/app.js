@@ -21,6 +21,7 @@ import { initCalm, renderCalm, startCalmNow } from './calm.js';
 import { WEIGHTED, lastLoad, lastLoadText, weekSummary } from './share.js';
 import { initVitals, renderVitals } from './vitals.js';
 import { vitalNotes } from './hr.js';
+import { nextStep } from './today.js';
 import { landmarksFrom, analyse, render, navyBodyFat, bfCategory, stanceProblem } from './bodyscan.js';
 
 const $ = s => document.querySelector(s);
@@ -63,7 +64,7 @@ function mountOrbs() {
 /* ---------- Navigation ---------- */
 function tab(id) {
   $$('.screen').forEach(s => s.classList.toggle('on', s.id === id));
-  const tabFor = ['gait', 'scan', 'rehab', 'calm', 'vitals'].includes(id) ? 'body' : id;
+  const tabFor = ['body', 'gait', 'scan', 'rehab', 'calm', 'vitals'].includes(id) ? 'today' : id; // tools live under Today
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tabFor));
   if (id === 'today') renderToday();
   if (id === 'progress') { renderProgress(); renderLoad(); renderToday(); $('#youName').textContent = S.profile.name || 'You'; }
@@ -71,12 +72,15 @@ function tab(id) {
   if (id === 'calm') renderCalm();
   if (id === 'vitals') renderVitals();
   if (id === 'scan') $('#hipWrap').hidden = S.profile.sex === 'male';
+  if (id === 'body') { const first = { recover: 'rehab', calm: 'calm' }[S.profile.focus]; const t = first && $(`#body [data-go=${first}]`); if (t) $('#body .page-head').after(t); }
   window.scrollTo(0, 0);
 }
 $$('.tabs button').forEach(b => b.onclick = () => tab(b.dataset.tab));
 document.addEventListener('click', e => {
-  const g = e.target.closest('[data-go]'); if (g) return tab(g.dataset.go);
+  const g = e.target.closest('[data-go]');
+  if (g) { if (g.dataset.go === 'calm-now') { tab('calm'); return startCalmNow(); } return tab(g.dataset.go); }
   if (e.target.closest('[data-back]')) tab('body');
+  if (e.target.closest('[data-home]')) tab('today');
 });
 
 /* ---------- Today ---------- */
@@ -120,7 +124,7 @@ function setRing(id, frac) {
 
 function renderToday() {
   if (typeof renderRehabToday === 'function' && S.rehab) renderRehabToday();
-  if (S.readiness) renderReady();
+  if (S.readiness) renderReady(); else renderNext(null);
   const now = new Date();
   $('#dateLine').textContent = now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
   const part = now.getHours() < 12 ? 'Morning' : now.getHours() < 18 ? 'Afternoon' : 'Evening';
@@ -140,7 +144,7 @@ function renderToday() {
   $('#ringsSvg').setAttribute('aria-label', `Sessions ${wk} of ${goal}, form score ${fs ?? 'not yet measured'}, plan kept ${st} days`);
 
   const p = S.plan || {};
-  $('#sessionMeta').textContent = ['Today', p.time, p.place].filter(Boolean).join(' · ');
+  $('#sessionMeta').textContent = [p.time, p.place].filter(Boolean).join(' · ');
   $('#todayList').innerHTML = TODAY.map(([k, sets]) => `<button type="button" class="ex-row" data-train="${k}" style="width:100%;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;cursor:pointer;padding-inline:0"><span class="pic">${icon(iconKey(k))}</span>
     <div><b>${esc(LIB[k].name)}</b>${LIB[k].pattern ? '<span class="tag">QK checks your form</span>' : '<span class="tag" style="color:var(--z3)">QK coaches your tempo</span>'}</div>
     <span class="sets">${sets}</span></button>`).join('');
@@ -1134,7 +1138,7 @@ async function finishRom(frames, q) {
 }
 
 function renderRehabToday() {
-  const p = plan(), el = $('#rehabToday'); el.hidden = !p; if (!p) return;
+  const p = plan(), el = $('#rehabToday'); el.hidden = true; if (!p) return; // the next-step card covers rehab now
   const c = condOf(p), ev = evaluatePhase(c, p.phase, p);
   el.innerHTML = `<span class="eyebrow" style="color:var(--good)">Rehab · phase ${p.phase + 1} of ${c.phases.length}</span><b>${esc(c.name)}</b><span class="muted small">${c.phases[p.phase].exercises.length} exercises today · ${ev.items.filter(i => i.met).length}/${ev.items.length} phase goals met</span>`;
   el.onclick = () => tab('rehab');
@@ -1150,7 +1154,8 @@ function renderReady() {
   const rk = S.rehab?.active?.checkins?.slice(-1)[0];
   const rl = rk ? painLight({ ...rk, usualMorning: S.rehab.active.usualMorning }, COND[S.rehab.active.cond].painLimit).light : null;
   const rec = recommendToday({ check: c, history: hist, sessions: S.loads, jumpStatus: jr?.status, rehabLight: rl });
-  const card = $('#readyCard'); card.className = 'card stack ' + (c ? rec.level : '');
+  const card = $('#readyCard'); card.className = 'card stack ' + (c ? rec.level + ' answered' : '');
+  $('#readyChange').hidden = !c;
   $('#readyResult').hidden = !c;
   $$('[data-feel]').forEach(b => b.classList.toggle('on', !!c && c.feel === b.dataset.feel));
   $('#readyTitle').textContent = c ? rec.title : '';
@@ -1159,6 +1164,35 @@ function renderReady() {
   const vn = vitalNotes(S.vitals, Date.now()).map(n => n.text);
   $('#readyReasons').innerHTML = c ? [...rec.reasons, ...vn].map(r => '<li>' + esc(r) + '</li>').join('') : '';
   $('#morningCheck').textContent = c ? 'Change or add detail' : 'Add more detail';
+  renderNext(c ? rec.level : null);
+}
+$('#readyChange').onclick = () => { $('#readyCard').classList.remove('answered'); $('#readyChange').hidden = true; };
+
+/* ---------- The one next step on Today ---------- */
+function renderNext(level) {
+  const today = dayKey(Date.now()), now = new Date();
+  const p = S.rehab?.active, c = p && COND[p.cond];
+  const morningDue = p ? p.checkins.find(k => k.nextMorning == null && Date.now() - k.at > 8 * 3600e3 && Date.now() - k.at < 48 * 3600e3) : null;
+  if (level === undefined) { const t = todayCheck(); level = t ? recommendToday({ check: t, history: S.readiness.filter(x => x !== t), sessions: S.loads }).level : null; }
+  const step = nextStep({
+    hour: now.getHours(), weekday: now.getDay(), plan: S.plan || { days: [] }, focus: S.profile.focus || 'train', readiness: level,
+    trainedToday: S.sessions.some(s => !s.demo && dayKey(s.at) === today) || S.checkins.some(x => dayKey(x.at) === today),
+    calmedToday: (S.calm || []).some(x => dayKey(x.at) === today),
+    rehab: p ? { name: c.name, phase: p.phase, phases: c.phases.length, morningDue: !!morningDue } : null,
+    workout: { name: 'Glute Builder', minutes: 38, count: TODAY.length },
+  });
+  $('#nextCard').dataset.kind = step.kind;
+  $('#nextEyebrow').textContent = step.eyebrow; $('#nextTitle').textContent = step.title; $('#nextSub').textContent = step.sub; $('#nextCta').textContent = step.cta;
+  $('#todayDetails').hidden = step.kind !== 'workout';
+  $('#nextAlt').hidden = !step.secondary; $('#nextAlt').textContent = step.secondary || '';
+  const go = {
+    'rehab-morning': () => { tab('rehab'); openMorning(morningDue); },
+    rehab: () => tab('rehab'), 'rehab-start': () => tab('rehab'),
+    calm: () => { tab('calm'); startCalmNow(); }, rest: () => { tab('calm'); startCalmNow(); },
+    done: () => tab('progress'), workout: () => openSetup(TODAY[0][0]),
+  };
+  $('#nextBtn').onclick = go[step.kind];
+  $('#nextAlt').onclick = () => openSetup(TODAY[0][0]);
 }
 const scale7 = (id, label, lo, hi, v = 3) => `<label class="field slider">${label} <span class="val" id="${id}v">${v}</span><input type="range" min="1" max="7" value="${v}" id="${id}"><span class="muted small" style="display:flex;justify-content:space-between"><span>${lo}</span><span>${hi}</span></span></label>`;
 // One tap: Great / OK / Rough maps onto the Hooper scale (1 = very good ... 7 = very bad).
@@ -1246,12 +1280,27 @@ if (S.profile.name) {
 }
 // Home-screen shortcut or a shared link: ?calm=now opens Sukoon.
 if (new URLSearchParams(location.search).has('calm') || location.hash === '#calm') { $('#welcome').hidden = true; tab('calm'); startCalmNow(); }
+// First run: three short questions, then straight to Today.
+const obStep = n => { ['ob1', 'ob2', 'ob3'].forEach((id, i) => $('#' + id).hidden = i !== n - 1); $('#obIntro').hidden = n !== 1; };
 $('#welcomeBtn').onclick = () => {
   const nm = $('#welcomeName').value.trim();
-  if (nm && !S.profile.name) { S.profile.name = nm; $('#pName').value = nm; persist(); renderToday(); }
-  $('#welcome').hidden = true;
-  say(`${greeting(S.profile.name)} ${nudgeLine()}`, { id: 'greet', priority: 'high' });
-  getVideoLandmarker().catch(() => {}); // warm the model up in the background
+  if (nm && !S.profile.name) { S.profile.name = nm; $('#pName').value = nm; persist(); }
+  obStep(2);
+  try { getVideoLandmarker().catch(() => {}); } catch {} // warm the model up in the background; never block the next step
 };
+$('#ob2').onclick = e => {
+  const b = e.target.closest('[data-focus]'); if (!b) return;
+  S.profile.focus = b.dataset.focus; persist();
+  if (b.dataset.focus === 'train') { drawObDays(); return obStep(3); }
+  finishWelcome();
+};
+const OB_ORDER = [1, 2, 3, 4, 5, 6, 0], OB_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+function drawObDays() { $('#obDays').innerHTML = OB_ORDER.map(d => `<button type="button" class="day ${S.plan.days.includes(d) ? 'on' : ''}" data-day="${d}" aria-pressed="${S.plan.days.includes(d)}">${OB_NAMES[d]}</button>`).join(''); }
+$('#obDays').onclick = e => { const b = e.target.closest('[data-day]'); if (!b) return; const d = +b.dataset.day, i = S.plan.days.indexOf(d); i >= 0 ? S.plan.days.splice(i, 1) : S.plan.days.push(d); if (S.plan.days.length) S.profile.weeklyGoal = S.plan.days.length; persist(); drawObDays(); };
+$('#obDone').onclick = $('#obSkip').onclick = () => finishWelcome();
+function finishWelcome() {
+  $('#welcome').hidden = true; bindPlan(); tab('today');
+  say(`${greeting(S.profile.name)} ${nudgeLine()}`, { id: 'greet', priority: 'high' });
+}
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 window.__shred = { S, CONFIG };

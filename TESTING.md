@@ -78,7 +78,9 @@ Crashes are logged on the device. **Export error log** in the same panel gives t
 - **`tests/share.test.mjs`:** last weight per exercise, and the weekly message (demo and hand-corrected sets left out of the form score, new best weights, this week only).
 - **`tests/hr.test.mjs`:** fingertip pulse on synthetic signals 48–165 bpm (±2 bpm), noise rejected, HRV against known beat-to-beat variability (and the known high reading at low HRV), artefact removal, personal baseline, PVT-B scoring, readiness notes.
 - **`tests/camera-pulse.cjs`** (manual): runs a fake fingertip video from `tools/make-pulse-video.py` through the real app in Chromium and prints the measured heart rate or HRV next to the true values.
+- **`tests/today.test.mjs`:** the single next step on Today for every situation: planned day, rest day (names the next workout day), lighter day, recovery day with and without rehab, rehab morning check first, after training (wind down, then done), and what the client came for.
 - **`tests/e2e.cjs`:**
+  - first run (name → what they want help with → training days), 3 tabs, one next step with one button, quick tools, the check-in folding away, rehab as the next step
   - Sukoon: goals, evidence labels, support screen, breathing, fallback when the recitation can't load, blocked autoplay, saved history, the ?calm=now shortcut
   - training flow: auto rest timer, weight pre-fill and last-time display, rep correction, one-tap next camera set, hidden angle readout
   - You screen: Send my week; returning clients skip the welcome screen

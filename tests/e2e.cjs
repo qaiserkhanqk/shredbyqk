@@ -23,14 +23,23 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   // Centre an element before tapping it, so the fixed tab bar never covers it.
   const tap = async sel => { await p.$eval(sel, el => el.scrollIntoView({ block: 'center' })); await p.click(sel); };
   const go = async id => {
-    if (['gait', 'scan', 'rehab', 'calm', 'vitals'].includes(id)) { await go("body"); await p.click(`#body [data-go=${id}]`); }
+    if (id === 'body') { await go('today'); await p.click('#today [data-go=body]'); }
+    else if (['gait', 'scan', 'rehab', 'calm', 'vitals'].includes(id)) { await go('body'); await p.click(`#body [data-go=${id}]`); }
     else await p.click(`.tabs [data-tab=${id}]`);
   };
   await p.goto('https://shred.local/');
   check('welcome: asks for a first name', await p.isVisible('#welcomeName'));
   await p.fill('#welcomeName', 'Sara'); await p.click('#welcomeBtn');
+  check('first run: asks what they want help with', await p.isVisible('[data-focus=train]') && await p.isVisible('[data-focus=recover]') && await p.isVisible('[data-focus=calm]'));
+  await p.click('[data-focus=train]');
+  check('first run: training → asks which days', await p.isVisible('#obDays'));
+  await p.click('#obDays [data-day="1"]'); await p.click('#obDays [data-day="3"]'); await p.click('#obDone');
   check('today: greets by name', /Sara/.test(await p.textContent('#hello')));
-  check('navigation: 4 tabs', (await p.$$('.tabs button')).length === 4);
+  check('navigation: 3 tabs (Today, Train, Me)', (await p.$$('.tabs button')).length === 3 && /Me/.test(await p.textContent('.tabs')));
+  check('today: one next step with one main button', await p.isVisible('#nextCard') && (await p.textContent('#nextCta')).length > 0, await p.textContent('#nextTitle'));
+  check('today: quick buttons for calm, body check and all tools', await p.isVisible('#today [data-go=calm-now]') && await p.isVisible('#today [data-go=vitals]') && await p.isVisible('#today [data-go=body]'));
+  await p.click('[data-feel=great]');
+  check('today: after the check-in the feel buttons fold away', !(await p.isVisible('[data-feel=ok]')) && await p.isVisible('#readyChange'));
 
   // Profile height enables height-scaled bar speed.
   await go('progress'); await tap('#profileCard summary'); await p.fill('#pHeight', '178'); await p.press('#pHeight', 'Tab'); await go('today');
@@ -114,8 +123,8 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.click('#endLive'); await p.waitForTimeout(800);
   check('rehab: no-person measurement refused safely', await p.isVisible('#rehabActive'));
   await go('today');
-  check('today: rehab card shown', await p.isVisible('#rehabToday') && /Rehab · phase 1/.test(await p.textContent('#rehabToday')));
-  await p.click('#rehabToday'); await p.click('#endPlan'); await p.click('#endYes');
+  check('today: next step is the rehab session', /Rehab · phase 1/.test(await p.textContent('#nextEyebrow')) && /Start rehab/.test(await p.textContent('#nextCta')), await p.textContent('#nextEyebrow'));
+  await p.click('#nextBtn'); await p.click('#endPlan'); await p.click('#endYes');
   await p.click('[data-area="Lower back"]'); await p.click('[data-cond=lbp]');
   await answerAll(0); await p.click('#safetyGo');
   const alertText = await p.textContent('#rsheetBody');
@@ -123,9 +132,9 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.click('#stopOk');
 
   // 7. Readiness, load and Studio
-  await go('today'); await p.click('[data-feel=great]');
+  await go('today'); if (await p.isVisible('#readyChange')) await p.click('#readyChange'); await p.click('[data-feel=great]');
   check('readiness: one tap "Great" → train as planned', /Train as planned/.test(await p.textContent('#readyTitle')), await p.textContent('#readyTitle'));
-  await p.click('#morningCheck');
+  await p.click('#readyChange'); await p.click('#morningCheck');
   for (const id of ['#rdS', '#rdF', '#rdT', '#rdM']) await p.fill(id, '6');
   await p.fill('#rdH', '5'); await p.click('#rdSave');
   check('readiness: poor check-in → lighter or recovery day', /lighter|Recovery/.test(await p.textContent('#readyTitle')), await p.textContent('#readyTitle'));
