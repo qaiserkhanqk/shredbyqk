@@ -14,10 +14,10 @@ Record each line as its **own file**, named with its number first: `01.m4a`, `02
 | 04 | Live coaching | I watch every rep through the camera, count it, and coach you one cue at a time. |
 | 05 | Live coaching | Feet too far forward? I'll tell you. Fix it, and I'll tell you that too. |
 | 06 | Set summary | After every set: your form score, one thing to fix, and your rest timer starts by itself. |
-| 07 | Train | Want to train something else? There are eighty-four exercises to choose from. |
+| 07 | Train | Want to train something else? There are over two hundred exercises to choose from. |
 | 08 | Tools | Everything else lives under All tools, so it's there when you need it. |
 | 09 | Rehab | Got pain or an injury? You get a safe, step-by-step rehab plan. |
-| 10 | Body check | Put your fingertip on the camera to check your heart rate and recovery. |
+| 10 | Body check | Put your fingertip on the camera to check your heart rate and recovery, and see your seven-day trend. |
 | 11 | Sukoon | And when your mind is racing, there's Sukoon. |
 | 12 | Sukoon | Tap how tense you feel. |
 | 13 | Sukoon | Breathe slowly with the circle. Close your eyes if you like. |

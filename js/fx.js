@@ -7,7 +7,7 @@
 import { dist, mid } from './angles.js';
 
 const DUR = 2400;
-const C = { bad: '#ff5a5f', good: '#3ddc97', aim: '#45c3ff', ink: 'rgba(10,13,20,.82)', z2: '#7c6cff' };
+const C = { bad: '#E46E66', good: '#5CC394', aim: '#9FD0B6', ink: 'rgba(11,19,17,.82)', z2: '#5FB39D' };
 const easeOut = x => 1 - Math.pow(1 - x, 3);
 
 export class FormFX {
@@ -230,9 +230,9 @@ export function drawDepthArc(ctx, joint, a, b, value, { start = 180, target = 10
   const ang1 = Math.atan2(a.y - joint.y, a.x - joint.x), ang2 = Math.atan2(b.y - joint.y, b.x - joint.x);
   let d = ang2 - ang1; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
   ctx.save(); ctx.lineCap = 'round';
-  ctx.strokeStyle = 'rgba(237,240,246,.18)'; ctx.lineWidth = u * 0.22;
+  ctx.strokeStyle = 'rgba(236,241,236,.18)'; ctx.lineWidth = u * 0.22;
   ctx.beginPath(); ctx.arc(joint.x, joint.y, u, ang1, ang1 + d, d < 0); ctx.stroke();
-  const col = prog >= 1 ? C.good : prog > 0.75 ? '#ffb547' : C.aim;
+  const col = prog >= 1 ? C.good : prog > 0.75 ? '#E5A84C' : C.aim;
   ctx.strokeStyle = col; ctx.shadowColor = col; ctx.shadowBlur = prog >= 1 ? u * 0.8 : 0;
   ctx.beginPath(); ctx.arc(joint.x, joint.y, u, ang1, ang1 + d * Math.max(0.02, prog), d < 0); ctx.stroke();
   ctx.restore();

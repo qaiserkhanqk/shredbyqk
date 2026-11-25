@@ -90,7 +90,9 @@ const seed = {
   await narr('09', 3200); await shot('07-rehab');
   await p.click('#rehab [data-back]'); await wait(400);
   await p.click('#body [data-go=vitals]'); await wait(600);
-  await narr('10', 3200); await shot('08-body-check');
+  await narr('10', 2000); await shot('08-body-check');
+  await p.evaluate(() => document.querySelector('#vHrvLast').scrollIntoView({ block: 'center', behavior: 'smooth' })); await wait(2600); await shot('08b-hrv');
+  await p.evaluate(() => window.scrollTo({ top: 0 }));
   await p.click('#vitals [data-back]'); await wait(400);
 
   // 4. Sukoon

@@ -28,12 +28,12 @@ export class MotionTracker {
     const w = Math.max(3, ctx.canvas.width / 200);
     for (let i = 1; i < t.length; i++) {
       const a = i / t.length;
-      ctx.strokeStyle = `rgba(${Math.round(69 + a * 186)}, ${Math.round(195 - a * 88)}, ${Math.round(255 - a * 181)}, ${a * 0.9})`;
+      ctx.strokeStyle = `rgba(${Math.round(159 + a * 71)}, ${Math.round(208 - a * 34)}, ${Math.round(182 - a * 64)}, ${a * 0.9})`; // sage → sand
       ctx.lineWidth = w * (0.4 + a); ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(t[i - 1].x, t[i - 1].y); ctx.lineTo(t[i].x, t[i].y); ctx.stroke();
     }
     const e = t[t.length - 1];
-    ctx.fillStyle = '#ff6b4a'; ctx.beginPath(); ctx.arc(e.x, e.y, w * 1.8, 0, 7); ctx.fill();
+    ctx.fillStyle = '#E6AE76'; ctx.beginPath(); ctx.arc(e.x, e.y, w * 1.8, 0, 7); ctx.fill();
   }
 }
 
