@@ -36,6 +36,8 @@ const vbtOn = () => { const it = LIB[exKey]; return !!it?.pattern && VBT_EQUIP.i
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 let toastTimer;
+const NO_WEBGL = 'This browser can\'t run the pose analysis: it needs graphics acceleration (WebGL). Turn on hardware acceleration in your browser settings, or try another browser.';
+const noWebGL = e => e?.message === 'webgl_unavailable';
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 2600); }
 
 /* ---------- Coach avatar ---------- */
@@ -321,7 +323,7 @@ async function startLive({ mode, source, file }) {
     }
   } catch (err) {
     console.warn(err);
-    $('#status').textContent = source === 'file' ? 'That video couldn\'t be played. Try an MP4 or MOV.' : 'Camera blocked. Allow camera access for this site in your browser settings, then try again.';
+    $('#status').textContent = noWebGL(err) ? NO_WEBGL : source === 'file' ? 'That video couldn\'t be played. Try an MP4 or MOV.' : 'Camera blocked. Allow camera access for this site in your browser settings, then try again.';
     return;
   }
 
@@ -718,7 +720,7 @@ async function runScan(file) {
     S.scans.push({ at: Date.now(), view: r.view, findings: r.findings.map(f => f.title) }); persist();
     const issues = r.findings.filter(f => !f.good);
     say(issues.length ? `Scan done. I spotted ${issues.length} thing${issues.length > 1 ? 's' : ''} to work on. The main one: ${issues[0].title}.` : 'Scan done. Your alignment looks good.', { id: 'scan_' + Date.now(), priority: 'high' });
-  } catch (e) { console.error(e); $('#scanStatus').textContent = 'That file couldn\'t be read. Try a JPG photo instead.'; }
+  } catch (e) { if (noWebGL(e)) { $('#scanStatus').textContent = NO_WEBGL; return; } console.error(e); $('#scanStatus').textContent = 'That file couldn\'t be read. Try a JPG photo instead.'; }
 }
 $('#scanFile').onchange = e => { runScan(e.target.files[0]); e.target.value = ''; };
 $('#scanFile2').onchange = e => { runScan(e.target.files[0]); e.target.value = ''; };
@@ -840,7 +842,7 @@ async function guidedScan(file, want) {
     fullScan[want] = analyse(px);
     slot.firstChild.textContent = (want === 'front' ? '1 · Front ✓' : '2 · Side ✓');
     renderFullScan();
-  } catch (e) { console.error(e); toast('That file couldn\'t be read. Try a JPG photo.'); }
+  } catch (e) { if (noWebGL(e)) return toast(NO_WEBGL); console.error(e); toast('That file couldn\'t be read. Try a JPG photo.'); }
 }
 function renderFullScan() {
   const box = $('#fullScreen'), f = fullScan.front, sd = fullScan.side;
@@ -1161,7 +1163,7 @@ $('#studioList').onclick = async e => {
       else { if (studioRec) await studioRec.r.stop(); studioRec = { id, r: await startRecording() }; }
     } else if (act === 'play') { const blob = await getClip(id); if (blob) new Audio(URL.createObjectURL(blob)).play(); }
     else if (act === 'del') { await deleteClip(id); }
-  } catch (err) { toast('Microphone not available. Allow microphone access for this site.'); studioRec = null; }
+  } catch (err) { toast(err?.message === 'recording_unsupported' ? 'This browser can\'t record audio. Try a recent Safari, Chrome or Firefox.' : 'Microphone not available. Allow microphone access for this site.'); studioRec = null; }
   renderStudio();
 };
 $('#studioExport').onclick = async () => { const data = await exportClips(); if (!Object.keys(data.clips).length) return toast('Record some lines first.'); downloadJSON(`shred-voice-${Date.now()}.json`, data); };

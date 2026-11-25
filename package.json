@@ -24,7 +24,8 @@
     "research:e2e:firefox": "E2E_BROWSER=firefox npm run research:e2e",
     "research:e2e:webkit": "E2E_BROWSER=webkit npm run research:e2e",
     "compat:audit": "node tools/compat-audit.mjs",
-    "test:a11y": "node tests/a11y.cjs"
+    "test:a11y": "node tests/a11y.cjs",
+    "test:browsers": "node tools/run-browser-suites.mjs chromium browser-logs && node tools/run-browser-suites.mjs webkit browser-logs && node tools/run-browser-suites.mjs firefox browser-logs"
   },
   "keywords": [],
   "author": "",

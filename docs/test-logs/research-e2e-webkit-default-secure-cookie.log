@@ -1,0 +1,15 @@
+(node:9410) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+browser: webkit 26.6
+ok   label: the persistent research label is shown before sign-in
+ok   panel: "What this can and cannot tell you" is shown
+FAIL auth: signed in with Secure, HttpOnly session cookie over local http
+FAIL researcher: sees the three synthetic participants
+page.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-ref=P-DEMO-A]')[22m
+
+    at /home/user/shredbyqk/research/tests/e2e.cjs:36:11 {
+  log: [ "  - waiting for locator('[data-ref=P-DEMO-A]')" ],
+  name: 'TimeoutError'
+}

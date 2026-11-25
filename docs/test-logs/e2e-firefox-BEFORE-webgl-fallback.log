@@ -1,0 +1,103 @@
+browser: firefox 155.0
+ok   welcome: asks for a first name
+ok   today: greets by name
+ok   navigation: 4 tabs
+ok   setup: weight field shown for a barbell lift
+ok   demo set: 10 reps, 7 clean
+ok   demo set: bar speed card shown (hip thrust is horizontal → asks for plate calibration)
+ok   library: core filter
+ok   camera: live squat session starts
+ok   camera: Calibrate button shown for barbell lift
+ok   calibration: two taps accepted
+ok   gait demo: report with quality badge and hip finding
+ok   diagnostics: last session listed   — App version1.3.0Live tracking modellite
+    Last sessiongait · 600 frames · 61 fps
+    Last recording quality100/100
+    Errors logged1
+ok   diagnostics: exported session replayable (meta + frames)
+ok   jump panel shown, demo hidden
+ok   knee test: live capture runs (camera granted)
+ok   knee test with no person: refuses to give a result
+FAIL two-view scan: lunge photo rejected with advice  — That file couldn't be read. Try a JPG photo.
+ok   rehab: safety screen requires every answer
+ok   rehab: programme starts at phase 1 with exercises
+ok   rehab: check-in gives a traffic light
+ok   rehab: phase criteria listed and not yet met
+ok   rehab: camera measurement starts
+ok   rehab: no-person measurement refused safely
+ok   today: rehab card shown
+ok   rehab: cauda equina red flag → emergency advice with 999
+ok   readiness: one tap "Great" → train as planned  — Train as planned
+ok   readiness: poor check-in → lighter or recovery day  — Recovery day: walk, mobility, easy cardio
+ok   load: weekly load shown in Progress
+ok   studio: lists coaching lines
+ok   studio: record with the microphone and save a clip
+ok   cycle: hidden by default (flag off)
+ok   cycle: tile shown once the prototype flag is on
+ok   cycle: consent screen first, says no sharing and not contraception
+ok   cycle: consent needs the box ticked
+ok   cycle: no history → "not enough data", no range
+ok   cycle: 5 cycles → dates from past cycles, explained, never called a prediction interval  — Your last 5 cycles were between 29 and 31 days long (typical: 30), which would put your next period between 14 Dec and 16 Dec. Your next period may come earlier or later than this. It is what your past cycles would show, not a prediction interval, and it has not been validated.
+ok   cycle: "may come earlier or later" is visible without opening any section
+ok   cycle: spotting logged without changing the estimate
+ok   cycle: correcting the latest start updates the estimate  — Your last 5 cycles were between 25 and 31 days long (typical: 30), which would put your next period between 4 Dec and 10 Dec. Your next period may come earlier or later than this. It is what your past cycles would show, not a prediction interval, and it has not been validated.
+ok   cycle: optional symptom (energy) logged after switching it on
+ok   cycle: symptom-pattern findings hidden by default (research flag off)
+ok   cycle: research flag on → pattern card shown, labelled unvalidated
+ok   cycle: reminder added with its next time and reason
+ok   cycle: reminder paused
+ok   cycle: reminder deleted
+ok   cycle: demo wearable labelled synthetic, skin temp not core temp, DS07 unavailable  — Wearable · last 7 nights
+    Mock Band (synthetic) · firmware mock-1.0 · synthetic demo, not your measurements
+    18 Nov33.80 °C · 2 rejected19 Nov33.76 °C · 3 rejected20 Nov33.79 °C · 1 rejected21 N
+ok   cycle: phase education (opt-in) has a "not enough data" state, no day-14 assumption
+ok   cycle: stored encrypted in IndexedDB (no dates or words in the stored value)
+ok   cycle: no cycle record left in localStorage
+ok   cycle: nothing cycle-related in the main store or error log
+ok   cycle: export contains the user's data
+ok   cycle: delete all → data gone and consent asked again
+ok   two tabs: entries from both tabs are kept (no lost update)  — ["2026-10-16","2026-11-15"]
+ok   two tabs: the other tab clears itself after a delete elsewhere
+ok   two tabs: after delete + reload, nothing comes back and no "can't unlock" error
+ok   unreadable data: a reset button is offered and returns to the consent screen
+ok   purge (browser): mood pattern reminder shown before purge, gone from reminders, due list and export after  — {"seeded":true}
+ok   simultaneous first opens (Web Locks available): one user ID, one key; a save from the second tab decrypts after reload  — ["7088eb80-ae7d-432c-b2a0-6aed11406f74","7088eb80-ae7d-432c-b2a0-6aed11406f74"]
+ok   simultaneous saves (Web Locks available): neither period is lost  — ["2026-09-06","2026-10-06","2026-11-05"]
+ok   other tab saves while this tab is typing (Web Locks available): the typed date is kept  — 2026-08-22
+ok   simultaneous save + delete (Web Locks available): nothing survives, both tabs ask for consent again
+ok   simultaneous first opens (Web Locks removed): one user ID, one key; a save from the second tab decrypts after reload  — ["11a4a0da-379c-4bad-8d22-c96b0f89c16e","11a4a0da-379c-4bad-8d22-c96b0f89c16e"]
+ok   simultaneous saves (Web Locks removed): neither period is lost  — ["2026-09-06","2026-10-06","2026-11-05"]
+ok   other tab saves while this tab is typing (Web Locks removed): the typed date is kept  — 2026-08-22
+ok   simultaneous save + delete (Web Locks removed): nothing survives, both tabs ask for consent again
+FAIL no JavaScript errors  — E1125 11:54:04.368000 1880752 gl_graph_runner_internal.cc:260] StartGraph failed: INTERNAL: Service "kGpuService", required by node mediapipe_tasks_vision_pose_landmarker_poselandmarkergraph__mediapipe_tasks_vision_pose_detector_posedetectorgraph__mediapipe_tasks_core_inferencesubgraph__inferencecalculator__mediapipe_tasks_vision_pose_landmarker_poselandmarkergraph__mediapipe_tasks_vision_pose_detector_posedetectorgraph__mediapipe_tasks_core_inferencesubgraph__InferenceCalculator, was not provided and cannot be created: emscripten_webgl_create_context() returned error 0; StartRun failed
+=== Source Location Trace: ===
+third_party/mediapipe/framework/calculator_graph.cc:685
+third_party/mediapipe/framework/calculator_graph.cc:716
+third_party/mediapipe/framework/calculator_graph.cc:585
+research/drishti/app/pursuit/wasm/graph_utils.cc:100 | can't access property "activeTexture", GLctx is undefined | E1125 11:55:07.627000 1880752 gl_graph_runner_internal.cc:260] StartGraph failed: INTERNAL: Service "kGpuService", required by node mediapipe_tasks_vision_pose_landmarker_poselandmarkergraph__mediapipe_tasks_vision_pose_detector_posedetectorgraph__mediapipe_tasks_core_inferencesubgraph__inferencecalculator__mediapipe_tasks_vision_pose_landmarker_poselandmarkergraph__mediapipe_tasks_vision_pose_detector_posedetectorgraph__mediapipe_tasks_core_inferencesubgraph__InferenceCalculator, was not provided and cannot be created: emscripten_webgl_create_context() returned error 0; StartRun failed
+=== Source Location Trace: ===
+third_party/mediapipe/framework/calculator_graph.cc:685
+third_party/mediapipe/framework/calculator_graph.cc:716
+third_party/mediapipe/framework/calculator_graph.cc:585
+research/drishti/app/pursuit/wasm/graph_utils.cc:100 | can't access property "activeTexture", GLctx is undefined | E1125 11:55:15.921000 1880752 gl_graph_runner_internal.cc:260] StartGraph failed: INTERNAL: Service "kGpuService", required by node mediapipe_tasks_vision_pose_landmarker_poselandmarkergraph__mediapipe_tasks_vision_pose_detector_posedetectorgraph__mediapipe_tasks_core_inferencesubgraph__inferencecalculator__mediapipe_tasks_vision_pose_landmarker_poselandmarkergraph__mediapipe_tasks_vision_pose_detector_posedetectorgraph__mediapipe_tasks_core_inferencesubgraph__InferenceCalculator, was not provided and cannot be created: emscripten_webgl_create_context() returned error 0; StartRun failed
+=== Source Location Trace: ===
+third_party/mediapipe/framework/calculator_graph.cc:685
+third_party/mediapipe/framework/calculator_graph.cc:716
+third_party/mediapipe/framework/calculator_graph.cc:585
+research/drishti/app/pursuit/wasm/graph_utils.cc:100 | JSHandle@object | can't access property "activeTexture", GLctx is undefined | E1125 11:55:58.710000 1880752 gl_graph_runner_internal.cc:260] StartGraph failed: INTERNAL: Service "kGpuService", required by node mediapipe_tasks_vision_pose_landmarker_poselandmarkergraph__mediapipe_tasks_vision_pose_detector_posedetectorgraph__mediapipe_tasks_core_inferencesubgraph__inferencecalculator__mediapipe_tasks_vision_pose_landmarker_poselandmarkergraph__mediapipe_tasks_vision_pose_detector_posedetectorgraph__mediapipe_tasks_core_inferencesubgraph__InferenceCalculator, was not provided and cannot be created: emscripten_webgl_create_context() returned error 0; StartRun failed
+=== Source Location Trace: ===
+third_party/mediapipe/framework/calculator_graph.cc:685
+third_party/mediapipe/framework/calculator_graph.cc:716
+third_party/mediapipe/framework/calculator_graph.cc:585
+research/drishti/app/pursuit/wasm/graph_utils.cc:100 | E1125 11:56:01.061000 1880752 gl_graph_runner_internal.cc:260] StartGraph failed: INTERNAL: Service "kGpuService", required by node mediapipe_tasks_vision_pose_landmarker_poselandmarkergraph__mediapipe_tasks_vision_pose_detector_posedetectorgraph__mediapipe_tasks_core_inferencesubgraph__inferencecalculator__mediapipe_tasks_vision_pose_landmarker_poselandmarkergraph__mediapipe_tasks_vision_pose_detector_posedetectorgraph__mediapipe_tasks_core_inferencesubgraph__InferenceCalculator, was not provided and cannot be created: emscripten_webgl_create_context() returned error 0; StartRun failed
+=== Source Location Trace: ===
+third_party/mediapipe/framework/calculator_graph.cc:685
+third_party/mediapipe/framework/calculator_graph.cc:716
+third_party/mediapipe/framework/calculator_graph.cc:585
+research/drishti/app/pursuit/wasm/graph_utils.cc:100 | E1125 11:56:04.809000 1880752 gl_graph_runner_internal.cc:260] StartGraph failed: INTERNAL: Service "kGpuService", required by node mediapipe_tasks_vision_pose_landmarker_poselandmarkergraph__mediapipe_tasks_vision_pose_detector_posedetectorgraph__mediapipe_tasks_core_inferencesubgraph__inferencecalculator__mediapipe_tasks_vision_pose_landmarker_poselandmarkergraph__mediapipe_tasks_vision_pose_detector_posedetectorgraph__mediapipe_tasks_core_inferencesubgraph__InferenceCalculator, was not provided and cannot be created: emscripten_webgl_create_context() returned error 0; StartRun failed
+=== Source Location Trace: ===
+third_party/mediapipe/framework/calculator_graph.cc:685
+third_party/mediapipe/framework/calculator_graph.cc:716
+third_party/mediapipe/framework/calculator_graph.cc:585
+research/drishti/app/pursuit/wasm/graph_utils.cc:100
+2 FAILED

@@ -11,7 +11,10 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
 (async () => {
   const b = await launch({ chromiumArgs: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'], firefoxUserPrefs: { 'media.navigator.streams.fake': true, 'media.navigator.permission.disabled': true } });
   // Service workers are blocked: their script fetch bypasses request interception, which only exists in this test.
-  const ctx = await b.newContext({ viewport: { width: 400, height: 860 }, acceptDownloads: true, serviceWorkers: 'block' });
+  // WebKit has no fake-camera switch: grant camera access the way a person taps "Allow" (Chromium and Firefox do this
+  // through their fake-media options above). Without it the app correctly shows "Camera blocked".
+  const camPerm = b.browserType().name() === 'webkit' ? { permissions: ['camera', 'microphone'] } : {};
+  const ctx = await b.newContext({ viewport: { width: 400, height: 860 }, acceptDownloads: true, serviceWorkers: 'block', ...camPerm });
   const serve = r => {
     let p = new URL(r.request().url()).pathname; if (p === '/') p = '/index.html';
     const f = path.join(ROOT, p);
@@ -28,6 +31,10 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
     else await p.click(`.tabs [data-tab=${id}]`);
   };
   await p.goto('https://shred.local/');
+  // The pose features need WebGL. Headless Firefox here has none, so in that case the honest message is checked
+  // instead, and the log says the pose analysis itself was NOT tested in this browser.
+  const webgl = await p.evaluate(() => { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); });
+  if (!webgl) console.log('note: this browser has no WebGL here, so camera and photo pose analysis were NOT tested; the no-WebGL message was checked instead');
   check('welcome: asks for a first name', await p.isVisible('#welcomeName'));
   await p.fill('#welcomeName', 'Sara'); await p.click('#welcomeBtn');
   check('today: greets by name', /Sara/.test(await p.textContent('#hello')));
@@ -51,7 +58,8 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
 
   // 3. Live camera form check (fake camera, no person) starts without errors
   await p.click('[data-muscle=All]'); await p.click('[data-train=squat]'); await p.click('#startCam'); await p.waitForTimeout(5000);
-  check('camera: live squat session starts', await p.isVisible('#live') && (await p.textContent('#status')) === '');
+  if (webgl) check('camera: live squat session starts', await p.isVisible('#live') && (await p.textContent('#status')) === '');
+  else check('camera: no WebGL → says the browser needs graphics acceleration (WebGL)', /WebGL/.test(await p.textContent('#status')), await p.textContent('#status'));
   check('camera: Calibrate button shown for barbell lift', await p.isVisible('#calBtn'));
   await p.click('#calBtn'); await p.click('#viewport', { position: { x: 200, y: 200 } }); await p.click('#viewport', { position: { x: 200, y: 330 } });
   check('calibration: two taps accepted', /Calibrated/.test(await p.textContent('#status')));
@@ -81,7 +89,8 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await go('scan');
   await p.setInputFiles('#scanFront', process.argv[2] || path.join(ROOT, 'tests/pose.jpg')).catch(() => {});
   await p.waitForSelector('#toast:not([hidden])', { timeout: 60000 }).catch(() => {});
-  check('two-view scan: lunge photo rejected with advice', /knees|arms|feet|Stand/.test(await p.textContent('#toast')));
+  if (webgl) check('two-view scan: lunge photo rejected with advice', /knees|arms|feet|Stand/.test(await p.textContent('#toast')), await p.textContent('#toast'));
+  else check('two-view scan: no WebGL → says the browser needs graphics acceleration (WebGL)', /WebGL/.test(await p.textContent('#toast')), await p.textContent('#toast'));
 
   // 6. Rehab clinic: normal path (knee pain at the front) and an emergency red-flag path (back pain)
   await go('rehab'); await p.click('[data-area=Knee]'); await p.click('[data-cond=pfp]');
@@ -125,8 +134,16 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('load: weekly load shown in Progress', /300 points/.test(await p.textContent('#loadNow')) && !!(await p.$('#loadChart svg')));
   await go('progress'); await tap('#studioCard summary'); await p.waitForTimeout(400);
   check('studio: lists coaching lines', /of \d+ lines recorded/.test(await p.textContent('#studioCount')));
+  if (!(await p.evaluate(() => !!window.MediaRecorder))) {
+    // Playwright's Linux WebKit build has no MediaRecorder (Safari has had it since 14.1). Recording itself can't be
+    // tested in that browser, so check the honest message instead and say so in the log.
+    console.log('note studio: this browser build has no MediaRecorder, so recording itself was NOT tested here');
+    await tap('#studioList [data-act=rec]'); await p.waitForTimeout(400);
+    check('studio: a browser that can\'t record says so (not "allow microphone")', /can't record audio/.test(await p.textContent('#toast')), await p.textContent('#toast'));
+  } else {
   await tap('#studioList [data-act=rec]'); await p.waitForTimeout(1200); await tap('#studioList [data-act=rec]'); await p.waitForTimeout(600);
   check('studio: record with the microphone and save a clip', /1 of \d+ lines recorded/.test(await p.textContent('#studioCount')) && /recorded/.test(await p.textContent('#studioList')));
+  }
 
   // 8. Cycle tracking prototype (synthetic data): off by default, consent-gated, encrypted, deletable
   p.on('dialog', d => d.accept());
