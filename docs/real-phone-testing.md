@@ -42,6 +42,14 @@ Minimum versions come from `docs/browser-compat.md`: iOS 15.4, Chrome 98, Firefo
   - on iPhone, only as a Home Screen app on iOS 16.4+, after allowing them;
   - in a Safari tab, the app says notifications aren't available.
 
+**Pregnancy and postpartum modes (synthetic data, flag `pregnancyMode`)**
+- [ ] Situations → Pregnancy mode: enter a due date with the system date picker → the pregnancy card shows the correct weeks and days. Check near midnight too: no off-by-one day.
+- [ ] "Urgent warning signs" opens, is readable, and VoiceOver reads it as a list.
+- [ ] "My baby was born" → the postpartum card replaces the pregnancy card. Close and reopen the app: it is still there.
+- [ ] "My pregnancy ended" → a confirm dialog appears, then a gentle message, and Zara does not check in.
+- [ ] "Delete my pregnancy records" removes everything; after a relaunch it is gone.
+- [ ] With the companion on: on the day a new pregnancy week starts, Zara's card appears once and the answer is saved.
+
 **Storage (important for health data)**
 - [ ] **iPhone Safari tab (not installed):** Safari can delete a website's stored data after 7 days without a visit. Leave the synthetic data, don't open the site for 8+ days, then check.
   - Expected risk: the data may be gone.
@@ -69,6 +77,7 @@ File failures with the device and version. Do not record real health data in scr
 
 ## Known limits of the automated tests
 - `npm run test:e2e:webkit` and `npm run test:e2e:firefox` run the same browser tests in WebKit and Firefox once those browsers are installed (`npx playwright install --with-deps webkit firefox`).
-  - They were **not** run in the development environment, where only Chromium is available.
+  - As of 2026-11-25 they had **not** been run in the development environment. The network now allows Playwright's download hosts, but installing the browsers needs the product owner's permission in that session.
+  - The pregnancy test also checks an iPhone SE-sized screen; `tests/mobile-layout.cjs` checks iPhone SE, iPhone 13 and Pixel 7 sizes. In Chromium these are emulated screen sizes, not Safari.
   - Desktop WebKit is close to Safari, but it is not iOS Safari.
 - The research dashboard is for researchers on a computer. It was laid out for desktop, and phone layout was not a goal.

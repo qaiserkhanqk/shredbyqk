@@ -1,6 +1,7 @@
 // Browser test of pregnancy and postpartum modes (flag pregnancyMode, default OFF). Written BEFORE the UI.
 // Synthetic data only. Run: node tests/cycle-ui-pregnancy.cjs   (E2E_BROWSER=chromium|firefox|webkit)
 const { launch } = require('./browser.cjs');
+const { devices } = require('playwright');
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.task': 'application/octet-stream', '.webmanifest': 'application/manifest+json' };
@@ -13,8 +14,8 @@ const plus = n => { const d = new Date(); d.setDate(d.getDate() + n); return iso
   const b = await launch(), errs = [], requests = [];
   const serve = r => { let p = new URL(r.request().url()).pathname; if (p === '/') p = '/index.html'; const f = path.join(ROOT, p);
     if (!fs.existsSync(f)) return r.fulfill({ status: 404, body: '' }); r.fulfill({ status: 200, body: fs.readFileSync(f), headers: { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' } }); };
-  async function page(flags) {
-    const c = await b.newContext({ serviceWorkers: 'block' }); await c.route('https://shred.local/**', serve);
+  async function page(flags, ctx = {}) {
+    const c = await b.newContext({ ...ctx, serviceWorkers: 'block' }); await c.route('https://shred.local/**', serve);
     await c.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, r => r.fulfill({ status: 200, body: '', headers: { 'content-type': 'text/css' } }));
     await c.addInitScript(f => localStorage.setItem('shred_flags_v1', JSON.stringify(f)), flags);
     const p = await c.newPage(); p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
@@ -62,6 +63,16 @@ const plus = n => { const d = new Date(); d.setDate(d.getDate() + n); return iso
       const { c, p } = await page({ cycleTracking: true, pregnancyMode: true });
       await openSit(p); await p.fill('#cyPregDue', plus(400)); await p.click('[data-act=pregStart]'); await p.waitForTimeout(600);
       check('an impossible due date is refused and nothing starts', (await p.$('#cyPregnancy')) === null);
+      await c.close();
+    }
+    { // Added after the UI was built: the new cards on a small phone (iPhone SE size), no sideways scrolling.
+      const d = { ...devices['iPhone SE'] }; delete d.defaultBrowserType; if (b.browserType().name() === 'firefox') delete d.isMobile;
+      const { c, p } = await page({ cycleTracking: true, pregnancyMode: true, companion: true }, d);
+      const overflow = () => p.evaluate(() => Math.max(0, document.scrollingElement.scrollWidth - window.innerWidth));
+      await startPregnancy(p, plus(140)); await p.click('#cyPregWarn summary'); await p.waitForTimeout(200);
+      check('iPhone SE size: pregnancy card fits the screen', (await overflow()) === 0, `${await overflow()}px`);
+      await p.fill('#cyBirthDate', plus(0)); await p.click('[data-act=pregBirth]'); await p.waitForTimeout(700); await p.click('#cyPpWarn summary'); await p.waitForTimeout(200);
+      check('iPhone SE size: postpartum card fits the screen', (await overflow()) === 0, `${await overflow()}px`);
       await c.close();
     }
   } catch (e) { check('run completed', false, e.stack); }

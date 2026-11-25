@@ -30,6 +30,14 @@ export const CATEGORIES = {
   heartRacing: { group: 'midlife', label: 'Heart racing or pounding', why: 'Feeling your heart racing, pounding or skipping a beat. If you have chest pain, feel breathless or faint, get urgent medical help.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe heart racing' },
   dryness: { group: 'midlife', label: 'Vaginal dryness or discomfort', why: 'Dryness, irritation or discomfort, including during sex.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe dryness or discomfort' },
   bladder: { group: 'midlife', label: 'Bladder changes', why: 'Needing to pass urine more urgently or more often, or discomfort when you do.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe bladder changes' },
+  // Pregnancy symptoms (group 'pregnancy': offered in settings only in pregnancy mode) and recovery after birth (group
+  // 'postpartum'). Areas from docs/pregnancy-postpartum-evidence.md; wording our own, awaiting clinician review.
+  nausea: { group: 'pregnancy', label: 'Nausea or being sick', why: 'Feeling sick or being sick. If you can\'t keep food or drink down, call your midwife or doctor.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe nausea' },
+  heartburn: { group: 'pregnancy', label: 'Heartburn', why: 'A burning feeling in your chest or throat, often after eating.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe heartburn' },
+  swelling: { group: 'pregnancy', label: 'Swelling', why: 'Swollen feet, ankles or fingers. Sudden or severe swelling of your face or hands needs a call to your maternity unit now.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe swelling' },
+  backPain: { group: 'pregnancy', label: 'Back or pelvic pain', why: 'Aches in your back or around your pelvis.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe back or pelvic pain' },
+  afterBirthBleeding: { group: 'postpartum', label: 'Bleeding after birth', why: 'Bleeding after birth (lochia) is not a period. Soaking a pad in an hour or less, or passing large clots, needs urgent help.', options: [['none', 'None'], ['light', 'Light'], ['moderate', 'Moderate'], ['heavy', 'Heavy']], notable: ['heavy'], notableLabel: 'heavy bleeding after birth' },
+  healingPain: { group: 'postpartum', label: 'Pain where you are healing', why: 'Pain from stitches, a tear or a caesarean wound.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe healing pain' },
   training: { label: 'Training', why: 'How your workouts felt compared with usual, so you can see your own pattern. No training advice is given by cycle phase.', options: [['easier', 'Easier than usual'], ['usual', 'Usual'], ['harder', 'Harder than usual']], notable: ['harder'], notableLabel: 'training feeling harder' },
 };
 /** Things that can disturb a night's skin temperature. Optional, per night (the evening's date), true or false.
@@ -68,6 +76,9 @@ export const blankState = owner => ({
   dismissed: {},         // insight key → date dismissed
   promptsDismissed: {},  // confirmation prompt key → date
   wearable: { devices: [], nights: [] }, // nightly summaries only; raw samples are not kept
+  pregnancy: null,       // current pregnancy she told the app about (js/cycle/pregnancy.js)
+  pregnancies: [],       // ended pregnancies [{dueDate, endDate, outcome: 'birth'|'ended'}]
+  postpartum: null,      // {birthDate} while postpartum mode is on
   comfort: { tries: [] }, // comfort options she tried and whether they helped (js/cycle/comfort.js)
 });
 
@@ -277,6 +288,12 @@ export function dismissPrompt(s, key, t) { s.promptsDismissed[key] = t; }
    clinical limits. */
 export const PLAUSIBLE = { min: 15, max: 90 };
 
+/** The end of her most recent pregnancy, or null. Estimates and the learning stage use only cycles from then on:
+ *  cycles often change after a pregnancy, and the gap that contains one is not a cycle. A design rule, not physiology. */
+export function restartDate(s, upTo = '9999-12-31') {
+  return (s.pregnancies || []).map(p => p.endDate).filter(d => d && d <= upTo).sort().at(-1) || null;
+}
+
 export function cycles(s) {
   const ps = sorted(s), out = [];
   for (let i = 0; i + 1 < ps.length; i++) {
@@ -329,6 +346,8 @@ export function stateAsOf(s, asOf, { knownAt = `${asOf}T00:00:00.000Z` } = {}) {
   for (const e of [...log].sort((a, b) => a.at.localeCompare(b.at))) if (e.at < knownAt) { if (e.on) sit[e.key] = true; else delete sit[e.key]; }
   for (const k of Object.keys(c.situation || {})) if (!logged.has(k) && c.situation[k]) { sit[k] = true; unknownTime++; }
   c.situation = sit;
+  c.pregnancies = (c.pregnancies || []).filter(p => p.endDate < asOf && (!p.endedAt || p.endedAt < knownAt));
+  if (c.pregnancy?.startedAt && c.pregnancy.startedAt >= knownAt) c.pregnancy = null;
   c.recordTimeUnknown = unknownTime;
   return c;
 }

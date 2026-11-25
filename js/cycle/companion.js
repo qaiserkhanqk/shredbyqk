@@ -4,7 +4,8 @@
 //   2. around her estimated start, from her own past cycles ("may start around now"), including when it is late;
 //   3. (only with the pattern research flag) a heads-up from her own logged pattern, with her numbers.
 // It ASKS and never guesses: nothing is saved until she taps an answer, and "Fine" records only that she answered.
-// At most one message a day; "Not now" hides it for the day. Silent in pregnancy (a pregnancy mode will handle that).
+// At most one message a day; "Not now" hides it for the day. In pregnancy (with a due date) it checks in weekly; after
+// a birth on days 3, 7, 10 and 14, then weekly to 12 weeks; after a pregnancy ended it is quiet until her next period.
 // Wording is our own, warm and plain, with no medical claims and no adult content (the audience may include teenagers);
 // it is a placeholder awaiting clinician review. No new physiological thresholds: the windows are her logged period
 // start (days 1–3, the first days of bleeding) and her own estimated range (predict.js), with two days' notice.
@@ -19,6 +20,11 @@ export const REVIEW_STATUS = 'awaiting_clinician_review';
 export const NOTICE_DAYS = 2;   // how many days before her estimated range the companion checks in (a UI choice, not physiology)
 export const PERIOD_DAYS = 3;   // check in on days 1–3 after a logged start (a UI choice, not physiology)
 
+const SEVS = [['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']];
+/** Postpartum check-in days after birth: days 3, 7, 10 and 14 (the baby-blues window, NICE CG192), then weekly to
+ *  12 weeks (ACOG CO 736: full postpartum care by 12 weeks). A UI schedule from those sources, not physiology. */
+export const POSTPARTUM_DAYS = [3, 7, 10, 14, 21, 28, 35, 42, 49, 56, 63, 70, 77, 84];
+
 /** One-tap answers. A symptom answer is offered only when she switched that category on. */
 export const QUICK = {
   periodStarted: { label: 'My period started' },
@@ -26,17 +32,31 @@ export const QUICK = {
   cramps: { label: 'Cramps', category: 'pain', severities: [['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']] },
   lowEnergy: { label: 'Low energy', category: 'energy', value: 'low' },
   lowMood: { label: 'Low mood', category: 'mood', value: 'low' },
+  nausea: { label: 'Nausea', category: 'nausea', severities: SEVS },
+  heartburn: { label: 'Heartburn', category: 'heartburn', severities: SEVS },
+  swelling: { label: 'Swelling', category: 'swelling', severities: SEVS },
+  backPain: { label: 'Back or pelvic pain', category: 'backPain', severities: SEVS },
   other: { label: 'Something else' },
 };
 
 const loggedToday = (s, t) => Object.keys(s.days[t] || {}).some(k => k in CATEGORIES);
 const startsUpTo = (s, t) => s.periods.map(p => p.start).filter(d => d <= t).sort();
-const quickFor = (s, withStart) => [...(withStart ? ['periodStarted'] : []), 'fine', 'cramps', 'lowEnergy', 'lowMood', 'other']
+const quickFor = (s, withStart, ids = ['fine', 'cramps', 'lowEnergy', 'lowMood', 'other']) => [...(withStart ? ['periodStarted'] : []), ...ids]
   .filter(id => !QUICK[id].category || categoryOn(s, QUICK[id].category)).map(id => ({ id, label: QUICK[id].label, severities: QUICK[id].severities || null }));
 
 /** Which kind of companion day `date` is, from her logs and her estimate (no flags, no answers). */
 function dayKind(s, date, estimate, patterns = []) {
+  if (s.situation?.pregnant) {
+    // Pregnancy (only when she gave a due date): the day each new week starts. Without one: silent.
+    const due = s.pregnancy?.dueDate; if (!due) return null;
+    const ga = 280 - diffDays(date, due);
+    return ga > 0 && ga % 7 === 0 && ga <= 43 * 7 ? { kind: 'pregnancyWeek', week: ga / 7 } : null;
+  }
   const starts = startsUpTo(s, date), last = starts.at(-1);
+  const quiet = s.companion?.quietSince; // after a pregnancy ended: silent until her next period start
+  if (quiet && !starts.some(d => d > quiet)) return null;
+  const birth = s.situation?.postpartum && s.postpartum?.birthDate;
+  if (birth && !starts.some(d => d > birth) && POSTPARTUM_DAYS.includes(diffDays(birth, date))) return { kind: 'postpartum', day: diffDays(birth, date) };
   if (last && diffDays(last, date) < PERIOD_DAYS) return { kind: 'periodDays', day: diffDays(last, date) + 1 };
   const e = estimate;
   // From two days before her estimated range, and on while it is late, until she logs a start (the estimate then moves on).
@@ -61,20 +81,26 @@ export function setCompanionName(s, name) {
 }
 
 /** True when the companion would check in on `date` (used to schedule the optional companion reminder). */
-export const isCompanionDay = (s, date, estimate, patterns = []) => !!(hasConsent(s) && !s.situation?.pregnant && dayKind(s, date, estimate, patterns));
+export const isCompanionDay = (s, date, estimate, patterns = []) => !!(hasConsent(s) && dayKind(s, date, estimate, patterns));
 
 /**
  * Today's companion message, or null.
  * opts: { estimate (predict.estimateNext for today), patternsOn (pattern research flag), patterns (findPatterns, if on) }
  */
 export function companionToday(s, today, { estimate = null, patternsOn = false, patterns = [] } = {}) {
-  if (!hasConsent(s) || s.situation?.pregnant) return null;
+  if (!hasConsent(s)) return null;
   const c = s.companion || {};
   if (c.dismissed?.[today] || c.answered?.[today] || loggedToday(s, today)) return null;
   const k = dayKind(s, today, estimate, patternsOn ? patterns.filter(p => !s.dismissed?.[p.key]) : []);
   if (!k) return null;
   const name = companionName(s);
   const base = { version: COMPANION_VERSION, reviewStatus: REVIEW_STATUS, from: name, privacy: PRIVACY, kind: k.kind };
+  if (k.kind === 'pregnancyWeek') return { ...base, title: `${k.week} weeks pregnant`, text: `Hi, it's ${name}. You're ${k.week} weeks today. How are you feeling?`,
+    why: 'You turned on pregnancy mode, so I check in once a week, on the day a new week starts. If anything worries you, call your midwife or doctor; the warning signs are on your pregnancy card.',
+    quick: quickFor(s, false, ['fine', 'nausea', 'heartburn', 'swelling', 'backPain', 'lowEnergy', 'lowMood', 'other']) };
+  if (k.kind === 'postpartum') return { ...base, title: `${k.day} days since the birth`, text: `Hi, it's ${name}. It's been ${k.day} days since your baby was born. How are you feeling?`,
+    why: 'After a birth I check in on days 3, 7, 10 and 14, when the "baby blues" are most common, then once a week until 12 weeks. If you feel very low, or low for more than 2 weeks, talk to your midwife, health visitor or doctor.',
+    quick: quickFor(s, false, ['fine', 'lowMood', 'lowEnergy', 'other']) };
   if (k.kind === 'periodDays') return { ...base, title: `Day ${k.day} of your period`, text: `Hi, it's ${name}. Day ${k.day} of your period. How are you feeling today?`,
     why: `Your period started on ${human(startsUpTo(s, today).at(-1))}, so I'm checking in for the first few days.`, quick: quickFor(s, false) };
   if (k.kind === 'periodSoon') return { ...base, title: estimate.overdue ? 'Your period may be late' : 'Your period may start soon',
@@ -90,10 +116,11 @@ export function answerCheckIn(s, today, answer, { severity, today: t = today, at
   if (!hasConsent(s)) throw new CycleError('NO_CONSENT');
   const q = QUICK[answer]; if (!q) throw new CycleError('INVALID_INPUT');
   if (answer === 'periodStarted') logPeriodStart(s, today, { today: t, at, source: 'companion' });
-  else if (answer === 'cramps') {
-    if (!categoryOn(s, 'pain')) throw new CycleError('CATEGORY_OFF');
+  else if (q.severities) { // cramps (pain) and the pregnancy symptoms: she chooses how strong
+    const cat = q.category;
+    if (!categoryOn(s, cat)) throw new CycleError('CATEGORY_OFF');
     if (!q.severities.some(([v]) => v === severity)) throw new CycleError('INVALID_INPUT');
-    logDay(s, today, { pain: severity }, { today: t, at, source: 'companion' });
+    logDay(s, today, { [cat]: severity }, { today: t, at, source: 'companion' });
   } else if (q.category) {
     if (!categoryOn(s, q.category)) throw new CycleError('CATEGORY_OFF');
     logDay(s, today, { [q.category]: q.value }, { today: t, at, source: 'companion' });

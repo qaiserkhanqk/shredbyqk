@@ -1,0 +1,18 @@
+ok   flag off: no pregnancy mode form
+ok   pregnancy card: weeks today from her due date
+ok   …trimester and due date shown, described as an estimate
+ok   …urgent warning signs are one tap away
+ok   …sources shown
+ok   the dates-only estimate is paused
+ok   Zara checks in on the day a new week starts
+ok   pregnancy symptoms can be switched on in settings
+ok   "My baby was born": the pregnancy card is replaced by the postpartum card
+ok   postpartum card: bleeding after birth is not a period; mood; check-ups; warning signs
+ok   "My pregnancy ended": mode ends without asking why, and no postpartum card
+ok   a gentle message is shown
+ok   an impossible due date is refused and nothing starts
+ok   iPhone SE size: pregnancy card fits the screen
+ok   iPhone SE size: postpartum card fits the screen
+ok   no JavaScript errors
+ok   no requests to any other server (privacy)
+ALL PASS (17)

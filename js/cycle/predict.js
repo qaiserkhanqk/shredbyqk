@@ -16,11 +16,11 @@
 // Parameter values are placeholders chosen for clarity, not tuned on data. VARIABLE = 9 echoes the
 // upper end of the FIGO 2018 description of normal cycle-to-cycle variation (see docs/cycle-evidence-register.md).
 import { addDays, diffDays, human } from './dates.js';
-import { cycles, SITUATIONS } from './model.js';
+import { cycles, SITUATIONS, restartDate } from './model.js';
 
 export const PARAMS = Object.freeze({ RECENT: 6, EARLY_MIN: 1, FULL_MIN: 3, VARIABLE: 9, TOO_VARIABLE: 20, STALE_FACTOR: 2 });
 export const OUTSIDE_NOTE = 'Your next period may come earlier or later than this. It is what your past cycles would show, not a prediction interval, and it has not been validated.';
-export const ALGORITHM_VERSION = 'dates-only-1.1.0'; // 1.1.0: no padding, past-cycles-only labelling, overdue flag
+export const ALGORITHM_VERSION = 'dates-only-1.2.0'; // 1.2.0: restart after a pregnancy; 1.1.0: no padding, past-cycles-only labelling, overdue flag
 
 const median = xs => { const a = [...xs].sort((x, y) => x - y), m = a.length >> 1; return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
 
@@ -37,11 +37,12 @@ export function estimateNext(s, today, params = PARAMS) {
   const base = { algorithm: ALGORITHM_VERSION, lastStart, cycleDay: lastStart ? diffDays(lastStart, today) + 1 : null, excluded: all.filter(c => !c.usable), notes, situations };
 
   if (s.situation?.pregnant) return { ...base, status: 'paused', headline: 'Estimates are paused', detail: SITUATIONS.pregnant.note };
-  const used = all.filter(c => c.usable && c.nextStart <= today).slice(-params.RECENT);
+  const since = restartDate(s, today); // after a pregnancy, only cycles that start after it
+  const used = all.filter(c => c.usable && c.nextStart <= today && (!since || c.start >= since)).slice(-params.RECENT);
   const lengths = used.map(c => c.length);
   if (!lastStart || lengths.length < params.EARLY_MIN) {
     return { ...base, status: 'none', used, lengths, headline: 'Not enough data yet',
-      detail: starts.length < 2 ? 'Log at least two period start dates and we can describe your cycle length. Until then there is no estimate.' : 'Your logged cycles are marked for checking, so none can be used yet.' };
+      detail: since ? 'After a pregnancy, estimates start again from your periods since then. Periods can take weeks or months to come back, often longer while breastfeeding.' : starts.length < 2 ? 'Log at least two period start dates and we can describe your cycle length. Until then there is no estimate.' : 'Your logged cycles are marked for checking, so none can be used yet.' };
   }
   const min = Math.min(...lengths), max = Math.max(...lengths), med = median(lengths), spread = max - min;
   const sinceLast = diffDays(lastStart, today);

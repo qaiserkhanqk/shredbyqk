@@ -14,6 +14,7 @@ import { clinicianSummary, summaryText, SUMMARY_MONTHS } from './summary.js';
 import { learningStage } from './learning.js';
 import { companionToday, answerCheckIn, dismissCompanion, setCompanionName, companionName } from './companion.js';
 import { adjustedEstimate } from './adjust.js';
+import * as PG from './pregnancy.js';
 import { midlifeObservations, SOURCES as MIDLIFE_SOURCES, INTRO as MIDLIFE_INTRO } from './midlife.js';
 import { comfortSuggestions, pendingComfortQuestions, logComfortTry, answerComfort, deleteComfort, ANSWERS, REVIEW_STATUS } from './comfort.js';
 
@@ -24,7 +25,7 @@ const MSG = {
   NOT_VERIFIED: 'This device isn\'t available: its integration is not verified.', CRYPTO_UNAVAILABLE: 'This browser can\'t encrypt data, so cycle tracking is unavailable here.',
   DECRYPT_FAILED: 'Your saved cycle data could not be unlocked on this device.', CORRUPT: 'Your saved cycle data is damaged.',
   CONFLICT: 'Another tab kept saving at the same moment, so this change was not saved. Please try again.', STORAGE_NOT_ATOMIC: 'This browser can\'t store cycle data safely.',
-  LH_OFF: 'Turn on ovulation test logging in settings first.',
+  LH_OFF: 'Turn on ovulation test logging in settings first.', OUT_OF_RANGE: 'That date doesn\'t look right. Check it and try again.', INVALID_INPUT: 'Please fill in one of the dates.',
   STALE_SESSION: 'Your cycle data was changed or deleted in another tab. The screen has been refreshed; nothing was saved.', KEYSTORE_UNAVAILABLE: 'Secure storage is blocked in this browser (private mode?).',
 };
 let repo = null, root = null, toast = () => {}, openErr = null, notified = new Set(), timer = null;
@@ -94,9 +95,9 @@ function render() {
   const unsaved = unsavedInputs(); // a redraw (e.g. another tab saved) must never change what the person typed
   const est = estimateNext(s, today);
   const tempShift = f.temperatureResearch && est.lastStart ? retrospectiveShift(s, est.lastStart, addDays(today, 1)) : null;
-  root.innerHTML = [banner(), f.companion ? companionHTML(s, today, est, f) : '', summaryMonths ? summaryHTML(s, today) : '', promptsHTML(s, est, today), dueHTML(s, est, today, nowMin), estimateHTML(s, est), f.temperatureEstimate ? adjustHTML(s, today) : '', learningHTML(s, today), f.midlifeMode && s.situation?.perimenopause ? midlifeHTML(s, today) : '', logHTML(s, today), f.comfortSuggestions ? comfortHTML(s, today) : '', f.patternInsights ? insightHTML(s, today) : '',
+  root.innerHTML = [banner(), f.companion ? companionHTML(s, today, est, f) : '', f.pregnancyMode ? pregnancyCardsHTML(s, today) : '', summaryMonths ? summaryHTML(s, today) : '', promptsHTML(s, est, today), dueHTML(s, est, today, nowMin), estimateHTML(s, est), f.temperatureEstimate ? adjustHTML(s, today) : '', learningHTML(s, today), f.midlifeMode && s.situation?.perimenopause ? midlifeHTML(s, today) : '', logHTML(s, today), f.comfortSuggestions ? comfortHTML(s, today) : '', f.patternInsights ? insightHTML(s, today) : '',
     f.phaseEducation ? phaseHTML(s, today, tempShift, est) : '', historyHTML(s), f.patternInsights ? patternsHTML(s, today, f) : '', remindersHTML(s, est, today, nowMin),
-    wearableHTML(s, today, f, tempShift), situationHTML(s), settingsHTML(s, f)].join('');
+    wearableHTML(s, today, f, tempShift), situationHTML(s, f), settingsHTML(s, f)].join('');
   for (const id of open) { const d = root.querySelector('#' + id); if (d) d.open = true; }
   restoreInputs(unsaved);
   notifyDue();
@@ -219,6 +220,37 @@ function companionHTML(s, today, est, f) {
 
 /* Perimenopause and menopause mode (js/cycle/midlife.js, flag midlifeMode, only when she marked the situation).
    Describes her own entries against published criteria; never diagnoses; awaiting clinician review. */
+/* Pregnancy and postpartum modes (js/cycle/pregnancy.js, flag pregnancyMode). Prototype; wording awaiting clinician
+   review. Warning signs are always one tap away; sources are shown. */
+const srcList = xs => `<details><summary class="linkbtn">Where this comes from</summary><ul class="issues small">${xs.map(x => `<li>${x.doi ? `<a href="https://doi.org/${esc(x.doi)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a>` : `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a>`}</li>`).join('')}</ul></details>`;
+const warnList = (id, intro, signs) => `<details id="${id}"><summary class="linkbtn"><b>Urgent warning signs</b></summary><div class="stack small" style="margin-top:6px"><p class="cy-alert"><b>${esc(intro)}</b></p><ul class="issues">${signs.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div></details>`;
+function pregnancyCardsHTML(s, today) {
+  const out = [], p = PG.pregnancyToday(s, today), pp = PG.postpartumToday(s, today), day = s.days[today] || {};
+  if (p) out.push(`<div class="card stack" id="cyPregnancy"><span class="eyebrow">Pregnancy · prototype · awaiting clinician review</span>
+    <h2 class="display h2">${esc(p.weeksText)}</h2><p class="small">Trimester ${p.trimester} · due date ${esc(human(p.dueDate))} (${p.daysToDue >= 0 ? `${p.daysToDue} days to go` : `${-p.daysToDue} days ago`})</p>
+    ${p.stageNote ? `<p class="small"><b>${esc(p.stageNote)}</b></p>` : ''}
+    ${PG.pregnancyAlerts(s, day).map(a => `<p class="small cy-alert" role="alert"><b>${esc(a.text)}</b></p>`).join('')}
+    <p class="muted small">${esc(p.dueNote)}</p>
+    ${warnList('cyPregWarn', p.warningIntro, p.warningSigns)}
+    <div class="grid2"><label class="field">Birth date<input type="date" id="cyBirthDate" value="${today}" max="${today}"></label><button class="ghost" type="button" data-act="pregBirth">My baby was born</button></div>
+    <div class="grid2"><label class="field">Date<input type="date" id="cyEndDate" value="${today}" max="${today}"></label><button class="ghost" type="button" data-act="pregEnded">My pregnancy ended</button></div>
+    <details><summary class="linkbtn">Change due date or delete</summary><div class="stack" style="margin-top:8px">
+      <div class="grid2"><label class="field">New due date from your midwife or doctor<input type="date" id="cyPregNewDue"></label><button class="ghost" type="button" data-act="pregDue">Save due date</button></div>
+      <button class="linkbtn" type="button" data-act="pregDelete">Delete my pregnancy records</button></div></details>
+    ${srcList(p.sources)}</div>`);
+  if (pp) out.push(`<div class="card stack" id="cyPostpartum"><span class="eyebrow">After the birth · prototype · awaiting clinician review</span>
+    <h2 class="display h2">${esc(pp.weeksText)} since the birth</h2>
+    ${PG.postpartumAlerts(s, day).map(a => `<p class="small cy-alert" role="alert"><b>${esc(a.text)}</b></p>`).join('')}
+    ${[pp.bleedingNote, pp.moodNote, pp.checkNote, pp.periodsNote, pp.yearNote].filter(Boolean).map(t => `<p class="small">${esc(t)}</p>`).join('')}
+    <p class="muted small">Switch on "Bleeding after birth" and "Pain where you are healing" in settings to log them.</p>
+    ${warnList('cyPpWarn', pp.warningIntro, pp.warningSigns)}
+    <div class="btn-row"><button class="linkbtn" type="button" data-act="ppEnd">Turn off postpartum mode</button><button class="linkbtn" type="button" data-act="pregDelete">Delete my pregnancy records</button></div>
+    ${srcList(pp.sources)}</div>`);
+  const last = s.pregnancies?.at(-1);
+  if (!p && !pp && last?.outcome === 'ended' && !last.ackd && diffDays(last.endDate, today) <= 14) out.push(`<div class="card stack" id="cyPregEnded" role="status"><p class="small">We're so sorry. Pregnancy mode is off. If you'd like support, your midwife or doctor can help, as can a pregnancy loss support charity, or someone you trust. Your period estimates will start again from your next period, and Zara's check-ins are paused until then.</p><button class="ghost" type="button" data-act="pregEndedAck">OK</button></div>`);
+  return out.join('');
+}
+
 function midlifeHTML(s, today) {
   const o = midlifeObservations(s, today); if (!o) return '';
   const rows = o.applicable ? [o.variability.text, o.longGap.text, o.sinceLastPeriod?.text].filter(Boolean) : [o.why];
@@ -326,10 +358,16 @@ function wearableHTML(s, today, f, tempShift) {
     <p class="muted small"><b>${esc(ds07.displayName)}:</b> ${esc(ds07.status)}</p><p class="muted small"><b>${esc(hume.displayName)}:</b> ${esc(hume.status)}</p></div>`;
 }
 
-function situationHTML(s) {
-  return `<details class="card" id="cySituation"><summary><span class="eyebrow">Situations that change how cycles work</span></summary><div class="stack" style="margin-top:10px">
+function situationHTML(s, f = {}) {
+  const pm = !!f.pregnancyMode, hide = k => pm && (k === 'pregnant' || k === 'postpartum'); // pregnancy mode replaces the two ticks
+  const form = pm && !s.pregnancy && !s.situation.pregnant ? `<div class="stack" id="cyPregStart"><b class="small">Pregnancy mode</b>
+      <p class="muted small">Pregnant? Use the due date from your midwife or doctor if you have one. If not, enter the first day of your last period and the app adds 280 days (ACOG). Period estimates pause while you're pregnant.</p>
+      <div class="grid2"><label class="field">Due date<input type="date" id="cyPregDue"></label><label class="field">Or first day of last period<input type="date" id="cyPregLmp"></label></div>
+      <button class="ghost" type="button" data-act="pregStart">Start pregnancy mode</button>
+      ${s.postpartum ? '' : `<p class="muted small">Already had your baby?</p><div class="grid2"><label class="field">Birth date<input type="date" id="cyPpBirth"></label><button class="ghost" type="button" data-act="ppStart">Start postpartum mode</button></div>`}</div>` : '';
+  return `<details class="card" id="cySituation"><summary><span class="eyebrow">Situations that change how cycles work</span></summary><div class="stack" style="margin-top:10px">${form}
     <p class="muted small">Optional. Used only to add caveats, pause estimates in pregnancy and hide phase information.</p>
-    ${Object.entries(M.SITUATIONS).map(([k, v]) => `<div class="btn-row" style="align-items:center"><label class="check"><input type="checkbox" data-sit="${k}" ${s.situation[k] ? 'checked' : ''}> ${esc(v.label)}</label>${(s.situationLog || []).some(e => e.key === k) ? `<button class="linkbtn" type="button" data-act="eraseSit" data-key="${k}">Delete (entered by mistake)</button>` : ''}</div>`).join('')}
+    ${Object.entries(M.SITUATIONS).filter(([k]) => !hide(k)).map(([k, v]) => `<div class="btn-row" style="align-items:center"><label class="check"><input type="checkbox" data-sit="${k}" ${s.situation[k] ? 'checked' : ''}> ${esc(v.label)}</label>${(s.situationLog || []).some(e => e.key === k) ? `<button class="linkbtn" type="button" data-act="eraseSit" data-key="${k}">Delete (entered by mistake)</button>` : ''}</div>`).join('')}
     <p class="muted small">Unticking records a change from that day. "Delete" removes the entry and its history, as if it was never entered.</p></div></details>`;
 }
 
@@ -337,10 +375,11 @@ function settingsHTML(s, f) {
   return `<details class="card" id="cySettings"><summary><span class="eyebrow">Settings, export &amp; delete</span></summary><div class="stack" style="margin-top:10px">
     <b class="small">Symptom categories (each is optional)</b>
     ${catRows(s, Object.entries(M.CATEGORIES).filter(([, c]) => !c.group))}
+    ${[['pregnancy', 'Pregnancy symptoms', s.situation?.pregnant], ['postpartum', 'After the birth', s.postpartum]].map(([g, title, active]) => { const cs = Object.entries(M.CATEGORIES).filter(([k, c]) => c.group === g && ((f.pregnancyMode && active) || M.categoryOn(s, k))); return cs.length ? `<b class="small">${title}</b>${catRows(s, cs)}` : ''; }).join('')}
     ${(() => { const mid = Object.entries(M.CATEGORIES).filter(([k, c]) => c.group === 'midlife' && ((f.midlifeMode && s.situation?.perimenopause) || M.categoryOn(s, k))); return mid.length ? `<b class="small">Perimenopause and menopause symptoms</b>${catRows(s, mid)}` : ''; })()}
     <p class="muted small">Turning a category off stops collecting it. You'll be asked whether to delete what you logged.</p>
     <b class="small">Optional features</b>
-    ${['phaseEducation', 'midlifeMode', 'comfortSuggestions', 'patternInsights', 'symptomForecast', 'temperatureResearch', 'temperatureEstimate', 'lhTests'].map(k => `<label class="check"><input type="checkbox" data-flag="${k}" ${f[k] ? 'checked' : ''}> <span><b>${esc(FLAG_DEFS[k].label)}</b> <span class="muted small">${esc(FLAG_DEFS[k].desc)}</span></span></label>`).join('')}
+    ${['phaseEducation', 'pregnancyMode', 'midlifeMode', 'comfortSuggestions', 'patternInsights', 'symptomForecast', 'temperatureResearch', 'temperatureEstimate', 'lhTests'].map(k => `<label class="check"><input type="checkbox" data-flag="${k}" ${f[k] ? 'checked' : ''}> <span><b>${esc(FLAG_DEFS[k].label)}</b> <span class="muted small">${esc(FLAG_DEFS[k].desc)}</span></span></label>`).join('')}
     ${f.companion ? `<div class="stack" id="cyCompanionNameRow"><label class="field">Your companion's name<input id="cyCompanionName" maxlength="20" autocomplete="off" value="${esc(companionName(s))}"></label><button class="ghost" type="button" data-act="companionName">Save name</button><p class="muted small">Letters, spaces, apostrophes and hyphens, up to 20. Leave empty to go back to Zara.</p></div>` : ''}
     ${f.lhTests && !s.consent.lhTests ? `<div class="stack" id="cyLhConsent"><b class="small">Ovulation test (LH) results · research</b><p class="muted small">Optional. Record home ovulation test results exactly as you read them. The app doesn't interpret them, doesn't use them for your estimate and doesn't give fertility advice. Not contraception.</p><button class="ghost" type="button" data-act="lhOn">Turn on ovulation test logging</button></div>` : ''}
     ${s.consent.lhTests ? '<button class="ghost" type="button" data-act="lhOff">Turn off &amp; delete ovulation test results</button>' : ''}
@@ -405,6 +444,14 @@ async function onClick(e) {
     },
     companionSeverity: () => act((s, t) => answerCheckIn(s, t, 'cramps', { severity: ds.sev, today: t }), 'Saved. Take care of yourself today.'),
     companionDismiss: () => act((s, t) => dismissCompanion(s, t)),
+    pregStart: () => { const due = root.querySelector('#cyPregDue')?.value || undefined, lmp = root.querySelector('#cyPregLmp')?.value || undefined; return act((s, t) => PG.startPregnancy(s, { dueDate: due, lmp, today: t }), 'Pregnancy mode is on'); },
+    ppStart: () => { const b = root.querySelector('#cyPpBirth')?.value; return act((s, t) => PG.startPostpartum(s, { birthDate: b, today: t }), 'Postpartum mode is on'); },
+    pregDue: () => { const d = root.querySelector('#cyPregNewDue')?.value; return act((s, t) => PG.setDueDate(s, d, { today: t }), 'Due date saved'); },
+    pregBirth: () => { const d = root.querySelector('#cyBirthDate')?.value; return act((s, t) => PG.endPregnancy(s, { outcome: 'birth', date: d, today: t }), 'Postpartum mode is on'); },
+    pregEnded: () => { const d = root.querySelector('#cyEndDate')?.value; if (!confirm('Turn off pregnancy mode? You won\'t be asked why.')) return; return act((s, t) => PG.endPregnancy(s, { outcome: 'ended', date: d, today: t })); },
+    pregEndedAck: () => act(s => { const l = s.pregnancies?.at(-1); if (l) l.ackd = true; }),
+    ppEnd: () => act(s => PG.finishPostpartum(s), 'Postpartum mode is off'),
+    pregDelete: () => { if (!confirm('Delete all your pregnancy and postpartum records, including those symptoms? This can\'t be undone.')) return; return act(s => PG.deletePregnancyRecords(s), 'Pregnancy records deleted'); },
     companionName: () => { const v = root.querySelector('#cyCompanionName')?.value ?? ''; return act(s => setCompanionName(s, v), 'Name saved'); },
     comfortTry: () => act((s, t) => logComfortTry(s, t, ds.opt, { today: t }), 'Noted. You can tell us later whether it helped.'),
     comfortAnswer: () => act(s => answerComfort(s, ds.id, ds.ans), 'Thanks, noted'),

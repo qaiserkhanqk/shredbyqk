@@ -19,7 +19,7 @@ const median = xs => { const a = [...xs].sort((x, y) => x - y), m = a.length >> 
 const WHY = 'Research feature. It uses your band\'s skin temperature together with your own past cycles. It has not been validated on real people or a real band; it has only been tested on synthetic (made-up) data. Your period may come earlier or later. It is not for contraception.';
 const REASONS = {
   no_consent: 'Cycle tracking is not set up.',
-  situation: 'Not used while you are pregnant, postpartum or using hormonal contraception: your temperature pattern may not follow your cycle then.',
+  situation: 'Not used in pregnancy, after a birth or with hormonal contraception: your temperature pattern may not follow your cycle then.',
   band_off: 'Your band is not connected.',
   no_period: 'Log a period start first.',
   no_rise_yet: 'No sustained temperature rise seen in this cycle yet, so your estimate comes from your past cycle dates only.',

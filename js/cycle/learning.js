@@ -5,7 +5,7 @@
 // band's figure is the temperature research rule's own need (tempshift.SHIFT_PARAMS.BASELINE + CONFIRM nights).
 // Missing nights are never filled in, and the period estimate never depends on the band.
 import { addDays } from './dates.js';
-import { cycles } from './model.js';
+import { cycles, restartDate } from './model.js';
 import { PARAMS } from './predict.js';
 import { SHIFT_PARAMS } from './tempshift.js';
 
@@ -14,9 +14,10 @@ export const LEARNING_VERSION = 'learning-stage-1.0.0';
 export function learningStage(s, today) {
   const needed = PARAMS.FULL_MIN;
   const starts = s.periods.map(p => p.start).filter(d => d <= today).sort();
-  const usable = cycles(s).filter(c => c.usable && c.nextStart <= today).length;
+  const since = restartDate(s, today); // learning restarts after a pregnancy, like the estimate
+  const usable = cycles(s).filter(c => c.usable && c.nextStart <= today && (!since || c.start >= since)).length;
   let stage, text;
-  if (s.situation?.pregnant) { stage = 'paused'; text = 'Learning is paused while you are pregnant.'; }
+  if (s.situation?.pregnant) { stage = 'paused'; text = 'Learning is paused during pregnancy.'; }
   else if (!starts.length) { stage = 'not_started'; text = 'Log your first period start to begin. The app learns only from what you log.'; }
   else if (!usable) { stage = 'first_cycle'; text = 'Learning your cycle: your first cycle is in progress. An estimate appears once your next period starts.'; }
   else if (usable < needed) { stage = 'learning'; text = `Learning your cycle: ${usable} of ${needed} cycles. Early estimates use very few cycles, so they are rough.`; }
