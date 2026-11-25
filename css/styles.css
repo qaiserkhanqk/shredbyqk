@@ -489,3 +489,8 @@ a.ghost { text-decoration: none; text-align: center; display: inline-flex; align
 
 .log-line { margin: 0; text-align: center; font-size: .84rem; color: var(--muted); }
 .log-line .linkbtn { font-size: .84rem; }
+
+.m-quality { margin: 0; font-weight: 650; min-height: 1.4em; }
+.m-quality.good { color: var(--good); } .m-quality.weak { color: var(--warn); } .m-quality.noisy { color: var(--bad); }
+.hrv-avg { margin-top: 6px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.hrv-avg b { font-size: 1.15rem; }

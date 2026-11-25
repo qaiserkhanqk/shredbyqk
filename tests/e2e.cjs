@@ -203,6 +203,10 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.goto('https://shred.local/'); await p.waitForTimeout(600);
   await go('vitals');
   check('body check: three measurements offered', await p.isVisible('#vHr') && await p.isVisible('#vHrv') && await p.isVisible('#vPvt'));
+  check('body check: 1- and 2-minute HRV options', await p.isVisible('#vHrv2'));
+  await tap('#valCard summary'); await p.click('#valOn');
+  check('strap comparison: mode on → shows how many comparisons are still needed', /10 more HRV comparisons/.test(await p.textContent('#valNeed')));
+  await p.click('#valOn'); await tap('#valCard summary');
   await p.evaluate(() => { window.__shredPvtSeconds = 9; });
   await tap('#vPvt'); await p.click('#pvtStart');
   await p.click('#pvtArea', { position: { x: 60, y: 60 } }); // too early: counted as a false start

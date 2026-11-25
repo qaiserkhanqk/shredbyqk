@@ -1447,5 +1447,6 @@ function finishWelcome() {
   $('#welcome').hidden = true; bindPlan(); tab('today');
   say(`${greeting(S.profile.name)} ${nudgeLine()}`, { id: 'greet', priority: 'high' });
 }
-if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+// The website caches itself for offline use; the native app (native/README.md) ships its files inside, so it skips this.
+if ('serviceWorker' in navigator && location.protocol === 'https:' && !globalThis.Capacitor?.isNativePlatform?.()) navigator.serviceWorker.register('sw.js').catch(() => {});
 window.__shred = { S, CONFIG };

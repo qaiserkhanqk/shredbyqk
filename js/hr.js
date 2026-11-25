@@ -70,19 +70,29 @@ function refineBeats(x, peaks, fs) {
   });
 }
 
+// The camera's real frame rate, rounded to a common rate (30, 60, 120, 240). Timing is resampled at this rate,
+// so a 60 fps camera keeps its finer timing instead of being thrown back to 30.
+export function frameRate(samples) {
+  if (samples.length < 2) return 30;
+  const r = (samples.length - 1) / (samples.at(-1).t - samples[0].t);
+  return [30, 60, 120, 240].reduce((a, b) => Math.abs(b - r) < Math.abs(a - r) ? b : a);
+}
+
 // samples: [{t: seconds, v: mean red brightness}] at the camera's (irregular) frame rate.
-export function ppgHeartRate(samples, { fs = 30, minBeats = 8 } = {}) {
+export function ppgHeartRate(samples, { fs = frameRate(samples), minBeats = 8 } = {}) {
   if (samples.length < fs * 4) return { ok: false, reason: 'Recording too short.' };
   const t0 = samples[0].t, n = Math.floor((samples.at(-1).t - t0) * fs);
   const x = new Float64Array(n); let j = 0;
-  for (let k = 0; k < n; k++) {        // resample to an even 30 Hz
+  for (let k = 0; k < n; k++) {        // resample to an even rate
     const t = t0 + k / fs;
     while (j < samples.length - 2 && samples[j + 1].t < t) j++;
     const a = samples[j], b = samples[j + 1], f = b.t > a.t ? Math.min(1, Math.max(0, (t - a.t) / (b.t - a.t))) : 0;
     x[k] = a.v + (b.v - a.v) * f;
   }
   const trend = movAvg(x, Math.round(fs * 1.5)), detr = x.map((v, i) => trend[i] - v); // remove drift; invert so beats are peaks
-  const y = movAvg(detr, 5), s = sd([...y]);
+  const y = movAvg(detr, Math.max(3, Math.round(fs / 6))), s = sd([...y]); // ~170 ms smoothing at any frame rate
+  // A flat signal (e.g. red maxed out by the flash) has no pulse in it; without this every sample would count as a beat.
+  if (!(s > 1e-3)) return { ok: false, reason: 'No clear pulse. Cover the camera and flash completely, and press gently.' };
   const gap = Math.round(fs * 60 / 200), peaks = [];  // no two beats closer than 200 bpm
   for (let i = gap; i < n - gap; i++) {
     if (y[i] < 0.3 * s) continue;
@@ -159,4 +169,62 @@ export function vitalNotes(vitals = [], now = Date.now()) {
     else notes.push({ level: 'go', text: 'Alertness in your normal range.' });
   }
   return notes;
+}
+
+/* ---------- Best colour channel ---------- */
+// samples: [{t, r, g}]. Red usually carries the pulse best, but a strong flash can max it out and some phones
+// show it more clearly in green, so both are analysed and the cleaner result is used.
+export function ppgBest(samples, fn = ppgHeartRate) {
+  const run = ch => ({ ch, res: fn(samples.map(s => ({ t: s.t, v: s[ch] }))) });
+  const cands = ['r', 'g'].filter(ch => samples.every(s => Number.isFinite(s[ch]))).map(run);
+  const ok = cands.filter(c => c.res.ok);
+  if (!ok.length) return cands[0]?.res || { ok: false, reason: 'No clear pulse.' };
+  const score = c => (c.res.quality ?? 1) * 100 + (c.res.beats ?? 0) / 10 - (c.res.artefacts ?? 0);
+  const best = ok.sort((a, b) => score(b) - score(a))[0];
+  return { ...best.res, channel: best.ch };
+}
+
+/* ---------- Live signal quality ---------- */
+// Judges the last few seconds while the person holds still, so they can fix problems before the reading ends.
+export function signalQuality(samples, ch = 'r') {
+  if (samples.length < 2) return { level: 'finding', tip: 'Finding your pulse…' };
+  const end = samples.at(-1).t, win = samples.filter(s => s.t > end - 5).map(s => ({ t: s.t, v: s[ch] }));
+  if (win.length < 30 || end - win[0].t < 4) return { level: 'finding', tip: 'Finding your pulse…' };
+  const vals = win.map(s => s.v), m = mean(vals);
+  const jumps = vals.slice(1).map((v, i) => Math.abs(v - vals[i]));
+  const swing = (Math.max(...vals) - Math.min(...vals)) / Math.max(1, m);
+  if (swing > 0.15 || Math.max(...jumps) > 0.06 * m) return { level: 'noisy', tip: 'Hold still: rest your hand on something.' };
+  const r = ppgHeartRate(win, { minBeats: 3 });
+  if (!r.ok) return swing < 0.004
+    ? { level: 'weak', tip: 'Pulse too faint. Press a little lighter, or move closer to a light.' }
+    : { level: 'weak', tip: 'Pulse unclear. Keep your fingertip flat over the camera.' };
+  return { level: 'good', tip: 'Good signal. Keep still…', bpm: r.bpm };
+}
+
+/* ---------- 7-day average ---------- */
+// Morning HRV is noisy day to day; sports science uses the 7-day rolling average of ln RMSSD as the signal.
+export function rollingHrv(vitals, now = Date.now(), days = 7) {
+  const lns = vitals.filter(v => v.kind === 'hrv' && v.at <= now && v.at > now - days * 864e5).map(v => v.ln);
+  if (lns.length < 3) return null;
+  return { rmssd: Math.round(Math.exp(mean(lns)) * 10) / 10, n: lns.length };
+}
+
+/* ---------- Correction from chest-strap comparisons ---------- */
+// pairs: [{cam, ref}] RMSSD in ms, the phone and a chest strap measured at the same time.
+// Fits ln(ref) = a + b·ln(cam) by least squares (HRV errors scale with the value, so logs are used).
+export const MIN_PAIRS = 10;
+export function fitCorrection(pairs) {
+  const p = pairs.filter(x => x.cam > 0 && x.ref > 0);
+  if (p.length < MIN_PAIRS) return { ok: false, n: p.length, need: MIN_PAIRS - p.length };
+  const X = p.map(x => Math.log(x.cam)), Y = p.map(x => Math.log(x.ref)), mx = mean(X), my = mean(Y);
+  const sxx = X.reduce((s, x) => s + (x - mx) ** 2, 0);
+  const b = sxx > 1e-9 ? X.reduce((s, x, i) => s + (x - mx) * (Y[i] - my), 0) / sxx : 1, a = my - b * mx;
+  const mae = f => mean(p.map(x => Math.abs(f(x.cam) - x.ref)));
+  return { ok: true, n: p.length, a, b, maeBefore: Math.round(mae(c => c) * 10) / 10, maeAfter: Math.round(mae(c => Math.exp(a + b * Math.log(c))) * 10) / 10 };
+}
+export const applyCorrection = (rmssd, c) => c?.ok ? Math.round(Math.exp(c.a + c.b * Math.log(rmssd)) * 10) / 10 : rmssd;
+
+// CSV for tools/validate (npm run validate): subject,metric,app,reference
+export function validationCsv(pairs) {
+  return ['subject,metric,app,reference', ...pairs.map(p => `${p.subject || 'me'},${p.kind === 'hr' ? 'heart_rate_bpm' : 'hrv_rmssd_ms'},${p.cam},${p.ref}`)].join('\n');
 }

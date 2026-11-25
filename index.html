@@ -104,7 +104,7 @@
       <div><span class="eyebrow">Recovery · 1 minute, each morning</span><h2 class="display h2" style="margin-top:4px">Heart-rate variability (HRV)</h2></div>
       <p class="muted small" style="margin:0">Higher than your normal usually means well recovered; lower can mean poor sleep, stress, illness or hard training. Measure it at the same time each morning, sitting, before coffee.</p>
       <div id="vHrvLast"></div>
-      <button class="cta" type="button" id="vHrv">Measure HRV</button>
+      <div class="btn-row"><button class="cta" type="button" id="vHrv">1 minute</button><button class="ghost" type="button" id="vHrv2">2 minutes · most accurate</button></div>
     </div>
     <div class="card stack vital-card">
       <div><span class="eyebrow">Alertness · 3 minutes</span><h2 class="display h2" style="margin-top:4px">Reaction-time test</h2></div>
@@ -112,6 +112,18 @@
       <div id="vPvtLast"></div>
       <button class="cta" type="button" id="vPvt">Start alertness test</button>
     </div>
+    <details class="card" id="valCard"><summary><b>Check it against a chest strap</b></summary>
+      <div class="stack small" style="margin-top:10px">
+        <p style="margin:0">To find out how accurate your phone is, and correct it: wear a chest strap (for example a Polar H10 with its free app) and take a Shred reading at the same moment. After each reading, type in the strap's number.</p>
+        <label class="check"><input type="checkbox" id="valOn"> Comparison mode: ask me for the strap reading after each measurement</label>
+        <div class="stack" id="valBody" hidden>
+          <div class="kv" id="valStats"></div>
+          <p class="muted" id="valNeed" style="margin:0"></p>
+          <label class="check" id="valFixWrap" hidden><input type="checkbox" id="valFix"> Correct my camera HRV using these comparisons</label>
+          <button class="ghost" type="button" id="valExport">Export comparisons (CSV)</button>
+        </div>
+      </div>
+    </details>
     <details class="card"><summary><b>How accurate is this?</b></summary>
       <div class="stack small" style="margin-top:10px">
         <p style="margin:0"><b>Heart rate:</b> fingertip camera readings are usually within 2–5 beats a minute of a hospital ECG. Less accurate if your heartbeat is irregular.</p>
@@ -521,6 +533,7 @@
         <canvas id="mWave" width="300" height="70"></canvas>
         <p id="mStatus" style="margin:0;font-weight:600"></p>
         <p class="muted small" id="mTip" style="margin:0"></p>
+        <p class="m-quality" id="mQuality"></p>
         <p class="muted small num" id="mSignal" style="margin:0;font-size:.72rem"></p>
         <p class="muted small" id="mLight" hidden style="margin:0">This phone's browser can't switch the flash on. Face a lamp or window so light shines through your fingertip.</p>
         <button class="ghost" type="button" id="mRetry" hidden>Try again</button>
@@ -529,6 +542,7 @@
       <div class="stack" id="mResult" hidden style="align-items:center;text-align:center">
         <div class="num m-value" id="mValue"></div>
         <p class="muted small" id="mWhat" style="margin:0;max-width:340px"></p>
+        <label class="field" id="mRef" hidden style="width:100%;max-width:300px;text-align:left"><span id="mRefLbl"></span><input id="mRefVal" type="number" inputmode="decimal" min="0" step="0.1" placeholder="Leave empty to skip"></label>
         <button class="cta" type="button" id="mDone">Done</button>
       </div>
     </div>

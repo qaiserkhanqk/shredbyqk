@@ -196,6 +196,27 @@ No wearable is needed. All processing happens on the phone.
 | **HRV, RMSSD** (1 min, morning) | Same recording for 60 s. Each beat is timed by matching an average beat shape across the whole waveform, refined between frames, because a single peak sample is too noisy at 30 fps. Readings with more than 10% irregular beats are rejected. | Phone-camera HRV correlates strongly with ECG but reads high ([Comfort 2026](https://doi.org/10.1007/s00406-026-02239-5)). A 60 s recording is long enough: ECG RMSSD from 30 s already agrees well with 5 minutes, and 120 s almost perfectly ([Munoz 2015](https://doi.org/10.1371/journal.pone.0138921)). | Reads 0–11 ms high, most when HRV is low, because of frame timing and camera noise. **So it is only ever compared with the person's own last 30 days (normal = within 1 SD, after 5 readings), never with norms or other devices.** |
 | **Alertness** (3 min) | PVT-B: numbers start counting at random every 2–5 s; tap as fast as possible. Lapse = 355 ms or slower; false start = early tap or under 100 ms. Response speed (1/RT) is the main measure. | The 3-minute phone PVT tracked 38 h of sleep loss against the 10-minute lab test ([Grant 2017](https://doi.org/10.3758/s13428-016-0763-8)); negligible practice effect over 16 repeats ([Basner 2018](https://doi.org/10.1093/sleep/zsx187)). Night shifts slowed doctors from 257 to 283 ms ([Weetman 2024](https://doi.org/10.1136/oemed-2023-109311)). | Screens add device-specific delay, so results are only compared on the same phone. The shorter adaptive version (PVT-BA) needs a published algorithm we don't have, so the validated 3 minutes is kept. |
 
+**Accuracy upgrades** (all checked with `tests/hr.test.mjs` and the real-browser camera check):
+- **Frame rate:** the camera is asked for 60 fps; beat timing uses the camera's real rate instead of resampling to 30, so a 60 fps phone keeps its finer timing.
+- **Locked camera:** once the fingertip settles, exposure, white balance and focus are locked where the browser allows (Chrome on Android), so automatic brightness changes don't look like pulse waves.
+- **Best colour channel:** red and green are both analysed and the cleaner one is used (a strong flash can max out red). A completely flat signal is now rejected; before, it could be mistaken for a 200 bpm pulse.
+- **Live quality line** during the reading: "Good signal", "Press a little lighter", "Hold still".
+- **2-minute HRV option:** ECG RMSSD from 120 s agrees almost perfectly with 5 minutes ([Munoz 2015](https://doi.org/10.1371/journal.pone.0138921)).
+- **7-day average** shown as the number to watch, the way morning HRV is used in sport.
+
+Results on fake fingertip videos through the real app in Chromium (`tools/make-pulse-video.py` → `tests/camera-pulse.cjs`):
+
+| True | 30 fps | 60 fps |
+|---|---|---|
+| HRV 4.8 ms (very low) | 5.4 ms (was 15–16 ms before these changes) | 5.2 ms |
+| HRV 14.5 ms, heart rate 58 bpm | – | 14.4 ms, 58 bpm |
+
+Real fingers are noisier than these videos, so the real-world check below still matters.
+
+**Checking against a chest strap:** Body check → *Check it against a chest strap*. After each reading the client types in the strap's value for the same minute. With 10+ HRV pairs, `fitCorrection` (in `js/hr.js`) fits ln(strap) = a + b·ln(camera) and the client can turn the correction on; raw values are always kept. Comparisons export as CSV for `npm run validate` (bias, MAE, limits of agreement, ICC).
+
+**Native app** (`native/README.md`): a Capacitor wrapper with a native pulse-camera plugin (flash on iPhone, up to 120–240 fps, locked exposure). The JavaScript side uses it automatically. The Swift and Kotlin plugins have not yet been compiled or tested on a device.
+
 **Where it's used:** the Body check screen; the Today readiness card adds today's HRV and alertness against the client's normal; Sukoon can measure heart rate before and after.
 
 **Cyclic sighing** (Sukoon breathing style): 2 s breath in, 1 s top-up breath in, 6 s slow breath out (about 6.7 breaths/min). Five minutes a day improved mood more than mindfulness meditation in a Stanford RCT ([Balban 2023](https://doi.org/10.1016/j.xcrm.2022.100895)); one trial, not yet independently repeated.

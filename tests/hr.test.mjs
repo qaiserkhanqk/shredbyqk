@@ -1,5 +1,5 @@
 // Heart rate, HRV and alertness maths, on signals with a known true answer. Run: node tests/hr.test.mjs
-import { cleanRR, rmssd, hrvReading, fingerOn, ppgHeartRate, ppgHrv, vitalNotes, vsBaseline, pvtScore, nextDelay, PVT } from '../js/hr.js';
+import { cleanRR, rmssd, hrvReading, fingerOn, ppgHeartRate, ppgHrv, vitalNotes, frameRate, ppgBest, signalQuality, rollingHrv, fitCorrection, applyCorrection, validationCsv, MIN_PAIRS, vsBaseline, pvtScore, nextDelay, PVT } from '../js/hr.js';
 let fails = 0;
 const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? '  — ' + detail : ''}`); if (!ok) fails++; };
 let seed = 7; const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -37,13 +37,13 @@ check('camera: pure noise is rejected, not reported as a heart rate', !ppgHeartR
 check('camera: too short is rejected', !ppgHeartRate(ppg(70, 2)).ok);
 
 // HRV from the camera: beats with known variable spacing (breathing-linked), rendered at a jittery ~30 fps.
-function ppgBeats(rrMs, noise = 0.15) {
+function ppgBeats(rrMs, noise = 0.15, fps = 30) {
   const beats = []; let tb = 0.5; for (const r of rrMs) { beats.push(tb); tb += r / 1000; }
   const out = []; let t = 0;
   while (t < tb) {
     let v = 200 + 3 * t / tb + noise * gauss();
     for (const b of beats) { const d = t - b; if (d > -0.3 && d < 0.6) v -= 2.2 * Math.exp(-((d - 0.08) ** 2) / 0.006) + 0.9 * Math.exp(-((d - 0.33) ** 2) / 0.012); }
-    out.push({ t, v }); t += (1 / 30) * (0.85 + 0.3 * rand());
+    out.push({ t, v }); t += (1 / fps) * (0.85 + 0.3 * rand());
   }
   return out;
 }
@@ -68,6 +68,28 @@ check('baseline: needs 5 readings first', vsBaseline(50, hist.slice(0, 3), { now
 check('baseline: usual value → normal', vsBaseline(51, hist, { now }).status === 'normal');
 check('baseline: well below usual → low, with % difference', vsBaseline(42, hist, { now }).status === 'low' && vsBaseline(42, hist, { now }).pct === -18);
 check('baseline: ignores readings older than 30 days', vsBaseline(51, hist.map(h => ({ ...h, at: h.at - 40 * DAY })), { now }).status === 'building');
+
+// --- Accuracy upgrades
+const low = Array.from({ length: 75 }, (_, i) => 850 + 15 * Math.sin(i / 2.2) + 4.5 * gauss()), lowTrue = rmssd(low);
+const at30 = ppgHrv(ppgBeats(low, 0.15, 30)), at60 = ppgHrv(ppgBeats(low, 0.15, 60));
+check('frame rate detected (30 vs 60 fps)', frameRate(ppgBeats(low.slice(0, 20), 0.15, 30)) === 30 && frameRate(ppgBeats(low.slice(0, 20), 0.15, 60)) === 60);
+check('60 fps reads low HRV closer to the truth than 30 fps', at30.ok && at60.ok && Math.abs(at60.rmssd - lowTrue) < Math.abs(at30.rmssd - lowTrue), `true ${lowTrue.toFixed(1)}: 30 fps ${at30.rmssd}, 60 fps ${at60.rmssd}`);
+const both = ppgBeats(Array.from({ length: 30 }, () => 850)).map(s => ({ t: s.t, r: 255, g: s.v - 120 })); // red maxed out by the flash
+const pick = ppgBest(both);
+check('best channel: uses green when red is maxed out', pick.ok && pick.channel === 'g' && Math.abs(pick.bpm - 71) <= 2, `${pick.channel} ${pick.bpm}`);
+const rg = ppgBeats(Array.from({ length: 12 }, () => 850)).map(s => ({ t: s.t, r: s.v, g: s.v - 100 }));
+check('signal quality: steady pulse → good', signalQuality(rg).level === 'good', JSON.stringify(signalQuality(rg)));
+check('signal quality: big jumps → hold still', signalQuality(rg.map((s, i) => ({ ...s, r: s.r + (i % 40 < 20 ? 0 : 25) }))).level === 'noisy');
+check('signal quality: flat → too faint, press lighter', /lighter/.test(signalQuality(rg.map(s => ({ ...s, r: 200 + 0.05 * gauss() }))).tip));
+const V7 = [40, 50, 60].map((v, i) => ({ at: now - i * DAY - 1000, kind: 'hrv', ln: Math.log(v) }));
+check('7-day HRV average (geometric mean of RMSSD)', rollingHrv(V7, now).rmssd === 49.3 && rollingHrv(V7.slice(0, 2), now) === null);
+const pairs = Array.from({ length: 14 }, (_, i) => { const ref = 20 + i * 5; return { cam: Math.round((ref * 0.8 + 9) * 10) / 10, ref }; }); // camera reads high at low HRV
+const fit = fitCorrection(pairs);
+check('correction: needs enough strap comparisons first', !fitCorrection(pairs.slice(0, MIN_PAIRS - 1)).ok && fitCorrection(pairs.slice(0, 4)).need === MIN_PAIRS - 4);
+check('correction: removes most of a known bias', fit.ok && fit.maeAfter < fit.maeBefore / 3, `MAE ${fit.maeBefore} → ${fit.maeAfter} ms`);
+check('correction: applied value close to the strap', Math.abs(applyCorrection(25, fit) - 20) < 3, `${applyCorrection(25, fit)}`);
+check('correction: no fit → value unchanged', applyCorrection(33.3, null) === 33.3);
+check('CSV for npm run validate', validationCsv([{ kind: 'hrv', cam: 30, ref: 25 }, { kind: 'hr', cam: 64, ref: 63 }]) === 'subject,metric,app,reference\nme,hrv_rmssd_ms,30,25\nme,heart_rate_bpm,64,63');
 
 // --- Alertness test (PVT-B rules)
 check('PVT-B timing: 3 minutes, stimulus every 2–5 s', PVT.seconds === 180 && nextDelay(() => 0) === 2000 && nextDelay(() => 1) === 5000);
