@@ -1,0 +1,10 @@
+ok   flag off: no pregnancy mode form
+FAIL run completed  — page.fill: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('#cyPregDue')[22m
+
+    at startPregnancy (/home/user/shredbyqk/tests/cycle-ui-pregnancy.cjs:28:69)
+    at async /home/user/shredbyqk/tests/cycle-ui-pregnancy.cjs:38:7
+ok   no JavaScript errors
+ok   no requests to any other server (privacy)
+1 FAILED of 4
