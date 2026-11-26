@@ -25,6 +25,8 @@ import * as prog from './progression.js';
 import * as brief from './brief.js';
 import { icsFor, dueToday } from './reminders.js';
 import * as refresh from './refresh.js';
+import { CLOUD, cloudOn } from './cloud-config.js';
+import { Cloud, pushAll } from './sync.js';
 import { PROGRAMS, scheme as progScheme, weeklySets, currentDay, byId as programById, GOALS, pickProgram, defaultDays } from './programs.js';
 import { ExerciseDetector, PICK_LIST } from './detect.js';
 import { initCalm, renderCalm, startCalmNow } from './calm.js';
@@ -750,7 +752,7 @@ function endSet() {
     S.sessions.push(lastSet = { at: Date.now(), ex: exKey, name: ex.name, reps, good, faults: tally, vl, tempo, roms: roms.map(r => Math.round(r.rom)), kg, demo: live?.source === 'demo' || undefined,
       ...(rx ? { target: rx.reps, mode: rx.mode === 'wave' ? 'wave' : undefined, wave: rx.day, rxKg: rx.kg } : {}) });
     logProgramDay(exKey);
-    showNext();
+    showNext(); setTimeout(() => syncNow?.(), 2000);
     persist();
     const better = prevScore != null && score > prevScore ? ` Your form score is up from ${prevScore} to ${score} percent.` : '';
     say(`Set done. ${reps} reps, ${good} clean.${better} ${top ? 'One thing for next set: ' + top.cue : 'Great form. Keep it up.'}`, { id: 'summary_' + Date.now(), priority: 'high' });
@@ -1424,6 +1426,46 @@ $('#rsheetBody').addEventListener('click', e => {
   toast(`Swapped. ${LIB[to].name} from now on.`);
   openSetup(to);
 });
+
+/* ---------- Coach connection: sync numbers, hear the coach's messages ---------- */
+// Off unless the server is configured (js/cloud-config.js). Everything works offline; sync catches up later.
+const cloud = cloudOn() ? new Cloud({ url: CLOUD.url, anonKey: CLOUD.anonKey, session: S.cloud?.session || null, onSession: s => { (S.cloud ||= {}).session = s; persist(); } }) : null;
+let syncing = false;
+async function syncNow() {
+  if (!cloud?.signedIn || !S.cloud?.coach || syncing || !navigator.onLine) return;
+  syncing = true;
+  try {
+    S.cloud.mark = await pushAll(cloud, S, S.cloud.mark || {}); persist();
+    const msgs = await cloud.unread();
+    if (msgs.length) {
+      const from = S.cloud.coach || 'Your coach';
+      msgs.forEach((m, i) => setTimeout(() => { say(`Message from ${from}. ${m.body}`, { id: 'coachmsg_' + m.id, priority: 'high' }); toast(`${from}: ${m.body}`); }, 1500 + i * 6000));
+      await cloud.markRead(msgs.map(m => m.id));
+    }
+  } catch (e) { if (e.status === 401) { S.cloud.session = null; persist(); renderCoachLink(); } }
+  finally { syncing = false; }
+}
+function renderCoachLink() {
+  const card = $('#coachLink'); card.hidden = !cloud; if (!cloud) return;
+  const signed = cloud.signedIn, coach = S.cloud?.coach;
+  $('#clStep1').hidden = signed; $('#clStep2').hidden = true; $('#clStep3').hidden = !signed || !!coach; $('#clOut').hidden = !signed;
+  $('#clStatus').textContent = coach ? `Connected to ${coach} ✓ Your sessions sync automatically. Only numbers are shared; your videos never leave your phone.`
+    : signed ? 'Signed in. Now enter your coach\'s invite code.' : 'Connect to your coach so they can see your training and cheer you on. Only numbers are shared (sets, reps, weights, form scores). Your videos never leave your phone.';
+}
+if (cloud) {
+  $('#clSend').onclick = async () => { const e = $('#clEmail').value.trim(); if (!e) return; try { await cloud.sendCode(e); $('#clStep2').hidden = false; toast('Code sent. Check your email.'); } catch (err) { toast(err.message); } };
+  $('#clVerify').onclick = async () => { try { await cloud.verify($('#clEmail').value, $('#clCode').value); renderCoachLink(); } catch (err) { toast(err.message); } };
+  $('#clJoin').onclick = async () => {
+    try { const name = await cloud.joinCoach($('#clInvite').value.trim()); (S.cloud ||= {}).coach = name || 'your coach'; persist(); renderCoachLink(); toast(`Connected to ${S.cloud.coach} ✓`); say(`You're connected to ${S.cloud.coach}. They'll see your training and cheer you on.`, { priority: 'high' }); await cloud.opened(); syncNow(); }
+    catch (err) { toast(/No coach/.test(err.message) ? 'That invite code didn\'t match. Check it with your coach.' : err.message); }
+  };
+  $('#clOut').onclick = () => { cloud.signOut(); S.cloud = {}; persist(); renderCoachLink(); };
+  renderCoachLink();
+  // An app open counts as "logged in today" for the coach; then sync anything new.
+  if (cloud.signedIn && S.cloud?.coach) cloud.opened().catch(() => {}).finally(syncNow);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) syncNow(); });
+  addEventListener('online', syncNow); setInterval(syncNow, 5 * 60e3);
+}
 
 /* ---------- Programs ---------- */
 // The program's rep target for an exercise on today's program day (feeds the progression engine).
