@@ -14,7 +14,7 @@
 // What it can show: how the dates-only logic behaves on real cycle-length sequences from this population (women in a
 // natural family planning study). What it cannot show: accuracy for other populations, accuracy of any band feature
 // (this data has no temperature), or anything clinical.
-import { readFileSync } from 'node:fs';
+import { loadMarquette } from './lib/marquette.mjs';
 import * as M from '../js/cycle/model.js';
 import { addDays, diffDays } from '../js/cycle/dates.js';
 import { estimateNext, PARAMS, ALGORITHM_VERSION } from '../js/cycle/predict.js';
@@ -23,34 +23,8 @@ import { learningStage } from '../js/cycle/learning.js';
 const file = process.argv[2];
 if (!file) { console.error('usage: node tools/real-data-eval.mjs <FedCycleData csv>'); process.exit(2); }
 
-function parseCSV(text) { // small RFC 4180 reader: quoted fields, commas, CRLF
-  const rows = []; let row = [], f = '', q = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (q) { if (c === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; continue; }
-    if (c === '"') q = true; else if (c === ',') { row.push(f); f = ''; } else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(f); rows.push(row); row = []; f = ''; } else f += c;
-  }
-  if (f || row.length) { row.push(f); rows.push(row); }
-  return rows;
-}
-const [head, ...body] = parseCSV(readFileSync(file, 'utf8').replace(/^﻿/, ''));
-const col = n => head.findIndex(h => h.trim() === n);
-const [iId, iNum, iLen] = ['ClientID', 'CycleNumber', 'LengthofCycle'].map(col);
-if ([iId, iNum, iLen].includes(-1)) { console.error('expected columns ClientID, CycleNumber, LengthofCycle'); process.exit(2); }
-
-const people = new Map();
-for (const r of body) {
-  const id = (r[iId] || '').trim(), num = Number(r[iNum]), len = Number(r[iLen]);
-  if (!id || !Number.isInteger(num) || !Number.isInteger(len)) continue;
-  (people.get(id) || people.set(id, []).get(id)).push({ num, len });
-}
-let truncated = 0;
-const series = [...people.values()].map(cs => {
-  cs.sort((a, b) => a.num - b.num);
-  const run = [cs[0]];
-  for (const c of cs.slice(1)) { if (c.num !== run.at(-1).num + 1) { truncated++; break; } run.push(c); }
-  return run.map(c => c.len);
-});
+const { people, series: runs, truncated } = loadMarquette(file);
+const series = runs.map(r => r.lens);
 
 const ANCHOR = '2020-01-06', AT = '2020-01-01T00:00:00.000Z';
 const median = xs => { const a = [...xs].sort((x, y) => x - y), m = a.length >> 1; return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
