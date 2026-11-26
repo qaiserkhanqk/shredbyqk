@@ -2,7 +2,7 @@
 // With no server configured (js/cloud-config.js) it shows sample clients so the coach can try it.
 import { CLOUD, cloudOn } from './cloud-config.js';
 import { Cloud } from './sync.js';
-import { clientCard, sortCards, overview, TEMPLATES, fill, demoData } from './dash.js';
+import { clientCard, sortCards, overview, TEMPLATES, fill, demoData, localClient, LOCAL_ID, DEMO_INBOX } from './dash.js';
 import { LIB } from './library.js';
 import { byId as programById } from './programs.js';
 import { EXERCISES, allRules } from './exercises.js';
@@ -22,7 +22,12 @@ const cloud = cloudOn() ? new Cloud({ url: CLOUD.url, anonKey: CLOUD.anonKey, se
 
 async function load() {
   const now = Date.now();
-  if (state.demo) state.raw = demoData(now);
+  if (state.demo) {
+    state.raw = demoData(now);
+    // Your own training on this device joins the sample clients, at the top.
+    const me = localClient(store.get('shred_qk_v1'), now);
+    if (me) { state.raw.profiles.unshift(me.profile); state.raw.sets.push(...me.sets); state.raw.opens.push(...me.opens); state.raw.checks.push(...me.checks); }
+  }
   else {
     const me = await cloud.me();
     if (me?.role !== 'coach') { showLogin('This account isn\'t set up as a coach yet. See supabase/README.md, step 4.'); return; }
@@ -34,6 +39,8 @@ async function load() {
   }
   const { profiles, sets, opens, checks } = state.raw, by = (rows, id) => rows.filter(r => r.client_id === id);
   state.cards = sortCards(profiles.map(p => clientCard(p, by(sets, p.id), by(opens, p.id), by(checks, p.id), { now, names })));
+  // Demo: your own row first, so you can find yourself.
+  const mine = state.cards.findIndex(c => c.id === LOCAL_ID); if (mine > 0) state.cards.unshift(...state.cards.splice(mine, 1));
   render();
 }
 
@@ -91,8 +98,9 @@ $('#cdDetail').addEventListener('click', async e => {
   if (!body || !c) return toast('Pick a message or write one first.');
   try {
     if (!state.demo) await cloud.send(c.id, e.target.dataset.kind, body);
+    else if (c.id === LOCAL_ID) store.set(DEMO_INBOX, [...(store.get(DEMO_INBOX) || []), { id: Date.now(), kind: e.target.dataset.kind, body }]);
     (state.sent[c.id] ||= []).unshift({ body, created_at: new Date().toISOString() });
-    renderDetail(); toast(state.demo ? `Sample mode: this would be sent to ${c.name}.` : `Sent. QK will say it to ${c.name.split(' ')[0]} when they open the app.`);
+    renderDetail(); toast(state.demo && c.id !== LOCAL_ID ? `Sample mode: this would be sent to ${c.name}.` : state.demo ? 'Sent. Open the app on this phone and QK will say it.' : `Sent. QK will say it to ${c.name.split(' ')[0]} when they open the app.`);
   } catch (err) { toast(`Couldn't send: ${err.message}`); }
 });
 

@@ -71,7 +71,8 @@ export const sessionRow = (uid, s) => ({
  */
 export async function pushAll(cloud, S, mark = {}) {
   const uid = cloud.uid; if (!uid) return mark;
-  const sets = (S.sessions || []).filter(s => !s.demo && s.at > (mark.sessions || 0));
+  const classSets = (S.classes || []).filter(c => c.at > (mark.classes || 0)).map(c => ({ at: c.at, ex: 'class:' + c.class, name: c.name, reps: 0, good: 0, secs: (c.minutes || 0) * 60, guided: true }));
+  const sets = [...(S.sessions || []).filter(s => !s.demo && s.at > (mark.sessions || 0)), ...classSets];
   const checks = (S.checkins || []).filter(c => c.at > (mark.checkins || 0));
   await cloud.upsert('sessions', sets.map(s => sessionRow(uid, s)), 'client_id,at,ex');
   await cloud.upsert('checkins', checks.map(c => ({ client_id: uid, at: new Date(c.at).toISOString(), data: c })), 'client_id,at');
@@ -81,7 +82,8 @@ export async function pushAll(cloud, S, mark = {}) {
     last_seen: new Date().toISOString(),
   });
   return {
-    sessions: Math.max(mark.sessions || 0, ...sets.map(s => s.at)),
+    sessions: Math.max(mark.sessions || 0, ...sets.filter(s => !String(s.ex).startsWith('class:')).map(s => s.at)),
+    classes: Math.max(mark.classes || 0, ...classSets.map(s => s.at)),
     checkins: Math.max(mark.checkins || 0, ...checks.map(c => c.at)),
   };
 }
