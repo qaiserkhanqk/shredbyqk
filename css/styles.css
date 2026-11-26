@@ -665,6 +665,11 @@ a.ghost { text-decoration: none; text-align: center; display: inline-flex; align
 .bd-results button.added { border-color: var(--good); }
 .ss { display: inline-block; font: 700 .7rem var(--f-data); color: var(--z3); background: var(--surface-2); border-radius: 6px; padding: 1px 5px; margin-right: 2px; }
 .bd-item .bd-btns button.on { color: var(--good); }
+.warm { margin: 4px 0 0; font: 600 .78rem var(--f-data); color: var(--muted); }
+.time-cap { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: .82rem; color: var(--muted); }
+.time-cap #planMins { font: 700 .9rem var(--f-data); color: var(--text); }
+.tc-btns button { border: 1px solid var(--line); background: var(--surface-2); color: var(--text); border-radius: 99px; padding: 3px 9px; margin-left: 4px; font: 600 .78rem var(--f-data); cursor: pointer; }
+.tc-btns button.on { background: var(--good); border-color: var(--good); color: #0b1311; }
 .track-chip { position: absolute; top: 104px; left: 16px; display: inline-flex; align-items: center; gap: 7px; pointer-events: none;
   font: 600 .72rem var(--f-data); letter-spacing: .06em; text-transform: uppercase; color: rgba(236,241,236,.75);
   background: rgba(var(--scrim-rgb),.7); border: 1px solid var(--line); padding: 4px 9px; border-radius: 99px; }

@@ -65,6 +65,8 @@
       <div class="card-head" style="margin:0"><div><span class="eyebrow" id="planEyebrow">QK's plan for today</span><h2 class="display h2" id="planTitle">Your weights are set</h2></div><button class="linkbtn" type="button" id="planListen" aria-label="Hear the plan"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Hear it</button></div>
       <div class="news" id="planNews" hidden><b id="newsTitle"></b><p class="muted small" id="newsNote"></p><ul id="newsList"></ul><button class="ghost" type="button" id="newsOk">Got it</button></div>
       <p class="muted small" style="margin:0" id="planSummary"></p>
+      <div class="time-cap" id="planTime"><span id="planMins"></span><span class="tc-btns">Short on time? <button type="button" data-cap="30">30</button><button type="button" data-cap="45">45</button><button type="button" data-cap="60">60</button> min</span></div>
+      <p class="muted small" style="margin:0" id="planCut" hidden></p>
       <div class="plan-rows" id="planRows"></div>
       <button class="cta" type="button" id="planStart"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Start workout</button>
     </div>
@@ -495,7 +497,7 @@
     <ol class="steps" id="setupSteps"></ol>
     <div class="fit-note" id="fitNote" hidden></div>
     <div class="rx" id="rxBox" hidden>
-      <div class="rx-main"><span class="eyebrow" id="rxEyebrow">QK's target today</span><b id="rxLine"></b><p class="plates" id="rxPlates" hidden></p><p class="muted small" id="rxWhy"></p></div>
+      <div class="rx-main"><span class="eyebrow" id="rxEyebrow">QK's target today</span><b id="rxLine"></b><p class="plates" id="rxPlates" hidden></p><p class="warm" id="rxWarm" hidden></p><p class="muted small" id="rxWhy"></p></div>
       <div class="rx-btns"><button class="ghost" type="button" id="rxEdit">Change</button><button class="ghost" type="button" id="swapBtn" hidden>Swap</button></div>
       <div class="rx-edit" id="rxEditWrap" hidden><label class="field"><span id="rxEditLbl">Weight</span><input id="rxKg" type="number" inputmode="decimal" step="0.5" min="0"></label><button class="ghost" type="button" id="rxSave">Save</button></div>
     </div>

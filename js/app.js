@@ -31,6 +31,7 @@ import { Cloud, pushAll } from './sync.js';
 import { PROGRAMS, scheme as progScheme, weeklySets, currentDay, byId as builtinById, GOALS, pickProgram, defaultDays } from './programs.js';
 import * as builder from './builder.js';
 import * as SS from './supersets.js';
+import * as warm from './warmup.js';
 import { ExerciseDetector, PICK_LIST } from './detect.js';
 import { initCalm, renderCalm, startCalmNow } from './calm.js';
 import { WEIGHTED, lastLoad, weekSummary } from './share.js';
@@ -106,7 +107,12 @@ const TODAY_DEFAULT = [['hipThrust', '4×10'], ['rdl', '3×10'], ['lunge', '3×1
 // Today's workout: the next day of the active program, or the starter glute session.
 const activeProgram = () => { const d = S.program?.id ? programById(S.program.id) : null; return d && S.program.plan ? { ...d, plan: S.program.plan } : d; };
 const programDay = () => { const p = activeProgram(); return p ? currentDay(p, S.program) : null; };
-const todayItems = () => { const d = programDay(); return d?.day ? d.day.items.map(it => [it[0], `${it[1]}×${it[2]}`]) : TODAY_DEFAULT; };
+const capToday = () => (S.timeCap?.day === new Date().toDateString() ? S.timeCap.mins : null);
+// Rough count of warm-up sets for a day (heavy barbell lifts get about three).
+const warmCount = items => items.reduce((a, it) => a + ((prog.liftClass(LIB[it[0]]) || '').startsWith('big') ? 3 : prog.liftClass(LIB[it[0]]) === 'mid' ? 1 : 0), 0);
+const dayItemsRaw = () => programDay()?.day?.items || null;
+const dayItems = () => { const raw = dayItemsRaw(); if (!raw) return null; const cap = capToday(); return cap ? warm.fitTo(raw, cap, warmCount(raw)).items : raw; };
+const todayItems = () => { const items = dayItems(); return items ? items.map(it => [it[0], `${it[1]}×${it[2]}`]) : TODAY_DEFAULT; };
 const todayName = () => { const p = activeProgram(), d = programDay(); return p && d ? `${p.name}: ${d.day.name}` : 'Glute Builder'; };
 const ICONS = {
   hipThrust: '<path d="M6 20h9l8-5 8 3M23 15l3 11M6 28h14"/><circle cx="23" cy="13" r="3.5"/>',
@@ -609,6 +615,7 @@ function setupLine(ex) {
   if (ex.hold) return `${ex.name}. Get into position and hold.`;
   const row = ex.libId ? brief.planRows([ex.libId], { lib: LIB, sets: S.sessions, unit: unit(), light: lightWeek(), schemeFor: programScheme })[0] : null;
   let target = row?.rx ? ' ' + brief.spokenTarget(row, unit()) : '';
+  if (row?.rx && !setsToday(ex.libId)) { const wu = warm.warmupSpeech(warm.warmupSets(LIB[ex.libId], row.rx.kg, unit()), unit()); if (wu) target += ' ' + wu; }
   const wk = brief.weekOf(Date.now()), P = (S.prog ||= {});
   if (target && P.briefWeek !== wk) { const sum = brief.summary(planToday().filter(r => r.rx)); if (sum) target = ` New week. ${sum}` + target; P.briefWeek = wk; persist(); }
   const tips = (TIPS[ex.patternKey] || []).map(t => t[0]).join(' ');
@@ -1237,6 +1244,8 @@ function showRx(k) {
   $('#rxWhy').textContent = r ? r.why : 'Log the weight after your set and QK plans the next one from how it went.';
   const pl = r && cls.startsWith('big') ? prog.plates(r.kg, unit()) : null;
   $('#rxPlates').hidden = !pl; $('#rxPlates').textContent = pl ? pl.text : '';
+  const wu = r && !setsToday(k) ? warm.warmupSets(LIB[k], r.kg, unit()) : [];
+  $('#rxWarm').hidden = !wu.length; $('#rxWarm').textContent = wu.length ? `Warm-up first: ${warm.warmupLine(wu, unit())}` : '';
   $('#rxEditLbl').textContent = `Weight (${unit()})`; $('#rxKg').value = r ? +prog.toUnit(r.kg, unit()).toFixed(2) : '';
   $('#loadKg').value = r ? +prog.toUnit(r.kg, unit()).toFixed(2) : $('#loadKg').value;
 }
@@ -1301,7 +1310,18 @@ function renderPlan(rows) {
   const known = lifts.filter(r => r.rx), needW = lifts.some(r => r.change === 'new');
   $('#planTitle').textContent = known.length ? (newWeek ? 'New week. Your weights are set.' : 'Your weights are set') : needW ? 'Pick your starting weights' : `Today: ${programDay()?.day?.name || 'your workout'}`;
   $('#planSummary').textContent = (brief.summary(known) + (known.length ? ' Based on how your last session went. Just follow the numbers.' : needW ? ' Do your first set and QK plans every one after it.' : ' Tap Start workout and follow QK.')).trim();
-  const dayItems = programDay()?.day?.items || [], lab = Object.fromEntries(SS.labels(dayItems).map((l, i) => [dayItems[i][0], l]));
+  const dItems = dayItems() || [], lab = Object.fromEntries(SS.labels(dItems).map((l, i) => [dItems[i][0], l]));
+  const raw = dayItemsRaw(), cap = capToday();
+  $('#planTime').hidden = !raw;
+  if (raw) {
+    const shown = dayItems(), mins = warm.dayMinutes(shown, warmCount(shown)), full = warm.dayMinutes(raw, warmCount(raw));
+    $('#planMins').textContent = cap ? `About ${mins} min (trimmed from ${full})` : `About ${mins} min`;
+    $('#planTime').querySelectorAll('[data-cap]').forEach(b => { b.classList.toggle('on', +b.dataset.cap === cap); b.hidden = +b.dataset.cap >= full && +b.dataset.cap !== cap; });
+    // One line per exercise: if it was cut down and then skipped, just say skipped.
+    const cut = cap ? Object.values(Object.fromEntries(warm.fitTo(raw, cap, warmCount(raw)).cut.map(c => [c.id, c]))) : [];
+    $('#planCut').hidden = !cut.length;
+    $('#planCut').textContent = cut.length ? 'QK trimmed: ' + cut.map(c => c.to ? `${LIB[c.id]?.name} ${c.from}→${c.to} sets` : `skipped ${LIB[c.id]?.name}`).join(', ') + '. Main lifts stay.' : '';
+  }
   $('#planRows').innerHTML = lifts.map(r => `<button type="button" class="plan-row ${r.change}" data-train="${r.id}"><b>${lab[r.id] ? `<span class="ss">${lab[r.id]}</span> ` : ''}${esc(r.name)}</b><span class="tgt">${esc(r.line)}</span><span class="why">${esc(r.why)}</span><span class="chg">${esc(r.tag || '')}</span>${platesFor(r)}</button>`).join('');
 }
 const platesFor = r => { const pl = r.rx && r.rx.cls?.startsWith('big') ? prog.plates(r.rx.kg, unit()) : null; return pl ? `<span class="plates">${esc(pl.text)}</span>` : ''; };
@@ -1311,6 +1331,12 @@ function planSpeech() {
   if (!rows.length) return '';
   return `${brief.summary(rows)} ${rows.map(r => `${r.name}: ${brief.spokenTarget(r, unit()).replace(/^Today: /, '')}`).join(' ')}`;
 }
+$('#planTime').onclick = e => {
+  const b = e.target.closest('[data-cap]'); if (!b) return;
+  const m = +b.dataset.cap, today = new Date().toDateString();
+  S.timeCap = capToday() === m ? null : { day: today, mins: m }; persist(); renderToday();
+  if (S.timeCap) say(`Got it. ${m} minutes. I've trimmed today's workout and kept your main lifts.`, { priority: 'high' });
+};
 $('#planListen').onclick = () => { const t = planSpeech(); if (t) say(t, { id: 'plan_' + Date.now(), priority: 'now' }); };
 
 /* ---------- One-tap workout: QK walks the lifter through every set ---------- */
@@ -1325,7 +1351,7 @@ function plannedSets(k) {
 // The next exercise, following supersets and circuits (A1 → A2 → rest → A1 …).
 const flowStep = () => {
   if (!flow) return null;
-  const items = programDay()?.day?.items || todayItems().map(([k, s]) => [k, parseInt(s, 10) || 3]);
+  const items = dayItems() || todayItems().map(([k, s]) => [k, parseInt(s, 10) || 3]);
   const its = items.filter(it => flow.items.includes(it[0]));
   return SS.nextUp(its, Object.fromEntries(its.map(it => [it[0], setsToday(it[0])])), Object.fromEntries(its.map(it => [it[0], plannedSets(it[0])])), exKey);
 };
@@ -1661,7 +1687,7 @@ $('#rsheetBody').addEventListener('click', e => {
 /* ---------- Programs ---------- */
 // The program's rep target for an exercise on today's program day (feeds the progression engine).
 function programScheme(k) {
-  const d = programDay(), it = d?.day?.items.find(x => x[0] === k);
+  const it = (dayItems() || []).find(x => x[0] === k);
   return it ? progScheme(it[1], it[2]) : undefined;
 }
 // A program day counts as trained when a set of one of its exercises is saved.
