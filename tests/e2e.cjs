@@ -323,6 +323,8 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   // One-tap workout: Start workout opens the first exercise's setup with its target filled in.
   await p.goto('https://shred.local/'); await p.waitForTimeout(400);
   await p.$eval('#planStart', el => el.scrollIntoView({ block: 'center' })); await p.click('#planStart'); await p.waitForTimeout(300);
+  check('workout mode: offers warm-up drills picked for today first', /warm-up drills/.test(await p.textContent('#rsheetTitle')), await p.textContent('#rsheetTitle'));
+  await p.click('#drillSkip'); await p.waitForTimeout(300);
   check('workout mode: Start workout opens the next exercise to do (resumes if some sets are done)', await p.isVisible('#setup') && /set \d/.test(await p.textContent('#setupEyebrow')) && await p.isVisible('#rxBox'), await p.textContent('#setupEyebrow'));
   await p.evaluate(() => { document.querySelector('#setup').hidden = true; });
   // Training-day reminders: a calendar file for the planned days.
@@ -341,6 +343,13 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('supersets: programs show A1/A2 pairs', /A1 Triceps Pushdown[\s\S]*A2 Hammer Curl/.test(await p.textContent('#rsheetBody')));
   await p.evaluate(() => { document.querySelector('#rsheet').hidden = true; });
   check('builder: your program runs like any other', /On QK Signature/.test(await p.textContent('#progActive')), await p.textContent('#progActive'));
+
+  // Warm up, stretch & recover: today's drills and cool-down, plus recovery routines, run by QK.
+  await p.goto('https://shred.local/'); await go('train');
+  check('recover: drills, cool-down and 6 recovery routines on the Train tab', (await p.$$('#recoverStrip [data-routine]')).length === 8);
+  await tap('[data-routine=today-stretch]'); await p.waitForTimeout(3200);
+  check('recover: QK runs the cool-down stretch', await p.isVisible('#classPlayer') && /Hold/.test(await p.textContent('#cpKind')), await p.textContent('#cpKind'));
+  await p.click('#cpEnd'); await p.waitForTimeout(200);
 
   // QK classes: start a HIIT class, QK runs it, the finisher is scored and saved.
   await p.goto('https://shred.local/'); await go('train');

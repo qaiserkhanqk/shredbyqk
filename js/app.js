@@ -27,6 +27,7 @@ import { icsFor, dueToday } from './reminders.js';
 import * as refresh from './refresh.js';
 import { CLOUD, cloudOn } from './cloud-config.js';
 import * as classes from './classes.js';
+import * as routines from './routines.js';
 import { Cloud, pushAll } from './sync.js';
 import { PROGRAMS, scheme as progScheme, weeklySets, currentDay, byId as builtinById, GOALS, pickProgram, defaultDays } from './programs.js';
 import * as builder from './builder.js';
@@ -179,7 +180,7 @@ function renderToday() {
   $('#todayList').innerHTML = todayItems().map(([k, sets]) => `<button type="button" class="ex-row" data-train="${k}" style="width:100%;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;cursor:pointer;padding-inline:0"><span class="pic">${icon(iconKey(k))}</span>
     <div><b>${esc(LIB[k].name)}</b>${LIB[k].pattern ? '<span class="tag">QK checks your form</span>' : '<span class="tag" style="color:var(--z3)">QK coaches your tempo</span>'}</div>
     <span class="sets">${tgt[k]?.rx ? esc(tgt[k].line) : sets}</span></button>`).join('');
-  renderPlan(plan);
+  renderPlan(plan); renderRecover();
 
   // Focus: the most frequent fault, and how often it's been clean recently.
   const tally = {};
@@ -291,7 +292,7 @@ COACH.tempo.note = COACH.hold.note = 'A camera can\'t judge this movement reliab
 
 let muscleFilter = 'All', searchQ = '';
 function renderTrain() {
-  renderPrograms(); renderClasses(); renderHome();
+  renderPrograms(); renderClasses(); renderHome(); renderRecover();
   $('#muscleChips').innerHTML = ['All', ...Object.keys(KINDS), ...MUSCLES, 'Rehab'].map(m => `<button type="button" class="mchip ${m === muscleFilter ? 'on' : ''}" data-muscle="${m}" aria-pressed="${m === muscleFilter}">${m}</button>`).join('');
   const q = searchQ.trim().toLowerCase();
   // Physio exercises live under their own Rehab filter so they don't clutter the gym library.
@@ -1357,7 +1358,20 @@ const flowStep = () => {
 };
 const flowNextId = () => flowStep()?.id;
 function startFlow() {
-  flow = { items: todayItems().map(x => x[0]) };
+  const ids = todayItems().map(x => x[0]);
+  if (!S.prog?.skipDrills && !(S.classes || []).some(r => r.routine === 'drills' && new Date(r.at).toDateString() === new Date().toDateString())) {
+    const wu = routines.warmupFor(ids, LIB);
+    openSheet(`<div><span class="eyebrow">Before you lift</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">${esc(wu.name)} · ${classes.minutes(wu)} min</h2></div>
+      <p class="muted small" style="margin:0">Dynamic moves picked for today's workout. QK keeps the static stretching for after.</p>
+      <div class="btn-row"><button class="ghost" type="button" id="drillSkip">Skip</button><button class="cta" type="button" id="drillGo">Warm up with QK</button></div>`);
+    $('#drillGo').onclick = () => { closeSheet(); startClass(wu, { then: () => beginFlow(ids) }); };
+    $('#drillSkip').onclick = () => { closeSheet(); beginFlow(ids); };
+    return;
+  }
+  beginFlow(ids);
+}
+function beginFlow(ids) {
+  flow = { items: ids };
   say(`Let's go. ${flow.items.length} exercises today. I'll take you through every set.`, { id: 'flow_start', priority: 'high' });
   nextInFlow(true);
 }
@@ -1366,9 +1380,16 @@ function nextInFlow(first) {
   const k = flowNextId();
   stopRest(); $('#summary').hidden = true; $('#flowNext').hidden = true;
   if (!k) {
-    flow = null; keepAwake(false); tab('today'); renderToday();
-    say('Workout done. Every set is logged and your next session is already planned.', { id: 'flow_done', priority: 'high' });
-    return toast('Workout done ✓ Next session is planned.');
+    const trained = flow.items; flow = null; keepAwake(false); tab('today'); renderToday();
+    say('Workout done. Every set is logged and your next session is already planned. Cool-down stretch? Six minutes.', { id: 'flow_done', priority: 'high' });
+    toast('Workout done ✓ Next session is planned.');
+    const st = routines.stretchFor(trained, LIB);
+    openSheet(`<div><span class="eyebrow">Workout done ✓</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Cool-down stretch · ${classes.minutes(st)} min</h2></div>
+      <p class="muted small" style="margin:0">${esc(st.tagline)} Helps you feel looser tomorrow.</p>
+      <div class="btn-row"><button class="ghost" type="button" id="cdSkip">Not now</button><button class="cta" type="button" id="cdGo">Stretch with QK</button></div>`);
+    $('#cdGo').onclick = () => { closeSheet(); startClass(st); };
+    $('#cdSkip').onclick = () => closeSheet();
+    return;
   }
   const n = setsToday(k) + 1, of = plannedSets(k);
   if (!first && k === exKey && lastSource === 'camera' && exFor(k)) {
@@ -1516,6 +1537,26 @@ if (cloud) {
   addEventListener('online', syncNow); setInterval(syncNow, 5 * 60e3);
 }
 
+/* ---------- Warm up, stretch & recover ---------- */
+// Today's drills and cool-down are built from today's workout; recovery routines are fixed.
+const todayRoutineIds = () => { const d = new Date().toDateString(), done = S.sessions.filter(x => new Date(x.at).toDateString() === d && !x.demo).map(x => x.ex); return done.length ? [...new Set(done)] : todayItems().map(x => x[0]); };
+const routineById = id => routines.ROUTINES.find(r => r.id === id) || (id === 'today-drills' ? routines.warmupFor(todayRoutineIds(), LIB) : id === 'today-stretch' ? routines.stretchFor(todayRoutineIds(), LIB) : null);
+function renderRecover() {
+  const ids = todayRoutineIds(), wu = routines.warmupFor(ids, LIB), st = routines.stretchFor(ids, LIB);
+  const card = (id, r, tag) => `<button type="button" role="listitem" class="prog-card class-card routine-card" data-routine="${id}"><span class="pgoal">${tag} · ${classes.minutes(r)} min</span><b>${esc(r.name)}</b><p>${esc(r.tagline)}</p><span class="meta">${r.blocks[0].moves.length} moves · QK guides you${r.equipment !== 'none' ? ' · ' + r.equipment : ''}</span></button>`;
+  $('#recoverStrip').innerHTML = [card('today-drills', wu, 'Before training'), card('today-stretch', st, 'After training'), ...routines.ROUTINES.map(r => card(r.id, r, r.calm ? 'Before bed' : 'Recovery'))].join('');
+  // Today: suggest recovery on a rest day, a rough check-in day, or late evening.
+  const planned = (S.plan?.days || []).includes(new Date().getDay()), h = new Date().getHours();
+  const rough = (S.readiness || []).some(r => new Date(r.at).toDateString() === new Date().toDateString() && /rough|red/i.test(r.feel || r.level || ''));
+  const trainedLegs = S.sessions.some(x => Date.now() - x.at < 2 * 864e5 && /Quads|Hamstrings|Glutes/.test((LIB[x.ex]?.muscles || [])[0] || ''));
+  const pick = h >= 20 ? 'bedtime' : rough ? 'restDay15' : !planned ? (trainedLegs ? 'foamRoll10' : 'restDay15') : null;
+  const r = pick && routines.ROUTINES.find(x => x.id === pick), box = $('#recoverCard');
+  box.hidden = !r;
+  if (r) { box.dataset.routine = r.id; $('#recoverEyebrow').textContent = h >= 20 ? 'Wind down' : rough ? 'Feeling rough? Recover instead' : 'Rest day'; $('#recoverTitle').textContent = `${r.name} · ${classes.minutes(r)} min`; $('#recoverSub').textContent = r.tagline; }
+}
+$('#recoverStrip').onclick = e => { const b = e.target.closest('[data-routine]'); if (b) startClass(routineById(b.dataset.routine)); };
+$('#recoverCard').onclick = () => { const id = $('#recoverCard').dataset.routine; if (id) startClass(routineById(id)); };
+
 /* ---------- QK classes: on-demand classes run by voice ---------- */
 function renderClasses() {
   S.classes ||= [];
@@ -1548,11 +1589,11 @@ $('#homeStrip').onclick = e => { const c = e.target.closest('[data-class]'), p =
 $('#rsheetBody').addEventListener('click', e => { const b = e.target.closest('[data-classstart]'); if (b) { const quiet = !!$('#classQuiet')?.checked; closeSheet(); startClass(b.dataset.classstart, { quiet }); } });
 
 let cls = null;
-function startClass(id, { quiet = false } = {}) {
-  const c = classes.byId(id), { segs, total } = classes.timeline(c, { quiet: quiet || c.quiet });
-  cls = { c, segs, total, i: -1, left: 0, done: 0, paused: false, score: 0, t0: Date.now(), last: Date.now(), timer: null };
+function startClass(id, { quiet = false, then = null } = {}) {
+  const c = typeof id === 'string' ? classes.byId(id) || routineById(id) : id, { segs, total } = classes.timeline(c, { quiet: quiet || c.quiet });
+  cls = { c, segs, total, i: -1, left: 0, done: 0, paused: false, score: 0, t0: Date.now(), last: Date.now(), timer: null, then };
   $('#classPlayer').hidden = false; keepAwake(true);
-  say(`${c.name}. ${Math.round(total / 60)} minutes. Let's warm up.`, { id: 'class_start', priority: 'now' });
+  say(c.routine ? `${c.name}. ${Math.round(total / 60)} minutes. Follow my voice.` : `${c.name}. ${Math.round(total / 60)} minutes. Let's warm up.`, { id: 'class_start', priority: 'now' });
   setTimeout(() => { if (cls) { nextSeg(); cls.timer = setInterval(tickClass, 250); } }, 2500);
 }
 function nextSeg() {
@@ -1564,7 +1605,7 @@ function nextSeg() {
   const rest = s.kind === 'rest';
   $('#classPlayer').classList.toggle('rest', rest);
   $('#cpBlock').textContent = `${s.block}${s.round ? ` · ${s.kind === 'emom' ? 'minute' : 'round'} ${s.round} of ${s.of}` : ''}`;
-  $('#cpKind').textContent = { warmup: 'Warm-up', work: 'Work', rest: s.label, emom: `${s.reps} reps`, amrap: 'Finisher · as many rounds as you can', cooldown: 'Cool-down' }[s.kind];
+  $('#cpKind').textContent = { warmup: 'Warm-up', work: 'Work', rest: s.label, emom: `${s.reps} reps`, amrap: 'Finisher · as many rounds as you can', cooldown: 'Cool-down', hold: `${cls.c.kind === 'drills' ? 'Drill' : 'Hold'}${s.side ? ` · side ${s.side}` : ''}` }[s.kind];
   const name = m => classes.MOVES[m]?.name || m;
   $('#cpMove').innerHTML = rest ? 'Rest' : s.kind === 'amrap' ? s.moves.map(([m, r]) => `<span>${r} ${esc(name(m))}</span>`).join('') : esc(name(s.move));
   $('#cpMove').classList.toggle('list', s.kind === 'amrap');
@@ -1594,12 +1635,20 @@ function drawClass() {
 function finishClass(complete) {
   if (!cls) return;
   clearInterval(cls.timer); keepAwake(false);
-  const c = cls.c, mins = Math.max(1, Math.round((Date.now() - cls.t0) / 60000)), hadAmrap = cls.segs.some(s => s.kind === 'amrap');
+  const c = cls.c, then = cls.then, mins = Math.max(1, Math.round((Date.now() - cls.t0) / 60000)), hadAmrap = cls.segs.some(s => s.kind === 'amrap');
   const best = classes.bestScore(S.classes || [], c.id), score = hadAmrap ? cls.score : null;
   $('#classPlayer').hidden = true;
   const done = complete || cls.done >= cls.total * 0.5;
   cls = null;
-  if (!done) { toast('Class ended early. No worries, come back to it.'); return; }
+  if (!done) { toast('Class ended early. No worries, come back to it.'); return then?.(); }
+  // Routines (drills, stretches, recovery): save and move on, no effort rating.
+  if (c.routine) {
+    (S.classes ||= []).push({ at: Date.now(), class: c.id, name: c.name, minutes: mins, routine: c.kind });
+    persist(); renderClasses(); renderToday();
+    say(c.kind === 'drills' ? 'Warm-up done. You\'re ready. Let\'s lift.' : c.kind === 'stretch' ? 'Cool-down done. Great session. Drink some water.' : `${c.name} done. Nice work looking after your body.`, { id: 'routine_done', priority: 'high' });
+    toast(`${c.name} ✓`);
+    return then?.();
+  }
   const beat = score != null && best && score > best;
   say(`${c.name} done! ${mins} minutes.${score != null ? ` ${score} rounds on the finisher.${beat ? ' New best!' : best ? ` Your best is ${best}.` : ''}` : ''} How hard was that?`, { id: 'class_done', priority: 'now' });
   openSheet(`<div><span class="eyebrow">Class done</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.4rem">${esc(c.name)} ✓</h2></div>

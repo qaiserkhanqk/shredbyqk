@@ -670,6 +670,9 @@ a.ghost { text-decoration: none; text-align: center; display: inline-flex; align
 .time-cap #planMins { font: 700 .9rem var(--f-data); color: var(--text); }
 .tc-btns button { border: 1px solid var(--line); background: var(--surface-2); color: var(--text); border-radius: 99px; padding: 3px 9px; margin-left: 4px; font: 600 .78rem var(--f-data); cursor: pointer; }
 .tc-btns button.on { background: var(--good); border-color: var(--good); color: #0b1311; }
+.recover-card { display: flex; flex-direction: column; gap: 4px; text-align: left; border-color: rgba(127,184,230,.55); cursor: pointer; font: inherit; color: var(--text); }
+.recover-card b { font: 800 1.1rem var(--f-display, inherit); }
+.routine-card .pgoal { color: #5b9fd0; }
 .track-chip { position: absolute; top: 104px; left: 16px; display: inline-flex; align-items: center; gap: 7px; pointer-events: none;
   font: 600 .72rem var(--f-data); letter-spacing: .06em; text-transform: uppercase; color: rgba(236,241,236,.75);
   background: rgba(var(--scrim-rgb),.7); border: 1px solid var(--line); padding: 4px 9px; border-radius: 99px; }
