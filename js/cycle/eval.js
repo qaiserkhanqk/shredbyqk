@@ -24,13 +24,14 @@ import { MockWearable, normalise, summariseNights, rng, gauss } from './wearable
 import { findPatterns, PATTERN_PARAMS } from './patterns.js';
 import { CATEGORIES } from './model.js';
 import { periodPrompt, NUDGE_PARAMS, NUDGE_VERSION } from './nudges.js';
+import { adjustedEstimate, ADJUST_VERSION } from './adjust.js';
 
 export const SYNTHETIC_BANNER = 'SYNTHETIC DATA. These results test the software only. They are not real-world or clinical performance and must not be quoted as accuracy.';
 
 export const FROZEN = Object.freeze({
   cohortVersion: 'synthetic-cohort-1', seed: 20261114, participants: 40, cyclesEach: 12,
   device: { model: 'Mock Band (synthetic)', firmware: 'mock-1.0' },
-  algorithms: { baseline: ALGORITHM_VERSION, sensor: `sensor-candidate-0.1.0+${SHIFT_VERSION}` },
+  algorithms: { baseline: ALGORITHM_VERSION, sensor: `sensor-candidate-0.2.0=${ADJUST_VERSION}` },
   params: { predict: PARAMS, shift: SHIFT_PARAMS, patterns: PATTERN_PARAMS, nudges: NUDGE_PARAMS },
   nudgeVersion: NUDGE_VERSION,
 });
@@ -101,22 +102,15 @@ export function baselineModel(view, asOf) {
   return { predicted: true, date: addDays(e.lastStart, Math.round(e.median)), rangeStart: e.rangeStart, rangeEnd: e.rangeEnd, status: e.status };
 }
 
-/** Candidate: after a retrospective rise in THIS cycle, use the person's own past rise→next-start intervals. */
+/** Candidate: after a retrospective rise in THIS cycle, use the person's own past rise→next-start intervals.
+ *  Since band-adjusted 0.2.0 this calls the app's own adjustedEstimate(), so the evaluator applies exactly the app's
+ *  eligibility rules (pregnancy restart, a rise that went back to baseline, one band identity). `frozen` additionally
+ *  restricts nights to the pre-registered evaluation device; pass null to apply only the app's rules. */
 export function sensorModel(view, asOf, frozen = FROZEN) {
-  const v = { ...view, wearable: { ...view.wearable, nights: view.wearable.nights.filter(n => n.model === frozen.device.model && n.firmware === frozen.device.firmware) } };
-  const fallback = () => ({ ...baselineModel(view, asOf), usedSensor: false });
-  const starts = v.periods.map(p => p.start).sort(); if (!starts.length) return fallback();
-  const cur = retrospectiveShift(v, starts.at(-1), asOf);
-  if (!cur.detected) return fallback();
-  const intervals = [];
-  for (const c of cycles(v).filter(c => c.usable)) {
-    const sh = retrospectiveShift(v, c.start, c.nextStart);
-    if (sh.detected) intervals.push(diffDays(sh.firstHighNight, c.nextStart));
-  }
-  if (intervals.length < 2) return fallback();
-  const m = median(intervals);
-  return { predicted: true, usedSensor: true, date: addDays(cur.firstHighNight, Math.round(m)),
-    rangeStart: addDays(cur.firstHighNight, Math.min(...intervals)), rangeEnd: addDays(cur.firstHighNight, Math.max(...intervals)), status: 'sensor' };
+  const v = frozen ? { ...view, wearable: { ...view.wearable, nights: view.wearable.nights.filter(n => n.model === frozen.device.model && n.firmware === frozen.device.firmware) } } : view;
+  const a = adjustedEstimate(v, asOf);
+  if (a.status !== 'adjusted') return { ...baselineModel(view, asOf), usedSensor: false, abstainReason: a.reason };
+  return { predicted: true, usedSensor: true, date: a.date, rangeStart: a.rangeStart, rangeEnd: a.rangeEnd, status: 'sensor' };
 }
 export const MODELS = { baseline: baselineModel, sensor: sensorModel };
 

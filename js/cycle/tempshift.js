@@ -32,7 +32,7 @@ const BASELINE_LIMIT = 'This rule cannot see a rise that begins while its 6-nigh
 export function retrospectiveShift(s, cycleStart, asOf, params = SHIFT_PARAMS) {
   const segs = segments(s.wearable.nights.filter(n => n.night >= cycleStart && n.night < asOf));
   const seg = segs.at(-1);
-  const res = { version: SHIFT_VERSION, detected: false, segment: seg ? { model: seg.model, firmware: seg.firmware } : null, deviceChangedThisCycle: segs.length > 1, excluded: { notOk: 0, flagged: 0, userFlagged: 0 }, nightsUsed: 0 };
+  const res = { version: SHIFT_VERSION, detected: false, segment: seg ? { deviceId: seg.deviceId, model: seg.model, firmware: seg.firmware } : null, deviceChangedThisCycle: segs.length > 1, excluded: { notOk: 0, flagged: 0, userFlagged: 0 }, nightsUsed: 0 };
   if (!seg) return { ...res, why: 'No skin-temperature nights in this cycle.' };
   // One eligible observation per biological night (issue 4 reported against b3d9589): several sleep sessions can
   // carry the same night label (split sleep, a nap misclassified as main sleep, a corrected re-send). They must not

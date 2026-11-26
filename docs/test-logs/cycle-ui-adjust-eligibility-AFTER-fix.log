@@ -1,0 +1,9 @@
+ok   flag off: no band-adjusted card
+ok   flag on: the card is labelled research
+ok   with no band data it says why it cannot adjust (band not connected)
+ok   it states the evidence: synthetic only, not validated
+ok   the dates-only estimate is still shown
+ok   it never mentions ovulation or fertility
+ok   when neither model can estimate, the card says "Not enough data yet."
+ok   no JavaScript errors
+ALL PASS (8)

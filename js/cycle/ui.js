@@ -163,7 +163,7 @@ function adjustHTML(s, today) {
   const a = adjustedEstimate(s, today);
   const range = a.status === 'adjusted' ? `<div class="num cy-range">${a.singleDate ? human(a.rangeStart) : `${human(a.rangeStart)} – ${human(a.rangeEnd)}`}</div>` : '';
   return `<div class="card stack" id="cyAdjusted"><span class="eyebrow">Band-adjusted estimate · research</span>${range}
-    <p class="small">${esc(a.text)}</p><p class="muted small">${esc(a.why)}</p></div>`;
+    <p class="small">${esc(a.text)}</p>${a.fallback ? `<p class="small" id="cyAdjustedFallback"><b>${esc(a.fallback.text)}</b></p>` : ''}<p class="muted small">${esc(a.why)}</p></div>`;
 }
 
 function estimateHTML(s, est) {
