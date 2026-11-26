@@ -1,0 +1,14 @@
+ok   version bumped to a calibrated-range algorithm
+ok   range settings are exported and documented (multiplier 1.20, population spread 2.94 days, weight 3 cycles)
+ok   one 28-day cycle: date at day 28, range day 24 to day 32 (9 days)
+ok   six identical 28-day cycles: day 26 to day 30 (it no longer pretends to a single day)
+ok   her own variability widens the range (variable cycles get a wider range than steady ones)
+ok   the date is unchanged: last start + median of her cycles (29)
+ok   the range is centred on that date
+ok   the result says it is calibrated, how, and on what data
+ok   the wording says about 8 in 10, in a research dataset, not validated for her, and that it can fall outside
+ok   no forbidden or fertility wording
+ok   still no date before one completed cycle (no 28-day default)
+ok   cycles too variable: still no range (unchanged)
+ok   overdue only after the end of the (new) range: day 31 > day 30
+ALL PASS (13)

@@ -24,7 +24,7 @@ Note on studies of other brands: they describe *those* devices and populations. 
 
 | Decision | Basis | Status |
 |---|---|---|
-| Range = shortest–longest of the last 6 usable cycles | Transparency: easy to explain from the user's own data | **Unvalidated.** To be measured (coverage and width) in the study. |
+| Range (since dates-only-2.0.0) = median ± 1.20 × her spread steadied by a population spread of 2.94 days (worth 3 cycles) | Tuned on the Marquette development group (Fehring 2012); real start inside it 83.5% on the held-out test group (80–85% at every history length); `docs/design-comparison-marquette.md` | **Checked on one real dataset only.** Needs a second dataset (e.g. mcPHASES) and the prospective study. The earlier shortest–longest window covered 20% after one cycle, 69% overall. |
 | 15–90 day plausibility, ±2 early pad, 20-day "too variable", stale rule | Display safeguards | Placeholder; needs clinical review |
 | Pattern rules (≥ 3 cycles, ≥ 75%, < 50% outside the window) | Conservative, explainable | Placeholder; to test against personal baselines |
 | Temperature rule ΔT 0.15 °C, 6/3 nights, ≥ 180 min per night | Shaped after the BBT three-over-six rule (E5) | Placeholder; **not fitted**; pre-register before any study |

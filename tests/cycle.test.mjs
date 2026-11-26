@@ -1,6 +1,6 @@
 // Cycle tracking unit tests (synthetic data only). Run: node tests/cycle.test.mjs
 import * as M from '../js/cycle/model.js';
-import { estimateNext, typicalPeriodLength, DISCLAIMER } from '../js/cycle/predict.js';
+import { estimateNext, typicalPeriodLength, DISCLAIMER, rangeHalfWidth } from '../js/cycle/predict.js';
 import { findPatterns, evaluateWindow, insightForToday, patternStatus, forecastCheckins } from '../js/cycle/patterns.js';
 import { phaseInfo } from '../js/cycle/phase.js';
 import { addReminder, updateReminder, deleteReminder, nextFire, dueNow, markDelivered, notificationContent, schedule } from '../js/cycle/reminders.js';
@@ -74,12 +74,16 @@ check('sparse: no data → insufficient-data state, no range', estimateNext(user
 check('sparse: one start → still no estimate', estimateNext(user(['2026-11-01']), T).status === 'none');
 {
   const e = estimateNext(user(['2026-09-20', '2026-10-30']), T); // one cycle of 40 days
-  check('no 28-day default: one 40-day cycle → early, day 40 only (no invented padding since 80ea40f issue 4)', e.status === 'early' && e.rangeStart === addDays('2026-10-30', 40) && e.rangeEnd === addDays('2026-10-30', 40), `${e.rangeStart}–${e.rangeEnd}`);
-  check('early estimate says one cycle can\'t show variation, and that the period may come earlier or later', /can't show how much yours varies/.test(e.detail) && /earlier or later/.test(e.detail));
+// Updated 2026-11-26 for the calibrated range (dates-only-2.0.0, product owner's decision): the DATE is unchanged; the
+  // RANGE is now median ± RANGE.Z × spread (tests/cycle-calibrated-range.test.mjs). Previously: shortest…longest.
+  check('no 28-day default: one 40-day cycle → early, centred on day 40 (calibrated range day 36–44)', e.status === 'early' && e.typicalDate === addDays('2026-10-30', 40) && e.rangeStart === addDays('2026-10-30', 36) && e.rangeEnd === addDays('2026-10-30', 44), `${e.rangeStart}–${e.rangeEnd}`);
+  check('early estimate says the range is wider with few cycles, and that the period may come earlier or later', /range is wider/.test(e.detail) && /earlier or later/.test(e.detail));
 }
 {
   const e = estimateNext(user(series('2026-04-10', [29, 31, 30, 30, 32, 29])), T);
-  check('regular history → estimate, range = shortest…longest', e.status === 'estimate' && e.min === 29 && e.max === 32 && diffDays(e.rangeStart, e.rangeEnd) === 3);
+  // Updated 2026-11-26 for the calibrated range (dates-only-2.0.0, product owner's decision): the DATE is unchanged; the
+  // RANGE is now median ± RANGE.Z × spread (tests/cycle-calibrated-range.test.mjs). Previously: shortest…longest.
+  check('regular history → estimate, calibrated range around the median (30)', e.status === 'estimate' && e.min === 29 && e.max === 32 && e.median === 30 && diffDays(e.lastStart, e.rangeStart) === Math.round(30 - rangeHalfWidth(e.lengths)) && diffDays(e.lastStart, e.rangeEnd) === Math.round(30 + rangeHalfWidth(e.lengths)));
   check('estimate text lists the cycles used', /last 6 cycles were between 29 and 32/.test(e.detail));
 }
 {
@@ -92,7 +96,9 @@ check('sparse: one start → still no estimate', estimateNext(user(['2026-11-01'
 }
 {
   const e = estimateNext(user(ending('2026-11-01', [38, 41, 39, 40, 37, 39])), T);
-  check('long cycles (37–41 days) are estimated from the person\'s own lengths', e.status === 'estimate' && e.min === 37 && e.max === 41 && e.rangeStart === '2026-12-08', `${e.status} ${e.min}-${e.max}`);
+  // Updated 2026-11-26 for the calibrated range (dates-only-2.0.0, product owner's decision): the DATE is unchanged; the
+  // RANGE is now median ± RANGE.Z × spread (tests/cycle-calibrated-range.test.mjs). Previously: shortest…longest.
+  check('long cycles (37–41 days) are estimated from the person\'s own lengths (centred on her median, 39)', e.status === 'estimate' && e.min === 37 && e.max === 41 && e.typicalDate === addDays('2026-11-01', 39) && e.rangeStart === addDays('2026-11-01', Math.round(39 - rangeHalfWidth(e.lengths))), `${e.status} ${e.rangeStart}`);
 }
 {
   const s = user(series('2026-03-01', [29, 30, 60, 30, 29]));
@@ -116,7 +122,8 @@ check('stale history → no estimate from old data', estimateNext(user(series('2
   s.situation = { hormonalContraception: true };
   check('hormonal contraception: estimate carries a withdrawal-bleed note', /withdrawal/.test(estimateNext(s, T).notes[0]));
 }
-check('disclaimer: not a guarantee, not a confidence interval, not contraception', /not a guaranteed date/.test(DISCLAIMER) && /confidence interval/.test(DISCLAIMER) && /contraception/.test(DISCLAIMER));
+// Updated 2026-11-26 (calibrated range): the disclaimer now says how the range was set instead of "not a confidence interval".
+check('disclaimer: not a guarantee, how the range was set (about 8 in 10 in research data), not validated, not contraception', /not a guaranteed date/.test(DISCLAIMER) && /8 in 10/.test(DISCLAIMER) && /not been clinically validated/.test(DISCLAIMER) && /contraception/.test(DISCLAIMER));
 {
   const s = user(['2026-09-01', '2026-10-01', '2026-11-01'], { end: null });
   check('no invented end dates: a new start never closes the previous period', s.periods.every(p => p.end === null) && typicalPeriodLength(s) === null);

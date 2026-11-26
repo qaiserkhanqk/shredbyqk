@@ -8,11 +8,12 @@
 //   • Point designs are scored by average absolute error (days) and % within ±2 days; range designs by how often the
 //     real start falls inside (coverage) and the average width. Differences from the current design get a 95%
 //     participant-level bootstrap interval.
-//   • D0 must reproduce the app's own estimate (js/cycle/predict.js) exactly; the tool stops if it doesn't.
+//   • D0 + R_app must reproduce the app's own estimate (js/cycle/predict.js) exactly; the tool stops if they don't.
+//     Since dates-only-2.0.0 the app shows the calibrated range (fixed settings); R0 is the previous app range.
 // Real data, aggregate output only. Not clinical validation; one population; dates only (no band data).
 import * as M from '../js/cycle/model.js';
 import { addDays, diffDays } from '../js/cycle/dates.js';
-import { estimateNext, PARAMS } from '../js/cycle/predict.js';
+import { estimateNext, PARAMS, RANGE as APP_RANGE, rangeHalfWidth } from '../js/cycle/predict.js';
 import { loadMarquette } from './lib/marquette.mjs';
 
 const file = process.argv[2];
@@ -56,7 +57,8 @@ const designs = { ...POINT, D4_recency_weighted: p => POINT.D4_recency_weighted(
 /** Range designs: past → [lo, hi] in cycle-length days. R1's multiplier is set on DEVELOPMENT for 80% coverage. */
 const r1Half = (past, z) => { const r = past.slice(-RECENT), n = r.length, k = 3; const s = Math.sqrt(((n - 1) * sd(r) ** 2 + k * POP_SD_WITHIN ** 2) / (n - 1 + k)); return z * s; };
 const RANGE = {
-  R0_current_shortest_to_longest: past => [Math.min(...past.slice(-RECENT)), Math.max(...past.slice(-RECENT))],
+  R0_previous_app_shortest_to_longest: past => [Math.min(...past.slice(-RECENT)), Math.max(...past.slice(-RECENT))],
+  R_app_calibrated_fixed: past => { const r = past.slice(-RECENT), c = median(r), h = rangeHalfWidth(r); return [Math.round(c - h), Math.round(c + h)]; },
   R1_calibrated_80: (past, z) => { const c = median(past.slice(-RECENT)), h = r1Half(past, z); return [Math.round(c - h), Math.round(c + h)]; },
 };
 const cover = (pts, f) => mean(pts.map(p => { const [lo, hi] = f(p.past); return p.truth >= lo && p.truth <= hi ? 1 : 0; }));
@@ -73,7 +75,8 @@ for (const p of [...test, ...dev]) {
   const e = estimateNext(s, addDays(starts.at(-1), 1));
   if (!e.rangeStart) { p.appAbstains = true; if (!p.dev) abstained++; continue; }
   const lo = diffDays(e.lastStart, e.rangeStart), hi = diffDays(e.lastStart, e.rangeEnd);
-  if (e.median !== designs.D0_current_median_last6(p.past) || lo !== Math.min(...p.past.slice(-RECENT)) || hi !== Math.max(...p.past.slice(-RECENT))) mismatches++;
+  const [alo, ahi] = ranges.R_app_calibrated_fixed(p.past);
+  if (e.median !== designs.D0_current_median_last6(p.past) || lo !== alo || hi !== ahi) mismatches++;
 }
 if (mismatches) { console.error(`D0 does not reproduce the app on ${mismatches} points; stopping.`); process.exit(1); }
 for (const arr of [dev, test]) for (let i = arr.length - 1; i >= 0; i--) if (arr[i].appAbstains) arr.splice(i, 1);
@@ -108,7 +111,7 @@ validation; dates only (no band data).**
 
 - ${series.length} participants (${truncated} sequences stopped at a gap or repeated cycle number). Split by ID hash:
   development ${new Set(dev.map(p => p.id)).size} participants / ${dev.length} predictions (tuning only), test ${ids.length} participants / ${test.length} predictions (scoring only).
-- The current design (D0) was checked against the app's own code on every point: identical. The app gave no date on ${abstained} test points (cycles too variable); those are left out for every design.
+- The current app (D0 date + R_app range, settings z ${APP_RANGE.Z}, population spread ${APP_RANGE.POP_SD}) was checked against the app's own code on every point: identical. The app gave no date on ${abstained} test points (cycles too variable); those are left out for every design.
 - Settings tuned on development only: D4 recency weight = ${tuned.D4}; D5 strength = ${tuned.D5} (population mean ${POP_MEAN.toFixed(2)} days from development); R1 multiplier = ${z80.toFixed(2)} (80% coverage on development; population within-person SD ${POP_SD_WITHIN.toFixed(2)} days).
 
 ## Point estimate: average error in days on the TEST group (lower is better)
@@ -128,6 +131,7 @@ ${rangeRows.join('\n')}
 - **D3:** median of her whole history.
 - **D4:** recency-weighted mean of her last ${RECENT}; the most recent cycle counts most.
 - **D5:** her median pulled towards the population average when she has few cycles. **This uses a population number, which the app deliberately does not do today.** Adopting it would be a product decision.
-- **R0 (current app):** shortest to longest of her last ${RECENT} cycles.
+- **R0 (previous app, before dates-only-2.0.0):** shortest to longest of her last ${RECENT} cycles.
+- **R_app (current app):** the calibrated range with the settings fixed in the app (z ${APP_RANGE.Z}, population spread ${APP_RANGE.POP_SD} days, worth ${APP_RANGE.PRIOR_CYCLES} cycles).
 - **R1:** a range around her median whose width comes from her own spread, steadied by the population's spread when she has few cycles, set for about 80% coverage. It also uses a population number.
 `);

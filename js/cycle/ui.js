@@ -169,7 +169,7 @@ function adjustHTML(s, today) {
 }
 
 function estimateHTML(s, est) {
-  const range = est.rangeStart ? `<div class="num cy-range">${est.singleDate ? human(est.rangeStart) : `${human(est.rangeStart)} – ${human(est.rangeEnd)}`}</div><p class="small" id="cyOutside"><b>From your past cycles only. Your period may come earlier or later.</b></p>` : '';
+  const range = est.rangeStart ? `<div class="num cy-range">${est.singleDate ? human(est.rangeStart) : `${human(est.rangeStart)} – ${human(est.rangeEnd)}`}</div><p class="small" id="cyOutside"><b>Most likely around ${human(est.typicalDate)}. About 8 in 10 periods start inside a range like this, but yours may come earlier or later.</b></p>` : '';
   const pl = typicalPeriodLength(s);
   return `<div class="card stack" id="cyEstimate"><div><span class="eyebrow">Next period · ${esc(est.overdue ? 'overdue' : est.status === 'estimate' ? 'past cycles' : est.status.replace('_', ' '))}</span><h2 class="display h2" id="cyHeadline">${esc(est.headline)}</h2></div>
     ${range}<p class="small" id="cyDetail">${esc(est.detail)}</p>
@@ -178,7 +178,7 @@ function estimateHTML(s, est) {
     <details><summary class="linkbtn">Why this estimate?</summary><div class="stack small" style="margin-top:8px">
       <p>Used: ${est.lengths?.length ? est.lengths.map(l => `${l} days`).join(', ') : 'nothing yet'}.</p>
       ${est.excluded.length ? `<p>Left out:</p><ul class="issues">${est.excluded.map(c => `<li>${human(c.start)} – ${human(c.nextStart)} (${c.length} d): ${esc(c.reason)}</li>`).join('')}</ul>` : ''}
-      <p class="muted">Method: shortest to longest of your last 6 usable cycles, counted from your last start. No padding, no 28-day default and no assumed ovulation day. Wearable data is not used. It is not a prediction interval: an interval would need validation on held-out data first.</p>
+      <p class="muted">Method: the date is your last start plus the typical length (median) of your last 6 usable cycles. The range around it depends on how much your cycles vary, steadied by a typical figure from research data when you have few cycles; it was set so that, in a research dataset of real cycles (Marquette, 1,637 cycles), about 8 in 10 next periods started inside it. It has not been validated for you or in a clinical study. No 28-day default and no assumed ovulation day. Wearable data is not used.</p>
       <p class="muted">${esc(DISCLAIMER)}</p></div></details></div>`;
 }
 

@@ -105,7 +105,7 @@ export function companionToday(s, today, { estimate = null, patternsOn = false, 
     why: `Your period started on ${human(startsUpTo(s, today).at(-1))}, so I'm checking in for the first few days.`, quick: quickFor(s, false) };
   if (k.kind === 'periodSoon') return { ...base, title: estimate.overdue ? 'Your period may be late' : 'Your period may start soon',
     text: estimate.overdue ? `Hi, it's ${name}. Your period hasn't been logged yet, and it is later than your past cycles. Cycles vary for many reasons. How are you feeling today?` : `Hi, it's ${name}. Based on your past cycles, your period may start around now. How are you feeling today?`,
-    why: `Your past cycles put your next period ${estimate.singleDate ? `on ${human(estimate.rangeStart)}` : `between ${human(estimate.rangeStart)} and ${human(estimate.rangeEnd)}`}. It's a description of your history, not a certain date.`, quick: quickFor(s, true) };
+    why: `Based on your past cycles, your next period is most likely ${estimate.singleDate ? `on ${human(estimate.rangeStart)}` : `between ${human(estimate.rangeStart)} and ${human(estimate.rangeEnd)}`}. It's an estimate, not a certain date.`, quick: quickFor(s, true) };
   const p = k.pattern, when = k.inDays === 0 ? 'around now' : `in about ${k.inDays} day${k.inDays === 1 ? '' : 's'}`;
   return { ...base, title: 'A heads-up from your own logs', text: `Hi, it's ${name}. In ${p.notable} of the ${p.observed} cycles with logs then, you logged ${CATEGORIES[p.category].notableLabel} around this point, ${when}. How are you feeling today?`,
     why: 'This comes only from your own logs. With few cycles it can be chance (it is an unvalidated research feature).', quick: quickFor(s, false) };

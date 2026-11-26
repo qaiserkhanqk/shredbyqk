@@ -94,7 +94,8 @@ run('3. a new band or firmware', () => {
   const a = adj(make(PRE, '2026-05-15', { device: fw2From('2026-04-23') }), '2026-05-15');
   check('new firmware this cycle, history from the old firmware: not adjusted', noDate(a), words(a));
   check('…with a plain reason about the change', a.reason === 'new_setup' && /changed/i.test(a.text || ''), words(a));
-  check('…and the dates-only result is shown instead', a.fallback?.status === 'dates_only' && a.fallback.rangeStart === '2026-05-21', words(a.fallback));
+  // Updated 2026-11-26 (calibrated range): the dates-only date is still 21 May; its range is now around it.
+  check('…and the dates-only result is shown instead', a.fallback?.status === 'dates_only' && a.fallback.rangeStart <= '2026-05-21' && a.fallback.rangeEnd >= '2026-05-21' && a.fallback.rangeStart === estimateNext(make(PRE, '2026-05-15'), '2026-05-15').rangeStart, words(a.fallback));
   const b = adj(make(PRE, '2026-05-15', { device: d => (d >= '2026-04-23' ? { ...D1, deviceId: 'd2' } : D1) }), '2026-05-15');
   check('a different band of the same model: not combined either', noDate(b) && b.reason === 'new_setup', words(b));
   const c = adj(make(PRE, '2026-05-15', { device: d => (d >= '2026-04-23' ? { deviceId: 'd1', model: 'SYN' } : D1) }), '2026-05-15');

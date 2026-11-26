@@ -5,7 +5,7 @@ validation; dates only (no band data).**
 
 - 159 participants (4 sequences stopped at a gap or repeated cycle number). Split by ID hash:
   development 44 participants / 441 predictions (tuning only), test 100 participants / 1032 predictions (scoring only).
-- The current design (D0) was checked against the app's own code on every point: identical. The app gave no date on 5 test points (cycles too variable); those are left out for every design.
+- The current app (D0 date + R_app range, settings z 1.2, population spread 2.94) was checked against the app's own code on every point: identical. The app gave no date on 5 test points (cycles too variable); those are left out for every design.
 - Settings tuned on development only: D4 recency weight = 0.9; D5 strength = 2 (population mean 29.31 days from development); R1 multiplier = 1.20 (80% coverage on development; population within-person SD 2.94 days).
 
 ## Point estimate: average error in days on the TEST group (lower is better)
@@ -21,7 +21,8 @@ validation; dates only (no band data).**
 ## Range shown to her: coverage / average width on the TEST group
 | Design | 1 past cycle | 2 | 3–5 | 6+ | All |
 |---|---|---|---|---|---|
-| R0_current_shortest_to_longest | 20.0% / 1.00 d | 53.4% / 3.68 d | 64.3% / 5.81 d | 80.8% / 6.68 d | 68.7% / 5.67 d |
+| R0_previous_app_shortest_to_longest | 20.0% / 1.00 d | 53.4% / 3.68 d | 64.3% / 5.81 d | 80.8% / 6.68 d | 68.7% / 5.67 d |
+| R_app_calibrated_fixed | 80.0% / 9.00 d | 85.2% / 7.84 d | 82.4% / 7.60 d | 84.3% / 7.10 d | 83.5% / 7.46 d |
 | R1_calibrated_80 | 80.0% / 9.00 d | 85.2% / 7.84 d | 82.4% / 7.60 d | 84.3% / 7.10 d | 83.5% / 7.46 d |
 
 ## Designs
@@ -31,9 +32,9 @@ validation; dates only (no band data).**
 - **D3:** median of her whole history.
 - **D4:** recency-weighted mean of her last 6; the most recent cycle counts most.
 - **D5:** her median pulled towards the population average when she has few cycles. **This uses a population number, which the app deliberately does not do today.** Adopting it would be a product decision.
-- **R0 (current app):** shortest to longest of her last 6 cycles.
+- **R0 (previous app, before dates-only-2.0.0):** shortest to longest of her last 6 cycles.
+- **R_app (current app):** the calibrated range with the settings fixed in the app (z 1.2, population spread 2.94 days, worth 3 cycles).
 - **R1:** a range around her median whose width comes from her own spread, steadied by the population's spread when she has few cycles, set for about 80% coverage. It also uses a population number.
-
 
 ## What this shows (plain language)
 **1. The current way of picking the date is as good as the alternatives.**
@@ -49,7 +50,10 @@ validation; dates only (no band data).**
   - overall, about 7.5 days instead of 5.7.
 - R1 also uses a population number, the typical cycle-to-cycle spread of 2.9 days, measured on the development group only.
 
-## Recommendation (needs a product decision; nothing has been changed in the app)
+## Decision (2026-11-26)
+The product owner chose the calibrated range. It is now in the app (`dates-only-2.0.0`), with the settings shown above as R_app; it gives the same results as R1. The recommendations below are kept as they were made.
+
+### Recommendation as made
 - **Keep the current date estimate.** Nothing beat it clearly on real data.
 - **Consider switching the shown range to the calibrated version (R1),** especially for the first cycles. This turns the range into a real "about 8 in 10 periods start inside this window" instead of a narrow window that is right only 1 time in 5 at first.
 - **Doing it needs two decisions:**

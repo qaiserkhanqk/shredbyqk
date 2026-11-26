@@ -86,6 +86,16 @@ Flags live in `localStorage['shred_flags_v1']` because they are not health data.
 
 ## Next-period estimate: the algorithm
 
+> **Since `dates-only-2.0.0` (2026-11-26, product owner's decision): calibrated range.**
+> - The **date** is unchanged: last start + the median of the last ≤ 6 usable cycles.
+> - The **range** is the date ± 1.20 × her cycle-to-cycle spread, rounded to whole days. The spread is steadied by a population spread of 2.94 days, worth 3 cycles, so early ranges aren't falsely narrow.
+> - **How it was set:** both numbers were tuned on the development group of real data (Marquette, 44 women). On the held-out test group (100 women), the real next start fell inside the range **83.5%** of the time, and 80–85% at every history length. The old shortest-to-longest window managed 20% after one cycle and 69% overall (`docs/design-comparison-marquette.md`).
+> - **What users are told:** "About 8 in 10 periods start inside a range like this", plus that it isn't validated for her or clinically, and may be earlier or later.
+> - **What stays the same:** no population cycle length ever sets the date, and there is no date before one completed cycle.
+> - **On the result:** it carries `calibrated: true`, `intervalSource: 'calibrated-80'`, the settings, the source and the held-out coverage.
+> - **Not yet done:** confirmation on a second dataset, such as mcPHASES.
+> - The notes below describe earlier versions.
+
 > **Since 80ea40f (`dates-only-1.1.0`):**
 > - The dates come from past cycles only, with **no padding**. With 1–2 cycles there is no ±2 days.
 > - The result is labelled `calibrated: false` and `intervalSource: 'past-cycles-only'`. It is never called a range or interval.
@@ -100,7 +110,7 @@ Flags live in `localStorage['shred_flags_v1']` because they are not health data.
    - the user marked "missed a log before this", or
    - its length is outside 15–90 days and the user hasn't confirmed it. Such cycles are kept and shown, but marked "check this".
 2. **Take the recent ones.** Use the last ≤ 6 usable cycles. The **typical length** is their median.
-3. **Range** = last start + shortest … last start + longest.
+3. **Range** (since 2.0.0) = the date ± 1.20 × her spread, steadied by a population spread of 2.94 days. Before 2.0.0 it was shortest … longest.
 4. **States:**
 
 | State | When | Shown |

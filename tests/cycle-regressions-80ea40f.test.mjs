@@ -92,10 +92,13 @@ function tempUser(start, values, { periods = [start] } = {}) {
   const point = e.rangeStart === e.rangeEnd;
   check('4 six identical 28-day cycles: a single date is not called an "estimated range"', !point || !/range/i.test(e.headline), JSON.stringify({ headline: e.headline, from: e.rangeStart, to: e.rangeEnd }));
   check('4 the text always says the period can fall outside what past cycles show', /earlier or later/i.test(e.detail), e.detail);
-  check('4 the result declares it is not a calibrated interval', e.calibrated === false && e.intervalSource === 'past-cycles-only');
+  // Updated 2026-11-26: issue 4 required any interval to come from held-out validation data. The calibrated range now
+  // does (Marquette development/test split, docs/design-comparison-marquette.md), so the result declares how it was set.
+  check('4 the result declares how its range was calibrated, and on what data', e.calibrated === true && e.intervalSource === 'calibrated-80' && /Marquette/.test(e.calibration.source));
   const s1 = M.blankState('u'); M.giveConsent(s1); M.logPeriodStart(s1, '2026-09-20', { today: T }); M.logPeriodStart(s1, '2026-10-30', { today: T });
   const e1 = estimateNext(s1, T);
-  check('4 no invented padding: one 40-day cycle shows day 40 only, not a ±2-day "range"', e1.rangeStart === addDays('2026-10-30', 40) && e1.rangeEnd === addDays('2026-10-30', 40), `${e1.rangeStart}–${e1.rangeEnd}`);
+  // Updated 2026-11-26: no invented padding remains true; the width now comes from the calibrated settings, not a guess.
+  check('4 no invented padding: one 40-day cycle\'s range is exactly the calibrated one (day 36–44 around day 40)', e1.rangeStart === addDays('2026-10-30', 36) && e1.rangeEnd === addDays('2026-10-30', 44), `${e1.rangeStart}–${e1.rangeEnd}`);
 }
 
 /* ---------- 5. Identical resyncs keep the first-known time ---------- */

@@ -25,7 +25,7 @@ const big = [['ClientID', 'CycleNumber', 'LengthofCycle']];
 for (let p = 0; p < 60; p++) { const base = 25 + Math.floor(rnd() * 8); for (let c = 1; c <= 10; c++) big.push([`P${p}`, c, base + Math.floor(rnd() * 7) - 3]); }
 const f2 = join(dir, 'synthetic-big.csv'); writeFileSync(f2, big.map(r => r.join(',')).join('\n'));
 let cmp = ''; try { cmp = execFileSync('node', ['tools/compare-designs.mjs', f2], { encoding: 'utf8' }); } catch (e) { cmp = String(e.stderr || e); }
-check('design comparison runs; its current design matches the app on every point', /checked against the app's own code on every point: identical/.test(cmp), cmp.slice(0, 200));
+check('design comparison runs; its copy of the current app matches the app on every point', /checked against the app's own code on every point: identical/.test(cmp), cmp.slice(0, 200));
 check('it reports tuning on development only and scoring on test only', /development \d+ participants/.test(cmp) && /test \d+ participants/.test(cmp));
 rmSync(dir, { recursive: true, force: true });
 console.log(fails ? `${fails} FAILED of ${count}` : `ALL PASS (${count})`); process.exit(fails ? 1 : 0);

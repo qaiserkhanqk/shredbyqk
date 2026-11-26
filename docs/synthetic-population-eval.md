@@ -3,7 +3,7 @@
 **SYNTHETIC DATA generated from published parameters and stated assumptions. It tests software behaviour only. It is not real-world or clinical performance and must not be quoted as accuracy.**
 
 - Generator `synthetic-population-0.1.0`, seed 20261126: 3000 synthetic people, 41792 cycles, 1055399 band nights, 83584 check points.
-- App code under test, unchanged: dates-only `dates-only-1.2.0`; band-adjusted `band-adjusted-0.3.0+three-over-six-skin-0.4.0-night-aggregated-onset-interval-disruptors-research` (research flag, off by default).
+- App code under test, unchanged: dates-only `dates-only-2.0.0`; band-adjusted `band-adjusted-0.3.0+three-over-six-skin-0.4.0-night-aggregated-onset-interval-disruptors-research` (research flag, off by default).
 - Groups (share is an assumption): afterPregnancy 208, bandChange 159, forgetfulWearer 228, noBand 143, perimenopause 269, regular 1404, teen 316, variable 273.
 
 ## Rules checked at every check point
@@ -18,20 +18,20 @@
 ## Three days before the real next start
 | Group | Checks | Dates-only gave a date | Dates-only average error (days) | Within ±2 days | Real start inside shown range | Band-adjusted used | Band vs dates-only average error, same checks | Real start inside band range |
 |---|---|---|---|---|---|---|---|---|
-| afterPregnancy | 2704 | 80.3% | 3.32 | 57.3% | 51.0% | 33.1% | 1.69 vs 2.25 | 63.8% |
-| bandChange | 2226 | 81.2% | 3.21 | 58.7% | 64.5% | 24.3% | 1.68 vs 2.22 | 60.6% |
-| forgetfulWearer | 3192 | 78.9% | 3.43 | 58.4% | 64.3% | 16.7% | 1.73 vs 2.16 | 67.1% |
-| noBand | 2002 | 82.6% | 3.02 | 62.3% | 65.2% | 0.0% | – vs – | – |
-| perimenopause | 3766 | 51.0% | 7.01 | 31.5% | 54.6% | 33.2% | 2.30 vs 4.69 | 73.1% |
-| regular | 19656 | 82.8% | 3.19 | 59.8% | 64.6% | 44.7% | 1.48 vs 2.18 | 78.8% |
-| teen | 4424 | 79.8% | 5.94 | 28.1% | 60.1% | 32.8% | 1.76 vs 4.59 | 76.8% |
-| variable | 3822 | 61.0% | 7.43 | 20.7% | 50.5% | 32.7% | 1.87 vs 6.52 | 77.9% |
-| **All** | 41792 | 77.1% | 4.05 | 51.6% | 61.6% | 35.2% | 1.61 vs 2.84 | 76.1% |
+| afterPregnancy | 2704 | 80.3% | 3.32 | 57.3% | 76.9% | 33.1% | 1.69 vs 2.25 | 63.8% |
+| bandChange | 2226 | 81.2% | 3.21 | 58.7% | 78.3% | 24.3% | 1.68 vs 2.22 | 60.6% |
+| forgetfulWearer | 3192 | 78.9% | 3.43 | 58.4% | 77.2% | 16.7% | 1.73 vs 2.16 | 67.1% |
+| noBand | 2002 | 82.6% | 3.02 | 62.3% | 77.9% | 0.0% | – vs – | – |
+| perimenopause | 3766 | 51.0% | 7.01 | 31.5% | 57.1% | 33.2% | 2.30 vs 4.69 | 73.1% |
+| regular | 19656 | 82.8% | 3.19 | 59.8% | 78.3% | 44.7% | 1.48 vs 2.18 | 78.8% |
+| teen | 4424 | 79.8% | 5.94 | 28.1% | 57.0% | 32.8% | 1.76 vs 4.59 | 76.8% |
+| variable | 3822 | 61.0% | 7.43 | 20.7% | 48.9% | 32.7% | 1.87 vs 6.52 | 77.9% |
+| **All** | 41792 | 77.1% | 4.05 | 51.6% | 72.4% | 35.2% | 1.61 vs 2.84 | 76.1% |
 
 ## The day after her period started
 | Group | Checks | Dates-only gave a date | Dates-only average error (days) | Within ±2 days | Real start inside shown range | Band-adjusted used | Band vs dates-only average error, same checks | Real start inside band range |
 |---|---|---|---|---|---|---|---|---|
-| **All** | 20595 | 77.6% | 3.90 | 51.7% | 61.8% | 0.0% | – vs – | – |
+| **All** | 20595 | 77.6% | 3.90 | 51.7% | 72.6% | 0.0% | – vs – | – |
 
 This counts only check points where she had already logged the period that day. On 21197 other check points (50.7%) she had not logged it yet (late or missed logging). The app then still shows the previous, now-overdue estimate and asks her to log, which is the intended behaviour, so those are not counted as errors.
 

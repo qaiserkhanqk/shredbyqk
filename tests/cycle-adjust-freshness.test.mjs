@@ -43,7 +43,8 @@ run('the reported regression: last usable night 12 April, viewed on 19 May', () 
   check('…the reason is stale band data, in the agreed words', a.reason === 'stale_band' && a.text === COPY, a.text);
   check('…it shows the date of the last usable overnight reading (12 April)', a.lastUsableNight === '2026-04-12' && /12 Apr/.test(words(lines(a))), words(lines(a)));
   const e = estimateNext(s, '2026-05-19');
-  check('…it falls back to the logged-period estimate, unchanged (23 April, not rolled forward)', a.fallback?.status === 'dates_only' && a.fallback.rangeStart === e.rangeStart && a.fallback.rangeStart === '2026-04-23', words(a.fallback));
+  // Updated 2026-11-26 (calibrated range): the logged-period date is still 23 April; its range now surrounds it.
+  check('…it falls back to the logged-period estimate, unchanged (23 April, not rolled forward)', a.fallback?.status === 'dates_only' && a.fallback.rangeStart === e.rangeStart && e.typicalDate === '2026-04-23' && a.fallback.rangeStart <= '2026-04-23' && a.fallback.rangeEnd >= '2026-04-23', words(a.fallback));
   check('…which is shown as overdue, asking her to log her period', a.fallback.overdue === true && /passed/i.test(a.fallback.text) && /log/i.test(a.fallback.text), a.fallback.text);
   check('the evaluator applies the same rule', sensorModel(s, '2026-05-19', null).usedSensor === false);
 });
