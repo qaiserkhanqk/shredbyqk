@@ -207,6 +207,35 @@ A 5–15 minute session: rate tension (0–10) → slow breathing with optional 
   - Pilates follows the classical mat order from Joseph Pilates' *Return to Life Through Contrology* (1945), with guides in the app's own words.
 - **Not yet verified:** NSCA text, wording against the manual itself (it couldn't be fetched); the exact ankle dorsiflexion cut-off (no consensus value was found, so the app uses a conservative 28° shin angle and doesn't quote a "typical" number).
 
+### NSCA-based rules (built from the sources above, read directly)
+
+Eleven NSCA documents were read in full, and 220 checkpoints were extracted: 190 a 2D camera can check, 30 it can't. NSCA's article pages (Kinetic Select) refuse automated access, so the Romanian deadlift and kettlebell swing pages weren't used. Rules cite their source with `src` in `js/exercises.js`, and the set summary names it.
+
+| Rule | What QK says | NSCA source |
+|---|---|---|
+| `sq_valgus`, `sq_heels`, `sq_depth` | knees caving in, heels lifting, depth | TSAC Exercise Technique module 3.2-5 (S1) |
+| `sq_chest` | chest up | PTQ 1.3, barbell back squat form (S3) |
+| `fsq_elbows` (new) | front squat: elbows up | S1, "elbow position not maintained" |
+| `dl_hips_first` (new) | deadlift: chest and hips rise together | Weightlifting position statement 2023, movement errors (S2) |
+| `rdl_bar` (new) | keep the bar close to the legs | S2 "inability to keep the bar close"; S1 "bar doesn't travel in a straight line" |
+| `rdl_arms` (new) | straight arms in the pull | S1 "elbow position not maintained" |
+| `rdl_locked` (new) | Romanian/stiff-leg deadlift: soft knees | S1 "maintain slight knee flexion" |
+| `lu_stride` (new), `lu_depth` | longer step; back knee to the floor | PTQ 4.4 "The Undervalued Lunge", Table 1 (S7) |
+| `bp_head` (new), `bp_butt`, `bp_legs`, `bp_depth` | five points of contact; touch the chest | S1 bench press key points and errors |
+| `pr_stack` (new) | wrists over elbows | S1 "hands, elbows, shoulders not in the same vertical plane" |
+| `row_angle` (new), `row_body` | torso near parallel; no swinging | S1 bent-over row |
+| `pu_hands` (new), `pu_sag`, `pu_pike` | hands under shoulders; rigid body | PTQ 10.2 teaching progressions (S9) |
+
+**Tips the camera can't check**, such as bracing, grip, head position and pulling in front of the neck, appear on the setup screen as "NSCA tips" (`TIPS` in `js/exercises.js`).
+
+**Where NSCA disagrees with other evidence, or with itself, and what QK does** (decided by the owner on 2026-11-26):
+1. **Knees past toes:** not cued. NSCA lists it as an error, but restricting forward knee travel shifts load to the hips and lower back (Fry et al. 2003). A test confirms no rule cues it.
+2. **Lunge torso:** forward lean is allowed, within the body-map limit. "The Undervalued Lunge" wants an upright torso, while PTQ 1.3 recommends about 45°; both cite the same study.
+3. **Squat depth:** NSCA's "thighs parallel" is the minimum target, never a maximum. Deeper is allowed (Hartmann et al. 2013).
+4. **Bench arch:** only the buttocks lifting off the bench is flagged, not a moderate arch.
+5. **Lat pulldown:** full arm extension by default. For anyone on the frozen-shoulder or rotator-cuff rehab plan, QK stops short of full extension (TSAC Report 80, S8).
+6. **Breathing:** the tip covers both groups. Brace and hold on heavy sets (NSCA Coach 4.1, S5), but breathe out as you lift if over 65 or with high blood pressure or a heart condition (older-adults position statement, S6).
+
 ## 12. Body check: heart rate, HRV and alertness with only the phone (`js/hr.js`, `js/vitals.js`)
 
 No wearable is needed. All processing happens on the phone.

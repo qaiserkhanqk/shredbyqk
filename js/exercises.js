@@ -9,6 +9,35 @@
 // Thresholds are starting points from coaching standards; tune with real client footage.
 import { angle, fromVertical, dist, bestSide, mid } from './angles.js';
 
+// NSCA sources behind the rules (src: on each rule). Read directly from NSCA's own publications;
+// every cue is the app's own wording. Full list with pages in SCIENCE.md §11.
+export const SOURCES = {
+  S1: { short: 'NSCA TSAC Exercise Technique module', url: 'https://www.nsca.com/contentassets/24f7e187e9aa4a588439c9612231c7fd/tsac-module-3.0--3.3.pdf' },
+  S2: { short: 'NSCA Position Statement on Weightlifting (2023)', url: 'https://www.nsca.com/contentassets/d8cfbfa7955544a78832822bbada99b7/nsca-position-statement-on-weightlifting.pdf' },
+  S3: { short: 'NSCA Personal Training Quarterly 1.3', url: 'https://www.nsca.com/globalassets/education/ptq/ptq-1.3.pdf' },
+  S5: { short: 'NSCA Coach 4.1, Stability and Weightlifting', url: 'https://www.nsca.com/contentassets/53f0e82e0e664f91898f1060e0a29883/coach-4.1.3-stability-and-weightlifting-mechanics-of-stabilization-part-11.pdf' },
+  S6: { short: 'NSCA Position Statement on Resistance Training for Older Adults', url: 'https://www.nsca.com/contentassets/2a4112fb355a4a48853bbafbe070fb8e/resistance_training_for_older_adults__position.1.pdf' },
+  S7: { short: 'NSCA PTQ 4.4, The Undervalued Lunge', url: 'https://www.nsca.com/contentassets/24dd7222ed1b4caeb8a0a46b81bd11f3/ptq-4.4.9-the-undervalued-lunge.pdf' },
+  S8: { short: 'NSCA TSAC Report 80, the shoulder', url: 'https://www.nsca.com/globalassets/education/articles/tsac/tsac-80/tsac-report-80.1.3_rehabilitation-to-performance-of-the-shoulder-for-the-tactical-athlete.pdf' },
+  S9: { short: 'NSCA PTQ 10.2, Teaching Fundamental Movement Patterns', url: 'https://www.nsca.com/contentassets/3d09f06f0b4c4f6fbd8cc382ed1f3d4a/ptq-10.2.1-progressive-strategies-for-teaching-fundamental-resistance-training-movement-patterns.pdf' },
+};
+
+// QK's spoken setup commands: what a coach would tell you before the first rep, for the things a
+// phone camera can't check (bracing, grip, bar start, head). Short and imperative, said out loud at the
+// start of a set rather than shown as text. Sources (src) are NSCA, listed in SCIENCE.md section 11.
+export const TIPS = {
+  squat: [['Big breath into your belly, ribs down.', 'S5'], ['Head in line, eyes forward.', 'S3']],
+  rdl: [['Bar close to your shins.', 'S1'], ['Back flat the whole way.', 'S1']],
+  lunge: [['Toes and knees pointing forward.', 'S7'], ['Drive through your front heel.', 'S7']],
+  bench: [['Head, back and hips on the bench, feet flat.', 'S1'], ['Grip just wider than your shoulders.', 'S1']],
+  press: [['Forearms straight up and down.', 'S9'], ['Move your head back, not the bar around it.', 'S9']],
+  row: [['Pull to your stomach. Shoulders down.', 'S1']],
+  vPull: [['Pull to the front, never behind your head.', 'S8']],
+  pushUp: [['Body tight like a plank.', 'S9']],
+};
+// Breathing: brace for heavy lifts (S5); breathe out instead for higher-risk people (S6), said once per session.
+export const BREATHING = { cue: 'Brace, and go.', safety: "If you have high blood pressure or a heart condition, breathe out as you lift. Don't hold your breath." };
+
 // A personal limit from the lifter's body map (bodymap.js → personalFor), or the textbook default.
 const lim = (c, k, d) => c?.P?.[k] ?? d;
 
@@ -72,6 +101,7 @@ export const EXERCISES = {
     setup: 'Phone at hip height, side-on to the camera, whole body in frame.',
     metrics(p, view) {
       const m = common(p), s = m.s;
+      m.armFlex = angle(s.hip, s.sh, s.el); // upper arm vs torso: high in a front rack, low if the elbows drop
       // Heel rise: how far the heel sits above the toe, as a fraction of foot length.
       // Judged against the lifter's own standing value (ctx.base), so camera tilt cancels out.
       if (s.he && s.ft && s.he.v > 0.4 && s.ft.v > 0.4) m.heelLift = (s.ft.y - s.he.y) / (dist(s.he, s.ft) || 1);
@@ -84,11 +114,11 @@ export const EXERCISES = {
     },
     bottom: [
       { id: 'sq_valgus', view: 'front', priority: 1, test: (m, c) => m.kneeGap < m.ankleGap * (c?.P?.sqValgus ?? 0.8),
-        cue: 'Spread the floor apart with your feet.', yes: 'Yes, knees tracking out. That\'s it.', tag: 'Knees out',
+        cue: 'Spread the floor apart with your feet.', yes: 'Yes, knees tracking out. That\'s it.', tag: 'Knees out', src: 'S1',
         why: 'Knees caving in (valgus) shifts load onto the inner knee ligaments.' },
       { id: 'sq_heels', view: 'side', only: FREE_SQUATS, priority: 2,
         test: (m, c) => m.heelLift != null && c?.base?.heelLift != null && m.heelLift - c.base.heelLift > 0.3,
-        cue: 'Keep your whole foot down and push the floor away through your heels.', yes: 'Heels down. Much better.', tag: 'Heels down',
+        cue: 'Keep your whole foot down and push the floor away through your heels.', yes: 'Heels down. Much better.', tag: 'Heels down', src: 'S1',
         why: 'When the heels lift, the weight rolls onto the toes and the knees take load the hips should share.' },
       { id: 'sq_feet', priority: 2, test: (m, c) => movedBy(m, c, 'anXn', 0.2),
         cue: 'Keep your feet planted. Stay rooted to the floor.', yes: 'Feet planted. Good.', tag: 'Feet planted',
@@ -96,11 +126,15 @@ export const EXERCISES = {
       { id: 'sq_shift', view: 'front', priority: 2, test: (m, c) => movedBy(m, c, 'shiftXn', 0.12),
         cue: 'Stay centred. Push evenly through both feet.', yes: 'Centred. Nice and even.', tag: 'Stay centred',
         why: 'Shifting to one side loads one hip and knee more than the other.' },
+      // NSCA (S1): in the front squat the elbow position must be maintained; dropped elbows tip the bar forward.
+      { id: 'fsq_elbows', view: 'side', only: ex => !!ex.rack, priority: 2, test: m => m.armFlex < 55,
+        cue: 'Elbows up high, pointing forward.', yes: 'Elbows high. Good rack.', tag: 'Elbows up', src: 'S1',
+        why: 'Dropped elbows let the bar roll forward and pull the chest down with it.' },
       { id: 'sq_chest', view: 'side', priority: 2, test: (m, c) => m.torsoLean > (c?.P?.sqLean ?? squatLeanLimit(m)),
-        cue: 'Show the logo on your shirt to the wall in front.', yes: 'Better, chest stayed proud.', tag: 'Chest up',
+        cue: 'Show the logo on your shirt to the wall in front.', yes: 'Better, chest stayed proud.', tag: 'Chest up', src: 'S3',
         why: 'Leaning past what your limb proportions need moves load to the lower back.' },
       { id: 'sq_depth', priority: 3, test: (m, c) => m.knee > (c?.P?.sqDepth ?? 105),
-        cue: 'Sit down between your heels, a little deeper.', yes: 'Great depth.', tag: 'Deeper',
+        cue: 'Sit down between your heels, a little deeper.', yes: 'Great depth.', tag: 'Deeper', src: 'S1',
         why: 'Deeper squats train the glutes and quads through a longer range (Kubo 2019).' },
     ],
     // Judged early in the drive up (40% of the way from the bottom), where "hips shoot up" shows.
@@ -151,8 +185,14 @@ export const EXERCISES = {
       const m = common(p);
       m.line = angle(m.s.sh, m.s.hip, m.s.an);
       m.sag = offsetFromLine(m.s.sh, m.s.hip, m.s.an);
+      m.handOff = Math.abs(m.s.wr.x - m.s.sh.x) / (dist(m.s.sh, m.s.hip) || 1);
       return m;
     },
+    top: [
+      { id: 'pu_hands', priority: 2, test: m => m.handOff > 0.35,
+        cue: 'Put your hands right under your shoulders.', yes: 'Hands under shoulders. Good.', tag: 'Hands under shoulders', src: 'S9',
+        why: 'Hands under the shoulders keeps the push straight and spares the shoulder joint.' },
+    ],
     bottom: [
       { id: 'pu_depth', priority: 3, test: (m, c) => m.elbow > lim(c, 'pressDepth', 100),
         cue: 'Bring your chest to the floor.', yes: 'Good depth.',
@@ -160,10 +200,10 @@ export const EXERCISES = {
     ],
     always: [
       { id: 'pu_sag', priority: 1, test: (m, c) => m.line < lim(c, 'line', 160) && m.sag > 0,
-        cue: 'Push the floor away and lift your belt buckle.', yes: 'Solid plank. Good.',
+        cue: 'Push the floor away and lift your belt buckle.', yes: 'Solid plank. Good.', src: 'S9',
         why: 'Sagging hips extend the lower back under load.' },
       { id: 'pu_pike', priority: 2, test: (m, c) => m.line < lim(c, 'line', 160) && m.sag < 0,
-        cue: 'Make one straight line from head to heels.', yes: 'Straight line, nice.',
+        cue: 'Make one straight line from head to heels.', yes: 'Straight line, nice.', src: 'S9',
         why: 'Piking shortens the range and takes load off the chest.' },
     ],
   },
@@ -171,15 +211,38 @@ export const EXERCISES = {
   rdl: {
     track: 'wr', name: 'Romanian Deadlift', view: 'side', primary: 'hip', downT: 120, upT: 165, concentric: 'up',
     setup: 'Side-on, camera at hip height, whole body in frame.',
-    metrics: p => common(p),
+    metrics(p) {
+      const m = common(p), s = m.s, T = dist(s.sh, s.hip) || 1;
+      // Bar (wrists) relative to mid-foot, in torso lengths: NSCA wants it over the mid-foot and close to the legs.
+      const mf = s.he && s.ft ? mid(s.he, s.ft) : s.an;
+      m.barOff = Math.abs(s.wr.x - mf.x) / T;
+      return m;
+    },
     bottom: [
-      { id: 'rdl_squat', priority: 2, test: m => m.knee < 135,
+      { id: 'rdl_bar', only: ex => !ex.barOnBack && !ex.swing, priority: 2, test: m => m.barOff > 0.35,
+        cue: 'Keep the bar close. Slide it down your legs.', yes: 'Bar close. Good.', tag: 'Bar close', src: 'S2',
+        why: 'A bar drifting away from the legs loads the lower back far more for the same weight.' },
+      { id: 'rdl_arms', only: ex => !ex.barOnBack, priority: 2, test: m => m.elbow < 155,
+        cue: 'Long arms. Keep your elbows straight; your arms are just hooks.', yes: 'Straight arms. Good.', tag: 'Straight arms', src: 'S1',
+        why: 'Bending the arms in a pull wastes the leg drive and lets the bar drift.' },
+      { id: 'rdl_locked', only: ex => !!ex.softKnee, priority: 2, test: m => m.knee > 174,
+        cue: 'Keep a soft bend in your knees.', yes: 'Soft knees. Good.', tag: 'Soft knees', src: 'S1',
+        why: 'Locked knees put the hamstring stretch onto the back of the knee and lower back instead.' },
+      { id: 'rdl_squat', only: ex => !ex.dl, priority: 2, test: m => m.knee < 135,
         cue: 'Push your hips back to touch the wall behind you.', yes: 'Beautiful hinge.',
         why: 'Too much knee bend turns the hinge into a squat and unloads the hamstrings.' },
       // Hinge depth depends on hamstring length, so it's only judged once the body map knows it.
       { id: 'rdl_short', priority: 3, test: (m, c) => m.hip > lim(c, 'hingeDepth', 999),
         cue: 'Push your hips further back until you feel your hamstrings stretch.', yes: 'Full stretch. Good.', tag: 'Hips back',
         why: 'The hamstrings grow most when trained through their full stretched range, which is set by your own flexibility.' },
+    ],
+    // NSCA (S1, S2): in a pull from the floor the hips and chest rise together; hips shooting up first is a common error.
+    ascent: [
+      { id: 'dl_hips_first', only: ex => !!ex.dl, priority: 2, view: 'side',
+        // Knees straighten by 25°+ while the chest has barely risen (lean down less than 5°): the hips shot up first.
+        continuous: true, test: (m, c) => c?.bottom && m.knee - c.bottom.knee > 25 && c.bottom.torsoLean - m.torsoLean < 5,
+        cue: 'Chest and hips rise together. Push the floor away.', yes: 'Together. That\'s the pull.', tag: 'Chest up', src: 'S2',
+        why: 'When the hips rise first, the back takes the weight the legs should be lifting.' },
     ],
     top: [
       { id: 'rdl_lockout', priority: 3, test: (m, c) => m.hip < lim(c, 'lockHip', 168),
@@ -192,16 +255,21 @@ export const EXERCISES = {
     track: 'hip', name: 'Lunge', view: 'side', primary: 'knee', downT: 115, upT: 155, concentric: 'up',
     setup: 'Side-on, camera at hip height. Leave room in frame for the step.',
     metrics(p) {
-      const m = common(p);
+      const m = common(p), s = m.s;
       m.knee = Math.min(angle(p[23], p[25], p[27]), angle(p[24], p[26], p[28]));
+      // Stride: distance between the feet, in leg lengths (only when both ankles are clearly seen).
+      if (p[27].v > 0.5 && p[28].v > 0.5) m.stride = Math.abs(p[27].x - p[28].x) / ((dist(s.hip, s.kn) + dist(s.kn, s.an)) || 1);
       return m;
     },
     bottom: [
+      { id: 'lu_stride', only: ex => !ex.step, priority: 2, test: m => m.stride != null && m.stride < 0.6,
+        cue: 'Take a longer step, so both knees can bend to ninety degrees.', yes: 'Good stride.', tag: 'Longer step', src: 'S7',
+        why: 'With the feet too close the front knee takes much more stress.' },
       { id: 'lu_torso', priority: 2, test: (m, c) => m.torsoLean > lim(c, 'luLean', 25),
         cue: 'Stay tall, like a string pulling your head to the ceiling.', yes: 'Tall torso, good.',
         why: 'Excess lean reduces quad loading and stresses the lower back.' },
       { id: 'lu_depth', priority: 3, test: (m, c) => m.knee > lim(c, 'luDepth', 105),
-        cue: 'Kiss the floor with your back knee.', yes: 'Good depth.',
+        cue: 'Kiss the floor with your back knee.', yes: 'Good depth.', src: 'S7',
         why: 'Full depth trains the glutes in their lengthened position.' },
     ],
   },
@@ -241,8 +309,15 @@ export const EXERCISES = {
       const m = common(p);
       m.elbow = Math.min(angle(p[11], p[13], p[15]), angle(p[12], p[14], p[16]));
       m.wristDiff = Math.abs(p[15].y - p[16].y) / (dist(p[11], p[12]) || 1);
+      // Wrist straight over elbow: forearm tilt as a share of upper-arm length, the worse arm.
+      m.stack = Math.max(Math.abs(p[15].x - p[13].x) / (dist(p[11], p[13]) || 1), Math.abs(p[16].x - p[14].x) / (dist(p[12], p[14]) || 1));
       return m;
     },
+    bottom: [
+      { id: 'pr_stack', priority: 2, test: m => m.stack > 0.45,
+        cue: 'Stack your wrists right above your elbows.', yes: 'Stacked. Good.', tag: 'Wrists over elbows', src: 'S1',
+        why: 'Hands, elbows and shoulders should line up vertically; tilted forearms push the load forward onto the shoulder.' },
+    ],
     always: [
       { id: 'pr_lean', priority: 1, test: (m, c) => m.sideTilt > 10 || movedBy(m, c, 'shiftXn', 0.12),
         cue: 'Stay tall and square. Don\'t lean to one side.', yes: 'Tall and square. Good.', tag: 'Stay square',
@@ -264,8 +339,11 @@ export const EXERCISES = {
     setup: 'Side-on, camera at hip height. Arms, torso and hips in frame.',
     metrics(p) { const m = common(p); return m; },
     bottom: [
+      { id: 'row_angle', only: ex => !!ex.bentOver, priority: 2, test: m => m.torsoLean < 45,
+        cue: 'Hinge further. Bring your chest closer to parallel with the floor.', yes: 'Good hinge.', tag: 'Hinge more', src: 'S1',
+        why: 'With your torso near parallel to the floor, your back muscles pull straight up against gravity.' },
       { id: 'row_body', priority: 2, test: (m, c) => movedBy(m, c, 'torsoLean', 15),
-        cue: 'Keep your chest still. Pull with your arms, not by lifting your body.', yes: 'Torso still. Strict reps.', tag: 'Chest still',
+        cue: 'Keep your chest still. Pull with your arms, not by lifting your body.', yes: 'Torso still. Strict reps.', tag: 'Chest still', src: 'S1',
         why: 'Heaving the torso up turns the row into a swing and takes work off the back muscles.' },
       { id: 'row_short', priority: 3, test: m => m.elbow > 85, cue: 'Pull your elbows back past your ribs.', yes: 'Full squeeze. Good.',
         why: 'The mid-back muscles (rhomboids, mid-traps) work hardest at the end of the pull.' },
@@ -305,12 +383,16 @@ export const EXERCISES = {
       m.upperArm = dist(s.sh, s.el); m.torso = dist(s.sh, s.hip);
       m.shY = s.sh.y; m.hipY = s.hip.y;
       m.feetUp = s.an.y < s.hip.y; // ankles above the bench line = feet off the floor
+      m.headY = s.ear.y;
       return m;
     },
     bottom: [
       { id: 'bp_legs', only: FEET_DOWN_PRESS, priority: 2, test: m => m.knee > 140 || m.feetUp,
         cue: 'Pull your feet back under your knees and drive them into the floor.', yes: 'Feet set. Good leg drive.', tag: 'Leg drive',
         why: 'Planted feet give a stable base and transfer force from the legs into the press.' },
+      { id: 'bp_head', only: ex => !!ex.bench, priority: 2, test: (m, c) => c?.base && (c.base.headY - m.headY) / (m.torso || 1) > 0.15,
+        cue: 'Keep your head down on the bench.', yes: 'Head down. Five points of contact.', tag: 'Head down', src: 'S1',
+        why: 'Head, upper back, buttocks and both feet stay in contact for a stable base.' },
       { id: 'bp_depth', priority: 3, test: (m, c) => m.elbow > lim(c, 'pressDepth', 100), cue: 'Bring the weight all the way down to your chest.', yes: 'Good depth.', tag: 'Touch chest',
         why: 'Full range loads the chest in its stretched position, where much of the growth comes from.' },
     ],
@@ -470,9 +552,12 @@ export const EXERCISES = {
 
 // Faults that can be judged mid-rep (posture, alignment), not ones that need the end of the rep
 // (depth, lockout, range). These are cued the moment they show.
-const LIVE = new Set(['sq_feet', 'sq_shift', 'row_body', 'sq_valgus', 'sq_heels', 'sq_chest', 'bp_legs', 'pu_sag', 'pu_pike', 'rdl_squat', 'lu_torso', 'cu_swing', 'raise_swing', 'fly_bend', 'dip_deep']);
+const LIVE = new Set(['fsq_elbows', 'rdl_bar', 'rdl_arms', 'rdl_locked', 'lu_stride', 'row_angle', 'sq_feet', 'sq_shift', 'row_body', 'sq_valgus', 'sq_heels', 'sq_chest', 'bp_legs', 'pu_sag', 'pu_pike', 'rdl_squat', 'lu_torso', 'cu_swing', 'raise_swing', 'fly_bend', 'dip_deep']);
 // What the lifter is doing wrong, in plain words, shown on screen next to the fix.
 const WRONG = {
+  fsq_elbows: 'Elbows dropping', rdl_bar: 'Bar drifting away from your legs', rdl_arms: 'Bending your arms', rdl_locked: 'Knees locked straight',
+  dl_hips_first: 'Hips rising before your chest', lu_stride: 'Step too short', bp_head: 'Head lifting off the bench', pr_stack: 'Wrists not over your elbows',
+  row_angle: 'Torso too upright', pu_hands: 'Hands too far forward',
   sq_feet: 'Feet moving', sq_shift: 'Shifting to one side', cu_body: 'Swinging your body', tri_body: 'Moving your body',
   pr_lean: 'Leaning to one side', row_body: 'Heaving with your body', raise_body: 'Swinging your body',
   sq_valgus: 'Knees caving in', sq_heels: 'Heels lifting', sq_chest: 'Leaning too far forward', sq_depth: 'Not deep enough',
@@ -522,7 +607,7 @@ export class RepEngine {
   // preacher curl, where the arm rests on a pad at an angle).
   rules(list) {
     const ex = this.ex;
-    return (list || []).filter(r => (!r.view || r.view === this.view) && (!r.only || !ex.libId || r.only(ex)) && !ex.skipRules?.includes(r.id));
+    return (list || []).filter(r => (!r.view || r.view === this.view) && (!r.only || r.only(ex)) && !ex.skipRules?.includes(r.id));
   }
   ctx() { return { base: this.base, bottom: this.bottomSnap, top: this.topSnap, ascent: this.ascentSnap, P: this.P }; }
 
@@ -557,7 +642,11 @@ export class RepEngine {
       }
       if (!this.ascentSnap && v >= b + 0.4 * (this.upT - b)) {
         this.ascentSnap = { ...m };
-        for (const r of this.rules(ex.ascent)) if (r.test(this.ascentSnap, this.ctx())) { this.liveSeen.add(r.id); events.push({ type: 'live', faults: [r] }); }
+        for (const r of this.rules(ex.ascent)) if (!r.continuous && !this.liveSeen.has(r.id) && r.test(this.ascentSnap, this.ctx())) { this.liveSeen.add(r.id); events.push({ type: 'live', faults: [r] }); }
+      }
+      // Continuous drive-up rules are checked on every frame of the way up, not at one moment.
+      if (rising) for (const r of this.rules(ex.ascent)) {
+        if (r.continuous && !this.liveSeen.has(r.id) && r.test(m, lc)) { this.liveSeen.add(r.id); events.push({ type: 'live', faults: [r] }); }
       }
       if (v > this.upT) {
         this.phase = 'top';

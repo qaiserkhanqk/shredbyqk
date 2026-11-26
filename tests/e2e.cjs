@@ -288,6 +288,17 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   for (const k of ['Plyometrics', 'Olympic', 'Stretching', 'Cardio', 'Pilates']) { await go('train'); await p.click(`[data-muscle="${k}"]`); kindCounts.push(parseInt(await p.textContent('#exCount'))); }
   check('library: plyometrics, Olympic, stretching, cardio and Pilates filters all list exercises', kindCounts.every(n => n > 0), kindCounts.join(','));
 
+  // Setup is one short line; QK says the coaching commands out loud when the set starts.
+  await p.goto('https://shred.local/'); await go('train'); await p.fill('#exSearch', 'deadlift');
+  await tap('[data-train=deadlift]');
+  check('setup: one short instruction, no wall of text', (await p.$$('#setupSteps li')).length === 1);
+  await p.click('#startCam'); await p.waitForTimeout(1500);
+  const spoken = await p.textContent('[data-coach-caption]');
+  check('set start: QK tells you what to do ("Bar close to your shins ... Brace, and go.")', /Bar close to your shins/.test(spoken) && /Brace, and go/.test(spoken), spoken);
+  check('no "NSCA" anywhere on screen', !/NSCA/.test(await p.textContent('body')));
+  await p.click('#endLive'); await p.waitForTimeout(400);
+  if (await p.isVisible('#doneBtn')) await p.click('#doneBtn');
+
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();
   console.log(fails ? `${fails} FAILED` : 'ALL PASS'); process.exit(fails ? 1 : 0);

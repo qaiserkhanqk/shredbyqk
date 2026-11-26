@@ -233,13 +233,34 @@ export const LIBRARY = [
   ...MORE.map(([id, name, muscles, equipment, pattern, extra]) => X(id, name, muscles, equipment, pattern, extra)),
 ];
 
+// Flags that decide which NSCA-based rules apply to an exercise (see exercises.js):
+//   rack      bar or bells held in the front rack, so the elbows must stay up (front squat)
+//   dl        conventional pull from the floor: knees bend, hips and chest rise together
+//   softKnee  Romanian / stiff-leg hinge: knees stay slightly bent, never locked
+//   barOnBack hinge with the load on the back (good morning) or none in the hands, so no bar-path rules
+//   swing     the weight swings away from the legs by design (kettlebell swing, pull-through)
+//   bentOver  free bent-over row, torso near parallel to the floor
+//   step      step-ups and step-downs (no stride-length rule)
+const FLAGS = {
+  frontSquat: { rack: true }, xDoubleKettlebellFrontSquat: { rack: true },
+  deadlift: { dl: true }, yCleanDeadlift: { dl: true }, ySnatchDeadlift: { dl: true },
+  rdl: { softKnee: true }, singleLegRdl: { softKnee: true }, xStiffLeggedBarbellDeadlift: { softKnee: true }, xStiffLeggedDumbbellDeadlift: { softKnee: true },
+  xSmithMachineStiffLeggedDeadlift: { softKnee: true }, yRomanianDeadliftFromDeficit: { softKnee: true }, yWideStanceStiffLegs: { softKnee: true }, goodMorning: { softKnee: true, barOnBack: true },
+  xBandGoodMorning: { barOnBack: true }, xStiffLegGoodMorning: { barOnBack: true }, backExt: { barOnBack: true }, hipHingeDowel: { barOnBack: true },
+  kbSwing: { swing: true }, xCablePullThrough: { swing: true },
+  bentRow: { bentOver: true }, xBentOverDumbbellRow: { bentOver: true }, xNeutralGripDumbbellRow: { bentOver: true }, xSmithMachineRow: { bentOver: true },
+  stepUp: { step: true }, xBarbellStepUp: { step: true }, xStepUpWithKneeRaise: { step: true }, stepDown: { step: true },
+};
+for (const x of LIBRARY) Object.assign(x, FLAGS[x.id]);
+
 export const LIB = Object.fromEntries(LIBRARY.map(x => [x.id, x]));
 
 // Engine definition for a library exercise: the movement pattern with this exercise's name and setup.
 export function exFor(id) {
   const item = LIB[id]; if (!item?.pattern) return null;
   const base = EXERCISES[item.pattern];
-  return { ...base, name: item.name, setup: item.setup || base.setup, patternKey: item.pattern, libId: id, free: item.free, bench: item.bench, skipRules: item.skipRules, kind: item.kind };
+  return { ...base, name: item.name, setup: item.setup || base.setup, patternKey: item.pattern, libId: id, free: item.free, bench: item.bench, skipRules: item.skipRules, kind: item.kind,
+    rack: item.rack, dl: item.dl, softKnee: item.softKnee, barOnBack: item.barOnBack, swing: item.swing, bentOver: item.bentOver, step: item.step };
 }
 
 export const tracked = id => !!LIB[id]?.pattern;
