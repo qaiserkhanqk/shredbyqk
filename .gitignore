@@ -1,2 +1,6 @@
 node_modules/
 browser-logs/
+
+# Real-iPhone testing: local certificate authority, keys and run files (never commit)
+tests/ios/.certs/
+tests/ios/.run/
