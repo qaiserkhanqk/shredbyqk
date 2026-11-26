@@ -7,7 +7,7 @@
 //  - Add a place: clients add their own dhaba or cart; each item is tied to a dish model.
 //  - Water taps, weigh-ins, and QK's weekly report (js/weekly.js).
 import * as N from './nutrition.js';
-import { recognise, PHOTO_CONFIG } from './foodphoto.js';
+import { recognise, PHOTO_CONFIG, needsShareCheck } from './foodphoto.js';
 import { searchPlaces, allPlaces, itemNutrition, suggestDish } from './menus.js';
 import { weekReport, reportText, waterGoal, dayKey } from './weekly.js';
 import { parseMeal, looksLikeMeal, bestTranscript } from './foodtext.js';
@@ -26,7 +26,7 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 let ctx; // { S, persist, toast, rehab: () => bool }
 let cur = null; // the sheet: { mode: 'food'|'place', ref, opts, name, official, onSave, saveLabel }
 let fsCache = { q: '', list: [] }, fsTimer = null;
-let mealPending = null, aiExtra = null; // parsed sentence waiting for "Add all"
+let mealPending = null, aiExtra = null, pendingPhoto = null; // parsed sentence waiting for "Add all"
 let snap = null; // the last photo added: { dataUrl, ids, unsure, unknown, setting }
 
 const F = () => {
@@ -381,6 +381,14 @@ async function runPhoto(file, hint = null) {
   try {
     const r = await recognise(file, { hint, plateCm: +F().plateCm || null, usual: usualDishes() });
     if (snap?.file === file) removeEntries(snap.ids, true); // re-reading the same photo with a note replaces the first try
+    // Food on a stove or a stall's display isn't a meal yet: don't log it unless the person says so.
+    if (['cooking_or_display', 'not_food'].includes(r.scene) && !snap?.force) {
+      pendingPhoto = { file, hint, r };
+      box.innerHTML = `<div class="card stack snap-card"><div class="photo-head"><img src="${r.dataUrl}" alt="Your photo"><div><b>${r.scene === 'not_food' ? 'No ready-to-eat food here' : 'This looks like food being cooked or on display'}</b>
+        <p class="muted small" style="margin:4px 0 0">Snap your own plate and QK logs it. ${r.items.length ? 'Or log what QK saw anyway.' : ''}</p></div></div>
+        <div class="btn-row"><button type="button" class="ghost" id="snapCancel">OK</button>${r.items.length ? '<button type="button" class="ghost" id="snapForce">Log it anyway</button>' : ''}</div></div>`;
+      return;
+    }
     const guess = r.setting === 'restaurant' ? 'restaurant' : r.setting === 'home' ? 'home' : null;
     const photoId = uid();
     const ids = r.items.filter(i => i.dish).map(i => {
@@ -395,7 +403,9 @@ async function runPhoto(file, hint = null) {
       return e.id;
     });
     ctx.persist();
-    snap = { file, hint, dataUrl: r.dataUrl, ids, quality: r.quality, unsure: r.agreement < 0.75 || r.items.some(i => i.confidence < 0.6), unknown: r.items.filter(i => !i.dish).map(i => i.otherName) };
+    const tot = ids.map(byId).reduce((a, e) => a + e.kcal, 0);
+    const share = needsShareCheck(r.scene, ids.map(byId).map(e => ({ kind: N.DISH[e.ref.id].kind, servings: e.opts.servings })), tot);
+    snap = { file, hint, share, dataUrl: r.dataUrl, ids, quality: r.quality, unsure: r.agreement < 0.75 || r.items.some(i => i.confidence < 0.6), unknown: r.items.filter(i => !i.dish).map(i => i.otherName) };
     renderFood(); renderSnap();
     box.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
   } catch (err) {
@@ -418,6 +428,7 @@ function renderSnap() {
       <button type="button" class="linkbtn del" data-sdel="${e.id}" aria-label="Remove ${esc(e.name)}">✕</button></div>
       ${e.alt && N.DISH[e.alt] ? `<button type="button" class="alt-chip" data-salt="${e.id}">or ${esc(N.DISH[e.alt].name)}?</button>` : ''}`).join('')}</div>
     ${snap.quality?.dark || snap.quality?.blurry ? `<p class="warn-note small">The photo looks ${snap.quality.dark ? 'dark' : 'blurry'}, so these are rougher guesses. A clear photo from above, in good light, works best.</p>` : ''}
+    ${snap.share ? `<div class="fq share-q"><span class="eyebrow">Is all of this yours?</span><div class="seg fseg" role="group"><button type="button" data-share="1">All</button><button type="button" data-share="0.5">Half</button><button type="button" data-share="0.25">A quarter</button><button type="button" data-share="one">One serving</button></div></div>` : ''}
     <div class="snap-note"><input id="snapHint" placeholder="Add a note: restaurant karahi, 2 naan…" value="${esc(snap.hint || '')}" aria-label="Add a note about this meal"><button type="button" class="ghost" id="snapReread">Re-read</button></div>
     ${snap.unknown.length ? `<p class="muted small" style="margin:0">Also saw ${snap.unknown.map(esc).join(', ')}. Search to add ${snap.unknown.length > 1 ? 'these' : 'it'}.</p>` : ''}
     ${ask ? `<div class="fq"><span class="eyebrow">${tr('Who usually cooks your food?')}</span><div class="seg fseg" role="group"><button type="button" data-usual="home">${tr('Mostly home')}</button><button type="button" data-usual="mixed">${tr('Both')}</button><button type="button" data-usual="out">${tr('Mostly out')}</button></div>
@@ -425,6 +436,8 @@ function renderSnap() {
     <div class="btn-row"><button type="button" class="ghost" id="snapUndo">${tr('Undo')}</button><button type="button" class="ghost" id="snapDone">${tr('Done')}</button></div></div>`;
 }
 function onSnapClick(e) {
+  if (e.target.closest('#snapCancel')) { pendingPhoto = null; $('#foodPhotoBox').hidden = true; return; }
+  if (e.target.closest('#snapForce') && pendingPhoto) { const p = pendingPhoto; pendingPhoto = null; snap = { force: true, file: null }; return runPhoto(p.file, p.hint); }
   if (!snap) return;
   const ed = e.target.closest('[data-sedit]'); if (ed) return editEntry(ed.dataset.sedit);
   const alt = e.target.closest('[data-salt]');
@@ -432,6 +445,14 @@ function onSnapClick(e) {
     const it = byId(alt.dataset.salt), was = it.ref.id, ref = { t: 'dish', id: it.alt };
     Object.assign(it, entryFrom(ref, { ...defaultOpts(ref), servings: it.opts.servings, meat: it.opts.meat, oil: it.opts.oil, style: it.opts.style, styleKnown: it.opts.styleKnown, portionSd: it.opts.portionSd }), { id: it.id, at: it.at, meal: it.meal });
     it.alt = was; delete it.photoG; ctx.persist(); renderFood(); return renderSnap();
+  }
+  const sh = e.target.closest('[data-share]');
+  if (sh) { // scale this photo's dishes to the person's share
+    for (const it of snap.ids.map(byId).filter(Boolean)) {
+      const sv = sh.dataset.share === 'one' ? 1 : Math.max(0.5, Math.round(it.opts.servings * +sh.dataset.share * 2) / 2);
+      Object.assign(it, entryFrom(it.ref, { ...it.opts, servings: sv }, { name: it.name !== N.DISH[it.ref.id]?.name ? it.name : null }), { id: it.id, at: it.at, meal: it.meal });
+    }
+    snap.share = false; ctx.persist(); renderFood(); return renderSnap();
   }
   if (e.target.closest('#snapReread')) { const h = $('#snapHint').value.trim(); if (h && snap.file) runPhoto(snap.file, h); return; }
   const del = e.target.closest('[data-sdel]'); if (del) return removeEntries([del.dataset.sdel]);

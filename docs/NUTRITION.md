@@ -70,7 +70,12 @@ The old ChatGPT feature asked the model for calories. A language model **samples
 4. Results are **cached by a SHA-256 hash of the image**, so the same photo always gives the same answer, on the phone and on the server.
 5. If the answers disagree, the app says **"Please check"**, and every dish can be changed in two taps. The cooking style it can't see is marked "probably restaurant" until you confirm it.
 
-Run the server (`tools/food-vision-server.mjs`) with either key; it has no dependencies:
+Run the server (`tools/food-vision-server.mjs`) with any one of these keys; it has no dependencies. **Gemini has a free tier**, good for testing. On the free tier Google may use what you send to improve its products, so switch to a paid key (Gemini, Claude or OpenAI) before real clients upload meal photos:
+
+```bash
+GEMINI_API_KEY=... node tools/food-vision-server.mjs
+```
+
 
 ```bash
 ANTHROPIC_API_KEY=... node tools/food-vision-server.mjs

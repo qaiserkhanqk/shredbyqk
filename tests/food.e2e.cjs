@@ -22,7 +22,9 @@ const num = s => +String(s).replace(/[^\d]/g, '');
       // With a note saying "2 naan", the stand-in model counts two.
       const naan = /2 naan/.test(body.hint || '') ? 2 : 1;
       const samples = [[it('chicken_karahi', 1, { oil: 'oily' }), it('naan', naan, { alternative: 'roghni_naan' })], [it('chicken_karahi', 1.5, { oil: 'oily' }), it('naan', naan, { alternative: 'roghni_naan' })], [it('chicken_karahi', 1), it('naan', naan), it('raita', 1)]]
-        .map(items => ({ items, setting: 'unsure' }));
+        .map(items => ({ items, setting: 'unsure', scene: 'plate' }));
+      if (/table/.test(body.hint || '')) samples.forEach(x => { x.scene = 'shared'; x.items = [it('chicken_karahi', 4)]; });
+      if (/stall/.test(body.hint || '')) samples.forEach(x => { x.scene = 'cooking_or_display'; x.items = [it('naan', 15)]; });
       return r.fulfill({ status: 200, body: JSON.stringify({ samples }), headers: { 'content-type': 'application/json' } });
     }
     const f = path.join(ROOT, p);
@@ -177,7 +179,19 @@ const num = s => +String(s).replace(/[^\d]/g, '');
   await p.fill('#snapHint', 'restaurant karahi, 2 naan'); await p.click('#snapReread');
   await p.waitForFunction(() => /2 naans/.test(document.querySelector('#foodPhotoBox')?.textContent || ''), null, { timeout: 8000 });
   check('a note re-reads the photo and replaces the first try', lastVision.hint === 'restaurant karahi, 2 naan' && (await rows()).length === rowsBefore, `${rowsBefore} → ${(await rows()).length}`);
-  await p.click('#snapDone');
+  // A whole pan for the table: logged, but asks whose share it is.
+  await p.fill('#snapHint', 'whole pan for the table'); await p.click('#snapReread');
+  await p.waitForSelector('[data-share="0.5"]', { timeout: 8000 });
+  check('shared dish → "Is all of this yours?"', /Is all of this yours/.test(await p.textContent('#foodPhotoBox')));
+  await p.click('[data-share="0.5"]');
+  check('"Half" scales the pan to 2 katori', /2 katori/.test(await p.textContent('#foodPhotoBox .list')) && !(await p.isVisible('[data-share]')), await p.textContent('#foodPhotoBox .list'));
+  // A stall's stack of naan: not logged unless the person says so.
+  const beforeStall = (await rows()).length;
+  await p.fill('#snapHint', 'naan stall'); await p.click('#snapReread');
+  await p.waitForSelector('#snapForce', { timeout: 8000 });
+  check('cooking/display photo is not logged automatically', /cooked or on display/.test(await p.textContent('#foodPhotoBox')));
+  await p.click('#snapCancel');
+  check('…and nothing was added', (await rows()).length <= beforeStall);
   await p.evaluate(() => { document.querySelector('#foodTargets').open = true; });
   await p.selectOption('#tPlate', '28');
   check('usual plate size is saved', await p.evaluate(() => JSON.parse(localStorage.getItem('shred_qk_v1')).food.plateCm === '28'));
