@@ -7,7 +7,7 @@
 //  - `yes` is the specific praise given when a previously-cued fault is corrected
 //    (feedback after good trials improves learning — Chiviacowsky & Wulf 2007).
 // Thresholds are starting points from coaching standards; tune with real client footage.
-import { angle, fromVertical, dist, bestSide } from './angles.js';
+import { angle, fromVertical, dist, bestSide, mid } from './angles.js';
 
 // A personal limit from the lifter's body map (bodymap.js → personalFor), or the textbook default.
 const lim = (c, k, d) => c?.P?.[k] ?? d;
@@ -29,8 +29,29 @@ function common(p) {
     torsoLean: fromVertical(s.hip, s.sh),
     // Segment ratios: limb proportions change "correct" positions from person to person.
     femurTorso: dist(s.hip, s.kn) / (dist(s.sh, s.hip) || 1),
+    ...steadiness(p, s),
   };
 }
+
+// Positions used by the "moving too much" checks, in torso lengths so camera distance doesn't matter.
+// Each check compares the lifter with their OWN position at the start of the rep (ctx.top), so standing
+// a little off-centre or leaning slightly by build is never flagged, only movement during the rep.
+function steadiness(p, s) {
+  const T = dist(s.sh, s.hip) || 1, mh = mid(p[23], p[24]), ms = mid(p[11], p[12]), ma = mid(p[27], p[28]);
+  return { hipXn: s.hip.x / T, anXn: s.an.x / T, shiftXn: (mh.x - ma.x) / T, sideTilt: fromVertical(mh, ms) };
+}
+// Facing the camera the knees bend towards the lens, so the 2D knee angle hardly changes. Depth is read
+// from how far the hips drop towards the ankles instead, scaled by shin length (the shin stays nearly
+// upright, so it barely foreshortens): standing ≈ 180°, hips near knee height ≈ 85°. Mapped to a knee
+// angle so the same depth and rep thresholds apply in both views.
+function frontKnee(p) {
+  const shin = (dist(p[25], p[27]) + dist(p[26], p[28])) / 2 || 1;
+  const ext = ((p[27].y + p[28].y) - (p[23].y + p[24].y)) / 2;
+  const r = Math.max(0, Math.min(1, ext / (2.1 * shin)));
+  return Math.max(40, 85 + (r - 0.5) / 0.5 * 95);
+}
+const movedBy = (m, c, k, lim) => !!c?.top && c.top[k] != null && Math.abs(m[k] - c.top[k]) > lim;
+const bodySway = (m, c, lean = 12) => movedBy(m, c, 'torsoLean', lean) || movedBy(m, c, 'hipXn', 0.15);
 
 // Squat: forward lean is a consequence of femur length relative to torso (Fry et al. 2003;
 // Demers et al. 2018). Long-femur lifters MUST lean more to keep the bar over mid-foot,
@@ -57,7 +78,7 @@ export const EXERCISES = {
       if (view === 'front') {
         m.kneeGap = dist(p[25], p[26]);
         m.ankleGap = dist(p[27], p[28]);
-        m.knee = Math.min(angle(p[23], p[25], p[27]), angle(p[24], p[26], p[28]));
+        m.knee = frontKnee(p);
       }
       return m;
     },
@@ -69,6 +90,12 @@ export const EXERCISES = {
         test: (m, c) => m.heelLift != null && c?.base?.heelLift != null && m.heelLift - c.base.heelLift > 0.3,
         cue: 'Keep your whole foot down and push the floor away through your heels.', yes: 'Heels down. Much better.', tag: 'Heels down',
         why: 'When the heels lift, the weight rolls onto the toes and the knees take load the hips should share.' },
+      { id: 'sq_feet', priority: 2, test: (m, c) => movedBy(m, c, 'anXn', 0.2),
+        cue: 'Keep your feet planted. Stay rooted to the floor.', yes: 'Feet planted. Good.', tag: 'Feet planted',
+        why: 'Feet that shift mid-rep mean the balance is off, and the load moves somewhere it shouldn\'t.' },
+      { id: 'sq_shift', view: 'front', priority: 2, test: (m, c) => movedBy(m, c, 'shiftXn', 0.12),
+        cue: 'Stay centred. Push evenly through both feet.', yes: 'Centred. Nice and even.', tag: 'Stay centred',
+        why: 'Shifting to one side loads one hip and knee more than the other.' },
       { id: 'sq_chest', view: 'side', priority: 2, test: (m, c) => m.torsoLean > (c?.P?.sqLean ?? squatLeanLimit(m)),
         cue: 'Show the logo on your shirt to the wall in front.', yes: 'Better, chest stayed proud.', tag: 'Chest up',
         why: 'Leaning past what your limb proportions need moves load to the lower back.' },
@@ -188,6 +215,9 @@ export const EXERCISES = {
       return m;
     },
     always: [
+      { id: 'cu_body', priority: 2, test: (m, c) => bodySway(m, c),
+        cue: 'Keep your body still. Only your forearms move.', yes: 'Body still. That\'s it.', tag: 'Body still',
+        why: 'Rocking the body uses momentum, so the biceps do less of the work.' },
       { id: 'cu_swing', priority: 2, test: m => m.upperArmSwing > 30,
         cue: 'Keep your elbows glued to your ribs.', yes: 'Elbows still. Perfect.',
         why: 'Swinging uses momentum and the shoulders instead of the biceps.' },
@@ -213,6 +243,11 @@ export const EXERCISES = {
       m.wristDiff = Math.abs(p[15].y - p[16].y) / (dist(p[11], p[12]) || 1);
       return m;
     },
+    always: [
+      { id: 'pr_lean', priority: 1, test: (m, c) => m.sideTilt > 10 || movedBy(m, c, 'shiftXn', 0.12),
+        cue: 'Stay tall and square. Don\'t lean to one side.', yes: 'Tall and square. Good.', tag: 'Stay square',
+        why: 'Leaning to one side under a weight overhead loads the lower back unevenly.' },
+    ],
     top: [
       { id: 'pr_even', priority: 2, test: m => m.wristDiff > 0.25,
         cue: 'Push both hands to the ceiling at the same time.', yes: 'Even press. Good.',
@@ -229,6 +264,9 @@ export const EXERCISES = {
     setup: 'Side-on, camera at hip height. Arms, torso and hips in frame.',
     metrics(p) { const m = common(p); return m; },
     bottom: [
+      { id: 'row_body', priority: 2, test: (m, c) => movedBy(m, c, 'torsoLean', 15),
+        cue: 'Keep your chest still. Pull with your arms, not by lifting your body.', yes: 'Torso still. Strict reps.', tag: 'Chest still',
+        why: 'Heaving the torso up turns the row into a swing and takes work off the back muscles.' },
       { id: 'row_short', priority: 3, test: m => m.elbow > 85, cue: 'Pull your elbows back past your ribs.', yes: 'Full squeeze. Good.',
         why: 'The mid-back muscles (rhomboids, mid-traps) work hardest at the end of the pull.' },
     ],
@@ -326,11 +364,15 @@ export const EXERCISES = {
     track: 'wr', name: 'Triceps Extension', view: 'side', primary: 'elbow', downT: 95, upT: 155, concentric: 'up',
     setup: 'Side-on, camera at chest height. Shoulder, elbow and hand in frame.',
     metrics(p) { const m = common(p); m.upperArmSwing = fromVertical(m.s.sh, m.s.el); return m; },
+    always: [
+      { id: 'tri_body', priority: 2, test: (m, c) => bodySway(m, c),
+        cue: 'Keep your upper body still. Only your forearms move.', yes: 'Steady. Good.', tag: 'Body still',
+        why: 'Leaning into the rep lets the shoulders and body weight do the triceps\' job.' },
+    ],
     top: [
       { id: 'tri_lockout', priority: 3, test: (m, c) => m.elbow < lim(c, 'lockElbow', 160), cue: 'Straighten your arm all the way and squeeze.', yes: 'Full lockout.',
         why: 'The triceps are fully shortened at lockout, so finishing the rep matters.' },
     ],
-    always: [],
   },
 
   raise: {
@@ -349,6 +391,9 @@ export const EXERCISES = {
         why: 'Going above shoulder height shifts the work to the upper traps.' },
     ],
     always: [
+      { id: 'raise_body', priority: 2, test: (m, c) => bodySway(m, c, 10),
+        cue: 'Keep your body still. Lift with your shoulders only.', yes: 'Steady body. Good.', tag: 'Body still',
+        why: 'Rocking the body flings the weight up with momentum instead of the shoulder muscles.' },
       { id: 'raise_swing', priority: 2, test: m => m.torsoLean > 15, cue: 'Stand tall. Lift with your shoulders, not momentum.', yes: 'Strict reps. Nice.',
         why: 'Swinging the torso uses momentum instead of the target muscle.' },
     ],
@@ -425,9 +470,11 @@ export const EXERCISES = {
 
 // Faults that can be judged mid-rep (posture, alignment), not ones that need the end of the rep
 // (depth, lockout, range). These are cued the moment they show.
-const LIVE = new Set(['sq_valgus', 'sq_heels', 'sq_chest', 'bp_legs', 'pu_sag', 'pu_pike', 'rdl_squat', 'lu_torso', 'cu_swing', 'raise_swing', 'fly_bend', 'dip_deep']);
+const LIVE = new Set(['sq_feet', 'sq_shift', 'row_body', 'sq_valgus', 'sq_heels', 'sq_chest', 'bp_legs', 'pu_sag', 'pu_pike', 'rdl_squat', 'lu_torso', 'cu_swing', 'raise_swing', 'fly_bend', 'dip_deep']);
 // What the lifter is doing wrong, in plain words, shown on screen next to the fix.
 const WRONG = {
+  sq_feet: 'Feet moving', sq_shift: 'Shifting to one side', cu_body: 'Swinging your body', tri_body: 'Moving your body',
+  pr_lean: 'Leaning to one side', row_body: 'Heaving with your body', raise_body: 'Swinging your body',
   sq_valgus: 'Knees caving in', sq_heels: 'Heels lifting', sq_chest: 'Leaning too far forward', sq_depth: 'Not deep enough',
   sq_hips_first: 'Hips shooting up first', sq_lockout: 'Not standing all the way up',
   bp_legs: 'No leg drive', bp_butt: 'Hips coming off the bench', bp_scap: 'Shoulders rolling off the bench', bp_depth: 'Not touching your chest', bp_lockout: 'Not locking out',
@@ -548,7 +595,7 @@ export class RepEngine {
 
     // Continuous faults must persist ~10 frames (~0.33 s) — a "bandwidth" so brief wobbles are ignored.
     for (const r of this.rules(ex.always)) {
-      this.alwaysCount[r.id] = r.test(m) ? (this.alwaysCount[r.id] || 0) + 1 : 0;
+      this.alwaysCount[r.id] = r.test(m, this.ctx()) ? (this.alwaysCount[r.id] || 0) + 1 : 0;
       if (this.alwaysCount[r.id] === 10) {
         this.faultTally[r.id] = (this.faultTally[r.id] || 0) + 1;
         events.push({ type: 'fault', faults: [r] });

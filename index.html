@@ -37,6 +37,7 @@
       <div><span class="eyebrow" id="dateLine"></span><h1 class="display h1" id="hello">Welcome.</h1></div>
     </div>
 
+    <button type="button" class="cam-start" id="camCoach"><span class="cam-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5zM1 5h15v14H1z"/></svg></span><span><b>Camera coach</b><span>Open the camera and start moving. QK recognises the exercise and corrects you live.</span></span></button>
     <div class="card stack" id="readyCard">
       <div class="ready-q"><span class="eyebrow">How do you feel today?</span><button type="button" class="linkbtn" id="readyChange" hidden>Change</button></div>
       <div class="feel" role="group" aria-label="How do you feel today?">
@@ -72,6 +73,7 @@
   <!-- TRAIN -->
   <section class="screen" id="train">
     <div class="page-head"><div><span class="eyebrow">Form check</span><h1 class="display h1">What are we training?</h1></div></div>
+    <button type="button" class="cam-start" id="camCoach2"><span class="cam-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5zM1 5h15v14H1z"/></svg></span><span><b>Just start moving</b><span>Open the camera and do your exercise. QK recognises it and corrects you live.</span></span></button>
     <label class="field"><span class="eyebrow">Search</span><input id="exSearch" type="search" placeholder="Search 84 exercises, e.g. row, squat, cable" autocomplete="off"></label>
     <div class="chips-scroll" id="muscleChips" role="group" aria-label="Filter by muscle"></div>
     <p class="muted small" style="margin:0" id="exCount"></p>
@@ -448,6 +450,7 @@
       <div class="media"><video id="video" playsinline muted></video><canvas id="overlay"></canvas></div>
       <div class="rep-big" id="repBig"><span class="num" id="repNum">0</span><small id="repLbl">reps</small></div>
       <div class="readout" id="readout"></div>
+      <div class="detect-chip" id="detectChip" hidden><span id="detectTxt"></span><button type="button" id="detectAlt" hidden></button><button type="button" id="detectChange" hidden>Change</button></div>
       <div class="fault-banner" id="faultBanner" hidden aria-live="assertive"><b id="fbWrong"></b><span id="fbFix"></span></div>
       <div class="countdown num" id="countdown" hidden></div>
       <div class="tempo-ring" id="tempoRing" hidden><div class="word" id="tempoWord"></div></div>

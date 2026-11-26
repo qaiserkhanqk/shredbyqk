@@ -3,7 +3,7 @@ import { say, registerAvatar, setMuted, greeting, CONFIG } from './coach.js';
 import { EXERCISES, RepEngine, allRules, estimateRIR } from './exercises.js';
 import { FeedbackCoach, restSeconds } from './feedback.js';
 import { getVideoLandmarker, drawPose, liveModelName } from './pose.js';
-import { toPx, viewOf, Smoother, bestSide } from './angles.js';
+import { toPx, viewOf, Smoother, bestSide, angle } from './angles.js';
 import { MotionTracker, romSummary, torsoLen } from './motion.js';
 import { analyseGait } from './gait.js';
 import { analyseJumps, jumpReadiness } from './jump.js';
@@ -19,6 +19,7 @@ import { LIBRARY, LIB, MUSCLES, exFor } from './library.js';
 import { HipThrustDemo, SquatDemo, BenchDemo, WalkDemo, BodyMapDemo, BODYMAP_SECS, BODYMAP_DEMO_STEPS, DEMO_W, DEMO_H } from './demo.js';
 import { analyseBodyMap, personalFor, explainBodyMap, fitLines } from './bodymap.js';
 import { FormFX, drawDepthArc } from './fx.js';
+import { ExerciseDetector, PICK_LIST } from './detect.js';
 import { initCalm, renderCalm, startCalmNow } from './calm.js';
 import { WEIGHTED, lastLoad, lastLoadText, weekSummary } from './share.js';
 import { initVitals, renderVitals } from './vitals.js';
@@ -250,7 +251,7 @@ function renderTrain() {
   const cam = list.filter(x => x.pattern).length;
   $('#exCount').textContent = `${list.length} exercise${list.length === 1 ? '' : 's'} · ${cam} with camera form check`;
   $('#exGrid').innerHTML = list.map(x => x.id === 'hipThrust' && muscleFilter === 'All' && !q
-    ? `<button type="button" class="ex-card feature" data-train="${x.id}"><div><span class="eyebrow" style="color:var(--z1)">Includes a demo set</span><h2 class="display h2" style="margin:8px 0 6px">${x.name}</h2><span class="watch">QK watches: ${WATCH[x.pattern]}</span></div>${icon('hipThrust', 'fig')}</button>`
+    ? `<button type="button" class="ex-card feature" data-train="${x.id}"><div><span class="eyebrow" style="color:var(--z1)">Live form check</span><h2 class="display h2" style="margin:8px 0 6px">${x.name}</h2><span class="watch">QK watches: ${WATCH[x.pattern]}</span></div>${icon('hipThrust', 'fig')}</button>`
     : `<button type="button" class="ex-card" data-train="${x.id}">${icon(iconKey(x.id), 'fig')}<b>${esc(x.name)}</b>
         <span class="watch">${esc(x.muscles.slice(0, 2).join(' · '))} · ${esc(x.equipment)}</span>
         <span class="meta">${x.pattern ? '<span class="pill cam">Form check</span>' : '<span class="pill voice">Tempo coach</span>'}</span></button>`).join('') || '<p class="empty">No exercises match. Try another word.</p>';
@@ -260,6 +261,8 @@ $('#exSearch').oninput = e => { searchQ = e.target.value; renderTrain(); };
 document.addEventListener('click', e => { const b = e.target.closest('[data-train]'); if (b) openSetup(b.dataset.train); });
 
 let exKey = 'hipThrust';
+// Simulated demo lifters are for automated tests only: hidden unless ?demo or localStorage qk_demo=1.
+const DEMO = (() => { try { return /[?&]demo\b/.test(location.search) || localStorage.getItem('qk_demo') === '1'; } catch { return false; } })();
 const curEx = () => exFor(exKey);
 function openSetup(k) {
   exKey = k; const item = LIB[k], ex = exFor(k);
@@ -273,7 +276,7 @@ function openSetup(k) {
   }
   $('#startCam').hidden = !ex; $('#videoFile').parentElement.hidden = !ex; $('#recordChk').parentElement.hidden = !ex;
   $('#startGuided').hidden = !!ex;
-  $('#startDemo').hidden = !['hipThrust', 'squat', 'benchPress'].includes(k);
+  $('#startDemo').hidden = !DEMO || !['hipThrust', 'squat', 'benchPress'].includes(k);
   const fit = !!ex, mapped = S.profile.body?.ok, lines = mapped && ex ? fitLines(ex.patternKey, S.profile.body) : [];
   $('#fitNote').hidden = !fit; $('#fitNote').classList.toggle('on', !!mapped);
   $('#fitNote').innerHTML = mapped ? `<span><b>✓ Fit to your body.</b> ${lines.length ? esc(lines.join('. ')) + '.' : 'Your body matches the standard limits for this one.'}</span><button class="ghost" type="button" id="fitView">View</button>`
@@ -307,21 +310,25 @@ async function keepAwake(on) {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && (!$('#live').hidden || !$('#summary').hidden)) keepAwake(true); });
 let lastSource = null, lastSet = null;
 
-async function startLive({ mode, source, file }) {
+async function startLive({ mode, source, file, auto = false }) {
   keepAwake(true);
   $('#setup').hidden = true; $('#summary').hidden = true; $('#live').hidden = false;
   $('#tempoRing').hidden = true;
-  const ex = mode === 'form' ? curEx() : null;
-  live = { mode, source, frames: [], t0: null, lost: 0, wrong: 0, demo: null, done: false, steps: 0, mPerPx: null, standFrames: [], times: [] };
-  bar.reset(); recorder2.start({ kind: mode, exercise: mode === 'form' ? exKey : undefined, gaitMode: mode === 'gait' ? gaitMode : undefined, source, loadKg: mode === 'form' ? parseFloat($('#loadKg').value) || null : undefined });
+  if (auto) exKey = null;
+  const ex = mode === 'form' && !auto ? curEx() : null;
+  live = { mode, source, frames: [], t0: null, lost: 0, wrong: 0, demo: null, done: false, steps: 0, mPerPx: null, standFrames: [], times: [],
+    auto, det: auto ? new ExerciseDetector() : null, buf: [], sets: [], lastRepT: 0 };
+  bar.reset(); recorder2.start({ kind: mode, exercise: mode === 'form' && !auto ? exKey : undefined, gaitMode: mode === 'gait' ? gaitMode : undefined, source, loadKg: mode === 'form' ? parseFloat($('#loadKg').value) || null : undefined });
   engine = null; fb = null; smooth.reset(); motion.reset(); fx.reset(); comp = null; recorder = null; $('#faultBanner').hidden = true;
   $('#formMeters').hidden = mode !== 'form'; $('#gaitMeters').hidden = mode === 'form';
   $('#repBig').hidden = mode !== 'form'; $('#cueHint').hidden = mode !== 'form';
   $('#repNum').textContent = '0'; $('#repLbl').textContent = ex?.hold ? 'seconds' : 'reps'; $('#dots').innerHTML = ''; $('#cleanCt').textContent = '0 clean'; $('#vlKnob').style.left = '0%'; $('#vlTxt').textContent = 'fresh';
   $('#gSteps').textContent = '0'; $('#gProg').style.width = '0'; $('#gStepsLbl').textContent = mode === 'gait' ? 'Steps seen' : 'Time';
   const testName = { rom: TEST.rom?.label || 'Measurement', gait: `Gait · ${gaitMode === 'run' ? 'running' : 'walking'}`, jump: 'Jump test', sls: 'Single-leg squat knee test', bodymap: 'Map my body' };
-  $('#liveEyebrow').textContent = mode === 'form' ? ex.name : testName[mode];
-  $('#liveTitle').textContent = mode === 'form' ? `Set ${setsToday(exKey) + 1}${source === 'demo' ? ' · demo' : ''}` : (mode === 'bodymap' ? 'Stand still, side-on' : source === 'demo' ? 'Demo walker' : source === 'file' ? 'Analysing your video (precise mode)' : mode === 'gait' ? 'Walk naturally for 10 seconds' : mode === 'jump' ? 'Up to 3 jumps' : mode === 'rom' ? `${TEST.rom.secs} seconds` : 'Left leg first, then right');
+  $('#detectChip').hidden = !auto; $('#detectChip').classList.remove('found'); $('#detectAlt').hidden = true; $('#detectChange').hidden = true;
+  $('#detectTxt').textContent = 'Start your exercise. I\'ll recognise it.';
+  $('#liveEyebrow').textContent = auto ? 'Camera coach' : mode === 'form' ? ex.name : testName[mode];
+  $('#liveTitle').textContent = auto ? 'Start moving' : mode === 'form' ? `Set ${setsToday(exKey) + 1}${source === 'demo' ? ' · demo' : ''}` : (mode === 'bodymap' ? 'Stand still, side-on' : source === 'demo' ? 'Demo walker' : source === 'file' ? 'Analysing your video (precise mode)' : mode === 'gait' ? 'Walk naturally for 10 seconds' : mode === 'jump' ? 'Up to 3 jumps' : mode === 'rom' ? `${TEST.rom.secs} seconds` : 'Left leg first, then right');
   $('#endLive').textContent = mode === 'form' ? 'End set' : 'Stop';
   $('#flipCam').hidden = source !== 'camera';
   $('#calBtn').hidden = !(mode === 'form' && vbtOn() && source !== 'demo');
@@ -333,7 +340,7 @@ async function startLive({ mode, source, file }) {
 
   try {
     if (source === 'demo') {
-      video.hidden = true; live.demo = mode === 'bodymap' ? new BodyMapDemo() : mode !== 'form' ? new WalkDemo() : ex.patternKey === 'squat' ? new SquatDemo() : ex.patternKey === 'bench' ? new BenchDemo() : new HipThrustDemo();
+      video.hidden = true; live.demo = auto && window.__qkFeed ? { frame: now => window.__qkFeed(now), drawScene() {} } : mode === 'bodymap' ? new BodyMapDemo() : mode !== 'form' ? new WalkDemo() : ex.patternKey === 'squat' ? new SquatDemo() : ex.patternKey === 'bench' ? new BenchDemo() : new HipThrustDemo();
       canvas.width = DEMO_W; canvas.height = DEMO_H;
     } else {
       video.hidden = false;
@@ -359,7 +366,8 @@ async function startLive({ mode, source, file }) {
     return;
   }
 
-  if (mode === 'form') say(`${ex.name}. ${ex.hold ? 'Get into position and hold.' : ex.setup + ' Start when you\'re ready.'}`, { id: `setup_${exKey}`, priority: 'high' });
+  if (auto) say('Camera coach. Step back so I can see your whole body, then start your exercise. I\'ll recognise it in a rep or two.', { id: 'auto_intro', priority: 'high' });
+  else if (mode === 'form') say(`${ex.name}. ${ex.hold ? 'Get into position and hold.' : ex.setup + ' Start when you\'re ready.'}`, { id: `setup_${exKey}`, priority: 'high' });
   else if (source !== 'file') { say(TEST[mode].intro(), { id: mode + '_intro', priority: 'high' }); await countdown(3); }
   live.t0 = performance.now();
   cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
@@ -442,7 +450,9 @@ function loop(now) {
 
 const fmtA = v => (v == null || Number.isNaN(v) ? '–' : Math.round(v) + '°');
 function formFrame(px, ctx, t) {
-  const ex = curEx(), view = viewOf(px);
+  if (live.auto && !live.replaying && autoFrame(px, ctx, t)) return;
+  const ex = curEx(), view = viewOf(px), quiet = live.replaying;
+  const speak = (...a) => { if (!quiet) say(...a); };
   if (!engine) {
     // Every camera exercise is judged against the lifter's own body map (not the demo athlete's).
     live.P = live.source !== 'demo' ? personalFor(ex.patternKey, S.profile.body) : null;
@@ -453,15 +463,15 @@ function formFrame(px, ctx, t) {
 
   // Confidence gate: low-confidence landmarks give wrong angles, so stay quiet instead.
   if (raw.s.conf < 0.55) {
-    if (++live.lost === 45) say('Move back a little. I need to see your whole body.', { id: 'not_visible', priority: 'high' });
+    if (++live.lost === 45) speak('Move back a little. I need to see your whole body.', { id: 'not_visible', priority: 'high' });
     drawPose(ctx, px, { color: 'rgba(237,240,246,.35)' }); return;
   }
   live.lost = 0;
-  if (ex.view !== 'either' && view !== ex.view) { if (++live.wrong === 60) say(ex.view === 'side' ? 'Turn side-on to the camera for this one.' : 'Face the camera for this one.', { id: 'wrong_view', priority: 'high' }); }
+  if (ex.view !== 'either' && view !== ex.view) { if (++live.wrong === 60) speak(ex.view === 'side' ? 'Turn side-on to the camera for this one.' : 'Face the camera for this one.', { id: 'wrong_view', priority: 'high' }); }
   else live.wrong = 0;
 
   motion.push(raw.s[ex.track], torsoLen(px));
-  recorder2.push(t, px);
+  if (!quiet) recorder2.push(t, px);
   // Bar speed: scale from the plate (if calibrated) or, for standing lifts, from the lifter's height.
   if (vbtOn()) {
     if (!live.mPerPx && live.standFrames.length < 20) { live.standFrames.push({ px }); if (live.standFrames.length === 20 && STANDING_LIFTS.includes(ex.patternKey)) live.mPerPx = scaleFromHeight(live.standFrames, (S.profile.heightCm || 0) / 100); }
@@ -474,12 +484,13 @@ function formFrame(px, ctx, t) {
     const bad = (ex.always || []).some(r => r.test(m));
     live.held = (live.held || 0) + dt; if (!bad) live.goodHeld = (live.goodHeld || 0) + dt;
     const sec = Math.floor(live.held);
-    if (sec !== live.lastSec) { live.lastSec = sec; $('#repNum').textContent = sec; if (sec && sec % 10 === 0) say(`${sec} seconds.${bad ? '' : ' Solid.'}`, { priority: 'low' }); }
+    if (sec !== live.lastSec) { live.lastSec = sec; $('#repNum').textContent = sec; if (sec && sec % 10 === 0) speak(`${sec} seconds.${bad ? '' : ' Solid.'}`, { priority: 'low' }); }
     $('#cleanCt').textContent = `${Math.floor(live.goodHeld || 0)} s good`;
   }
   let flagged = false;
   for (const ev of engine.update(m, t)) {
     if (ev.type === 'rep') {
+      live.lastRepT = t;
       ev.drift = motion.endRep();
       $('#repNum').textContent = engine.reps;
       flash(ev.faults.length ? 'bad' : 'good');
@@ -489,6 +500,7 @@ function formFrame(px, ctx, t) {
       $('#vlTxt').textContent = ev.vl < .1 ? 'fresh' : ev.vl < .25 ? `−${Math.round(ev.vl * 100)}%` : `−${Math.round(ev.vl * 100)}% · near failure`;
       if (vbtOn() && live.mPerPx) { const v = bar.closeRep(); if (v) { live.lastV = v; $('#vlTxt').textContent = `${v.mcv.toFixed(2)} m/s`; } }
     }
+    if (quiet) continue; // replaying the reps seen while recognising the exercise: count them, don't re-coach
     if (ev.faults.length && ev.type !== 'rep') flagged = true;
     const awaiting = fb.awaitingFix;
     const line = ev.type === 'live' ? fb.onLive(ev.faults[0]) : ev.type === 'rep' ? fb.onRep(ev) : fb.onContinuousFault(ev.faults[0]);
@@ -499,6 +511,7 @@ function formFrame(px, ctx, t) {
     else if (cued) { fx.cue(cued, t); showBanner(cued); markFault(cued); }
     else if (ev.type === 'rep' && !ev.faults.length) fx.clean(t);
   }
+  if (quiet) return;
   motion.draw(ctx);
   const s = raw.s;
   if (live.badUntil > performance.now()) flagged = true; // skeleton stays red while the fault is on screen
@@ -510,6 +523,81 @@ function formFrame(px, ctx, t) {
   $('#readout').innerHTML = keys.map(k => `<span>${k} ${fmtA(m[k])}</span>`).join('') + (live.lastV ? `<span>${live.lastV.mcv.toFixed(2)} m/s</span>` : '') + `<span class="muted">${engine.view} view</span>` + (live.P ? '<span class="fit">fit to your body</span>' : '');
 }
 
+/* ---------- Camera coach: recognise the exercise, then coach it ---------- */
+// While no exercise is known: draw the skeleton with joint angles, feed the detector, keep ~4 s of frames.
+// Once recognised: adopt it and replay those frames so the first reps count. Afterwards keep watching:
+// if the lifter clearly switches to another exercise (no rep for 5 s and a confident new match), the
+// finished set is saved and QK moves on with them.
+function autoFrame(px, ctx, t) {
+  live.lastFrameT = t; live.ctx = ctx;
+  const res = live.det.push(px, t);
+  // Always keep the last ~4 s: when the exercise is recognised (or changes), these frames are replayed
+  // into the new coach so the reps already done still count.
+  live.buf.push({ px, t }); while (live.buf.length && t - live.buf[0].t > 4000) live.buf.shift();
+  if (!exKey) {
+    recorder2.push(t, px);
+    const s = bestSide(px), seen = s.conf >= 0.55;
+    drawPose(ctx, px, { color: seen ? '#9FD0B6' : 'rgba(237,240,246,.35)', labels: seen ? [{ at: s.kn, value: angle(s.hip, s.kn, s.an) }, { at: s.hip, value: angle(s.sh, s.hip, s.kn) }, { at: s.el, value: angle(s.sh, s.el, s.wr) }] : [] });
+    if (!seen) { if (++live.lost === 45) say('Step back so I can see your whole body, head to feet.', { id: 'not_visible', priority: 'high' }); }
+    else live.lost = 0;
+    live.searchT ??= t;
+    if (t - live.searchT > 10000 && !live.hinted) {
+      live.hinted = true; $('#detectTxt').textContent = 'Not sure yet. Try side-on, with a slow full rep.';
+      say('I can\'t tell which exercise yet. Turn side-on to the camera and do one slow, full rep. Or tap Change to pick it.', { id: 'det_hint', priority: 'high' });
+      $('#detectChange').hidden = false;
+    }
+    if (res) adoptExercise(res, t, true);
+    return true;
+  }
+  // Switching exercise: as soon as a different exercise is seen with confidence, stop coaching the old
+  // one (its rules would misread the new movement), and switch once the old one has had no rep for 3 s.
+  if (res) live.other = res.key !== live.detected?.key && res.confidence >= 0.8 ? (live.other?.key === res.key ? live.other : { ...res, since: t }) : null;
+  if (live.other) {
+    if (t - live.lastRepT > 3000 && t - live.other.since > 600) { const next = live.other; live.other = null; saveQuietSet(); adoptExercise(next, t, true); return true; }
+    const s = bestSide(px);
+    drawPose(ctx, px, { color: '#9FD0B6', labels: [{ at: s.kn, value: angle(s.hip, s.kn, s.an) }, { at: s.el, value: angle(s.sh, s.el, s.wr) }] });
+    $('#detectTxt').textContent = `${live.other.label}?`;
+    return true;
+  }
+  return false;
+}
+
+function adoptExercise(res, t, replay) {
+  exKey = res.id; live.detected = res; live.lastRepT = t;
+  engine = null; fb = null; smooth.reset(); motion.reset(); fx.reset();
+  live.held = 0; live.goodHeld = 0; live.lastT = null; live.lastSec = null; live.wrong = 0;
+  const ex = curEx();
+  $('#liveEyebrow').textContent = ex.name; $('#liveTitle').textContent = `Set ${setsToday(exKey) + 1}`;
+  $('#repLbl').textContent = ex.hold ? 'seconds' : 'reps'; $('#repNum').textContent = '0'; $('#dots').innerHTML = ''; $('#cleanCt').textContent = '0 clean';
+  $('#detectChip').classList.add('found'); $('#detectTxt').textContent = `${res.label} ✓`; $('#faultBanner').hidden = true; live.badUntil = 0;
+  $('#detectAlt').hidden = !res.alt; if (res.alt) $('#detectAlt').textContent = `Or ${res.alt.label.toLowerCase()}?`;
+  $('#detectChange').hidden = false;
+  say(`${res.label}. Got it. Keep going.`, { id: 'det_' + res.key, priority: 'now' });
+  if (replay && live.buf.length) {
+    const buf = live.buf.slice(); live.replaying = true;
+    try { for (const b of buf) formFrame(b.px, live.ctx, b.t); } finally { live.replaying = false; }
+  }
+}
+
+function saveQuietSet() {
+  if (!engine?.reps || !exKey) return;
+  const ex = curEx(), reps = engine.reps;
+  S.sessions.push({ at: Date.now(), ex: exKey, name: ex.name, reps, good: engine.goodReps, faults: engine.faultTally, vl: engine.velocityLoss(), tempo: engine.tempo, roms: engine.roms.map(r => Math.round(r.rom)), auto: true });
+  persist(); live.sets.push(`${ex.name} ${reps}`); toast(`${ex.name}: ${reps} reps saved`);
+}
+
+function pickExercise(id) {
+  if (!live) return;
+  const r = PICK_LIST.find(x => x.id === id) || { key: id, id, label: LIB[id]?.name || id };
+  saveQuietSet(); live.det.reset(); adoptExercise(r, live.lastFrameT || 0, false);
+}
+$('#detectAlt').onclick = () => live?.detected?.alt && pickExercise(live.detected.alt.id);
+$('#detectChange').onclick = () => openSheet(`<div><span class="eyebrow">Camera coach</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Which exercise?</h2></div>
+  <div class="pick-grid">${PICK_LIST.map(x => `<button type="button" class="ghost" data-pick="${x.id}">${esc(x.label)}</button>`).join('')}</div>`);
+$('#rsheetBody').addEventListener('click', e => { const b = e.target.closest('[data-pick]'); if (!b) return; closeSheet(); pickExercise(b.dataset.pick); });
+const startAuto = () => startLive({ mode: 'form', source: DEMO && window.__qkFeed ? 'demo' : 'camera', auto: true });
+$('#camCoach').onclick = startAuto; $('#camCoach2').onclick = startAuto;
+
 // A border flash per rep: green clean, red fault. Readable from across the room, unlike numbers.
 let flashT;
 function flash(kind) { const v = $('#viewport'); v.classList.remove('flash-good', 'flash-bad'); void v.offsetWidth; v.classList.add('flash-' + kind); clearTimeout(flashT); flashT = setTimeout(() => v.classList.remove('flash-' + kind), 450); }
@@ -517,6 +605,10 @@ function flash(kind) { const v = $('#viewport'); v.classList.remove('flash-good'
 function endSet() {
   if (!live) return;
   if (live.mode === 'guided') return endGuided();
+  if (live.auto && !exKey) {
+    stopLive(); $('#live').hidden = true; keepAwake(false); live = null;
+    return toast('No exercise recognised. Next time stand side-on, whole body in view, and do a slow full rep.');
+  }
   const wasRec = recorder && recorder.state !== 'inactive';
   lastSource = live.source;
   const hold = curEx().hold, held = Math.round(live.held || 0), goodHeld = Math.round(live.goodHeld || 0);
@@ -536,6 +628,7 @@ function endSet() {
   $('#scoreRing').hidden = false;
   $('#sReps').textContent = hold ? `${reps} s` : reps; $('#sClean').textContent = hold ? `${good} s in good position` : `${good} clean`;
   $('#sCompare').textContent = !reps ? 'No reps counted. Check the camera angle in the setup tips.' : prevScore == null ? 'First set logged. Next time you\'ll see your progress here.' : score > prevScore ? `Up from ${prevScore}% last time.` : `Last time: ${prevScore}%.`;
+  if (live?.sets?.length) $('#sCompare').textContent += ` Also saved this session: ${live.sets.join(', ')} reps.`;
   const L = 2 * Math.PI * 50;
   $('#scoreRing').innerHTML = `<circle cx="60" cy="60" r="50" fill="none" style="stroke:var(--surface-2)" stroke-width="11"/><circle cx="60" cy="60" r="50" fill="none" stroke="url(#zoneStroke)" stroke-width="11" stroke-linecap="round" stroke-dasharray="${L}" stroke-dashoffset="${L * (1 - score / 100)}" transform="rotate(-90 60 60)"/><text x="60" y="64" text-anchor="middle" style="fill:var(--text)" font-family="Archivo, sans-serif" font-weight="800" font-size="26">${score}%</text><text x="60" y="81" text-anchor="middle" style="fill:var(--muted)" font-family="Figtree, sans-serif" font-size="10">form score</text>`;
   $('#scoreRing').setAttribute('aria-label', `Form score ${score} percent`);
@@ -714,7 +807,7 @@ $$('[data-test]').forEach(b => b.onclick = () => {
   $$('[data-test]').forEach(x => x.classList.toggle('on', x === b));
   $$('[data-panel]').forEach(p => p.hidden = p.dataset.panel !== testMode);
   $('#testLiveLbl').textContent = TEST[testMode].label;
-  $('#gaitDemo').hidden = testMode !== 'gait';
+  $('#gaitDemo').hidden = !DEMO || testMode !== 'gait';
   $('#gaitResult').hidden = true; renderTestHistory();
 });
 /* ---------- Map my body ---------- */
@@ -724,7 +817,7 @@ function showBodyMapIntro() {
     <p class="muted" style="margin:0">Everyone's built differently. Long thighs need more forward lean, tight hamstrings limit a hinge, and some elbows never fully straighten. QK measures yours, then judges every exercise against <b>your</b> body instead of one textbook number.</p>
     <ol class="steps"><li>Phone at hip height, 2–3 metres away. Whole body in view.</li><li>Side-on: stand still, rise onto your toes, 3 slow squats, reach overhead, 2 slow hinges.</li><li>Facing the camera: stand still, arms out and up, 2 slow squats. QK talks you through each step.</li></ol>
     <button class="cta" type="button" data-bm="start">Start (1 min)</button>
-    <div class="btn-row"><button class="ghost" type="button" data-bm="demo">Watch a demo</button><button class="ghost" type="button" data-bm="close">Not now</button></div>`);
+    <div class="btn-row">${DEMO ? '<button class="ghost" type="button" data-bm="demo">Watch a demo</button>' : ''}<button class="ghost" type="button" data-bm="close">Not now</button></div>`);
 }
 function startBodyMap(demo) { closeSheet(); $('#setup').hidden = true; startLive({ mode: 'bodymap', source: demo ? 'demo' : 'camera' }); }
 function renderBodyMapTile() {

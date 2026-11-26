@@ -18,6 +18,8 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
     if (!fs.existsSync(f)) return r.fulfill({ status: 404, body: '' });
     r.fulfill({ status: 200, body: fs.readFileSync(f), headers: { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' } });
   });
+  // Simulated demo lifters are hidden in the app; this switch turns them on for the test run only.
+  await ctx.addInitScript(() => { try { localStorage.setItem('qk_demo', '1'); } catch {} });
   const p = await ctx.newPage(); const errs = [];
   p.on('pageerror', e => errs.push(e.message)); p.on('console', m => m.type() === 'error' && !/favicon|fonts\.g/.test(m.text()) && errs.push(m.text()));
   // Centre an element before tapping it, so the fixed tab bar never covers it.
@@ -247,6 +249,28 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.waitForTimeout(2300);
   check('cyclic sighing: then the top-up breath', /Top up/.test(await p.textContent('#calmWord')), await p.textContent('#calmWord'));
   await p.click('#calmEnd'); await p.click('#cSave');
+
+  // Camera coach: one tap, QK recognises the exercise, coaches it, and follows a switch to another one.
+  // A simulated lifter stands in for the camera: curls with a body swing, then squats.
+  await p.goto('https://shred.local/'); await p.waitForTimeout(500);
+  check('camera coach: one big button at the top of Today', await p.isVisible('#camCoach'));
+  await p.evaluate(async () => {
+    const { frameAt } = await import('/tests/synth.mjs'); let t0 = null;
+    window.__qkFeed = now => { t0 ??= now; const t = (now - t0) / 1000;
+      return t < 9 ? frameAt('curl', t, { extra: (tt, k) => (tt > 3 && tt < 8 ? { t: -18 * Math.sin(Math.PI * k) } : {}) }) : frameAt('squat', t - 9); };
+  });
+  await tap('#camCoach');
+  check('camera coach: opens straight into the camera, looking for the exercise', await p.isVisible('#live') && /recognise/.test(await p.textContent('#detectTxt')));
+  await p.waitForFunction(() => /Biceps curls/.test(document.querySelector('#detectTxt').textContent), null, { timeout: 8000 }).catch(() => {});
+  check('camera coach: recognises curls within a rep or two', /Biceps curls/.test(await p.textContent('#detectTxt')), await p.textContent('#detectTxt'));
+  await p.waitForFunction(() => /Swinging your body/.test(document.querySelector('#faultBanner')?.textContent || ''), null, { timeout: 9000 }).catch(() => {});
+  check('camera coach: catches the body swing live ("Swinging your body")', /Swinging your body/.test(await p.textContent('#faultBanner')));
+  await p.waitForFunction(() => /Squats ✓/.test(document.querySelector('#detectTxt').textContent), null, { timeout: 12000 }).catch(() => {});
+  check('camera coach: follows the switch to squats', /Squats ✓/.test(await p.textContent('#detectTxt')) && /Squat/.test(await p.textContent('#liveEyebrow')));
+  await p.waitForTimeout(5000); await p.click('#endLive'); await p.waitForTimeout(600);
+  check('camera coach: both exercises saved', /Also saved this session: Dumbbell Curl \d+/.test(await p.textContent('#sCompare')) && +(await p.textContent('#sReps')) >= 1, (await p.textContent('#sCompare')).trim());
+  await p.click('#doneBtn');
+  await p.evaluate(() => { delete window.__qkFeed; });
 
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();
