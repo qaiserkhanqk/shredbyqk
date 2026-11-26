@@ -41,7 +41,7 @@ export const blank = (now = Date.now()) => ({ id: 'my-' + now.toString(36), name
 
 /** Finish a draft: tidy names, set days to the number of planned days. */
 export function finalize(draft) {
-  const plan = draft.plan.filter(d => d.items.length).map((d, i) => ({ ...d, name: d.name?.trim() || `Day ${i + 1}`, items: d.items.map(it => [it[0], +it[1], String(it[2]).trim(), +it[3] || 0, ...(it[4] ? [it[4]] : [])]) }));
+  const plan = draft.plan.filter(d => d.items.length).map((d, i) => ({ ...d, name: d.name?.trim() || `Day ${i + 1}`, items: d.items.map(it => [it[0], +it[1], String(it[2]).trim(), +it[3] || 0, ...(it[4] || it[5] ? [it[4] || ''] : []), ...(it[5] ? [it[5]] : [])]) }));
   return { ...draft, name: draft.name.trim(), plan, days: Math.min(7, +draft.daysPerWeek || plan.length), tagline: draft.tagline?.trim() || `${plan.length} day${plan.length > 1 ? 's' : ''}, built by you.` };
 }
 

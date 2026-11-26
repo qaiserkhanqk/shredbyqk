@@ -30,6 +30,7 @@ import * as classes from './classes.js';
 import { Cloud, pushAll } from './sync.js';
 import { PROGRAMS, scheme as progScheme, weeklySets, currentDay, byId as builtinById, GOALS, pickProgram, defaultDays } from './programs.js';
 import * as builder from './builder.js';
+import * as SS from './supersets.js';
 import { ExerciseDetector, PICK_LIST } from './detect.js';
 import { initCalm, renderCalm, startCalmNow } from './calm.js';
 import { WEIGHTED, lastLoad, weekSummary } from './share.js';
@@ -1300,7 +1301,8 @@ function renderPlan(rows) {
   const known = lifts.filter(r => r.rx), needW = lifts.some(r => r.change === 'new');
   $('#planTitle').textContent = known.length ? (newWeek ? 'New week. Your weights are set.' : 'Your weights are set') : needW ? 'Pick your starting weights' : `Today: ${programDay()?.day?.name || 'your workout'}`;
   $('#planSummary').textContent = (brief.summary(known) + (known.length ? ' Based on how your last session went. Just follow the numbers.' : needW ? ' Do your first set and QK plans every one after it.' : ' Tap Start workout and follow QK.')).trim();
-  $('#planRows').innerHTML = lifts.map(r => `<button type="button" class="plan-row ${r.change}" data-train="${r.id}"><b>${esc(r.name)}</b><span class="tgt">${esc(r.line)}</span><span class="why">${esc(r.why)}</span><span class="chg">${esc(r.tag || '')}</span>${platesFor(r)}</button>`).join('');
+  const dayItems = programDay()?.day?.items || [], lab = Object.fromEntries(SS.labels(dayItems).map((l, i) => [dayItems[i][0], l]));
+  $('#planRows').innerHTML = lifts.map(r => `<button type="button" class="plan-row ${r.change}" data-train="${r.id}"><b>${lab[r.id] ? `<span class="ss">${lab[r.id]}</span> ` : ''}${esc(r.name)}</b><span class="tgt">${esc(r.line)}</span><span class="why">${esc(r.why)}</span><span class="chg">${esc(r.tag || '')}</span>${platesFor(r)}</button>`).join('');
 }
 const platesFor = r => { const pl = r.rx && r.rx.cls?.startsWith('big') ? prog.plates(r.rx.kg, unit()) : null; return pl ? `<span class="plates">${esc(pl.text)}</span>` : ''; };
 // The plan, out loud: the weekly summary then each lift's target.
@@ -1320,7 +1322,14 @@ function plannedSets(k) {
   const row = planToday().find(r => r.id === k); if (row?.rx) return row.rx.sets;
   const it = todayItems().find(x => x[0] === k); return parseInt(it?.[1], 10) || 3;
 }
-const flowNextId = () => flow && flow.items.find(id => setsToday(id) < plannedSets(id));
+// The next exercise, following supersets and circuits (A1 → A2 → rest → A1 …).
+const flowStep = () => {
+  if (!flow) return null;
+  const items = programDay()?.day?.items || todayItems().map(([k, s]) => [k, parseInt(s, 10) || 3]);
+  const its = items.filter(it => flow.items.includes(it[0]));
+  return SS.nextUp(its, Object.fromEntries(its.map(it => [it[0], setsToday(it[0])])), Object.fromEntries(its.map(it => [it[0], plannedSets(it[0])])), exKey);
+};
+const flowNextId = () => flowStep()?.id;
 function startFlow() {
   flow = { items: todayItems().map(x => x[0]) };
   say(`Let's go. ${flow.items.length} exercises today. I'll take you through every set.`, { id: 'flow_start', priority: 'high' });
@@ -1344,7 +1353,9 @@ function nextInFlow(first) {
   openSetup(k);
 }
 function showFlowNext() {
-  const k = flowNextId(), box = $('#flowNext');
+  const st = flowStep(), k = st?.id, box = $('#flowNext');
+  // Superset partner next: a short switch-over instead of the full rest.
+  if (flow && st && !st.rest && k !== exKey) { stopRest(); restLeft = restTotal = 15; drawRest(); $('#restWhy').textContent = 'Superset: straight to the next exercise'; $('#restCard').hidden = false; $('#restBtn').click(); }
   if (!flow) { box.hidden = true; return; }
   box.hidden = false;
   if (!k) { $('#flowNextLine').textContent = 'That was the last set'; $('#flowNextSub').textContent = 'Tap Go now to finish. Everything is saved.'; return; }
@@ -1595,11 +1606,11 @@ function drawBuilder() {
   $('#bdDays').innerHTML = bd.plan.map((d, di) => `<div class="bd-day" data-day="${di}">
     <div class="bd-day-head"><input data-dname="${di}" value="${esc(d.name)}" aria-label="Day name"><button type="button" data-ddel="${di}" aria-label="Remove day" title="Remove day">✕</button></div>
     ${d.items.length ? '<div class="bd-cols"><span>Exercise</span><span>Sets</span><span>Reps</span><span>Rest s</span><span></span></div>' : ''}
-    ${d.items.map((it, ii) => `<div class="bd-item"><b>${esc(LIB[it[0]]?.name || it[0])}</b>
+    ${d.items.map((it, ii) => `<div class="bd-item"><b>${SS.labels(d.items)[ii] ? `<span class="ss">${SS.labels(d.items)[ii]}</span> ` : ''}${esc(LIB[it[0]]?.name || it[0])}</b>
       <input data-f="1" data-d="${di}" data-i="${ii}" value="${it[1]}" inputmode="numeric" aria-label="Sets">
       <input data-f="2" data-d="${di}" data-i="${ii}" value="${esc(it[2])}" aria-label="Reps">
       <input data-f="3" data-d="${di}" data-i="${ii}" value="${it[3]}" inputmode="numeric" aria-label="Rest seconds">
-      <span class="bd-btns"><button type="button" data-up="${di}:${ii}" aria-label="Move up">↑</button><button type="button" data-down="${di}:${ii}" aria-label="Move down">↓</button><button type="button" data-rm="${di}:${ii}" aria-label="Remove">✕</button></span></div>`).join('')}
+      <span class="bd-btns">${ii < d.items.length - 1 ? `<button type="button" data-link="${di}:${ii}" aria-label="Superset with the next exercise" title="Superset with the next exercise" class="${SS.groupOf(it) && SS.groupOf(it) === SS.groupOf(d.items[ii + 1]) ? 'on' : ''}">⛓</button>` : ''}<button type="button" data-up="${di}:${ii}" aria-label="Move up">↑</button><button type="button" data-down="${di}:${ii}" aria-label="Move down">↓</button><button type="button" data-rm="${di}:${ii}" aria-label="Remove">✕</button></span></div>`).join('')}
     <button class="ghost" type="button" data-add="${di}">+ Add exercise</button></div>`).join('');
 }
 $('#builder').addEventListener('input', () => { $('#bdErr').hidden = true; });
@@ -1610,8 +1621,9 @@ $('#bdDays').addEventListener('input', e => {
 });
 $('#bdDays').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  const [di, ii] = (b.dataset.up || b.dataset.down || b.dataset.rm || '').split(':').map(Number);
-  if (b.dataset.up) bd.plan[di].items = builder.move(bd.plan[di].items, ii, -1);
+  const [di, ii] = (b.dataset.up || b.dataset.down || b.dataset.rm || b.dataset.link || '').split(':').map(Number);
+  if (b.dataset.link) bd.plan[di].items = SS.toggleLink(bd.plan[di].items, ii);
+  else if (b.dataset.up) bd.plan[di].items = builder.move(bd.plan[di].items, ii, -1);
   else if (b.dataset.down) bd.plan[di].items = builder.move(bd.plan[di].items, ii, 1);
   else if (b.dataset.rm) bd.plan[di].items.splice(ii, 1);
   else if (b.dataset.ddel) { if (bd.plan.length > 1) bd.plan.splice(+b.dataset.ddel, 1); }
@@ -1672,7 +1684,7 @@ function showProgram(id) {
     <p style="margin:0">${esc(p.tagline)}</p>
     <p class="muted small" style="margin:0"><b>How it works:</b> ${esc(p.method)} QK picks your weights from how each session went.</p>
     <p class="data small" style="margin:0">${p.days} days a week · ${p.weeks} weeks · about ${Math.round(weeklySets(p))} working sets a week</p>
-    ${p.plan.map(dd => `<div class="prog-day"><h3>${esc(dd.name)} <span class="muted small">· ${esc(dd.focus)}</span></h3><ol>${dd.items.map(it => `<li>${esc(LIB[it[0]]?.name || it[0])} <span>${it[1]} × ${esc(it[2])}${it[3] ? ` · rest ${it[3] < 120 ? it[3] + ' s' : it[3] / 60 + ' min'}` : ''}</span>${it[4] ? `<br><span class="muted small">${esc(it[4])}</span>` : ''}</li>`).join('')}</ol></div>`).join('')}
+    ${p.plan.map(dd => { const lb = SS.labels(dd.items); return `<div class="prog-day"><h3>${esc(dd.name)} <span class="muted small">· ${esc(dd.focus)}</span></h3><ol>${dd.items.map((it, ix) => `<li>${lb[ix] ? `<span class="ss">${lb[ix]}</span> ` : ''}${esc(LIB[it[0]]?.name || it[0])} <span>${it[1]} × ${esc(it[2])}${it[3] ? ` · rest ${it[3] < 120 ? it[3] + ' s' : it[3] / 60 + ' min'}` : ''}</span>${it[4] ? `<br><span class="muted small">${esc(it[4])}</span>` : ''}</li>`).join('')}</ol></div>`; }).join('')}
     <div class="btn-row"><button class="ghost" type="button" data-progedit="${p.id}">${p.custom ? 'Edit' : 'Copy and edit'}</button>${p.custom && !on ? `<button class="ghost" type="button" data-progdel="${p.id}">Delete</button>` : ''}${on ? '<button class="ghost" type="button" data-progstop>Stop this program</button>' : ''}<button class="cta" type="button" data-progstart="${p.id}">${on ? 'Restart from day 1' : 'Start this program'}</button></div>`);
 }
 $('#progStrip').onclick = e => { const b = e.target.closest('[data-prog]'); if (b) showProgram(b.dataset.prog); };

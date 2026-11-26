@@ -333,6 +333,9 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.click('#bdResults [data-pick=benchPress]'); await p.click('#bdSearchClose'); await p.click('#bdSave'); await p.waitForTimeout(300);
   check('builder: a saved program opens ready to start', /QK Signature/.test(await p.textContent('#rsheetBody')) && await p.isVisible('[data-progstart]'));
   await p.click('[data-progstart]'); await p.waitForTimeout(300);
+  await go('train'); await tap('#progStrip [data-prog=powerPump]'); await p.waitForTimeout(150);
+  check('supersets: programs show A1/A2 pairs', /A1 Triceps Pushdown[\s\S]*A2 Hammer Curl/.test(await p.textContent('#rsheetBody')));
+  await p.evaluate(() => { document.querySelector('#rsheet').hidden = true; });
   check('builder: your program runs like any other', /On QK Signature/.test(await p.textContent('#progActive')), await p.textContent('#progActive'));
 
   // QK classes: start a HIIT class, QK runs it, the finisher is scored and saved.

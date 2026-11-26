@@ -663,6 +663,8 @@ a.ghost { text-decoration: none; text-align: center; display: inline-flex; align
 .bd-results button { text-align: left; display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
 .bd-results button span { font-size: .75rem; color: var(--muted); }
 .bd-results button.added { border-color: var(--good); }
+.ss { display: inline-block; font: 700 .7rem var(--f-data); color: var(--z3); background: var(--surface-2); border-radius: 6px; padding: 1px 5px; margin-right: 2px; }
+.bd-item .bd-btns button.on { color: var(--good); }
 .track-chip { position: absolute; top: 104px; left: 16px; display: inline-flex; align-items: center; gap: 7px; pointer-events: none;
   font: 600 .72rem var(--f-data); letter-spacing: .06em; text-transform: uppercase; color: rgba(236,241,236,.75);
   background: rgba(var(--scrim-rgb),.7); border: 1px solid var(--line); padding: 4px 9px; border-radius: 99px; }

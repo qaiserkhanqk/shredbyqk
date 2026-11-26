@@ -26,7 +26,7 @@ export const PROGRAMS = [
     plan: [
       d('Upper power', 'Heavy bench and rows', [['benchPress', 4, '4-6', 180], ['bentRow', 4, '4-6', 180], ['press', 3, '6-8', 120], ['pullUp', 3, '6-10', 120], ['skullCrusher', 3, '8-12', 75], ['barbellCurl', 3, '8-12', 75]]),
       d('Lower power', 'Heavy squats and pulls', [['squat', 4, '4-6', 180], ['deadlift', 3, '3-5', 210], ['legPress', 3, '8-12', 120], ['lyingLegCurl', 3, '10-12', 75], ['calfRaise', 4, '10-15', 60]]),
-      d('Upper pump', 'Volume for chest, back, arms', [['inclinePress', 4, '8-12', 90], ['cableRow', 4, '10-12', 90], ['dbShoulderPress', 3, '10-12', 90], ['cableFly', 3, '12-15', 60], ['lateralRaise', 4, '12-15', 45], ['pushdown', 3, '12-15', 45], ['hammerCurl', 3, '12-15', 45]]),
+      d('Upper pump', 'Volume for chest, back, arms', [['inclinePress', 4, '8-12', 90], ['cableRow', 4, '10-12', 90], ['dbShoulderPress', 3, '10-12', 90], ['cableFly', 3, '12-15', 60], ['lateralRaise', 4, '12-15', 45], ['pushdown', 3, '12-15', 45, '', 'A'], ['hammerCurl', 3, '12-15', 45, '', 'A']]),
       d('Lower pump', 'Volume for legs and glutes', [['hackSquat', 4, '8-12', 120], ['rdl', 3, '8-12', 120], ['bulgarian', 3, '10-12', 90], ['legExtension', 3, '12-15', 60], ['seatedLegCurl', 3, '12-15', 60], ['hipThrust', 3, '10-12', 90]]),
     ],
   },
@@ -35,7 +35,7 @@ export const PROGRAMS = [
     tagline: 'Five days, every muscle twice a week, 12–20 hard sets each.',
     method: 'Research-led hypertrophy: 10–20 weekly sets per muscle, 8–15 reps taken close to failure, each muscle trained twice a week.',
     plan: [
-      d('Push', 'Chest, shoulders, triceps', [['dbBench', 4, '8-12', 90], ['inclinePress', 3, '8-12', 90], ['dbShoulderPress', 3, '10-12', 90], ['cableFly', 3, '12-15', 60], ['lateralRaise', 4, '12-20', 45], ['ohExtension', 3, '10-15', 60]]),
+      d('Push', 'Chest, shoulders, triceps', [['dbBench', 4, '8-12', 90], ['inclinePress', 3, '8-12', 90], ['dbShoulderPress', 3, '10-12', 90], ['cableFly', 3, '12-15', 60], ['lateralRaise', 4, '12-20', 45, '', 'A'], ['ohExtension', 3, '10-15', 60, '', 'A']]),
       d('Pull', 'Back, rear delts, biceps', [['latPulldown', 4, '8-12', 90], ['chestRow', 4, '8-12', 90], ['dbRow', 3, '10-12', 75], ['rearDeltFly', 3, '12-20', 45], ['preacherCurl', 3, '10-12', 60], ['hammerCurl', 3, '12-15', 60]]),
       d('Legs', 'Quads, hamstrings, calves', [['hackSquat', 4, '8-12', 120], ['rdl', 4, '8-12', 120], ['legExtension', 3, '12-15', 60], ['lyingLegCurl', 3, '10-15', 60], ['seatedCalf', 4, '12-20', 45]]),
       d('Upper', 'Chest, back, arms', [['benchPress', 3, '6-10', 120], ['cableRow', 3, '10-12', 90], ['xMachineShoulderPress', 3, '10-12', 75], ['pecDeck', 3, '12-15', 60], ['cableCurl', 3, '12-15', 45], ['pushdown', 3, '12-15', 45]]),
