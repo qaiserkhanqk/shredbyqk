@@ -313,12 +313,18 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('programs: starting one shows it as active', /On Power & Pump/.test(await p.textContent('#progActive')), await p.textContent('#progActive'));
   await go('today');
   check("programs: day 1 is today's workout", /Barbell Bench Press[\s\S]*4×4-6/.test(await p.textContent('#todayList')));
+  check('workout length: Today shows how long the workout takes', /About \d+ min/.test(await p.textContent('#planMins')), await p.textContent('#planMins'));
+  await p.click('#planTime [data-cap="30"]'); await p.waitForTimeout(200);
+  check('short on time: 30 minutes trims accessories, keeps main lifts', /trimmed from/.test(await p.textContent('#planMins')) && /Main lifts stay/.test(await p.textContent('#planCut')) && /Barbell Bench Press/.test(await p.textContent('#todayList')), await p.textContent('#planCut'));
+  await p.click('#planTime [data-cap="30"]'); await p.waitForTimeout(150);
   check("QK's plan: today's lifts are listed with what to do", await p.isVisible('#qkPlan') && /Power & Pump · month 1 · week 1 of 4/.test(await p.textContent('#planEyebrow')) && /Barbell Bench Press/.test(await p.textContent('#planRows')), await p.textContent('#qkPlan'));
   await go('train'); await tap('[data-prog=powerPump]'); await p.click('[data-progstop]'); await p.waitForTimeout(200);
 
   // One-tap workout: Start workout opens the first exercise's setup with its target filled in.
   await p.goto('https://shred.local/'); await p.waitForTimeout(400);
   await p.$eval('#planStart', el => el.scrollIntoView({ block: 'center' })); await p.click('#planStart'); await p.waitForTimeout(300);
+  check('workout mode: offers warm-up drills picked for today first', /warm-up drills/.test(await p.textContent('#rsheetTitle')), await p.textContent('#rsheetTitle'));
+  await p.click('#drillSkip'); await p.waitForTimeout(300);
   check('workout mode: Start workout opens the next exercise to do (resumes if some sets are done)', await p.isVisible('#setup') && /set \d/.test(await p.textContent('#setupEyebrow')) && await p.isVisible('#rxBox'), await p.textContent('#setupEyebrow'));
   await p.evaluate(() => { document.querySelector('#setup').hidden = true; });
   // Training-day reminders: a calendar file for the planned days.
@@ -326,6 +332,24 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   const [icsDl] = await Promise.all([p.waitForEvent('download', { timeout: 4000 }).catch(() => null), p.click('#remindCal')]);
   const ics = icsDl ? fs.readFileSync(await icsDl.path(), 'utf8') : '';
   check('reminders: calendar file repeats on the training days', /RRULE:FREQ=WEEKLY;BYDAY=TU,FR,SA/.test(ics), ics.slice(0, 80));
+
+  // Workout builder: build a two-exercise program, save it, start it; day 1 becomes today's workout.
+  await p.goto('https://shred.local/'); await go('train'); await tap('#buildNew');
+  await p.fill('#bdName', 'QK Signature'); await p.click('[data-add="0"]'); await p.fill('#bdQ', 'bench press'); await p.waitForTimeout(150);
+  await p.click('#bdResults [data-pick=benchPress]'); await p.click('#bdSearchClose'); await p.click('#bdSave'); await p.waitForTimeout(300);
+  check('builder: a saved program opens ready to start', /QK Signature/.test(await p.textContent('#rsheetBody')) && await p.isVisible('[data-progstart]'));
+  await p.click('[data-progstart]'); await p.waitForTimeout(300);
+  await go('train'); await tap('#progStrip [data-prog=powerPump]'); await p.waitForTimeout(150);
+  check('supersets: programs show A1/A2 pairs', /A1 Triceps Pushdown[\s\S]*A2 Hammer Curl/.test(await p.textContent('#rsheetBody')));
+  await p.evaluate(() => { document.querySelector('#rsheet').hidden = true; });
+  check('builder: your program runs like any other', /On QK Signature/.test(await p.textContent('#progActive')), await p.textContent('#progActive'));
+
+  // Warm up, stretch & recover: today's drills and cool-down, plus recovery routines, run by QK.
+  await p.goto('https://shred.local/'); await go('train');
+  check('recover: drills, cool-down and 6 recovery routines on the Train tab', (await p.$$('#recoverStrip [data-routine]')).length === 8);
+  await tap('[data-routine=today-stretch]'); await p.waitForTimeout(3200);
+  check('recover: QK runs the cool-down stretch', await p.isVisible('#classPlayer') && /Hold/.test(await p.textContent('#cpKind')), await p.textContent('#cpKind'));
+  await p.click('#cpEnd'); await p.waitForTimeout(200);
 
   // QK classes: start a HIIT class, QK runs it, the finisher is scored and saved.
   await p.goto('https://shred.local/'); await go('train');

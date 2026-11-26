@@ -76,7 +76,7 @@ export function nextBlock(def, cur, { lib, avoid = [], compliance = 1, clean = 1
       // Single-session items (a run, a timed piece) keep one set; volume moves on the set-based work.
       if (volume === 'less' && !main && sets > 2) sets -= 1;
       if (volume === 'more' && main && sets > 1 && sets < 10) sets += 1;
-      return [id, sets, repsFor(orig[2], phase), orig[3], orig[4]].filter((x, k) => k < 4 || x);
+      return [id, sets, repsFor(orig[2], phase), orig[3], orig[4] || (orig[5] ? '' : undefined), orig[5]].filter((x, k) => k < 4 || x !== undefined);
     });
     return { ...day, items };
   });

@@ -49,6 +49,8 @@
       <button type="button" class="linkbtn" id="morningCheck">Add more detail</button>
     </div>
 
+    <button type="button" class="card recover-card" id="recoverCard" hidden><span class="eyebrow" id="recoverEyebrow">Recovery</span><b id="recoverTitle"></b><span class="muted small" id="recoverSub"></span></button>
+
     <div class="card next" id="nextCard">
       <span class="eyebrow" id="nextEyebrow"></span>
       <h2 class="display h2" id="nextTitle"></h2>
@@ -65,6 +67,8 @@
       <div class="card-head" style="margin:0"><div><span class="eyebrow" id="planEyebrow">QK's plan for today</span><h2 class="display h2" id="planTitle">Your weights are set</h2></div><button class="linkbtn" type="button" id="planListen" aria-label="Hear the plan"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Hear it</button></div>
       <div class="news" id="planNews" hidden><b id="newsTitle"></b><p class="muted small" id="newsNote"></p><ul id="newsList"></ul><button class="ghost" type="button" id="newsOk">Got it</button></div>
       <p class="muted small" style="margin:0" id="planSummary"></p>
+      <div class="time-cap" id="planTime"><span id="planMins"></span><span class="tc-btns">Short on time? <button type="button" data-cap="30">30</button><button type="button" data-cap="45">45</button><button type="button" data-cap="60">60</button> min</span></div>
+      <p class="muted small" style="margin:0" id="planCut" hidden></p>
       <div class="plan-rows" id="planRows"></div>
       <button class="cta" type="button" id="planStart"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Start workout</button>
     </div>
@@ -83,11 +87,14 @@
   <section class="screen" id="train">
     <div class="page-head"><div><span class="eyebrow">Form check</span><h1 class="display h1">What are we training?</h1></div></div>
     <button type="button" class="cam-start" id="camCoach2"><span class="cam-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5zM1 5h15v14H1z"/></svg></span><span><b>Just start moving</b><span>Open the camera and do your exercise. QK recognises it and corrects you live.</span></span></button>
+    <div class="prog-head"><span class="eyebrow">Warm up, stretch &amp; recover</span></div>
+    <div class="prog-strip" id="recoverStrip" role="list"></div>
     <div class="prog-head"><span class="eyebrow">At home · no gym needed</span></div>
     <div class="prog-strip" id="homeStrip" role="list"></div>
     <div class="prog-head"><span class="eyebrow">Classes · QK runs them, any time</span></div>
     <div class="prog-strip" id="classStrip" role="list"></div>
     <div class="prog-head"><span class="eyebrow">Programs</span><span class="muted small" id="progActive"></span></div>
+    <button class="ghost build-btn" type="button" id="buildNew">+ Build your own program</button>
     <div class="prog-strip" id="progStrip" role="list"></div>
     <label class="field"><span class="eyebrow">Search</span><input id="exSearch" type="search" placeholder="Search 84 exercises, e.g. row, squat, cable" autocomplete="off"></label>
     <div class="chips-scroll" id="muscleChips" role="group" aria-label="Filter by muscle"></div>
@@ -498,7 +505,7 @@
     <ol class="steps" id="setupSteps"></ol>
     <div class="fit-note" id="fitNote" hidden></div>
     <div class="rx" id="rxBox" hidden>
-      <div class="rx-main"><span class="eyebrow" id="rxEyebrow">QK's target today</span><b id="rxLine"></b><p class="plates" id="rxPlates" hidden></p><p class="muted small" id="rxWhy"></p></div>
+      <div class="rx-main"><span class="eyebrow" id="rxEyebrow">QK's target today</span><b id="rxLine"></b><p class="plates" id="rxPlates" hidden></p><p class="warm" id="rxWarm" hidden></p><p class="muted small" id="rxWhy"></p></div>
       <div class="rx-btns"><button class="ghost" type="button" id="rxEdit">Change</button><button class="ghost" type="button" id="swapBtn" hidden>Swap</button></div>
       <div class="rx-edit" id="rxEditWrap" hidden><label class="field"><span id="rxEditLbl">Weight</span><input id="rxKg" type="number" inputmode="decimal" step="0.5" min="0"></label><button class="ghost" type="button" id="rxSave">Save</button></div>
     </div>
@@ -711,6 +718,23 @@
 
 <div class="sheet-wrap" id="foodSheet" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-label="Food" id="foodSheetBody"></div>
+</div>
+
+<!-- Workout builder -->
+<div class="builder" id="builder" hidden>
+  <div class="bd-top"><button class="linkbtn" type="button" id="bdCancel">Cancel</button><b>Build a program</b><button class="linkbtn" type="button" id="bdSave">Save</button></div>
+  <div class="bd-body">
+    <label class="field">Program name<input id="bdName" placeholder="e.g. QK Summer Shred" maxlength="40"></label>
+    <label class="field">Short description (optional)<input id="bdTag" placeholder="What it's for, in one line" maxlength="90"></label>
+    <div id="bdDays"></div>
+    <button class="ghost" type="button" id="bdAddDay">+ Add a day</button>
+    <p class="cd-err" id="bdErr" hidden></p>
+  </div>
+  <div class="bd-search" id="bdSearch" hidden>
+    <div class="bd-top"><button class="linkbtn" type="button" id="bdSearchClose">Done</button><b id="bdSearchTitle">Add exercises</b><span></span></div>
+    <input id="bdQ" type="search" placeholder="Search: squat, dumbbell chest, glutes…" autocomplete="off">
+    <div class="bd-results" id="bdResults"></div>
+  </div>
 </div>
 
 <!-- Class player: a full-screen class QK runs by voice -->
