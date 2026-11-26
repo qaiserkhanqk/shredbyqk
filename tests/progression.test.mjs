@@ -37,7 +37,7 @@ n = P.nextFor(SQ, [...day('squat', 0, 80, 8, { target: 8 }), ...day('squat', 3, 
 check('one miss → same weight again', n.kg === 85 && n.action === 'same');
 const twoMiss = [...day('squat', 0, 80, 8, { target: 8 }), ...day('squat', 3, 85, [8, 7, 6], { target: 8 }), ...day('squat', 6, 85, [7, 6, 6], { target: 8 })];
 n = P.nextFor(SQ, twoMiss);
-check('two misses → back off 10% and rotate heavy/medium/light', n.action === 'reset' && n.kg === 85 && n.day === 'heavy' && n.reps === 5 && n.mode === 'wave' && /rotates/.test(n.why), JSON.stringify(n));
+check('two misses → back off 10% and rotate heavy/medium/light (starting on medium)', n.action === 'reset' && n.kg === 77.5 && n.day === 'medium' && n.reps === 8 && n.mode === 'wave' && /rotates/.test(n.why), JSON.stringify(n));
 // base 76.5 → round 77.5; heavy ×1.1 = 85.25 → 85
 
 // Wave: medium after heavy, weights from the base.

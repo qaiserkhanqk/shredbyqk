@@ -22,6 +22,7 @@ import { FormFX, drawDepthArc } from './fx.js';
 import { TrackHUD } from './hud.js';
 import * as rewards from './rewards.js';
 import * as prog from './progression.js';
+import * as brief from './brief.js';
 import { PROGRAMS, scheme as progScheme, weeklySets, currentDay, byId as programById } from './programs.js';
 import { ExerciseDetector, PICK_LIST } from './detect.js';
 import { initCalm, renderCalm, startCalmNow } from './calm.js';
@@ -157,9 +158,11 @@ function renderToday() {
 
   const p = S.plan || {};
   $('#sessionMeta').textContent = [p.time, p.place].filter(Boolean).join(' · ');
+  const plan = planToday(), tgt = Object.fromEntries(plan.map(r => [r.id, r]));
   $('#todayList').innerHTML = todayItems().map(([k, sets]) => `<button type="button" class="ex-row" data-train="${k}" style="width:100%;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;cursor:pointer;padding-inline:0"><span class="pic">${icon(iconKey(k))}</span>
     <div><b>${esc(LIB[k].name)}</b>${LIB[k].pattern ? '<span class="tag">QK checks your form</span>' : '<span class="tag" style="color:var(--z3)">QK coaches your tempo</span>'}</div>
-    <span class="sets">${sets}</span></button>`).join('');
+    <span class="sets">${tgt[k]?.rx ? esc(tgt[k].line) : sets}</span></button>`).join('');
+  renderPlan(plan);
 
   // Focus: the most frequent fault, and how often it's been clean recently.
   const tally = {};
@@ -593,10 +596,14 @@ let saidBreathSafety = false;
 const LOADED = ['squat', 'rdl', 'lunge', 'bench', 'press', 'row', 'vPull', 'hipThrust', 'dip'];
 function setupLine(ex) {
   if (ex.hold) return `${ex.name}. Get into position and hold.`;
+  const row = ex.libId ? brief.planRows([ex.libId], { lib: LIB, sets: S.sessions, unit: unit(), light: lightWeek(), schemeFor: programScheme })[0] : null;
+  let target = row?.rx ? ' ' + brief.spokenTarget(row, unit()) : '';
+  const wk = brief.weekOf(Date.now()), P = (S.prog ||= {});
+  if (target && P.briefWeek !== wk) { const sum = brief.summary(planToday().filter(r => r.rx)); if (sum) target = ` New week. ${sum}` + target; P.briefWeek = wk; persist(); }
   const tips = (TIPS[ex.patternKey] || []).map(t => t[0]).join(' ');
   const heavy = LOADED.includes(ex.patternKey);
   const safety = heavy && !saidBreathSafety ? (saidBreathSafety = true, ' ' + BREATHING.safety) : '';
-  return `${ex.name}. ${ex.setup} ${tips}${safety} ${heavy ? BREATHING.cue : 'Start when you\'re ready.'}`.replace(/\s+/g, ' ');
+  return `${ex.name}.${target} ${ex.setup} ${tips}${safety} ${heavy ? BREATHING.cue : 'Start when you\'re ready.'}`.replace(/\s+/g, ' ');
 }
 
 /* ---------- Camera coach: recognise the exercise, then coach it ---------- */
@@ -1259,6 +1266,28 @@ function renderStrength() {
 }
 $('#stLift').onchange = renderStrength;
 $('#stRange').onclick = e => { const b = e.target.closest('[data-r]'); if (!b) return; stRange = b.dataset.r; $('#stRange').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); renderStrength(); };
+
+/* ---------- QK's plan: every weight decided before the lifter asks ---------- */
+const planToday = () => brief.planRows(todayItems().map(x => x[0]), { lib: LIB, sets: S.sessions, unit: unit(), light: lightWeek(), schemeFor: programScheme });
+function renderPlan(rows) {
+  const lifts = rows.filter(r => r.change !== 'none'), card = $('#qkPlan');
+  if (!lifts.length) { card.hidden = true; return; }
+  card.hidden = false;
+  const p = activeProgram(), pw = brief.programWeek(S.program, p), newWeek = (S.prog?.briefWeek ?? -1) !== brief.weekOf(Date.now());
+  $('#planEyebrow').textContent = pw ? (pw.finished ? `${p.name} · complete` : `${p.name} · week ${pw.week} of ${pw.of}`) : 'QK\'s plan for today';
+  const known = lifts.filter(r => r.rx);
+  $('#planTitle').textContent = !known.length ? 'Pick your starting weights' : newWeek ? 'New week. Your weights are set.' : 'Your weights are set';
+  $('#planSummary').textContent = pw?.finished ? `You finished ${p.name}. Pick your next program on the Train tab, or keep going and QK keeps progressing you.`
+    : (brief.summary(known) + (known.length ? ' Based on how your last session went. Just follow the numbers.' : ' Do your first set and QK plans every one after it.')).trim();
+  $('#planRows').innerHTML = lifts.map(r => `<button type="button" class="plan-row ${r.change}" data-train="${r.id}"><b>${esc(r.name)}</b><span class="tgt">${esc(r.line)}</span><span class="why">${esc(r.why)}</span><span class="chg">${esc(r.tag || '')}</span></button>`).join('');
+}
+// The plan, out loud: the weekly summary then each lift's target.
+function planSpeech() {
+  const rows = planToday().filter(r => r.rx);
+  if (!rows.length) return '';
+  return `${brief.summary(rows)} ${rows.map(r => `${r.name}: ${brief.spokenTarget(r, unit()).replace(/^Today: /, '')}`).join(' ')}`;
+}
+$('#planListen').onclick = () => { const t = planSpeech(); if (t) say(t, { id: 'plan_' + Date.now(), priority: 'now' }); };
 
 /* ---------- Programs ---------- */
 // The program's rep target for an exercise on today's program day (feeds the progression engine).

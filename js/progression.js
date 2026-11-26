@@ -115,7 +115,7 @@ export function nextFor(item, sets, o = {}) {
     else {
       base = j.kg; reps = Math.min(R.hi, Math.max(R.lo, j.worst + 1)); action = 'reps';
       why = !j.cleanOk ? 'Same weight: tidy up the form before adding reps.' : j.grind ? `Same weight, aim for ${reps} reps: the last reps slowed down a lot.` : `Same weight, aim for ${reps} reps on every set.`;
-      if (!j.cleanOk) reps = Math.max(R.lo, j.worst);
+      if (!j.cleanOk) { reps = Math.max(R.lo, j.worst); action = 'same'; }
     }
     day = undefined;
   } else {
@@ -127,7 +127,7 @@ export function nextFor(item, sets, o = {}) {
     if (sc) { reps = sc.lo; nSets = sc.sets; }
     else if (mode === 'linear') { reps = LINEAR.reps; nSets = LINEAR.sets; }
     else {
-      day = lastDay ? ORDER[(ORDER.indexOf(lastDay) + 1) % 3] : 'heavy';
+      day = lastDay ? ORDER[(ORDER.indexOf(lastDay) + 1) % 3] : 'medium'; // start the wave on the medium day
       reps = WAVE[day].reps; nSets = WAVE[day].sets;
       if (sw) why = 'You stalled on steady jumps, so this lift now rotates heavy, medium and light days. ' + why;
     }
