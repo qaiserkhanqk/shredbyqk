@@ -10,6 +10,8 @@
 // Clients grow it with "Add a place" (stored on the phone now; send to a backend later so every
 // client sees places others added).
 import { DISH, DISHES, estimate } from './nutrition.js';
+import { near, typo } from './fuzzy.js';
+import { LOCAL_PLACES } from './places-local.js';
 
 const I = (name, dish, opts = {}, official = null) => ({ name, dish, opts, official });
 const R = { style: 'restaurant', styleKnown: true }, S = { style: 'shaadi', styleKnown: true };
@@ -106,7 +108,7 @@ export const PLACES = [
 const norm = s => String(s).toLowerCase().replace(/['’]/g, '').normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
 /** All places: the seed list plus the client's own. */
-export const allPlaces = (custom = []) => [...PLACES, ...custom.map(p => ({ ...p, type: p.type || 'Added by you', custom: true }))];
+export const allPlaces = (custom = []) => [...PLACES, ...LOCAL_PLACES, ...custom.map(p => ({ ...p, type: p.type || 'Added by you', custom: true }))];
 
 /** Nutrition for a menu item: the chain's official numbers if present, else the dish model. */
 export function itemNutrition(item) {
@@ -115,26 +117,34 @@ export function itemNutrition(item) {
   return estimate({ t: 'dish', id: item.dish }, item.opts);
 }
 
-/** Search places and their menus: "kfc zinger", "butt karahi", "gol gappay cart". */
-export function searchPlaces(q, custom = [], limit = 12) {
-  const words = norm(q).split(' ').filter(Boolean);
+/**
+ * Search places and their menus: "kfc zinger", "nagina burger", "butt karahi", "rawalpindi burger".
+ * Typo-tolerant ("nagina burgr", "cheezius", "kababjes"): words are matched by sound, not exact spelling.
+ * A word can hit the place's name, its city or area, or the item.
+ */
+export function searchPlaces(q, custom = [], limit = 12, myCity = '') {
+  const words = norm(q).split(' ').filter(w => w && !STOP.has(w));
   if (!words.length) return [];
   const out = [];
+  const hit = (w, list) => list.some(x => x === w || (w.length >= 3 && x.startsWith(w)) || near(w, x));
+  const named = (w, list) => list.some(x => typo(w, x));
   for (const p of allPlaces(custom)) {
-    const pn = norm(p.name);
-    const placeHit = words.filter(w => pn.includes(w));
+    const pw = norm(p.name).split(' '), cw = norm([p.city, p.area].filter(Boolean).join(' ')).split(' ').filter(Boolean);
+    const placeHit = words.filter(w => named(w, pw)), cityHit = words.filter(w => !placeHit.includes(w) && named(w, cw));
     for (const it of p.items || []) {
       if (!DISH[it.dish]) continue;
-      const hay = norm(it.name + ' ' + DISH[it.dish].name + ' ' + DISH[it.dish].alias);
-      const rest = words.filter(w => !pn.includes(w));
-      if (!placeHit.length && !rest.length) continue;
-      if (rest.every(w => hay.includes(w)) && (placeHit.length || rest.length)) {
-        out.push({ place: p, item: it, score: placeHit.length * 3 + rest.length * 2 - (placeHit.length && !rest.length ? 2 : 0) });
-      }
+      const iw0 = norm(it.name + ' ' + DISH[it.dish].name + ' ' + DISH[it.dish].alias).split(' '), iw = [...iw0, ...iw0.slice(1).map((x, i) => iw0[i] + x)]; // "bigmac" = "big mac"
+      const rest = words.filter(w => !placeHit.includes(w) && !cityHit.includes(w));
+      if (!placeHit.length && !cityHit.length && !rest.length) continue;
+      if (!rest.every(w => hit(w, iw))) continue;
+      if (!placeHit.length && !rest.length) continue; // a city alone isn't enough to list every item there
+      const exactName = placeHit.filter(w => pw.includes(w)).length;
+      out.push({ place: p, item: it, score: placeHit.length * 3 + exactName * 0.5 + cityHit.length * 2.5 + rest.length * 2 - (placeHit.length && !rest.length ? 0.5 : 0) + (p.custom ? 0.3 : 0) + (myCity && p.city === myCity ? 0.8 : 0) });
     }
   }
   return out.sort((a, b) => b.score - a.score).slice(0, limit);
 }
+const STOP = new Set(['the', 'from', 'at', 'se', 'ka', 'ki', 'ke', 'wala', 'wali', 'of', 'in', 'mein']);
 
 /** Closest dish models for a new menu item a client is adding ("chicken cheese burger" → burgers). */
 // Ranks by how many of the words match, so extra words ("cheese", "special") don't hide the right family.
