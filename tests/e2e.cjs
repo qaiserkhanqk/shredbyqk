@@ -330,6 +330,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   // QK classes: start a HIIT class, QK runs it, the finisher is scored and saved.
   await p.goto('https://shred.local/'); await go('train');
   check('classes: HIIT classes on the Train tab', (await p.$$('#classStrip [data-class]')).length >= 6);
+  check('home: an At home row with home programs and home sessions', (await p.$$('#homeStrip [data-prog]')).length >= 3 && (await p.$$('#homeStrip [data-class]')).length >= 5);
   await tap('[data-class=ignite20]'); await p.click('[data-classstart]'); await p.waitForTimeout(3200);
   check('classes: the player runs the warm-up', await p.isVisible('#classPlayer') && /Warm-up/.test(await p.textContent('#cpBlock')), await p.textContent('#cpBlock'));
   for (let i = 0; i < 80 && await p.isVisible('#classPlayer'); i++) { await p.click('#cpSkip'); await p.waitForTimeout(30); }
