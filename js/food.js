@@ -45,8 +45,8 @@ export function initFood(c) {
     if (e.target.id === 'fsGrams') { cur.opts.grams = Math.max(1, +e.target.value || 0); renderSheetResult(); }
   };
   const p = ctx.S.profile;
-  for (const [id, key] of [['#tWeight', 'weightKg'], ['#tAge', 'age'], ['#tGoal', 'goal'], ['#tActivity', 'activity']]) {
-    const el = $(id); if (p[key] != null) el.value = p[key];
+  for (const [id, key] of [['#tWeight', 'weightKg'], ['#tAge', 'age'], ['#tGoal', 'dietGoal'], ['#tActivity', 'activity']]) {
+    const el = $(id); el.value = key === 'dietGoal' ? N.dietGoal(p) : p[key] ?? el.value;
     el.onchange = () => { p[key] = el.value; ctx.persist(); renderFood(); };
   }
 }

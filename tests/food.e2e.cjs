@@ -32,6 +32,7 @@ const num = s => +String(s).replace(/[^\d]/g, '');
 
   await p.goto('https://shred.local/');
   await p.fill('#welcomeName', 'Sara'); await p.click('#welcomeBtn'); await p.click('[data-focus=train]');
+  await p.click('[data-goal=muscle]'); await p.click('[data-exp=trained]');
   await p.click('#obDays [data-day="1"]'); await p.click('#obDone');
   await p.click('.tabs [data-tab=progress]'); await p.click('#profileCard summary');
   await p.fill('#pHeight', '178'); await p.dispatchEvent('#pHeight', 'change');
@@ -42,7 +43,7 @@ const num = s => +String(s).replace(/[^\d]/g, '');
   await p.click('#foodTargets summary');
   await p.fill('#tWeight', '80'); await p.dispatchEvent('#tWeight', 'change');
   await p.fill('#tAge', '30'); await p.dispatchEvent('#tAge', 'change');
-  check('targets shown once weight, age and height are known', /of 2,740/.test(await p.textContent('#foodToday')), await p.textContent('#tSummary'));
+  check('targets shown once weight, age and height are known (sign-up goal: build muscle → +10%)', /of 3,010/.test(await p.textContent('#foodToday')), await p.textContent('#tSummary'));
 
   await p.fill('#foodSearch', 'karahi');
   check('search shows desi models first', /Desi model/.test(await p.textContent('#foodResults .row'))); await shot('1-search');

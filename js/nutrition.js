@@ -291,14 +291,20 @@ export function search(q, limit = 30) {
 // Mifflin-St Jeor resting energy (best of the common equations for non-obese adults; Frankenfield 2005),
 // times an activity factor, then a goal change. Protein 1.6–2.2 g/kg supports muscle while training
 // (Morton 2018; ISSN 2017); the higher end when cutting.
+// The food goal is its own setting. Until it's set, it follows the training goal chosen at sign-up.
+const GAIN_GOALS = ['muscle', 'powerbuild', 'strength', 'glutes'];
+export function dietGoal(p) {
+  if (['lose', 'maintain', 'gain'].includes(p.dietGoal)) return p.dietGoal;
+  return p.goal === 'lose' ? 'lose' : GAIN_GOALS.includes(p.goal) ? 'gain' : 'maintain';
+}
 export function targets(p) {
   const w = +p.weightKg, h = +p.heightCm, a = +p.age;
   if (!(w > 30 && h > 120 && a >= 14)) return null;
   const bmr = 10 * w + 6.25 * h - 5 * a + (p.sex === 'female' ? -161 : 5);
-  const act = { low: 1.375, mid: 1.55, high: 1.725 }[p.activity || 'mid'];
-  const goal = { lose: -0.2, maintain: 0, gain: 0.1 }[p.goal || 'maintain'];
+  const act = { low: 1.375, mid: 1.55, high: 1.725 }[p.activity] || 1.55;
+  const dg = dietGoal(p), goal = { lose: -0.2, maintain: 0, gain: 0.1 }[dg];
   const kcal = Math.round(bmr * act * (1 + goal) / 10) * 10;
-  const protein = Math.round(w * (p.goal === 'lose' ? 2.0 : 1.8));
+  const protein = Math.round(w * (dg === 'lose' ? 2.0 : 1.8));
   const fat = Math.round(kcal * 0.27 / 9);
   const carbs = Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4));
   return { kcal, protein, fat, carbs, bmr: Math.round(bmr) };

@@ -80,6 +80,8 @@ check('Mifflin-St Jeor BMR for 80 kg, 178 cm, 30 y male = 1,768', t.bmr === 1768
 check('maintenance ≈ BMR × 1.55', Math.abs(t.kcal - 1768 * 1.55) < 10);
 check('macros add up to the calorie target', Math.abs(t.protein * 4 + t.carbs * 4 + t.fat * 9 - t.kcal) < 15);
 check('cutting: −20% calories, more protein', (() => { const c = N.targets({ weightKg: 80, heightCm: 178, age: 30, sex: 'male', goal: 'lose' }); return c.kcal < t.kcal * 0.82 && c.protein > t.protein; })());
+check('sign-up goal "Build muscle" → eat to gain', N.dietGoal({ goal: 'muscle' }) === 'gain' && N.targets({ weightKg: 80, heightCm: 178, age: 30, goal: 'muscle' }).kcal > t.kcal);
+check('sign-up goal "Race HYROX" → maintain; food goal overrides it', N.dietGoal({ goal: 'hyrox' }) === 'maintain' && N.dietGoal({ goal: 'hyrox', dietGoal: 'lose' }) === 'lose');
 check('no weight → no target (never guess)', N.targets({ heightCm: 170, age: 30 }) === null);
 const day = N.dayTotals([{ at: Date.now(), kcal: 300, protein: 20, carbs: 10, fat: 15, low: 250, high: 350 }, { at: Date.now() - 2 * 86400000, kcal: 999, protein: 0, carbs: 0, fat: 0, low: 0, high: 0 }]);
 check('day totals only count today', day.kcal === 300 && day.items.length === 1);
