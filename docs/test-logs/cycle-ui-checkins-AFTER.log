@@ -1,0 +1,9 @@
+ok   in her range: "Has your period started?" with today / yesterday / 2 days ago / another day
+ok   "Yesterday" saves yesterday as the start (the real day, not today)
+ok   …and the check-in goes away
+ok   a gap of about two of her cycles: asks if she missed logging a period (does not assume)
+ok   "Yes": the question goes away and the long gap is no longer used as a cycle
+ok   Zara: "My period started" asks which day
+ok   …and saves the chosen day (2 days ago)
+ok   no JavaScript errors
+ALL PASS (8)

@@ -84,6 +84,23 @@ Flags live in `localStorage['shred_flags_v1']` because they are not health data.
 - **Optional symptoms.** Pain, energy, mood, cravings and sleep are each off until switched on, and each has a one-line explanation. Turning one off stops collection and asks whether to delete past entries. Mood is self-reported only; nothing is inferred from sensors.
 - **History.** You can see and edit periods, cycle lengths (marked as used or not used), and day logs per cycle, including the current one.
 
+## Period-start check-ins (`js/cycle/checkins.js`, always on with cycle tracking)
+- **Why:** logging quality decides accuracy. On the real Marquette data, recording starts 1–3 days late (the day she remembered, not the real day) raised the dates-only error:
+
+  | Starts recorded late | Average error |
+  |---|---|
+  | none | 2.21 days |
+  | 1 in 3 | 2.68 days |
+  | 2 in 3 | 2.99 days |
+
+- **"Has your period started?"** appears from the first day of her range.
+  - It offers the **real start day**: Today, Yesterday, 2 days ago, or another date. It never offers a day on or before her last start.
+  - It also offers "Spotting only" and "Not yet" ("Not yet" quiets it for the day).
+  - **If late:** it asks daily for 7 days after her range, then every 3 days. These are UI choices, not physiology, and the wording stays gentle.
+- **Zara's "My period started"** also asks which day.
+- **A possibly forgotten period:** if her latest gap is about two of her usual cycles (within max(3 days, her spread)), it **asks** whether she missed logging one. "Yes" stops that gap being used as one long cycle. It never assumes.
+- **Never automatic:** nothing is logged without her tap.
+
 ## Next-period estimate: the algorithm
 
 > **Since `dates-only-2.0.0` (2026-11-26, product owner's decision): calibrated range.**

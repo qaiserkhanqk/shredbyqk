@@ -167,7 +167,7 @@ function checkPeriod(s, start, end, ignoreId, todayStr) {
 
 /** Log the first day of a period (a confirmed start). */
 /** Where an entry came from. Every stored value is something the user typed or confirmed; predictions are never stored. */
-export const SOURCES = ['typed', 'suggestion', 'range_prompt', 'sensor_prompt', 'companion'];
+export const SOURCES = ['typed', 'suggestion', 'range_prompt', 'sensor_prompt', 'companion', 'checkin'];
 const src = v => (SOURCES.includes(v) ? v : 'typed');
 
 export function logPeriodStart(s, start, { today: t, at = new Date().toISOString(), source } = {}) {

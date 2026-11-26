@@ -14,6 +14,7 @@ import { clinicianSummary, summaryText, SUMMARY_MONTHS } from './summary.js';
 import { learningStage } from './learning.js';
 import { companionToday, answerCheckIn, dismissCompanion, setCompanionName, companionName } from './companion.js';
 import { adjustedEstimate, cardLines } from './adjust.js';
+import { periodCheckIn, answerPeriodCheckIn, missedLogQuestion, answerMissedLog } from './checkins.js';
 import * as PG from './pregnancy.js';
 import { midlifeObservations, SOURCES as MIDLIFE_SOURCES, INTRO as MIDLIFE_INTRO } from './midlife.js';
 import { comfortSuggestions, pendingComfortQuestions, logComfortTry, answerComfort, deleteComfort, ANSWERS, REVIEW_STATUS } from './comfort.js';
@@ -143,11 +144,15 @@ function promptsHTML(s, est, today) {
     <div class="btn-row">${p.kind === 'confirmStart' ? `<button class="ghost" type="button" data-act="confirmStart" data-date="${p.date}">Yes, it started</button><button class="ghost" type="button" data-act="wasSpotting" data-date="${p.date}">It was spotting</button>`
       : `<label class="field">Last day<input type="date" id="endFor-${esc(p.id)}" max="${today}" value="${today}"></label><button class="ghost" type="button" data-act="endPeriod" data-id="${esc(p.id)}">Save end</button>`}
     <button class="ghost" type="button" data-act="dismissPrompt" data-key="${esc(p.key)}">Not now</button></div></div>`);
-  const started = est.lastStart && est.rangeStart && est.lastStart >= addDays(est.rangeStart, -10);
-  if (!started && (est.inRange || est.beyondRange) && !s.promptsDismissed[`check:${today}`]) {
-    out.unshift(`<div class="card cy-ask" id="cyCheck"><b>Has your period started?</b><p class="muted small">${est.beyondRange ? 'Your usual range has passed. Cycles vary for many reasons. If you\'re worried, talk to a health professional.' : 'You\'re in your estimated range.'} Only you can tell us; a missing entry is never read as "no bleeding".</p>
-    <div class="btn-row"><button class="ghost" type="button" data-act="logStartToday">Yes, today</button><button class="ghost" type="button" data-act="spottingToday">Spotting only</button><button class="ghost" type="button" data-act="notYet">Not yet</button><button class="ghost" type="button" data-act="dismissPrompt" data-key="check:${today}">Ask later</button></div></div>`);
-  }
+  // Smarter period-start check-in (js/cycle/checkins.js): she says the REAL start day; nothing is logged for her.
+  const ci = periodCheckIn(s, today);
+  if (ci) out.unshift(`<div class="card cy-ask" id="cyCheck"><b>${esc(ci.title)}</b><p class="muted small">${esc(ci.text)} Only you can tell us; a missing entry is never read as "no bleeding".</p>
+    <div class="btn-row">${ci.options.filter(o => o.date).map(o => `<button class="ghost" type="button" data-act="logStartOn" data-date="${o.date}">${esc(o.label)}</button>`).join('')}</div>
+    <div class="btn-row"><label class="field">Another day<input type="date" id="cyCheckDate" min="${ci.pick.min}" max="${ci.pick.max}"></label><button class="ghost" type="button" data-act="logStartPicked">Save that day</button></div>
+    <div class="btn-row"><button class="ghost" type="button" data-act="spottingToday">Spotting only</button><button class="ghost" type="button" data-act="notYet">Not yet</button></div></div>`);
+  const mq = missedLogQuestion(s, today);
+  if (mq) out.push(`<div class="card cy-ask" id="cyMissed"><b>Did you miss logging a period?</b><p class="muted small">${esc(mq.text)} If yes, that gap won't be used as one long cycle in your estimate.</p>
+    <div class="btn-row"><button class="ghost" type="button" data-act="missedYes" data-id="${esc(mq.periodId)}">Yes, I missed one</button><button class="ghost" type="button" data-act="missedNo" data-id="${esc(mq.periodId)}">No, it was one long cycle</button></div></div>`);
   return out.join('');
 }
 
@@ -215,6 +220,7 @@ function companionHTML(s, today, est, f) {
   const cr = m.quick.find(q => q.id === 'cramps');
   return `<div class="card stack cy-companion" id="cyCompanion"><span class="eyebrow">${esc(m.from)} · check-in</span><b>${esc(m.title)}</b><p class="small">${esc(m.text)}</p>
     <div class="btn-row">${m.quick.map(q => `<button class="ghost" type="button" data-act="companionAnswer" data-ans="${esc(q.id)}">${esc(q.label)}</button>`).join('')}</div>
+    ${m.quick.some(q => q.id === 'periodStarted') ? `<div class="btn-row" id="cyCompanionStart" hidden><span class="small">Which day did it start?</span>${[['Today', 0], ['Yesterday', 1], ['2 days ago', 2]].map(([l, n]) => addDays(today, -n)).map((d, i) => d > (est.lastStart || '') ? `<button class="ghost" type="button" data-act="companionStartOn" data-date="${d}">${['Today', 'Yesterday', '2 days ago'][i]}</button>` : '').join('')}</div>` : ''}
     ${cr ? `<div class="btn-row" id="cyCompanionSev" hidden><span class="small">How strong?</span>${cr.severities.map(([v, l]) => `<button class="ghost" type="button" data-act="companionSeverity" data-sev="${v}">${esc(l)}</button>`).join('')}</div>` : ''}
     <div class="row"><details><summary class="linkbtn">Why am I seeing this?</summary><p class="muted small">${esc(m.why)} Wording awaiting clinician review.</p></details><button class="linkbtn" type="button" data-act="companionDismiss">Not now</button></div>
     <p class="muted small" id="cyCompanionPrivacy">${esc(m.privacy)}</p></div>`;
@@ -428,6 +434,11 @@ async function onClick(e) {
     consent: () => { if (!root.querySelector('#cyAgree')?.checked) return toast('Tick the box to agree first.'); act(s => M.giveConsent(s), 'Cycle tracking is on'); },
     logStart: () => act((s, t) => M.logPeriodStart(s, date(), { today: t }), 'Period start saved'),
     logStartToday: () => act((s, t) => M.logPeriodStart(s, t, { today: t }), 'Period start saved'),
+    logStartOn: () => act((s, t) => answerPeriodCheckIn(s, t, ds.date), 'Period start saved'),
+    logStartPicked: () => { const d = root.querySelector('#cyCheckDate')?.value; if (!d) return; return act((s, t) => answerPeriodCheckIn(s, t, d), 'Period start saved'); },
+    missedYes: () => act((s, t) => answerMissedLog(s, ds.id, true, { today: t }), 'Thanks. That gap won\'t be used as one cycle.'),
+    missedNo: () => act((s, t) => answerMissedLog(s, ds.id, false, { today: t }), 'Thanks, noted'),
+    companionStartOn: () => act((s, t) => answerCheckIn(s, t, 'periodStarted', { date: ds.date, today: t }), 'Period start saved'),
     confirmStart: () => act((s, t) => M.logPeriodStart(s, ds.date, { today: t }), 'Period start saved'),
     wasSpotting: () => act((s, t) => M.logDay(s, ds.date, { bleeding: 'spotting' }, { today: t }), 'Saved as spotting'),
     logEnd: () => act((s, t) => { const p = [...s.periods].reverse().find(x => x.start <= date()); if (!p) throw new M.CycleError('NOT_FOUND'); M.logPeriodEnd(s, p.id, date(), { today: t }); }, 'Period end saved'),
@@ -441,6 +452,7 @@ async function onClick(e) {
     eraseSit: () => act(s => M.eraseSituation(s, ds.key), 'Deleted'),
     companionAnswer: () => {
       if (ds.ans === 'cramps') { const sev = root.querySelector('#cyCompanionSev'); if (sev) sev.hidden = false; return; }
+      if (ds.ans === 'periodStarted') { const row = root.querySelector('#cyCompanionStart'); if (row) { row.hidden = false; return; } }
       if (ds.ans === 'other') { act((s, t) => answerCheckIn(s, t, 'other', { today: t })); root.querySelector('#cyLog')?.scrollIntoView?.({ block: 'start' }); return; }
       return act((s, t) => answerCheckIn(s, t, ds.ans, { today: t }), ds.ans === 'fine' ? 'Glad to hear it' : ds.ans === 'periodStarted' ? 'Period start saved' : 'Saved. Take care of yourself today.');
     },

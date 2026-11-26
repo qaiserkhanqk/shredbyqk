@@ -112,10 +112,15 @@ export function companionToday(s, today, { estimate = null, patternsOn = false, 
 }
 
 /** Her answer. Saves only what she chose; "fine" and "other" save no symptom. */
-export function answerCheckIn(s, today, answer, { severity, today: t = today, at = new Date().toISOString() } = {}) {
+export function answerCheckIn(s, today, answer, { severity, date, today: t = today, at = new Date().toISOString() } = {}) {
   if (!hasConsent(s)) throw new CycleError('NO_CONSENT');
   const q = QUICK[answer]; if (!q) throw new CycleError('INVALID_INPUT');
-  if (answer === 'periodStarted') logPeriodStart(s, today, { today: t, at, source: 'companion' });
+  if (answer === 'periodStarted') { // the real start day (checkins.js): today unless she picks an earlier day
+    const d = date || today, last = s.periods.map(p => p.start).filter(x => x <= t).sort().at(-1);
+    if (d > t) throw new CycleError('FUTURE_DATE');
+    if (last && d <= last) throw new CycleError('INVALID_DATE');
+    logPeriodStart(s, d, { today: t, at, source: 'companion' });
+  }
   else if (q.severities) { // cramps (pain) and the pregnancy symptoms: she chooses how strong
     const cat = q.category;
     if (!categoryOn(s, cat)) throw new CycleError('CATEGORY_OFF');
