@@ -4,6 +4,10 @@
 //
 //   ANTHROPIC_API_KEY=... node tools/food-vision-server.mjs          # Claude (default model claude-sonnet-5-5)
 //   OPENAI_API_KEY=...    node tools/food-vision-server.mjs          # OpenAI (set OPENAI_MODEL, default gpt-4o)
+//   GEMINI_API_KEY=...    node tools/food-vision-server.mjs          # Google Gemini (set GEMINI_MODEL, default gemini-2.5-flash)
+//   FOOD_AI=gemini …                                                  # pick one when several keys are set
+// Gemini has a free tier, but on it Google may use what you send to improve its products: fine for
+// testing, switch to a paid key before real clients upload meal photos.
 //   PORT=8787 ALLOW_ORIGIN=https://you.github.io node tools/food-vision-server.mjs
 //   FATSECRET_CLIENT_ID=... FATSECRET_CLIENT_SECRET=...   # optional: live fallback search, GET /food-search?q=
 //
@@ -18,8 +22,9 @@ import { parseFatSecret } from '../js/fatsecret.js';
 
 const PORT = +process.env.PORT || 8787;
 const ORIGIN = process.env.ALLOW_ORIGIN || '*';
-const PROVIDER = process.env.ANTHROPIC_API_KEY ? 'anthropic' : process.env.OPENAI_API_KEY ? 'openai' : null;
-const MODEL = PROVIDER === 'anthropic' ? (process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5') : (process.env.OPENAI_MODEL || 'gpt-4o');
+const KEYS = { anthropic: process.env.ANTHROPIC_API_KEY, openai: process.env.OPENAI_API_KEY, gemini: process.env.GEMINI_API_KEY };
+const PROVIDER = KEYS[process.env.FOOD_AI] ? process.env.FOOD_AI : ['anthropic', 'openai', 'gemini'].find(k => KEYS[k]) || null;
+const MODEL = { anthropic: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5', openai: process.env.OPENAI_MODEL || 'gpt-4o', gemini: process.env.GEMINI_MODEL || 'gemini-2.5-flash' }[PROVIDER];
 const cache = new Map(); // hash → samples
 
 const RULES = `For each separate food:
@@ -34,7 +39,14 @@ const RULES = `For each separate food:
 - meat_share (curries and rice with meat only, else "na"): "more" if mostly meat pieces, "less" if mostly gravy or rice, else "normal".
 - oil (cooked dishes only, else "na"): "oily" if a layer of oil (tarri) shows on top or pools at the edge, "less" if dry, else "normal".
 - confidence: 0 to 1, how sure you are of the dish.
-setting: "restaurant" for a restaurant, dhaba or wedding (karahi pans, foil, branded boxes, buffet), "home" for home, else "unsure".`;
+setting: "restaurant" for a restaurant, dhaba or wedding (karahi pans, foil, branded boxes, buffet), "home" for home, else "unsure".
+scene: "plate" if it's one person's meal; "shared" if it's a dish for several people (a whole karahi pan, a big platter, a
+  basket of naan for the table); "cooking_or_display" if food is being cooked or sold (pots on the stove, a stall's stack,
+  a sweet shop tray); "not_food" if there's no ready-to-eat food (raw meat, a kitchen, a machine).
+  For "shared", give servings for ONE person's share, not the whole dish.
+Include drinks and small bowls at the edges (lassi, raita, chutney is fine to skip).
+Chicken vs mutton/beef: look at the bones (long thin chicken bones vs thick mutton bones), the meat's colour and grain;
+  if unsure, put the other one as the alternative.`;
 
 const catalogueText = catalogue => `Catalogue (id: name, serving unit):\n${catalogue.map(c => `${c.id}: ${c.name} (${c.serving})`).join('\n')}`;
 
@@ -57,9 +69,10 @@ ${RULES}
 ${catalogueText(catalogue)}`;
 
 const schema = ids => ({
-  type: 'object', additionalProperties: false, required: ['items', 'setting'],
+  type: 'object', additionalProperties: false, required: ['items', 'setting', 'scene'],
   properties: {
     setting: { type: 'string', enum: ['home', 'restaurant', 'unsure'] },
+    scene: { type: 'string', enum: ['plate', 'shared', 'cooking_or_display', 'not_food'] },
     items: {
       type: 'array', items: {
         type: 'object', additionalProperties: false,
@@ -111,8 +124,36 @@ async function askOpenAI({ image, text, ids }) {
   return JSON.parse((await r.json()).choices[0].message.content);
 }
 
+// Gemini takes an OpenAPI-style schema: upper-case type names and no additionalProperties.
+export function toGeminiSchema(x) {
+  if (Array.isArray(x)) return x.map(toGeminiSchema);
+  if (!x || typeof x !== 'object') return x;
+  const out = {};
+  for (const [k, v] of Object.entries(x)) {
+    if (k === 'additionalProperties') continue;
+    out[k] = k === 'type' && typeof v === 'string' ? v.toUpperCase() : (k === 'enum' ? v : toGeminiSchema(v));
+  }
+  return out;
+}
+
+async function askGemini({ image, text, ids }) {
+  const parts = [{ text }];
+  if (image) { const [, mimeType, data] = image.match(/^data:(image\/[a-z]+);base64,(.+)$/) || []; parts.unshift({ inline_data: { mime_type: mimeType, data } }); }
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts }],
+      generationConfig: { responseMimeType: 'application/json', responseSchema: toGeminiSchema(schema(ids)) },
+    }),
+  });
+  if (!r.ok) throw new Error(`gemini ${r.status}: ${(await r.text()).slice(0, 300)}`);
+  const j = await r.json(), out = j.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('');
+  return out ? JSON.parse(out) : null;
+}
+
 async function ask(job, samples) {
-  const fn = PROVIDER === 'anthropic' ? askAnthropic : askOpenAI;
+  const fn = { anthropic: askAnthropic, openai: askOpenAI, gemini: askGemini }[PROVIDER];
   const n = Math.min(5, Math.max(1, samples | 0));
   const out = (await Promise.allSettled(Array.from({ length: n }, () => fn(job)))).filter(s => s.status === 'fulfilled' && s.value).map(s => s.value);
   if (!out.length) throw new Error('every request failed');
@@ -179,4 +220,4 @@ http.createServer(async (req, res) => {
     console.error(e.message);
     res.statusCode = 502; res.end(JSON.stringify({ error: e.message }));
   }
-}).listen(PORT, () => console.log(PROVIDER ? `Food vision on :${PORT} using ${PROVIDER} ${MODEL}` : 'Set ANTHROPIC_API_KEY or OPENAI_API_KEY first.'));
+}).listen(PORT, () => console.log(PROVIDER ? `Food vision on :${PORT} using ${PROVIDER} ${MODEL}` : 'Set GEMINI_API_KEY, ANTHROPIC_API_KEY or OPENAI_API_KEY first.'));

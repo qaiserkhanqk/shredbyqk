@@ -33,7 +33,7 @@ const half = v => Math.max(0.5, Math.round(v * 2) / 2);
 // A dish is kept when at least half the samples saw it. Order follows the first sample that saw it.
 export function consensus(samples) {
   const ok = (samples || []).filter(s => Array.isArray(s?.items));
-  if (!ok.length) return { items: [], setting: 'unsure', agreement: 0 };
+  if (!ok.length) return { items: [], setting: 'unsure', scene: 'plate', agreement: 0 };
   const need = Math.ceil(ok.length / 2), by = new Map();
   ok.forEach((s, si) => {
     const seen = new Set();
@@ -59,9 +59,10 @@ export function consensus(samples) {
     agree: g.servings.length / ok.length,
   }));
   const setting = mode(ok.map(s => s.setting || 'unsure'));
+  const scene = mode(ok.map(s => s.scene || 'plate'));
   // How much the samples agreed overall: shown to the user as "QK is sure" vs "please check".
   const agreement = items.length ? items.reduce((a, i) => a + i.agree, 0) / items.length : 0;
-  return { items, setting, agreement };
+  return { items, setting, scene, agreement };
 }
 
 // Downscale to JPEG and hash it, so the same photo always maps to the same cache entry.
@@ -133,4 +134,15 @@ export async function askText(text) {
   });
   if (!r.ok) throw new Error('server ' + r.status);
   return consensus((await r.json()).samples).items.filter(i => i.dish);
+}
+
+/**
+ * Should the app ask "Is all of this yours?" A web-photo test showed the real risk: a naan seller's stack
+ * logged as 15 naans (5,300 kcal), a whole karahi pan for a table as 4 servings. Ask when the model says
+ * the dish is shared, when one item is a big count or volume, or when the plate totals more than a big meal.
+ */
+export function needsShareCheck(scene, items, totalKcal) {
+  if (scene === 'shared') return true;
+  if (totalKcal > 1600) return true;
+  return items.some(i => (i.kind === 'bread' && i.servings > 4) || (['curry', 'rice'].includes(i.kind) && i.servings > 2.5) || i.servings > 6);
 }
