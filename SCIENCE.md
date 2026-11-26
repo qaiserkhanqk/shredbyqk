@@ -330,3 +330,42 @@ The full reasoning and the database comparison are in [docs/NUTRITION.md](docs/N
 | A 15-minute walk after the biggest meal when steps are low | Light walking after meals lowers the blood-sugar rise (Buffey et al. 2022, Sports Medicine) |
 
 Limits: the fat grams per dish are modelling assumptions until real plates are weighed. That is the most useful next step. Photo portions of curries are rough (±30%). Counted items (rotis, kebabs, samosas) are much better. Ingredient values are rounded USDA SR Legacy figures, and mutton uses goat meat.
+
+## Athletes (`js/athletes.js`, `js/library-athlete.js`)
+
+Sport → position/style → season phase. Each role's exercises come from a research brief (PubMed + reviews);
+the app shows an evidence note wherever studies are thin. No trials test position-specific gym programmes,
+so these are evidence-informed choices, not proven prescriptions.
+
+| Sport | Key evidence used |
+|---|---|
+| Cricket | Mixed (counter-rotating) fast-bowling actions are linked to lumbar stress injury (Elliott 2000, doi:10.1080/026404100446784; review doi:10.1136/bjsports-2012-091782). Injured bowlers: more thorax side-flexion at release, lower back-extensor endurance (Bayne, doi:10.1016/j.jsams.2015.02.011). Bowling-load spikes and <3.5 rest days between bowling days raise risk (doi:10.1136/bjsports-2013-092524; doi:10.1136/bjsm.2005.018515). Faster bowlers: more relative mid-thigh-pull force and jump height (doi:10.1123/ijspp.2021-0140). |
+| Football | FIFA 11+ (IRR 0.61, doi:10.1136/bjsports-2016-097066); Nordic programmes halve hamstring injuries (doi:10.1136/bjsports-2018-100045); Copenhagen adduction −41% groin problems (doi:10.1136/bjsports-2017-098937); ACL neuromuscular training (doi:10.1002/jor.24043); positional running demands (Bradley 2009, doi:10.1080/02640410802512775); 1 in-season session/week maintains strength (doi:10.1519/JSC.0b013e31822dcd96). |
+| Field hockey | Crouched dribbling raises lumbar load (doi:10.1080/15438627.2024.2309400); prevention borrowed from football (not yet tested in hockey). |
+| MMA / boxing | Lower-body power and relative strength relate to punch impact and level (doi:10.1519/JSC.0000000000001075; doi:10.1123/ijspp.2016-0373); MMA work:rest ~1:2–1:4 (doi:10.2466/05.25.PMS.112.2.639-648). Neck training may reduce head acceleration (doi:10.1136/bjsports-2024-108847) but is not proven to prevent concussion (doi:10.3390/jfmk6010008). No weight-cut protocols; extreme cuts need medical supervision (doi:10.1186/1550-2783-9-52). |
+| Padel / tennis / squash | OSTRC shoulder programme −28% (doi:10.1136/bjsports-2016-096226); external-rotation ratio and scapular dyskinesis predict tennis shoulder problems (doi:10.1177/23259671251351322); ankle balance training −35% re-sprains (doi:10.1136/bmj.b2684); squash: ~92% HRmax, one match drops knee-extensor strength 16% (doi:10.1519/R-20306.1; doi:10.1016/j.jsams.2008.11.002). Padel evidence is mostly surveys. |
+
+Phases: off-season 3 days (strength + power + prevention), pre-season 2 days (power, low reps), in-season 2 short
+maintenance days. Injury-prevention work runs in every phase.
+
+### Sports screens (`js/sportsbio.js`)
+
+Camera joint tracking used as biomechanics: 2D angles from one phone camera, no forces, so each screen is a
+screen and not a diagnosis.
+
+- **Bowling action (cricket).** Side-on: QK finds release (bowling hand at its highest above the shoulder) and
+  front-foot contact (front ankle reaching the ground in the 0.35 s before release), then classifies the
+  front knee from contact to release as braced, straightening (≥10° straighter), collapsing (≥10° more bent)
+  or flex-then-extend. A firmer front leg goes with faster ball release in fast bowlers (Worthington et al.
+  2013, doi:10.1123/jab.29.1.78; Wormgoor et al. 2010, doi:10.1080/02640411003774537). Trade-off: in adolescent
+  bowlers a more extended front knee also went with higher lumbar loads (Crewe et al. 2013,
+  doi:10.1080/02640414.2012.762601), so QK pairs a braced front leg with trunk and back work and does not push
+  a straighter knee on young bowlers without a coach. From behind: trunk side-bend at release; injured adolescent fast
+  bowlers averaged ~50° and uninjured ~40° (Bayne et al. 2016, doi:10.1016/j.jsams.2015.02.011), so >45°
+  is flagged for trunk work and a coach review. Normal 30 fps video is too slow for release timing, so QK
+  asks for slow motion (120–240 fps).
+- **Landing test.** Front-on drop landing from about 30 cm: peak knee frontal-plane projection angle in
+  the 0.3 s after landing for each leg. Inward knee motion on landing is a known ACL-injury risk factor:
+  in a prospective 3D study of 205 female athletes, those who later tore the ACL landed with ~8° more knee
+  abduction (Hewett et al. 2005, doi:10.1177/0363546504269591). QK's 2D angle is a simpler proxy for this. >10°
+  is flagged, and a left–right difference >5° is flagged for extra work on the weaker side.

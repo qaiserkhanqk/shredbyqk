@@ -96,7 +96,7 @@ export const SPORTS = [
   {
     id: 'boxing', name: 'Boxing', icon: '🥊',
     intro: 'Punch impact is strongly linked to lower-body power and upper-body explosive strength. Hand injuries are the most common upper-limb injury.',
-    protect: ['neckIso', 'eccWrist'],
+    protect: ['neckIso', 'eccWristExt'],
     roles: [
       role('out', 'Out-boxer', 'Highest punch volume and footwork: aerobic engine, springy calves, shoulder endurance.',
         { power: ['pogoJumps', 'yPlyoPushUp'], strength: ['bulgarian', 'calfRaise'], trunk: ['pallof'], protect: ['facePull', 'bandER'], condition: 'runIntervals' }),
@@ -111,7 +111,7 @@ export const SPORTS = [
   {
     id: 'padel', name: 'Padel', icon: '🎾',
     intro: 'Rallies last about 10–15 seconds. Elbow, shoulder and ankle are the most injured areas. Wear eye protection.',
-    protect: ['bandER', 'eccWrist', 'copenhagen'],
+    protect: ['bandER', 'eccWristExt', 'copenhagen'],
     roles: [
       role('left', 'Left side (revés)', 'More smashes, winners and accelerations; left-side players tend to be stronger.',
         { power: ['mbShotPut', 'skaterBounds'], strength: ['squat', 'nordic', 'bulgarian'], trunk: ['cableChop'], protect: ['pronYTW', 'platePinch'], condition: 'turn505' }),
@@ -124,7 +124,7 @@ export const SPORTS = [
   {
     id: 'tennis', name: 'Tennis', icon: '🎾',
     intro: 'Points last under 10 seconds with 3–5 times as much rest. The serve is the hardest stroke on the shoulder; a weak external-rotation ratio predicts shoulder problems.',
-    protect: ['bandER', 'pronYTW', 'eccWrist'],
+    protect: ['bandER', 'pronYTW', 'eccWristExt'],
     roles: [
       role('aggressive', 'Aggressive baseliner / serve-and-volley', 'More serves, overheads and hard braking.',
         { power: ['mbShotPut', 'yOverheadSlam', 'jumpSquat'], strength: ['trapBarDeadlift', 'bulgarian'], trunk: ['pallof'], protect: ['crossBody'], condition: 'runSprints' }),
@@ -137,7 +137,7 @@ export const SPORTS = [
   {
     id: 'squash', name: 'Squash', icon: '🎾',
     intro: 'The most demanding racket sport: about 92% of max heart rate and 70% of the match in play. One match drops thigh strength by 16%.',
-    protect: ['copenhagen', 'calfRaise', 'eccWrist'],
+    protect: ['copenhagen', 'calfRaise', 'eccWristExt'],
     roles: [
       role('attack', 'Attacking player', 'Shorter, explosive rallies: first step, change of direction, rotation.',
         { power: ['skaterBounds', 'mbShotPut'], strength: ['bulgarian', 'squat'], trunk: ['cableChop'], protect: ['bandER'], condition: 'turn505' }),
