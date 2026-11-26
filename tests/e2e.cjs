@@ -314,7 +314,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   // One-tap workout: Start workout opens the first exercise's setup with its target filled in.
   await p.goto('https://shred.local/'); await p.waitForTimeout(400);
   await p.$eval('#planStart', el => el.scrollIntoView({ block: 'center' })); await p.click('#planStart'); await p.waitForTimeout(300);
-  check('workout mode: Start workout opens exercise 1, ready to go', await p.isVisible('#setup') && /set 1/.test(await p.textContent('#setupEyebrow')) && await p.isVisible('#rxBox'), await p.textContent('#setupEyebrow'));
+  check('workout mode: Start workout opens the next exercise to do (resumes if some sets are done)', await p.isVisible('#setup') && /set \d/.test(await p.textContent('#setupEyebrow')) && await p.isVisible('#rxBox'), await p.textContent('#setupEyebrow'));
   await p.evaluate(() => { document.querySelector('#setup').hidden = true; });
   // Training-day reminders: a calendar file for the planned days.
   await go('progress'); await p.click('#planCard summary').catch(() => {});
