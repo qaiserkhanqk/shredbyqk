@@ -52,7 +52,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await go('progress'); await tap('#profileCard summary'); await p.fill('#pHeight', '178'); await p.press('#pHeight', 'Tab'); await go('today');
 
   // 1. Demo set through the real engine
-  await go('train'); await p.click('.ex-card.feature');
+  await go('train'); await tap('#exOpen'); await p.click('.ex-card.feature');
   check('setup: weight field shown for a barbell lift', await p.isVisible('#loadWrap'));
   await p.fill('#loadKg', '80'); await p.click('#startDemo');
   await p.waitForSelector('#summary:not([hidden])', { timeout: 60000 });
@@ -321,6 +321,23 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('programs: 10+ programs on the Train tab', (await p.$$('#progStrip [data-prog]')).length >= 10);
   await tap('[data-prog=powerPump]'); await p.click('[data-progstart=powerPump]'); await p.waitForTimeout(300);
   check('programs: starting one shows it as active', /On Power & Pump/.test(await p.textContent('#progActive')), await p.textContent('#progActive'));
+  // Train tab, program first: the hero shows the month, today's session and every session in order.
+  // This lifter already trains Tue/Fri/Sat, so the program starts on 3 days (re-packed from 4).
+  check('train: program hero with month, week, days a week and today\'s session', /Month 1 · week 1 of 4 · 3 days a week/.test(await p.textContent('#progHero')) && /about \d+ min/.test(await p.textContent('#progHero .hero-next')), await p.textContent('#progHero'));
+  check('train: all 3 sessions listed, the next one marked', (await p.$$('#progHero [data-pday]')).length === 3 && /Next/.test(await p.textContent('#progHero .hero-day.next')));
+  check('train: the active program leaves the switch list', !(await p.$('#progStrip [data-prog=powerPump]')));
+  await tap('#progHero [data-pday="1"]'); await p.waitForTimeout(150);
+  check('train: a session opens with its exercises', /session 2 of 3/.test(await p.textContent('#rsheetBody')) && (await p.$$('#rsheetBody .prog-day li')).length >= 4);
+  await p.evaluate(() => { document.querySelector('#rsheet').hidden = true; });
+  await p.click('#collChips [data-coll=muscle]'); await p.waitForTimeout(100);
+  check('train: collections filter (Build muscle: Mass Monster, Elite Physique)', /Mass Monster/.test(await p.textContent('#progStrip')) && /Elite Physique/.test(await p.textContent('#progStrip')) && !/Platform Prep/.test(await p.textContent('#progStrip')));
+  await p.click('#collChips [data-coll=all]');
+  check('train: single exercises start folded away', !(await p.isVisible('#exGrid')) && await p.isVisible('#exOpen'));
+  await tap('#exOpen'); await p.waitForTimeout(100);
+  check('train: "Browse all exercises" opens the library', await p.isVisible('#exGrid') && /exercises/.test(await p.textContent('#exCount')));
+  await tap('#heroStart'); await p.waitForTimeout(600);
+  check('train: Start workout runs the whole session (warm-up offer, then the sets)', /Before you lift/.test(await p.textContent('#rsheetBody')) || await p.isVisible('#setup') || await p.isVisible('#live'));
+  await p.evaluate(() => { document.querySelector('#rsheet').hidden = true; });
   await go('today');
   check("programs: day 1 is today's workout", /Barbell Bench Press[\s\S]*4×4-6/.test(await p.textContent('#todayList')));
   check('workout length: Today shows how long the workout takes', /About \d+ min/.test(await p.textContent('#planMins')), await p.textContent('#planMins'));
@@ -343,6 +360,33 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   const ics = icsDl ? fs.readFileSync(await icsDl.path(), 'utf8') : '';
   check('reminders: calendar file repeats on the training days', /RRULE:FREQ=WEEKLY;BYDAY=TU,FR,SA/.test(ics), ics.slice(0, 80));
 
+  // Days a week: pick 3, 4 or 5 on an adjustable program; QK re-packs it and judges the pattern itself.
+  await p.goto('https://shred.local/'); await go('train'); await tap('#progStrip [data-prog=massMonster]'); await p.waitForTimeout(150);
+  check('days: Mass Monster starts on the 3 days this lifter already trains, with a 3/4/5 choice', (await p.$$('#rsheetBody [data-pdays]')).length === 3 && /3 days a week/.test(await p.textContent('#rsheetBody .data')), await p.textContent('#rsheetBody .data'));
+  await p.click('[data-pdays="5"]'); await p.waitForTimeout(150);
+  check('days: 5 days gives 5 sessions', (await p.$$('#rsheetBody .prog-day')).length === 5 && /5 days a week/.test(await p.textContent('#rsheetBody .data')));
+  await p.click('[data-pdays="3"]'); await p.waitForTimeout(150);
+  check('days: 3 days re-packs into 3 sessions, same weekly sets', (await p.$$('#rsheetBody .prog-day')).length === 3 && /same weekly sets/.test(await p.textContent('#daysWhy')));
+  await p.click('[data-progstart=massMonster]'); await p.waitForTimeout(300);
+  check('days: started on 3 days', /3 days a week/.test(await p.textContent('#progHero .eyebrow')) && (await p.$$('#progHero [data-pday]')).length === 3);
+  check('days: circuits keep their own days (no choice on Shred Circuit)', await (async () => { await tap('#progStrip [data-prog=shredCircuit]'); await p.waitForTimeout(100); const n = (await p.$$('#rsheetBody [data-pdays]')).length; await p.evaluate(() => { document.querySelector('#rsheet').hidden = true; }); return n === 0; })());
+  // Three full weeks of 3 sessions on a 5-day plan: QK moves to 3 days, says why, and can be undone.
+  await p.evaluate(() => {
+    const S = JSON.parse(localStorage.getItem('shred_qk_v1')), DAY = 864e5, mon = new Date(); mon.setHours(10, 0, 0, 0); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
+    const log = []; for (let w = 4; w >= 1; w--) for (const k of (w === 4 ? [0, 1, 2, 3, 4] : [0, 2, 4])) log.push({ day: log.length % 5, at: mon.getTime() - w * 7 * DAY + k * DAY });
+    Object.assign(S.program, { days: 5, start: mon.getTime() - 5 * 7 * DAY, daysSince: undefined, restartAt: 0, log, daysNote: undefined, daysHold: 0 });
+    localStorage.setItem('shred_qk_v1', JSON.stringify(S));
+  });
+  await p.reload(); await p.waitForTimeout(600);
+  check('days: QK spots 3 sessions a week for 3 weeks and moves to 3 days, saying why', await p.isVisible('#daysNews') && /3, 3, 3 days the last 3 weeks/.test(await p.textContent('#daysNews')), await p.textContent('#daysNews'));
+  await go('train');
+  check('days: the program now has 3 sessions', /3 days a week/.test(await p.textContent('#progHero .eyebrow')) && (await p.$$('#progHero [data-pday]')).length === 3);
+  await tap('#progHero [data-daysundo]'); await p.waitForTimeout(200);
+  check('days: one tap keeps 5 days', /5 days a week/.test(await p.textContent('#progHero .eyebrow')) && !(await p.isVisible('#heroDaysNews')));
+  await p.reload(); await p.waitForTimeout(500); await go('train');
+  check('days: after keeping 5, QK does not change it again straight away', /5 days a week/.test(await p.textContent('#progHero .eyebrow')) && !(await p.isVisible('#daysNews')));
+  await tap('#progHero [data-prog]'); await p.click('[data-progstop]'); await p.waitForTimeout(200);
+
   // Workout builder: build a two-exercise program, save it, start it; day 1 becomes today's workout.
   await p.goto('https://shred.local/'); await go('train'); await tap('#buildNew');
   await p.fill('#bdName', 'QK Signature'); await p.click('[data-add="0"]'); await p.fill('#bdQ', 'bench press'); await p.waitForTimeout(150);
@@ -361,11 +405,11 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('athletes: mixed-action fast bowler programme, with the back-injury warning', /Fast bowler: mixed action/.test(await p.textContent('#rsheetBody')) && /lumbar stress/.test(await p.textContent('#rsheetBody')) && /Trap-Bar Deadlift/.test(await p.textContent('#rsheetBody')));
   await p.click('[data-progstart]'); await p.waitForTimeout(200);
   check('athletes: it runs like any programme', /On Cricket/.test(await p.textContent('#athleteSub')), await p.textContent('#athleteSub'));
-  await tap('#progStrip [data-prog]'); await p.waitForTimeout(200);
+  await tap('#progHero [data-prog]'); await p.waitForTimeout(200);
   check('athletes: fast bowler sheet links the bowling check', await p.isVisible('#rsheetBody [data-screen=bowl]'));
   await p.click('#rsheetBody [data-screen=bowl]'); await p.waitForTimeout(300);
   check('athletes: link opens the bowling check', await p.isVisible('[data-panel=bowl]'));
-  await go('train'); await tap('#progStrip [data-prog]'); await p.click('[data-progstop]'); await p.waitForTimeout(200);
+  await go('train'); await tap('#progHero [data-prog]'); await p.click('[data-progstop]'); await p.waitForTimeout(200);
 
   // Warm up, stretch & recover: today's drills and cool-down, plus recovery routines, run by QK.
   await p.goto('https://shred.local/'); await go('train');
