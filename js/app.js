@@ -15,7 +15,7 @@ import { ROM_TESTS, runRomTest } from './rom.js';
 import { readiness, recommendToday, sessionLoad, weekStats, loadSpike, dayKey } from './load.js';
 import { cueList, saveClip, getClip, deleteClip, listClipIds, startRecording, exportClips } from './studio.js';
 import { SessionRecorder, ErrorLog, downloadJSON, APP_VERSION } from './diagnostics.js';
-import { LIBRARY, LIB, MUSCLES, exFor } from './library.js';
+import { LIBRARY, LIB, MUSCLES, KINDS, exFor } from './library.js';
 import { HipThrustDemo, SquatDemo, BenchDemo, WalkDemo, BodyMapDemo, BODYMAP_SECS, BODYMAP_DEMO_STEPS, DEMO_W, DEMO_H } from './demo.js';
 import { analyseBodyMap, personalFor, explainBodyMap, fitLines } from './bodymap.js';
 import { FormFX, drawDepthArc } from './fx.js';
@@ -242,19 +242,36 @@ const WATCH = { squat: 'Depth, chest, knees', hipThrust: 'Foot position, lockout
   calf: 'Full height, pause', torsoCurl: 'Full crunch', legRaise: 'Leg height', kneeExt: 'Full squeeze', kneeFlex: 'Full curl, full stretch', plank: 'Hip height, time held' };
 const PATTERN_ICON = { bench: 'pushUp', dip: 'press', fly: 'press', row: 'rdl', vPull: 'press', triExt: 'curl', raise: 'press', calf: 'lunge', torsoCurl: 'pushUp', legRaise: 'pushUp', kneeExt: 'squat', kneeFlex: 'lunge', plank: 'pushUp' };
 const iconKey = id => { const p = LIB[id]?.pattern; return p ? (ICONS[p] ? p : PATTERN_ICON[p]) : 'band'; };
+// How QK coaches an exercise the camera can't judge. Each mode has a label for the card, a setup title
+// and a line saying what QK will do.
+const mmss = sec => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+const coachOf = x => x.coach && x.coach !== 'camera' ? x.coach : x.hold ? 'hold' : 'tempo';
+const COACH = {
+  tempo: { pill: 'Tempo coach', title: 'QK coaches your tempo', how: () => 'QK calls out a controlled tempo: three seconds down, a pause, then up.' },
+  hold: { pill: 'Hold timer', title: 'QK times your hold', how: x => `QK times a ${x.hold}-second hold and counts you down.` },
+  explosive: { pill: 'Rep pacer', title: 'QK paces your reps', how: x => `${x.reps || 6} reps. QK says "Set" and "Go" for each one, with ${x.gap || 5} seconds to reset in between.` },
+  mobility: { pill: 'Rep pacer', title: 'QK paces your reps', how: x => `${x.reps || 10} slow reps. QK counts them with you.` },
+  timer: { pill: 'Timer', title: 'QK times your session', how: x => `${x.mins || 20} minutes. QK tells you the time left as you go.` },
+  intervals: { pill: 'Intervals', title: 'QK runs your intervals', how: x => `${x.rounds} rounds of ${mmss(x.work)} work and ${mmss(x.rest)} rest. QK calls "Go" and "Rest" for you.` },
+  stopwatch: { pill: 'Stopwatch', title: 'QK times you', how: () => 'Tap End when you finish. QK saves your time so you can see your progress.' },
+};
+COACH.tempo.note = COACH.hold.note = 'A camera can\'t judge this movement reliably, so there\'s no form score. QK still coaches every rep with you.';
+
 let muscleFilter = 'All', searchQ = '';
 function renderTrain() {
-  $('#muscleChips').innerHTML = ['All', ...MUSCLES, 'Rehab'].map(m => `<button type="button" class="mchip ${m === muscleFilter ? 'on' : ''}" data-muscle="${m}" aria-pressed="${m === muscleFilter}">${m}</button>`).join('');
+  $('#muscleChips').innerHTML = ['All', ...Object.keys(KINDS), ...MUSCLES, 'Rehab'].map(m => `<button type="button" class="mchip ${m === muscleFilter ? 'on' : ''}" data-muscle="${m}" aria-pressed="${m === muscleFilter}">${m}</button>`).join('');
   const q = searchQ.trim().toLowerCase();
   // Physio exercises live under their own Rehab filter so they don't clutter the gym library.
-  const list = LIBRARY.filter(x => (muscleFilter === 'Rehab' ? x.rehab : !x.rehab && (muscleFilter === 'All' || x.muscles.includes(muscleFilter))) && (!q || `${x.name} ${x.muscles.join(' ')} ${x.equipment}`.toLowerCase().includes(q)));
+  const kind = KINDS[muscleFilter];
+  const list = LIBRARY.filter(x => (muscleFilter === 'Rehab' ? x.rehab : !x.rehab && (muscleFilter === 'All' || (kind ? x.kind === kind : x.muscles.includes(muscleFilter)))) && (!q || `${x.name} ${x.muscles.join(' ')} ${x.equipment}`.toLowerCase().includes(q)));
   const cam = list.filter(x => x.pattern).length;
+  $('#exSearch').placeholder = `Search ${LIBRARY.filter(x => !x.rehab).length} exercises, e.g. row, box jump, sled`;
   $('#exCount').textContent = `${list.length} exercise${list.length === 1 ? '' : 's'} · ${cam} with camera form check`;
   $('#exGrid').innerHTML = list.map(x => x.id === 'hipThrust' && muscleFilter === 'All' && !q
     ? `<button type="button" class="ex-card feature" data-train="${x.id}"><div><span class="eyebrow" style="color:var(--z1)">Live form check</span><h2 class="display h2" style="margin:8px 0 6px">${x.name}</h2><span class="watch">QK watches: ${WATCH[x.pattern]}</span></div>${icon('hipThrust', 'fig')}</button>`
     : `<button type="button" class="ex-card" data-train="${x.id}">${icon(iconKey(x.id), 'fig')}<b>${esc(x.name)}</b>
         <span class="watch">${esc(x.muscles.slice(0, 2).join(' · '))} · ${esc(x.equipment)}</span>
-        <span class="meta">${x.pattern ? '<span class="pill cam">Form check</span>' : '<span class="pill voice">Tempo coach</span>'}</span></button>`).join('') || '<p class="empty">No exercises match. Try another word.</p>';
+        <span class="meta">${x.pattern ? '<span class="pill cam">Form check</span>' : `<span class="pill voice">${COACH[coachOf(x)].pill}</span>`}</span></button>`).join('') || '<p class="empty">No exercises match. Try another word.</p>';
 }
 $('#muscleChips').onclick = e => { const b = e.target.closest('[data-muscle]'); if (!b) return; muscleFilter = b.dataset.muscle; renderTrain(); };
 $('#exSearch').oninput = e => { searchQ = e.target.value; renderTrain(); };
@@ -271,11 +288,13 @@ function openSetup(k) {
     $('#setupTitle').textContent = 'Set up your phone';
     $('#setupSteps').innerHTML = [ex.setup, 'Shoulders, hips, knees and feet all in frame, with good light.', 'Turn your sound up. QK talks you through the set.'].map(s => `<li>${esc(s)}</li>`).join('');
   } else {
-    $('#setupTitle').textContent = 'QK coaches your tempo';
-    $('#setupSteps').innerHTML = [item.guide, item.hold ? `QK times a ${item.hold}-second hold and counts you down.` : 'QK calls out a controlled tempo: three seconds down, a pause, then up.', 'A camera can\'t judge this movement reliably, so there\'s no form score. QK still counts every rep with you.'].map(s => `<li>${esc(s)}</li>`).join('');
+    const c = COACH[coachOf(item)];
+    $('#setupTitle').textContent = c.title;
+    $('#setupSteps').innerHTML = [item.guide, c.how(item), ...(c.note ? [c.note] : [])].map(s => `<li>${esc(s)}</li>`).join('');
   }
   $('#startCam').hidden = !ex; $('#videoFile').parentElement.hidden = !ex; $('#recordChk').parentElement.hidden = !ex;
   $('#startGuided').hidden = !!ex;
+  $('#formTestBtn').hidden = !item.formTest;
   $('#startDemo').hidden = !DEMO || !['hipThrust', 'squat', 'benchPress'].includes(k);
   const fit = !!ex, mapped = S.profile.body?.ok, lines = mapped && ex ? fitLines(ex.patternKey, S.profile.body) : [];
   $('#fitNote').hidden = !fit; $('#fitNote').classList.toggle('on', !!mapped);
@@ -292,6 +311,7 @@ $('#setup').onclick = e => { if (e.target.id === 'setup') $('#setup').hidden = t
 $('#startCam').onclick = () => startLive({ mode: 'form', source: 'camera' });
 $('#startDemo').onclick = () => startLive({ mode: 'form', source: 'demo' });
 $('#startGuided').onclick = () => startGuided();
+$('#formTestBtn').onclick = () => { $('#setup').hidden = true; gaitMode = 'run'; startLive({ mode: 'gait', source: 'camera' }); };
 $('#videoFile').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) startLive({ mode: 'form', source: 'file', file: f }); };
 
 /* ---------- Live session (form check + gait capture) ---------- */
@@ -722,21 +742,23 @@ $('#restBtn').onclick = () => {
 // Used where a phone camera can't judge the movement. QK paces a controlled tempo
 // (3 s lowering, 1 s pause, 1 s lifting) or times a hold — no form score is invented.
 function startGuided() {
-  const item = LIB[exKey], target = item.hold || 10;
+  const item = LIB[exKey], mode = coachOf(item);
+  const target = mode === 'hold' ? item.hold || 10 : mode === 'timer' ? (item.mins || 20) * 60 : mode === 'intervals' ? item.rounds : mode === 'stopwatch' ? 0 : item.reps || 10;
   $('#setup').hidden = true; $('#summary').hidden = true; $('#live').hidden = false;
-  live = { mode: 'guided', source: 'voice', done: false, reps: 0, timers: [], target };
-  $('#formMeters').hidden = true; $('#gaitMeters').hidden = true; $('#repBig').hidden = false; $('#cueHint').hidden = true;
+  live = { mode: 'guided', coach: mode, source: 'voice', done: false, reps: 0, secs: 0, timers: [], target };
+  $('#formMeters').hidden = true; $('#gaitMeters').hidden = true; $('#repBig').hidden = false; $('#cueHint').hidden = true; $('#detectChip').hidden = true;
   $('#flipCam').hidden = true; $('#readout').innerHTML = ''; $('#status').textContent = ''; $('#recBadge').hidden = true;
   $('#video').hidden = true; const c = $('#overlay'); c.getContext('2d').clearRect(0, 0, c.width, c.height);
   $('#tempoRing').hidden = false; $('#tempoWord').textContent = 'Get set';
-  $('#repNum').textContent = item.hold ? target : 0; $('#repLbl').textContent = item.hold ? 'seconds left' : `of ${target} reps`;
-  $('#liveEyebrow').textContent = item.name; $('#liveTitle').textContent = item.hold ? `${target}-second hold · tempo coach` : `Target ${target} · tempo coach`;
-  $('#endLive').textContent = 'End set';
+  $('#liveEyebrow').textContent = item.name; $('#liveTitle').textContent = COACH[mode].title;
+  $('#endLive').textContent = mode === 'stopwatch' ? 'Finish' : 'End';
   say(`${item.name}. ${item.guide}`, { id: 'guide_' + Date.now(), priority: 'high' });
   const T = (fn, ms) => live.timers.push(setTimeout(() => { if (live && !live.done) fn(); }, ms));
   const word = w => { $('#tempoWord').textContent = w; };
-  if (item.hold) {
-    let left = target;
+  const big = (v, lbl) => { $('#repNum').textContent = v; $('#repLbl').textContent = lbl; };
+
+  if (mode === 'hold') {
+    let left = target; big(target, 'seconds left');
     T(function tick() {
       if (left === target) { word('Hold'); say('Go. Hold it.', { id: 'hold_go', priority: 'high' }); }
       $('#repNum').textContent = left; live.reps = target - left;
@@ -746,7 +768,60 @@ function startGuided() {
       if (left === 0) { live.reps = target; return endGuided(); }
       left--; T(tick, 1000);
     }, 5000);
+  } else if (mode === 'timer') {
+    // A session timer: time left on screen, a voice update every 5 minutes and for the last minute.
+    let left = target; big(mmss(left), 'left');
+    T(function tick() {
+      if (left === target) { word('Go'); say('Go. Settle into your pace.', { id: 'timer_go', priority: 'high' }); }
+      $('#repNum').textContent = mmss(left); live.secs = target - left;
+      const m = left / 60;
+      if (left !== target && left % 300 === 0 && left > 60) say(`${m} minutes left.`, { id: 'timer_' + left, priority: 'high' });
+      if (left === Math.floor(target / 2) && target >= 600) say('Halfway.', { id: 'timer_half', priority: 'high' });
+      if (left === 60) say('Last minute.', { id: 'timer_60', priority: 'high' });
+      if (left === 0) { live.secs = target; return endGuided(); }
+      left--; T(tick, 1000);
+    }, 4000);
+  } else if (mode === 'intervals') {
+    // Work / rest rounds, with "Go", "Rest" and a 3-2-1 before each switch.
+    let round = 0, phase = 'rest', left = 4; big('1', `of ${target} rounds`);
+    T(function tick() {
+      if (left <= 3 && left > 0) say(String(left), { priority: 'low' });
+      if (left === 0) {
+        if (phase === 'rest') {
+          if (round >= target) { live.reps = round; return endGuided(); }
+          round++; phase = 'work'; left = item.work; word('Go'); say(round === target ? 'Last round. Go!' : 'Go!', { id: 'int_go_' + round, priority: 'now' });
+        } else {
+          phase = 'rest'; left = item.rest; word('Rest'); live.reps = round;
+          if (round >= target) { left = 0; return endGuided(); }
+          say(`Rest. ${target - round} to go.`, { id: 'int_rest_' + round, priority: 'now' });
+        }
+        $('#repNum').textContent = round;
+      }
+      $('#tempoWord').textContent = `${phase === 'work' ? 'Go' : 'Rest'} ${mmss(left)}`;
+      live.secs += phase === 'work' ? 1 : 0; left--; T(tick, 1000);
+    }, 1000);
+  } else if (mode === 'stopwatch') {
+    // Counts up until the lifter taps Finish; the time is what gets saved.
+    big('0:00', 'time');
+    T(() => { word('Go'); say('Three, two, one, go!', { id: 'sw_go', priority: 'now' }); live.t0 = performance.now();
+      T(function tick() { live.secs = Math.round((performance.now() - live.t0) / 1000); $('#repNum').textContent = mmss(live.secs);
+        if (live.secs && live.secs % 60 === 0) say(`${live.secs / 60} minute${live.secs > 60 ? 's' : ''}.`, { id: 'sw_' + live.secs, priority: 'low' });
+        T(tick, 1000); }, 1000); }, 3000);
+  } else if (mode === 'explosive' || mode === 'mobility') {
+    // Explosive: "Set", then "Go", with time to reset fully between reps. Mobility: slow counted reps.
+    const gap = (item.gap || (mode === 'mobility' ? 3 : 5)) * 1000; big(0, `of ${target} reps`);
+    const rep = () => {
+      if (mode === 'explosive') { word('Set'); T(() => { word('Go!'); say('Go!', { priority: 'now' }); }, 1200); }
+      else word(item.kind === 'pilates' ? 'Control' : 'Reach');
+      T(() => {
+        live.reps++; $('#repNum').textContent = live.reps;
+        if (mode === 'mobility') say(String(live.reps), { priority: 'low' });
+        if (live.reps >= target) T(endGuided, 900); else { word('Reset'); T(rep, mode === 'explosive' ? gap - 1200 : 400); }
+      }, mode === 'explosive' ? 1700 : gap);
+    };
+    T(rep, 4000);
   } else {
+    big(0, `of ${target} reps`);
     const rep = () => {
       word('Down'); say('Down', { priority: 'low' });
       T(() => word('2'), 1000); T(() => word('3'), 2000);
@@ -765,19 +840,22 @@ function startGuided() {
 function endGuided() {
   if (!live) return;
   live.timers.forEach(clearTimeout);
-  const item = LIB[exKey], reps = live.reps, hold = !!item.hold;
+  const item = LIB[exKey], reps = live.reps, secs = live.secs, mode = live.coach, hold = mode === 'hold', timed = mode === 'timer' || mode === 'stopwatch';
   stopLive(); live = null;
   $('#live').hidden = true; $('#tempoRing').hidden = true; $('#summary').hidden = false;
   $('#sumEyebrow').textContent = `${item.name} · set ${setsToday(exKey) + 1}`;
   $('#scoreRing').hidden = true; $('#romBars').parentElement.hidden = true; $('#sTable').hidden = true;
-  $('#sReps').textContent = hold ? `${reps} s` : reps; $('#sClean').textContent = 'coached by tempo';
-  $('#sCompare').textContent = 'Voice-coached set. No camera form score for this movement.';
+  $('#sReps').textContent = timed ? mmss(secs) : hold ? `${reps} s` : reps;
+  $('#sClean').textContent = timed ? (mode === 'stopwatch' ? 'your time' : 'time done') : mode === 'intervals' ? `rounds · ${mmss(secs)} of work` : 'coached by voice';
+  const prevTime = mode === 'stopwatch' ? [...S.sessions].reverse().find(x => x.ex === exKey && x.secs) : null;
+  $('#sCompare').textContent = prevTime ? (secs < prevTime.secs ? `${mmss(prevTime.secs - secs)} faster than last time (${mmss(prevTime.secs)}).` : `Last time: ${mmss(prevTime.secs)}.`) : 'Voice-coached. No camera form score for this one.';
   $('#sFocusBox').hidden = false; $('#sFocus').textContent = item.guide; $('#sWhy').textContent = '';
   restLeft = restTotal = item.muscles.includes('Full body') || ['Quads', 'Hamstrings', 'Back', 'Chest'].includes(item.muscles[0]) ? 120 : 75; drawRest();
-  $('#restWhy').textContent = 'Recovery for the next set'; $('#restCard').hidden = !reps;
+  $('#restWhy').textContent = 'Recovery for the next set'; $('#restCard').hidden = !reps || timed || mode === 'intervals';
   $('#playback').hidden = true;
-  if (reps) { S.sessions.push({ at: Date.now(), ex: exKey, name: item.name, reps, good: 0, guided: true }); persist(); }
-  say(reps ? `Set done. ${hold ? reps + ' seconds' : reps + ' reps'}. Nice and controlled.` : 'Set ended.', { id: 'gsum_' + Date.now(), priority: 'high' });
+  const done = timed ? secs >= 10 : reps > 0;
+  if (done) { S.sessions.push({ at: Date.now(), ex: exKey, name: item.name, reps: timed ? 0 : reps, secs: secs || undefined, good: 0, guided: true, kind: item.kind }); persist(); }
+  say(!done ? 'Ended.' : timed ? `Done. ${Math.floor(secs / 60)} minutes ${secs % 60} seconds.` : mode === 'intervals' ? `Done. ${reps} rounds. Great work.` : `Set done. ${hold ? reps + ' seconds' : reps + ' reps'}. Nice work.`, { id: 'gsum_' + Date.now(), priority: 'high' });
 }
 
 /* ---------- Movement tests: gait, jump, single-leg squat ---------- */
