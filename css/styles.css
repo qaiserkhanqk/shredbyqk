@@ -681,6 +681,8 @@ a.ghost { text-decoration: none; text-align: center; display: inline-flex; align
 .role-list span, .phase-list span { font-size: .8rem; color: var(--muted); }
 .ath-flag { margin: 0; padding: 10px 12px; border-radius: 12px; background: rgba(229,168,76,.14); border: 1px solid rgba(229,168,76,.5); font-size: .85rem; }
 .ath-gaps { margin: 0; font-size: .78rem; color: var(--muted); }
+.mode-switch.five { display: grid; grid-template-columns: repeat(5, 1fr); }
+.mode-switch.five button { font-size: .78rem; padding-inline: 2px; }
 .track-chip { position: absolute; top: 104px; left: 16px; display: inline-flex; align-items: center; gap: 7px; pointer-events: none;
   font: 600 .72rem var(--f-data); letter-spacing: .06em; text-transform: uppercase; color: rgba(236,241,236,.75);
   background: rgba(var(--scrim-rgb),.7); border: 1px solid var(--line); padding: 4px 9px; border-radius: 99px; }

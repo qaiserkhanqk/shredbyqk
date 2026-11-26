@@ -29,6 +29,7 @@ import { CLOUD, cloudOn } from './cloud-config.js';
 import * as classes from './classes.js';
 import * as routines from './routines.js';
 import * as athletes from './athletes.js';
+import { analyseBowling, analyseLanding } from './sportsbio.js';
 import { Cloud, pushAll } from './sync.js';
 import { PROGRAMS, scheme as progScheme, weeklySets, currentDay, byId as builtinById, GOALS, pickProgram, defaultDays } from './programs.js';
 import * as builder from './builder.js';
@@ -396,11 +397,11 @@ async function startLive({ mode, source, file, auto = false }) {
   $('#repBig').hidden = mode !== 'form'; $('#trackChip').hidden = mode !== 'form'; $('#cueHint').hidden = mode !== 'form';
   $('#repNum').textContent = '0'; $('#repLbl').textContent = ex?.hold ? 'seconds' : 'reps'; $('#dots').innerHTML = ''; $('#cleanCt').textContent = '0 clean'; $('#vlKnob').style.left = '0%'; $('#vlTxt').textContent = 'fresh';
   $('#gSteps').textContent = '0'; $('#gProg').style.width = '0'; $('#gStepsLbl').textContent = mode === 'gait' ? 'Steps seen' : 'Time';
-  const testName = { rom: TEST.rom?.label || 'Measurement', gait: `Gait · ${gaitMode === 'run' ? 'running' : 'walking'}`, jump: 'Jump test', sls: 'Single-leg squat knee test', bodymap: 'Map my body' };
+  const testName = { rom: TEST.rom?.label || 'Measurement', gait: `Gait · ${gaitMode === 'run' ? 'running' : 'walking'}`, jump: 'Jump test', sls: 'Single-leg squat knee test', land: 'Landing test', bowl: 'Bowling action check', bodymap: 'Map my body' };
   $('#detectChip').hidden = !auto; $('#detectChip').classList.remove('found'); $('#detectAlt').hidden = true; $('#detectChange').hidden = true;
   $('#detectTxt').textContent = 'Start your exercise. I\'ll recognise it.';
   $('#liveEyebrow').textContent = auto ? 'Camera coach' : mode === 'form' ? ex.name : testName[mode];
-  $('#liveTitle').textContent = auto ? 'Start moving' : mode === 'form' ? `Set ${setsToday(exKey) + 1}${source === 'demo' ? ' · demo' : ''}` : (mode === 'bodymap' ? 'Stand still, side-on' : source === 'demo' ? 'Demo walker' : source === 'file' ? 'Analysing your video (precise mode)' : mode === 'gait' ? 'Walk naturally for 10 seconds' : mode === 'jump' ? 'Up to 3 jumps' : mode === 'rom' ? `${TEST.rom.secs} seconds` : 'Left leg first, then right');
+  $('#liveTitle').textContent = auto ? 'Start moving' : mode === 'form' ? `Set ${setsToday(exKey) + 1}${source === 'demo' ? ' · demo' : ''}` : (mode === 'bodymap' ? 'Stand still, side-on' : source === 'demo' ? 'Demo walker' : source === 'file' ? 'Analysing your video (precise mode)' : mode === 'gait' ? 'Walk naturally for 10 seconds' : mode === 'jump' ? 'Up to 3 jumps' : mode === 'rom' ? `${TEST.rom.secs} seconds` : mode === 'land' ? 'Step off and land, 3 times' : mode === 'bowl' ? 'Bowl one delivery' : 'Left leg first, then right');
   $('#endLive').textContent = mode === 'form' ? 'End set' : 'Stop';
   $('#flipCam').hidden = source !== 'camera';
   $('#calBtn').hidden = !(mode === 'form' && vbtOn() && source !== 'demo');
@@ -802,7 +803,7 @@ const showAngles = () => { try { return localStorage.getItem('qk_angles') === '1
 $('#readout').hidden = !showAngles();
 $('#anglesBtn').onclick = () => { const on = !showAngles(); try { localStorage.setItem('qk_angles', on ? '1' : '0'); } catch {} $('#readout').hidden = !on; $('#anglesBtn').textContent = on ? 'Hide angles' : 'Angles'; };
 $('#anglesBtn').textContent = showAngles() ? 'Hide angles' : 'Angles';
-$('#endLive').onclick = () => { if (!live) return; ['gait', 'jump', 'sls', 'rom'].includes(live.mode) ? finishTest() : endSet(); };
+$('#endLive').onclick = () => { if (!live) return; ['gait', 'jump', 'sls', 'rom', 'land', 'bowl'].includes(live.mode) ? finishTest() : endSet(); };
 $('#flipCam').onclick = () => { const m = live?.mode || 'form'; live && (live.done = true); facing = facing === 'user' ? 'environment' : 'user'; stopLive(); live = null; startLive({ mode: m, source: 'camera' }); };
 $('#doneBtn').onclick = () => { flow = null; stopRest(); keepAwake(false); $('#summary').hidden = true; tab('today'); };
 // After a camera set the phone is already placed, so the next set starts straight away.
@@ -973,6 +974,8 @@ const TEST = {
     // [seconds, step]. The demo athlete runs a faster timeline (BODYMAP_DEMO_STEPS in demo.js).
     steps: demo => demo ? BODYMAP_DEMO_STEPS : [[0, 'stand'], [5, 'toes'], [10, 'squat'], [25, 'reach'], [31, 'hinge'], [41, 'face'], [45, 'arms'], [51, 'fsquat']] },
   sls: { secs: 30, label: 'Record knee test (30 s)', minFps: 25, view: 'front', intro: () => 'Stand on your left leg and do five slow squats.' },
+  land: { secs: 12, label: 'Record 3 landings (12 s)', minFps: 25, view: 'front', intro: () => 'Step onto the box. Step off and land on both feet. Three times.' },
+  bowl: { secs: 8, label: 'Record a delivery (8 s)', minFps: 25, view: null, intro: () => 'Bowl when you\'re ready. Keep your whole body in frame.' },
 };
 $$('[data-gmode]').forEach(b => b.onclick = () => { gaitMode = b.dataset.gmode; $$('[data-gmode]').forEach(x => x.classList.toggle('on', x === b)); });
 $$('[data-test]').forEach(b => b.onclick = () => {
@@ -1075,7 +1078,8 @@ function finishTest() {
   if (mode === 'rom') { recorder2.finish({ mode, quality: q }); return finishRom(frames, q); }
   if (mode === 'bodymap') { recorder2.finish({ mode, quality: q }); return finishBodyMap(frames, demo); }
   const mPerPx = scaleFromHeight(frames.slice(0, 20), (S.profile.heightCm || 0) / 100);
-  const r = mode === 'gait' ? analyseGait(frames, { mode: gaitMode }) : mode === 'jump' ? analyseJumps(frames, { mPerPx }) : analyseSingleLegSquat(frames);
+  const r = mode === 'gait' ? analyseGait(frames, { mode: gaitMode }) : mode === 'jump' ? analyseJumps(frames, { mPerPx })
+    : mode === 'land' ? analyseLanding(frames) : mode === 'bowl' ? analyseBowling(frames, { arm: $('#bowlArm').value, view: $('#bowlView').value }) : analyseSingleLegSquat(frames);
   recorder2.finish({ mode, quality: q, result: summarise(mode, r) });
   const box = $('#gaitResult'); box.hidden = false;
   const qHTML = qualityHTML(q);
@@ -1096,6 +1100,13 @@ function finishTest() {
     if (!demo) { S.jumps.push({ at: Date.now(), cm: r.best.heightCm, fps: r.fps, quality: q.score }); persist(); }
     box.innerHTML = qHTML + jumpHTML(r, ready);
     say(`Best jump ${Math.round(r.best.heightCm)} centimetres.${ready ? ready.status === 'ready' ? ' You\'re ready to train hard today.' : ` That's ${Math.abs(ready.pct)} percent below your usual, so keep today lighter.` : ''}`, { id: 'jump_done_' + Date.now(), priority: 'high' });
+  } else if (mode === 'land' || mode === 'bowl') {
+    if (!r.ok) return fail(r.issues[0]);
+    const key = mode === 'land' ? 'landings' : 'bowls';
+    if (!demo) { (S[key] ||= []).push(mode === 'land' ? { at: Date.now(), L: r.L, R: r.R, asym: r.asym } : { at: Date.now(), view: r.view, frontLeg: r.frontLeg, kneeFfc: r.kneeFfc, kneeRelease: r.kneeRelease, sideBend: r.sideBend, fps: r.fps }); persist(); }
+    box.innerHTML = qHTML + bioHTML(mode, r);
+    const issue = r.findings.find(f => !f.ok);
+    say(`${mode === 'land' ? 'Landing test' : 'Bowling check'} done. ${issue ? issue.title + '. The fix is below.' : r.findings[0].title + '.'}`, { id: mode + '_done_' + Date.now(), priority: 'high' });
   } else {
     if (!r.ok) return fail(r.issues[0] || 'No single-leg squats found.');
     S.knees ||= [];
@@ -1107,7 +1118,7 @@ function finishTest() {
   tab('gait'); renderTestHistory(); box.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-const summarise = (mode, r) => mode === 'gait' ? { cadence: r.cadence, findings: r.findings?.map(f => f.title) } : mode === 'jump' ? { best: r.best, n: r.jumps?.length } : { legs: r.legs, asymmetry: r.asymmetry };
+const summarise = (mode, r) => mode === 'gait' ? { cadence: r.cadence, findings: r.findings?.map(f => f.title) } : mode === 'jump' ? { best: r.best, n: r.jumps?.length } : mode === 'land' ? { L: r.L, R: r.R, asym: r.asym } : mode === 'bowl' ? { view: r.view, frontLeg: r.frontLeg, kneeFfc: r.kneeFfc, kneeRelease: r.kneeRelease, sideBend: r.sideBend } : { legs: r.legs, asymmetry: r.asymmetry };
 function qualityHTML(q) {
   const cls = q.score >= 80 ? '' : q.score >= 60 ? 'mid' : 'low';
   return `<div class="card stack"><div class="quality"><span class="q ${cls}">Quality ${q.score}/100</span><span class="muted">${q.fps ? q.fps + ' fps · ' : ''}${q.issues.length ? 'see tips below' : 'good recording'}</span></div>${q.issues.length ? `<ul class="issues">${q.issues.map(i => `<li>${esc(i)}</li>`).join('')}</ul>` : ''}</div>`;
@@ -1122,6 +1133,16 @@ function jumpHTML(r, ready) {
     ${r.jumps.some(j => j.flagged) ? `<p class="muted small" style="margin:0">⚠ ${esc(r.jumps.find(j => j.flagged).flagged)}</p>` : ''}
     ${r.issues.length ? `<ul class="issues">${r.issues.map(i => `<li>${esc(i)}</li>`).join('')}</ul>` : ''}</div>`;
 }
+// Sports screens: the numbers, the findings and what the measure can and can't tell you.
+function bioHTML(mode, r) {
+  const m = (label, v, warn) => `<div class="metric ${warn ? 'warn' : ''}"><small>${label}</small><span class="num">${v}</span></div>`;
+  const metrics = mode === 'land' ? m('Left knee', `${r.L}°`, r.L > 10) + m('Right knee', `${r.R}°`, r.R > 10) + m('Difference', `${r.asym}°`, r.asym > 5)
+    : r.view === 'side' ? m('Knee at landing', `${r.kneeFfc}°`) + m('Knee at release', `${r.kneeRelease}°`, r.frontLeg === 'collapsing') + m('Front leg', r.frontLeg, r.frontLeg === 'collapsing')
+    : m('Side-bend at release', `${r.sideBend}°`, r.sideBend > 45);
+  return `<div class="card stack"><span class="eyebrow">${mode === 'land' ? 'Landing test · front view' : `Bowling action · ${r.view === 'side' ? 'side-on' : 'from behind'}${r.fps ? ` · ${r.fps} fps` : ''}`}</span>
+    <div class="metric-grid">${metrics}</div>${(r.issues || []).map(x => `<p class="muted small" style="margin:0">${esc(x)}</p>`).join('')}</div>
+    ${findingsHTML(r.findings.map(f => ({ ...f, why: f.detail, fix: [] })))}<p class="muted small" style="margin:0">Measured from a single camera (2D): angles are accurate in the plane the camera faces, and no forces are measured. A screen, not a diagnosis.</p>`;
+}
 function slsHTML(r) {
   const leg = (n, d) => d ? `<div class="metric ${d.meanFppa > 10 ? 'warn' : ''}"><small>${n} knee</small><span class="num">${d.meanFppa}°</span><small>inward drift · ${d.reps} reps · hip drop ${d.pelvicDrop}°</small></div>` : `<div class="metric warn"><small>${n} knee</small><span class="num">–</span><small>not recorded</small></div>`;
   return `<div class="card stack"><span class="eyebrow">Single-leg squat · front view</span>
@@ -1132,6 +1153,8 @@ function slsHTML(r) {
 function renderTestHistory() {
   const rows = testMode === 'gait' ? (S.gaits || []).map(g => [g.at, `${Math.round(g.cadence)} steps/min${g.strideCm ? ` · stride ${g.strideCm} cm` : ''}`])
     : testMode === 'jump' ? (S.jumps || []).map(j => [j.at, `${j.cm.toFixed(1)} cm`])
+    : testMode === 'land' ? (S.landings || []).map(l => [l.at, `L ${l.L}° · R ${l.R}°`])
+    : testMode === 'bowl' ? (S.bowls || []).map(b => [b.at, b.view === 'side' ? `Front leg ${b.frontLeg} · ${b.kneeFfc}°→${b.kneeRelease}°` : `Side-bend ${b.sideBend}°`])
     : (S.knees || []).map(k => [k.at, `L ${k.L ?? '–'}° · R ${k.R ?? '–'}°`]);
   $('#testHistory').hidden = !rows.length;
   $('#testHistoryList').innerHTML = rows.slice(-6).reverse().map(([at, t]) => `<div class="row"><div>${t}</div><time>${new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</time></div>`).join('');
@@ -1748,6 +1771,8 @@ function openAthlete(step = 'sport', pick = {}) {
     <div class="phase-list">${athletes.PHASES.map(ph => `<button type="button" data-phase="${ph.id}" data-psport="${sp.id}" data-prole="${pick.role}"><b>${ph.name}</b><span>${ph.sub} · ${esc(sp.season[ph.id])}</span></button>`).join('')}</div>`);
 }
 $('#athleteBtn').onclick = () => openAthlete('sport');
+// Open a sport screen from an athlete programme.
+$('#rsheetBody').addEventListener('click', e => { const b = e.target.closest('[data-screen]'); if (!b) return; closeSheet(); tab('gait'); const t = document.querySelector(`[data-test="${b.dataset.screen}"]`); t?.click(); if (b.dataset.screen === 'gait') document.querySelector('[data-gmode=run]')?.click(); });
 $('#rsheetBody').addEventListener('click', e => {
   const s1 = e.target.closest('[data-sport]'), r1 = e.target.closest('[data-role]'), p1 = e.target.closest('[data-phase]'), ph = e.target.closest('[data-athphase]');
   if (s1) openAthlete('role', { sport: s1.dataset.sport });
@@ -1795,6 +1820,7 @@ function showProgram(id) {
     <p class="data small" style="margin:0">${p.days} days a week · ${p.weeks} weeks · about ${Math.round(weeklySets(p))} working sets a week</p>
     ${p.flag ? `<p class="ath-flag">⚠️ ${esc(p.flag)}</p>` : ''}
     ${p.gaps ? `<p class="ath-gaps">Evidence note: ${esc(p.gaps)}</p>` : ''}
+    ${p.athlete ? `<div class="btn-row">${p.athlete.sport === 'cricket' && /^(fast|allrounder|spin)/.test(p.athlete.role) ? '<button class="ghost" type="button" data-screen="bowl">Check my bowling action</button>' : ''}<button class="ghost" type="button" data-screen="land">Landing test</button>${['football', 'hockey'].includes(p.athlete.sport) ? '<button class="ghost" type="button" data-screen="gait">Running form</button>' : ''}</div>` : ''}
     ${p.athlete ? `<div class="seg" role="group" aria-label="Season phase">${athletes.PHASES.map(ph => `<button type="button" data-athphase="${ph.id}" class="${ph.id === p.athlete.phase ? 'on' : ''}">${ph.name}</button>`).join('')}</div>` : ''}
     ${p.plan.map(dd => { const lb = SS.labels(dd.items); return `<div class="prog-day"><h3>${esc(dd.name)} <span class="muted small">· ${esc(dd.focus)}</span></h3><ol>${dd.items.map((it, ix) => `<li>${lb[ix] ? `<span class="ss">${lb[ix]}</span> ` : ''}${esc(LIB[it[0]]?.name || it[0])} <span>${it[1]} × ${esc(it[2])}${it[3] ? ` · rest ${it[3] < 120 ? it[3] + ' s' : it[3] / 60 + ' min'}` : ''}</span>${it[4] ? `<br><span class="muted small">${esc(it[4])}</span>` : ''}</li>`).join('')}</ol></div>`; }).join('')}
     <div class="btn-row"><button class="ghost" type="button" data-progedit="${p.id}">${p.custom ? 'Edit' : 'Copy and edit'}</button>${p.custom && !on ? `<button class="ghost" type="button" data-progdel="${p.id}">Delete</button>` : ''}${on ? '<button class="ghost" type="button" data-progstop>Stop this program</button>' : ''}<button class="cta" type="button" data-progstart="${p.id}">${on ? 'Restart from day 1' : 'Start this program'}</button></div>`);

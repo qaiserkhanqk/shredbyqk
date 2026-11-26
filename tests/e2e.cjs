@@ -103,6 +103,16 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.click('#endLive'); await p.waitForTimeout(500);
   check('knee test with no person: refuses to give a result', /No result yet/.test(await p.textContent('#gaitResult')));
 
+  // Sports screens: landing test and bowling action.
+  await p.click('[data-test=land]');
+  check('landing test: panel shown', await p.isVisible('[data-panel=land]') && /Record 3 landings/.test(await p.textContent('#testLiveLbl')));
+  await p.click('#testLive'); await p.waitForTimeout(5000);
+  check('landing test: live capture runs', await p.isVisible('#live') && /Landing test/.test(await p.textContent('#liveEyebrow')));
+  await p.click('#endLive'); await p.waitForTimeout(500);
+  check('landing test with no person: no result', /No result yet/.test(await p.textContent('#gaitResult')));
+  await p.click('[data-test=bowl]');
+  check('bowling check: arm and camera choices, slow-motion advice', await p.isVisible('#bowlArm') && await p.isVisible('#bowlView') && /slow motion/.test(await p.textContent('[data-panel=bowl]')));
+
   // 5. Two-view scan rejects a non-neutral pose (the sample photo is a yoga lunge)
   await go('scan');
   await p.setInputFiles('#scanFront', process.argv[2] || path.join(ROOT, 'tests/pose.jpg')).catch(() => {});
@@ -351,7 +361,11 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('athletes: mixed-action fast bowler programme, with the back-injury warning', /Fast bowler: mixed action/.test(await p.textContent('#rsheetBody')) && /lumbar stress/.test(await p.textContent('#rsheetBody')) && /Trap-Bar Deadlift/.test(await p.textContent('#rsheetBody')));
   await p.click('[data-progstart]'); await p.waitForTimeout(200);
   check('athletes: it runs like any programme', /On Cricket/.test(await p.textContent('#athleteSub')), await p.textContent('#athleteSub'));
-  await tap('#progStrip [data-prog]'); await p.click('[data-progstop]'); await p.waitForTimeout(200);
+  await tap('#progStrip [data-prog]'); await p.waitForTimeout(200);
+  check('athletes: fast bowler sheet links the bowling check', await p.isVisible('#rsheetBody [data-screen=bowl]'));
+  await p.click('#rsheetBody [data-screen=bowl]'); await p.waitForTimeout(300);
+  check('athletes: link opens the bowling check', await p.isVisible('[data-panel=bowl]'));
+  await go('train'); await tap('#progStrip [data-prog]'); await p.click('[data-progstop]'); await p.waitForTimeout(200);
 
   // Warm up, stretch & recover: today's drills and cool-down, plus recovery routines, run by QK.
   await p.goto('https://shred.local/'); await go('train');

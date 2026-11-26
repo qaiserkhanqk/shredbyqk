@@ -347,3 +347,25 @@ so these are evidence-informed choices, not proven prescriptions.
 
 Phases: off-season 3 days (strength + power + prevention), pre-season 2 days (power, low reps), in-season 2 short
 maintenance days. Injury-prevention work runs in every phase.
+
+### Sports screens (`js/sportsbio.js`)
+
+Camera joint tracking used as biomechanics: 2D angles from one phone camera, no forces, so each screen is a
+screen and not a diagnosis.
+
+- **Bowling action (cricket).** Side-on: QK finds release (bowling hand at its highest above the shoulder) and
+  front-foot contact (front ankle reaching the ground in the 0.35 s before release), then classifies the
+  front knee from contact to release as braced, straightening (≥10° straighter), collapsing (≥10° more bent)
+  or flex-then-extend. A firmer front leg goes with faster ball release in fast bowlers (Worthington et al.
+  2013, doi:10.1123/jab.29.1.78; Wormgoor et al. 2010, doi:10.1080/02640411003774537). Trade-off: in adolescent
+  bowlers a more extended front knee also went with higher lumbar loads (Crewe et al. 2013,
+  doi:10.1080/02640414.2012.762601), so QK pairs a braced front leg with trunk and back work and does not push
+  a straighter knee on young bowlers without a coach. From behind: trunk side-bend at release; injured adolescent fast
+  bowlers averaged ~50° and uninjured ~40° (Bayne et al. 2016, doi:10.1016/j.jsams.2015.02.011), so >45°
+  is flagged for trunk work and a coach review. Normal 30 fps video is too slow for release timing, so QK
+  asks for slow motion (120–240 fps).
+- **Landing test.** Front-on drop landing from about 30 cm: peak knee frontal-plane projection angle in
+  the 0.3 s after landing for each leg. Inward knee motion on landing is a known ACL-injury risk factor:
+  in a prospective 3D study of 205 female athletes, those who later tore the ACL landed with ~8° more knee
+  abduction (Hewett et al. 2005, doi:10.1177/0363546504269591). QK's 2D angle is a simpler proxy for this. >10°
+  is flagged, and a left–right difference >5° is flagged for extra work on the weaker side.
