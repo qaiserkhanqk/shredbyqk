@@ -51,7 +51,7 @@ const persist = () => {
 ErrorLog.install();
 initCalm({ S, persist: () => persist(), toast: m => toast(m) });
 initVitals({ S, persist: () => persist(), toast: m => toast(m) });
-initFood({ S, persist: () => persist(), toast: m => toast(m) });
+initFood({ S, persist: () => persist(), toast: m => toast(m), rehab: () => !!S.rehab?.active });
 const recorder2 = new SessionRecorder();
 const bar = new BarTracker();
 const VBT_EQUIP = ['Barbell', 'Dumbbell', 'Dumbbells', 'EZ bar', 'Kettlebell'];

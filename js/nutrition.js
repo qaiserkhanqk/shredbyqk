@@ -67,6 +67,14 @@ export const ING = {
   bread: ['White bread', 266, 8.9, 49, 3.3, 2.7],
   oats: ['Oats, dry', 379, 13.2, 67.7, 6.5, 10.1],
   whey: ['Whey protein powder', 400, 80, 8, 6, 0],
+  chickenSkin: ['Chicken with skin (thigh/leg), raw', 221, 17.3, 0, 16.6, 0],
+  bun: ['Burger bun', 279, 9.5, 50, 4.3, 2.4],
+  mayo: ['Mayonnaise / garlic sauce', 680, 1, 0.6, 75, 0],
+  cheese: ['Cheese slice (cheddar/processed)', 380, 21, 4, 31, 0],
+  mozzarella: ['Mozzarella', 300, 22, 2.2, 22, 0],
+  ketchup: ['Ketchup and chutney', 101, 1, 27, 0.1, 0.3],
+  cabbage: ['Cabbage and lettuce', 25, 1.3, 5.8, 0.1, 2.5],
+  sesame: ['Sesame and nigella seeds', 573, 17.7, 23.4, 49.7, 11.8],
 };
 const FATS = { oil: 'Oil', ghee: 'Ghee', butter: 'Butter' };
 
@@ -85,6 +93,8 @@ const MEAT_YIELD = 0.7; // meat keeps ~70% of its raw weight when stewed or gril
 const D = (id, name, alias, kind, serve, cooked, meat, base, fat, x = {}) => ({ id, name, alias, kind, serve, cooked, meat, base, fat, ...x });
 const F = (type, home, restaurant, shaadi) => ({ type, home, restaurant, shaadi });
 const NOFAT = F('oil', 0, 0, 0);
+// Families: dishes people name loosely ("roti" can be a naan). The sheet shows the family as one-tap chips.
+const FAM = (fam, list) => list.forEach(d => { d.fam = fam; });
 
 export const DISHES = [
   // Curries and salans — serving is one katori (~200 g) unless noted.
@@ -137,6 +147,15 @@ export const DISHES = [
   D('anda_paratha', 'Anda paratha', 'egg paratha', 'bread', 'paratha', 115, ['egg', 50], [['atta', 45]], F('ghee', 12, 20, 24)),
   D('puri', 'Puri', 'poori halwa puri', 'fried', 'puri', 28, null, [['atta', 20]], F('oil', 5, 7, 8)),
   D('makki_roti', 'Makki ki roti', 'makai roti corn roti', 'bread', 'roti', 65, null, [['makki', 45]], NOFAT, { topping: ['butter', 8, 'Makhan on top'] }),
+  D('roghni_naan', 'Roghni naan', 'roghni naan roghani sesame naan', 'bread', 'naan', 125, null, [['maida', 90], ['milk', 15], ['dahi', 10], ['egg', 5], ['sugar', 3], ['sesame', 3]], F('ghee', 8, 10, 12)),
+  D('garlic_naan', 'Garlic naan', 'garlic naan', 'bread', 'naan', 105, null, [['maida', 80], ['dahi', 8], ['milk', 10], ['spices', 3]], F('butter', 8, 10, 12)),
+  D('kulcha', 'Kulcha', 'kulcha amritsari', 'bread', 'kulcha', 95, null, [['maida', 75], ['dahi', 8], ['milk', 8]], F('butter', 5, 8, 10)),
+  D('taftan', 'Taftan', 'taftaan', 'bread', 'taftan', 120, null, [['maida', 85], ['milk', 30], ['egg', 5], ['sugar', 6], ['nuts', 2]], F('ghee', 6, 8, 10)),
+  D('sheermal', 'Sheermal', 'shirmal sheer mal', 'bread', 'sheermal', 115, null, [['maida', 80], ['milk', 30], ['sugar', 10]], F('ghee', 10, 12, 14)),
+  D('bakarkhani', 'Bakarkhani', 'baqarkhani', 'bread', 'piece', 70, null, [['maida', 50], ['sugar', 3]], F('ghee', 15, 16, 18)),
+  D('chapati_thin', 'Phulka (thin chapati)', 'phulka chapati patli roti', 'bread', 'phulka', 30, null, [['atta', 20]], NOFAT, { topping: ['ghee', 3, 'Ghee on top'] }),
+  D('lachha_paratha', 'Lachha paratha', 'laccha paratha layered', 'bread', 'paratha', 90, null, [['atta', 25], ['maida', 25]], F('ghee', 12, 18, 24)),
+  D('bread_slice', 'Bread (slice)', 'double roti toast slice', 'bread', 'slice', 28, null, [['bread', 28]], NOFAT, { topping: ['butter', 5, 'Butter or margarine'] }),
 
   // BBQ and kebabs.
   D('chicken_tikka', 'Chicken tikka / tandoori (leg piece)', 'tikka tandoori chicken leg piece bbq', 'bbq', 'piece', 120, ['chicken', 160], [['dahi', 15], ['spices', 4]], F('oil', 3, 6, 8)),
@@ -153,6 +172,31 @@ export const DISHES = [
   D('dahi_bhalla', 'Dahi bhalla', 'dahi baray dahi vada', 'fried', 'plate', 220, null, [['mash', 30], ['dahi', 120], ['sugar', 6], ['spices', 2]], F('oil', 8, 10, 12)),
   D('chana_chaat', 'Chana chaat', 'chaat chickpea chaat', 'snack', 'plate', 180, null, [['kabuli', 40], ['potato', 30], ['onion', 15], ['tomato', 20], ['sugar', 3], ['spices', 3]], NOFAT),
   D('suji_halwa', 'Suji halwa', 'halwa sooji halwa', 'sweet', 'katori', 110, null, [['suji', 35], ['sugar', 30]], F('ghee', 20, 25, 30)),
+
+  // Fast food (chains). Built as recipes; official chain values can override them in js/menus.js.
+  D('zinger_burger', 'Zinger / crispy chicken burger', 'zinger krunch crispy chicken burger kfc', 'fastfood', 'burger', 200, ['chickenBreast', 110], [['bun', 60], ['maida', 15], ['mayo', 12], ['cabbage', 10]], F('oil', 8, 10, 12)),
+  D('mighty_zinger', 'Double fillet burger (Mighty Zinger)', 'mighty zinger double', 'fastfood', 'burger', 300, ['chickenBreast', 210], [['bun', 65], ['maida', 28], ['mayo', 16], ['cheese', 14], ['cabbage', 12]], F('oil', 15, 18, 20)),
+  D('beef_burger', 'Beef burger (two patties, cheese)', 'big mac whopper beef burger hardees', 'fastfood', 'burger', 220, ['beefMince', 90], [['bun', 75], ['cheese', 14], ['mayo', 15], ['cabbage', 20], ['ketchup', 5]], NOFAT),
+  D('chicken_burger', 'Chicken patty burger', 'mcchicken chicken burger patty', 'fastfood', 'burger', 160, ['chickenMince', 75], [['bun', 60], ['maida', 15], ['mayo', 8], ['cabbage', 10]], F('oil', 8, 8, 10)),
+  D('fried_chicken', 'Fried chicken piece', 'hot and crispy kfc piece broast fried chicken', 'fastfood', 'piece', 110, ['chickenSkin', 100], [['maida', 12], ['spices', 2]], F('oil', 8, 10, 12)),
+  D('broast', 'Broast (quarter)', 'broast chicken quarter', 'fastfood', 'quarter', 260, ['chickenSkin', 200], [['maida', 25], ['spices', 3]], F('oil', 18, 22, 25)),
+  D('nuggets', 'Chicken nuggets (6 pieces)', 'nuggets mcnuggets', 'fastfood', 'box', 100, ['chickenMince', 70], [['maida', 15]], F('oil', 10, 12, 12)),
+  D('fries', 'French fries (regular)', 'fries chips french fries', 'fastfood', 'regular', 110, null, [['potato', 230]], F('oil', 14, 16, 18)),
+  D('pizza_slice', 'Pizza slice (medium, chicken)', 'pizza slice dominos pizza hut chicken tikka fajita', 'fastfood', 'slice', 110, ['chicken', 15], [['maida', 40], ['mozzarella', 25], ['tomato', 15]], F('oil', 4, 5, 6)),
+  D('club_sandwich', 'Club sandwich', 'club sandwich', 'fastfood', 'sandwich', 230, ['chicken', 60], [['bread', 90], ['egg', 25], ['mayo', 15], ['cheese', 14], ['cabbage', 15], ['tomato', 15]], NOFAT),
+  D('sub_6', 'Sub sandwich (6 inch, chicken)', 'subway sub chicken tikka teriyaki', 'fastfood', 'sub', 230, ['chickenBreast', 70], [['bread', 75], ['cheese', 14], ['cabbage', 25], ['tomato', 20], ['mayo', 10]], NOFAT),
+  D('shawarma', 'Chicken shawarma', 'shawarma shwarma wrap', 'fastfood', 'shawarma', 200, ['chicken', 70], [['maida', 50], ['mayo', 20], ['cabbage', 30], ['spices', 3]], F('oil', 4, 6, 8)),
+  D('cola', 'Cola / soft drink (can)', 'pepsi coke 7up sprite soft drink', 'drink', 'can', 345, null, [['sugar', 36]], NOFAT),
+  D('milkshake', 'Milkshake', 'shake mango shake', 'drink', 'glass', 300, null, [['milk', 250], ['sugar', 25], ['cream', 20]], NOFAT),
+
+  // Street carts and stalls.
+  D('bun_kebab', 'Bun kebab', 'bun kabab anda bun', 'street', 'bun kebab', 150, ['beefMince', 20], [['bun', 60], ['chanaDal', 15], ['egg', 25], ['onion', 15], ['ketchup', 10]], F('oil', 6, 8, 10)),
+  D('anda_shami_burger', 'Anda shami burger', 'anda shami burger egg shami', 'street', 'burger', 190, ['beef', 25], [['bun', 60], ['chanaDal', 12], ['egg', 55], ['cabbage', 15], ['ketchup', 10]], F('oil', 8, 10, 12)),
+  D('paratha_roll', 'Chicken paratha roll', 'roll paratha roll chicken roll kathi', 'street', 'roll', 190, ['chicken', 70], [['atta', 45], ['mayo', 10], ['ketchup', 8], ['onion', 20], ['spices', 3]], F('ghee', 10, 14, 16)),
+  D('gol_gappay', 'Gol gappay (plate of 6)', 'gol gappay pani puri gol gappe', 'street', 'plate', 150, null, [['suji', 24], ['kabuli', 10], ['potato', 30], ['sugar', 8], ['spices', 3]], F('oil', 6, 7, 8)),
+  D('fruit_chaat', 'Fruit chaat', 'fruit chaat', 'street', 'plate', 200, null, [['banana', 60], ['apple', 60], ['mango', 40], ['sugar', 6], ['spices', 1]], NOFAT),
+  D('samosa_chaat', 'Samosa chaat', 'samosa chaat chana samosa', 'street', 'plate', 250, null, [['maida', 25], ['potato', 40], ['kabuli', 30], ['dahi', 50], ['onion', 15], ['sugar', 6], ['spices', 3]], F('oil', 10, 12, 13)),
+  D('bhutta', 'Bhutta (roasted corn)', 'bhutta corn cob makai', 'street', 'cob', 100, null, [['makki', 35]], NOFAT),
 
   // Sweets.
   D('kheer', 'Kheer', 'rice kheer chawal ki kheer', 'sweet', 'katori', 150, null, [['milk', 150], ['rice', 12], ['sugar', 15], ['nuts', 3]], NOFAT),
@@ -175,10 +219,22 @@ export const DISHES = [
   D('salad', 'Salad (kachumber)', 'salad kachumber', 'side', 'plate', 100, null, [['tomato', 40], ['onion', 30], ['cucumber', 30]], NOFAT),
 ];
 export const DISH = Object.fromEntries(DISHES.map(d => [d.id, d]));
+const fam = (name, ids) => FAM(name, ids.map(id => DISH[id]));
+fam('Bread', ['roti', 'chapati_thin', 'tandoori_roti', 'naan', 'garlic_naan', 'roghni_naan', 'kulcha', 'taftan', 'sheermal', 'paratha', 'lachha_paratha', 'aloo_paratha', 'anda_paratha', 'puri', 'makki_roti', 'bakarkhani', 'bread_slice']);
+fam('Rice', ['plain_rice', 'zeera_rice', 'matar_pulao', 'chicken_pulao', 'beef_pulao', 'chicken_biryani', 'mutton_biryani', 'khichdi']);
+fam('Daal', ['daal_masoor', 'daal_moong', 'daal_chana', 'daal_mash', 'daal_makhani', 'rajma', 'cholay']);
+fam('Chicken salan', ['chicken_karahi', 'chicken_handi', 'chicken_qorma', 'chicken_salan', 'chicken_jalfrezi', 'butter_chicken']);
+fam('Mutton and beef', ['mutton_karahi', 'mutton_qorma', 'aloo_gosht', 'palak_gosht', 'nihari', 'haleem', 'qeema', 'qeema_matar']);
+fam('Kebab and BBQ', ['seekh_kebab', 'chapli_kebab', 'shami_kebab', 'chicken_tikka', 'chicken_boti']);
+fam('Burger', ['zinger_burger', 'mighty_zinger', 'beef_burger', 'chicken_burger', 'anda_shami_burger', 'bun_kebab']);
+fam('Fried chicken', ['fried_chicken', 'broast', 'nuggets']);
+fam('Eggs', ['boiled_egg', 'anda_fry', 'omelette', 'anda_curry']);
+fam('Lassi and drinks', ['chai', 'sweet_lassi', 'salted_lassi', 'milkshake', 'cola']);
+export const family = d => (d?.fam ? DISHES.filter(x => x.fam === d.fam) : []);
 
 // "1½ katori (≈300 g)", "2 rotis". Containers show grams so people can check against a scale.
 export function serveLabel(d, n = 1) {
-  const u = d.serve, many = n > 1 && !u === 'katori';
+  const u = d.serve, many = n > 1 && u !== 'katori';
   const word = many ? (u.endsWith('s') ? u : u + 's') : u;
   const grams = ['katori', 'bowl', 'plate', 'cup', 'glass', 'portion'].includes(u) ? ` (≈${Math.round(d.cooked * n)} g)` : '';
   return `${fmtN(n)} ${word}${grams}`;
@@ -194,17 +250,18 @@ const pack = v => ({ kcal: v[0], protein: v[1], carbs: v[2], fat: v[3], fibre: v
 
 export const hasFatChoice = d => d.fat.home + d.fat.restaurant + d.fat.shaadi > 0;
 export const hasMeatChoice = d => !!d.meat && ['curry', 'rice'].includes(d.kind) && d.meat[0] !== 'egg';
-export const hasOilChoice = d => hasFatChoice(d) && !['fried', 'bbq', 'egg'].includes(d.kind);
+export const hasOilChoice = d => hasFatChoice(d) && ['curry', 'rice'].includes(d.kind);
 
 // One dish → nutrition. opts: servings, grams (overrides servings), style, meat, oil, size, topping,
 // styleKnown (the user picked who cooked it — narrows the range), portionSd (photo portions are vaguer).
-export function estimateDish(d, opts = {}) {
+// The raw ingredients behind one logged dish, in grams for the whole portion. Shared by the calorie
+// estimate and the weekly report (which counts veg, dairy, lentils and fish from the same numbers).
+export function dishParts(d, opts = {}) {
   const style = opts.style || 'home';
   const size = SIZES.find(s => s.id === opts.size)?.f ?? 1;
   const servings = opts.grams ? opts.grams / d.cooked : (opts.servings ?? 1) * (d.sizes ? size : 1);
   const meatF = hasMeatChoice(d) ? MEAT_SHARE.find(m => m.id === opts.meat)?.f ?? 1 : 1;
   const oilF = hasOilChoice(d) ? OIL_LEVEL.find(m => m.id === opts.oil)?.f ?? 1 : 1;
-
   // Taking more meat pieces leaves less room for gravy in the same katori, and the oil sits in the gravy.
   let gravyF = 1;
   if (d.meat && meatF !== 1) {
@@ -212,30 +269,58 @@ export function estimateDish(d, opts = {}) {
     gravyF = Math.max(0.2, (d.cooked - meatCooked * meatF) / (d.cooked - meatCooked));
   }
   const fatG = d.fat[style] * oilF * (d.kind === 'curry' ? 0.3 + 0.7 * gravyF : gravyF);
+  const fat = [[d.fat.type, fatG]];
+  if (opts.topping && d.topping) fat.push([d.topping[0], d.topping[1]]);
+  return {
+    servings,
+    meat: d.meat ? [[d.meat[0], d.meat[1] * meatF * servings]] : [],
+    base: d.base.map(([ing, g]) => [ing, g * gravyF * servings]),
+    fat: fat.map(([ing, g]) => [ing, g * servings]),
+  };
+}
+const total = list => list.reduce((a, [ing, g]) => sum(a, nut(ing, g)), [0, 0, 0, 0, 0]);
 
-  let meat = [0, 0, 0, 0, 0], base = [0, 0, 0, 0, 0];
-  if (d.meat) meat = nut(d.meat[0], d.meat[1] * meatF);
-  for (const [ing, g] of d.base) base = sum(base, nut(ing, g * gravyF));
-  let fat = nut(d.fat.type, fatG);
-  if (opts.topping && d.topping) fat = sum(fat, nut(d.topping[0], d.topping[1]));
-
-  const one = sum(sum(meat, base), fat);
-  const total = one.map(v => v * servings);
-  const kcal = total[0], fatKcal = fat[0] * servings, meatKcal = meat[0] * servings;
+// One dish → nutrition. opts: servings, grams (overrides servings), style, meat, oil, size, topping,
+// styleKnown (the user picked who cooked it — narrows the range), portionSd (photo portions are vaguer).
+export function estimateDish(d, opts = {}) {
+  const P = dishParts(d, opts), servings = P.servings;
+  const meat = total(P.meat), fat = total(P.fat), all = sum(sum(meat, total(P.base)), fat);
+  const kcal = all[0], fatKcal = fat[0], meatKcal = meat[0];
 
   // Likely range (about ±1 SD): portion error on everything, plus fat error, plus meat-share error.
   const portionSd = opts.portionSd ?? (['curry', 'rice', 'side', 'snack'].includes(d.kind) || ['plate', 'portion'].includes(d.serve) ? 0.2 : 0.1);
   const fatSd = hasFatChoice(d) ? (opts.styleKnown ? 0.25 : 0.4) : 0;
   const sd = Math.sqrt((portionSd * kcal) ** 2 + (fatSd * fatKcal) ** 2 + (0.15 * meatKcal) ** 2);
   return {
-    ...pack(total), grams: d.cooked * servings,
+    ...pack(all), grams: d.cooked * servings,
     low: round10(Math.max(0, kcal - sd)), high: round10(kcal + sd),
     parts: { fat: fatKcal, meat: meatKcal, rest: kcal - fatKcal - meatKcal },
     fatLabel: (opts.topping && d.topping ? FATS[d.topping[0]] : FATS[d.fat.type]) || 'Fat',
-    fatGrams: (fatG + (opts.topping && d.topping ? d.topping[1] : 0)) * servings,
+    fatGrams: P.fat.reduce((a, [, g]) => a + g, 0),
   };
 }
 const round10 = v => Math.round(v / 10) * 10;
+
+// Food groups for the weekly report. Potatoes count as starch, not veg (WHO 5-a-day rule).
+export const GROUP = {
+  veg: ['onion', 'tomato', 'spinach', 'sarson', 'peas', 'okra', 'cauliflower', 'carrot', 'capsicum', 'cucumber', 'mixedVeg'],
+  fruit: ['banana', 'apple', 'mango', 'dates'],
+  dairy: ['dahi', 'milk', 'paneer', 'khoya'],
+  legumes: ['masoor', 'moong', 'chanaDal', 'mash', 'kabuli', 'rajma', 'besan'],
+  fish: ['fish'], redMeat: ['mutton', 'beef', 'beefMince'], poultry: ['chicken', 'chickenBreast', 'chickenMince'], egg: ['egg'],
+  wholeGrain: ['atta', 'dalia', 'oats', 'makki'], refined: ['maida', 'rice', 'suji', 'vermicelli', 'bread'],
+  sugar: ['sugar'], nuts: ['nuts'], fat: ['oil', 'ghee', 'butter', 'cream'],
+};
+export const GROUP_OF = Object.fromEntries(Object.entries(GROUP).flatMap(([g, ids]) => ids.map(id => [id, g])));
+// Dairy as milk-equivalent grams (by calcium): paneer and khoya are concentrated milk.
+export const MILK_EQ = { dahi: 1, milk: 1, paneer: 3, khoya: 4 };
+
+/** Raw ingredients behind a logged food, [[ingredient, grams]], or null for INDB recipes (no breakdown). */
+export function ingredientsOf(ref, opts = {}) {
+  if (ref.t === 'dish') { const d = DISH[ref.id]; if (!d) return null; const P = dishParts(d, opts); return [...P.meat, ...P.base, ...P.fat]; }
+  if (ref.t === 'ing') return ING[ref.id] ? [[ref.id, opts.grams ?? 100]] : null;
+  return null;
+}
 
 // INDB recipe → nutrition (values are per 100 g; serving grams from INDB's own serving size).
 export function estimateIndb(row, opts = {}) {
