@@ -11,6 +11,7 @@
 // client sees places others added).
 import { DISH, DISHES, estimate } from './nutrition.js';
 import { near, typo } from './fuzzy.js';
+import { LOCAL_PLACES } from './places-local.js';
 
 const I = (name, dish, opts = {}, official = null) => ({ name, dish, opts, official });
 const R = { style: 'restaurant', styleKnown: true }, S = { style: 'shaadi', styleKnown: true };
@@ -107,7 +108,7 @@ export const PLACES = [
 const norm = s => String(s).toLowerCase().replace(/['’]/g, '').normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
 /** All places: the seed list plus the client's own. */
-export const allPlaces = (custom = []) => [...PLACES, ...custom.map(p => ({ ...p, type: p.type || 'Added by you', custom: true }))];
+export const allPlaces = (custom = []) => [...PLACES, ...LOCAL_PLACES, ...custom.map(p => ({ ...p, type: p.type || 'Added by you', custom: true }))];
 
 /** Nutrition for a menu item: the chain's official numbers if present, else the dish model. */
 export function itemNutrition(item) {
@@ -121,7 +122,7 @@ export function itemNutrition(item) {
  * Typo-tolerant ("nagina burgr", "cheezius", "kababjes"): words are matched by sound, not exact spelling.
  * A word can hit the place's name, its city or area, or the item.
  */
-export function searchPlaces(q, custom = [], limit = 12) {
+export function searchPlaces(q, custom = [], limit = 12, myCity = '') {
   const words = norm(q).split(' ').filter(w => w && !STOP.has(w));
   if (!words.length) return [];
   const out = [];
@@ -138,7 +139,7 @@ export function searchPlaces(q, custom = [], limit = 12) {
       if (!rest.every(w => hit(w, iw))) continue;
       if (!placeHit.length && !rest.length) continue; // a city alone isn't enough to list every item there
       const exactName = placeHit.filter(w => pw.includes(w)).length;
-      out.push({ place: p, item: it, score: placeHit.length * 3 + exactName * 0.5 + cityHit.length * 1.5 + rest.length * 2 - (placeHit.length && !rest.length ? 2 : 0) + (p.custom ? 0.3 : 0) });
+      out.push({ place: p, item: it, score: placeHit.length * 3 + exactName * 0.5 + cityHit.length * 2.5 + rest.length * 2 - (placeHit.length && !rest.length ? 0.5 : 0) + (p.custom ? 0.3 : 0) + (myCity && p.city === myCity ? 0.8 : 0) });
     }
   }
   return out.sort((a, b) => b.score - a.score).slice(0, limit);

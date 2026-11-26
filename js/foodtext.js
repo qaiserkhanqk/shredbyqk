@@ -83,6 +83,7 @@ function strict(qw, fuzzy = false) {
 }
 /** A single word that clearly names a dish on its own ("halwa", "puri", "raita"), for splitting pairs. */
 function standalone(w) {
+  if (ADJ.has(w)) return null; // "sweet" alone isn't a dish
   const key = Object.keys(DEFAULT).find(k => exact(w, k)) || Object.keys(DEFAULT).find(k => near(w, k));
   if (key) return DEFAULT[key];
   const e = INDEX.find(x => exact(w, x.name[0])) || INDEX.find(x => near(w, x.name[0]));
@@ -90,8 +91,11 @@ function standalone(w) {
 }
 
 const GENERIC = new Set(['any', 'the', 'and', 'pizza', 'burger', 'burgers', 'roll', 'cart', 'stall', 'shop', 'foods', 'food', 'cafe', 'roadside', 'hotel', 'dhaba', 'halwa', 'samosa', 'chaat', 'bhutta', 'broast', 'fried', 'fish', 'nihari', 'karahi', 'biryani', 'king', 'house', 'point', 'corner', 'centre', 'center', 'restaurant', 'tikka', 'kebab', 'kabab', 'chicken', 'paratha', 'chai', 'sweets', 'bakers', 'special']);
+// A place's own word (Nagina, Cheezious, Kala Khan), not a food or describing word ("Corner Sweet House" is
+// named by "corner"/"house", not "sweet"; "Haleem Ghar" not by "haleem").
+const FOOD_WORDS = new Set(INDEX.flatMap(e => [...e.name, ...e.alias]));
 const placeNamed = (name, query) => {
-  const w = name.toLowerCase().replace(/['’]/g, '').split(/[^a-z0-9]+/).find(x => x.length >= 3 && !GENERIC.has(x));
+  const w = name.toLowerCase().replace(/['’]/g, '').split(/[^a-z0-9]+/).find(x => x.length >= 3 && !GENERIC.has(x) && !FOOD_WORDS.has(x) && !ADJ.has(x) && !SIDE.has(x));
   // In a spoken meal a place must really be named: exact, or one typo in a longer word (no prefixes: "bun" ≠ "Bundu").
   return !!w && query.split(' ').some(q => q === w || (q.length >= 6 && w.length >= 6 && q[0] === w[0] && rawLev(q, w) <= 1));
 };

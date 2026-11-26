@@ -100,16 +100,22 @@ The app is built so a new client is never faced with a wall of features:
   - You answer what you can actually tell: how much (rotis, katori, plate, pieces, with grams), **who cooked it** (home, restaurant, shaadi/dhaba), mostly meat or gravy, and oil on top.
   - Every estimate shows a likely range and where the calories come from ("Oil: 42 g, 61% of the calories"). The app remembers how each person's food is usually cooked.
   - **1,014 Indian recipes** from the Indian Nutrient Databank and USDA ingredients are also searchable. Search works with Urdu, Hindi and English names.
+  - **Photo extras:** one-tap "or roghni naan?" correction chips (the model's runner-up), an "Add a note" option that re-reads the photo with the client's words, your usual plate size as a scale, your most-eaten dishes as context, and a warning for dark or blurry photos.
   - **Snap your meal, one tap:** the photo is logged straight away (also from **Snap meal** on Today), with Undo and tap-to-fix. The AI only names dishes from the app's list and counts portions. Calories are computed, it asks 3 times and keeps the consensus, and results are cached by photo, so the same plate gives the same number. The app asks once who usually cooks your food, then remembers it per dish. Needs `tools/food-vision-server.mjs`.
   - **"Which one?"**: "roti" can be a phulka, a tandoori roti, a naan, a roghni naan, a kulcha, a taftan or a paratha. Breads, rice, daal, salans, kebabs, burgers and drinks come as families, one tap apart.
-  - **Places: 45 restaurants, chains and carts, 170 menu items.**
+  - **Places: 150 restaurants, chains, local favourites and carts in 11 cities, 396 menu items.** Local favourites include Nagina Burger, Kala Khan Nihari, Sadiq Halwa Puri, Hafiz Sohan Halwa and Lehri Sajji. Search is typo-tolerant ("nagina burgr", "cheezius"), takes city names ("peshawar chapli"), and ranks your city first.
     - International chains, with each chain's published values where they exist. No chain publishes Pakistan values, so these come from another country's menu and are labelled with it (e.g. "McDonald's Singapore").
     - Pakistani chains: Cheezious, Broadway, Burger Lab, Ranchers, Howdy, Kaybees, OPTP, Hot n Spicy and more.
     - Famous desi restaurants and cafés.
     - The street carts every city has.
     - Search "kfc zinger" or "cheezious crown crust". **Add a place** saves a client's own dhaba or cart; each item is tied to the closest dish.
     - Checked against 20 published values, QK's recipe models are within 10% (median).
-  - **Say it or type it:** "do roti aur chicken karahi", "aadhi plate biryani", "2 big mac from mcdonalds", or in Urdu script. The whole meal becomes one card and one tap to add. Voice uses the phone's speech recognition.
+  - **Say it or type it:** "maine do paratha aur ek cup chai pi", "aadhi plate biryani", "sawa roti", "nagina burger", or in Urdu script. The whole meal becomes one card and one tap to add.
+    - Spelling variants and speech-to-text mistakes are matched by sound (parata = paratha, nahari = nihari, karhai = karahi).
+    - Pairs said as one ("halwa puri", "daal chawal") are split.
+    - Anything left over can go to the AI server.
+    - It's measured on 235 phrases in `tests/phrases/`. A blind set, scored once before any fixes, came out at 85%; all three sets now pass.
+    - Voice keeps the best of the recogniser's guesses, and the Urdu screen switches it to Urdu speech.
   - **Barcode scanning** for packaged food: label values from Open Food Facts, which stay on the phone afterwards.
   - **FatSecret live fallback** when the app's own data has little, through the server, so the key stays private and their data isn't copied.
   - **Weigh to calibrate:** enter the weight of a photo meal. After 3 of a kind, QK corrects that person's photo portions. The accuracy-study CSV export is for QK's validation study.
@@ -181,4 +187,6 @@ This simulates a full hip-thrust set (checks the coach's cueing logic) and a wal
 | `js/activity.js` | Steps from the phone's health app; activity level from steps and training |
 | `js/foodsync.js` | Food day rows and weekly summary for the coach dashboard |
 | `js/food-ur.js` | Urdu labels for the Food screen |
+| `js/fuzzy.js` | Sound-alike and typo matching for Roman Urdu food words and place names |
+| `js/places-local.js` | Famous local places in 11 cities, with sources |
 | `tools/food-vision-server.mjs` | Tiny server that keeps the AI key off the phone (Claude or OpenAI) |

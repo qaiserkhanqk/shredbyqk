@@ -94,6 +94,7 @@ export function initFood(c) {
   };
   const p = ctx.S.profile;
   const pl = $('#tPlate'); pl.value = F().plateCm || ''; pl.onchange = () => { F().plateCm = pl.value; ctx.persist(); };
+  const ct = $('#tCity'); ct.value = F().city || ''; ct.onchange = () => { F().city = ct.value; ctx.persist(); };
   for (const [id, key] of [['#tWeight', 'weightKg'], ['#tAge', 'age'], ['#tGoal', 'dietGoal'], ['#tActivity', 'activity']]) {
     const el = $(id); el.value = key === 'dietGoal' ? N.dietGoal(p) : p[key] ?? el.value;
     el.onchange = () => { p[key] = el.value; ctx.persist(); renderFood(); };
@@ -166,12 +167,12 @@ function renderResults() {
     }
   }
   const prods = Object.values(F().products || {}).filter(p => p.name.toLowerCase().includes(q.toLowerCase().trim())).slice(0, 5);
-  const menu = searchPlaces(q, F().places, 8);
+  const menu = searchPlaces(q, F().places, 8, F().city);
   const res = N.search(q, 20);
   const tag = e => e.ref.t === 'dish' ? '<span class="ftag desi">Desi model</span>' : e.ref.t === 'indb' ? `<span class="ftag">Indian recipe${e.fried ? ' · fried' : ''}</span>` : '<span class="ftag">Ingredient</span>';
   const menuRows = menu.map(({ place, item }) => {
     const n = itemNutrition(item);
-    return `<button type="button" class="row food-hit" data-menu="${esc(place.id)}|${place.items.indexOf(item)}"><div><b>${esc(item.name)}</b><div class="muted small"><span class="ftag place">${esc(place.name)}</span> ${n.official ? 'official values' : 'QK estimate'}</div></div><span class="r data">${fmt(n.kcal)} kcal</span></button>`;
+    return `<button type="button" class="row food-hit" data-menu="${esc(place.id)}|${place.items.indexOf(item)}"><div><b>${esc(item.name)}</b><div class="muted small"><span class="ftag place">${esc(place.name)}${place.city ? ' · ' + esc(place.city) : ''}</span> ${n.official ? 'official values' : 'QK estimate'}</div></div><span class="r data">${fmt(n.kcal)} kcal</span></button>`;
   }).join('');
   const foodRows = res.map(e => {
     const est = N.estimate(e.ref, defaultOpts(e.ref));
@@ -206,7 +207,7 @@ function openSheet(ref, opts, onSave, saveLabel, extra = {}) {
   $('#foodSheet').hidden = false;
 }
 function openMenuItem(place, item) {
-  openSheet({ t: 'dish', id: item.dish }, { ...item.opts, menuBase: item.opts.servings || 1 }, null, null, { name: `${place.name} · ${item.name}`, official: item.official && { ...item.official, base: item.opts.servings || 1 }, place: place.name });
+  openSheet({ t: 'dish', id: item.dish }, { ...item.opts, menuBase: item.opts.servings || 1 }, null, null, { name: `${place.name} · ${item.name}`, official: item.official && { ...item.official, base: item.opts.servings || 1 }, place: place.name + (place.city ? `, ${place.area ? place.area + ', ' : ''}${place.city}` : '') });
 }
 function closeSheet() { scanStop?.(); $('#foodSheet').hidden = true; cur = null; }
 
