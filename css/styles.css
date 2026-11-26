@@ -569,6 +569,19 @@ a.ghost { text-decoration: none; text-align: center; display: inline-flex; align
 .vol-bars { display: flex; gap: 6px; align-items: end; height: 70px; }
 .vol-bars i { flex: 1; background: var(--surface-2); border-radius: 5px 5px 2px 2px; min-height: 3px; }
 .vol-bars i.now { background: linear-gradient(180deg, var(--z2), var(--good)); }
+/* Programs on the Train tab. */
+.prog-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.prog-strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(210px, 72%); gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; margin-inline: -4px; padding-inline: 4px; }
+.prog-card { scroll-snap-align: start; text-align: left; display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 18px; border: 1px solid var(--line); background: var(--surface); color: var(--text); cursor: pointer; font: inherit; }
+.prog-card.on { border-color: var(--good); box-shadow: 0 0 0 2px rgba(92,195,148,.25); }
+.prog-card .pgoal { font: 700 .68rem var(--f-body); letter-spacing: .12em; text-transform: uppercase; color: var(--z3); }
+.prog-card b { font: 800 1.15rem var(--f-display, inherit); }
+.prog-card p { margin: 0; font-size: .85rem; color: var(--muted); }
+.prog-card .meta { margin-top: auto; font: 600 .72rem var(--f-data); color: var(--muted); }
+.prog-day { border-top: 1px solid var(--line); padding-top: 10px; }
+.prog-day h3 { margin: 0 0 6px; font-size: .95rem; }
+.prog-day ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; font-size: .88rem; }
+.prog-day li span { color: var(--muted); font-family: var(--f-data); font-size: .8rem; }
 .track-chip { position: absolute; top: 104px; left: 16px; display: inline-flex; align-items: center; gap: 7px; pointer-events: none;
   font: 600 .72rem var(--f-data); letter-spacing: .06em; text-transform: uppercase; color: rgba(236,241,236,.75);
   background: rgba(var(--scrim-rgb),.7); border: 1px solid var(--line); padding: 4px 9px; border-radius: 99px; }

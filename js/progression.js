@@ -101,27 +101,31 @@ export function nextFor(item, sets, o = {}) {
   // Count consecutive misses, newest first.
   let misses = 0; for (let i = days.length - 1; i >= 0; i--) { const d = judge(days[i], { reps: days[i][0].target }); if (d.hit) break; misses++; }
 
-  const dbl = cls === 'small' || cls === 'mid';
-  const mode = dbl ? 'reps' : days.some(d => d[0].mode === 'wave') || stalledBefore(days) ? 'wave' : 'linear';
-  let base = j.kg / (lastDay ? WAVE[lastDay].f : 1), action, why, reps, nSets, day;
+  // A program can set the rep target: a fixed number (e.g. 10 × 10) or a range (double progression).
+  const sc = o.scheme;
+  const dbl = sc ? sc.hi > sc.lo : cls === 'small' || cls === 'mid';
+  const R = sc && sc.hi > sc.lo ? { lo: sc.lo, hi: sc.hi, sets: sc.sets } : RANGE;
+  const mode = dbl ? 'reps' : sc ? 'linear' : days.some(d => d[0].mode === 'wave') || stalledBefore(days) ? 'wave' : 'linear';
+  let base = j.kg / (lastDay && !sc ? WAVE[lastDay].f : 1), action, why, reps, nSets, day;
 
   if (dbl) {
-    nSets = RANGE.sets;
-    if (misses >= 2 && j.worst < RANGE.lo) { base = round(j.kg * 0.9); reps = RANGE.lo; action = 'reset'; why = `Missed ${RANGE.lo} reps twice. Back off 10% and build up again.`; }
-    else if (j.worst >= RANGE.hi && j.cleanOk && !j.grind) { base = round(j.kg + step); reps = RANGE.lo; action = 'add'; why = `Every set hit ${RANGE.hi} clean reps. Time for more weight.`; }
+    nSets = R.sets;
+    if (misses >= 2 && j.worst < R.lo) { base = round(j.kg * 0.9); reps = R.lo; action = 'reset'; why = `Missed ${R.lo} reps twice. Back off 10% and build up again.`; }
+    else if (j.worst >= R.hi && j.cleanOk && !j.grind) { base = round(j.kg + step); reps = R.lo; action = 'add'; why = `Every set hit ${R.hi} clean reps. Time for more weight.`; }
     else {
-      base = j.kg; reps = Math.min(RANGE.hi, Math.max(RANGE.lo, j.worst + 1)); action = 'reps';
+      base = j.kg; reps = Math.min(R.hi, Math.max(R.lo, j.worst + 1)); action = 'reps';
       why = !j.cleanOk ? 'Same weight: tidy up the form before adding reps.' : j.grind ? `Same weight, aim for ${reps} reps: the last reps slowed down a lot.` : `Same weight, aim for ${reps} reps on every set.`;
-      if (!j.cleanOk) reps = Math.max(RANGE.lo, j.worst);
+      if (!j.cleanOk) reps = Math.max(R.lo, j.worst);
     }
     day = undefined;
   } else {
-    const sw = mode === 'wave' && !days.some(d => d[0].mode === 'wave');
+    const sw = !sc && mode === 'wave' && !days.some(d => d[0].mode === 'wave');
     if (misses >= 2) { base = round(base * 0.9); action = 'reset'; why = 'Missed the target twice. Back off 10% and build up again.'; }
     else if (j.hit && j.cleanOk && !j.grind) { base = base + step; action = 'add'; why = `All reps clean and the bar speed held up. Add ${fmtW(step, unit)}.`; }
     else if (j.hit) { action = 'same'; why = !j.cleanOk ? 'Reps done, but form slipped. Same weight until every rep is clean.' : 'Reps done, but they slowed down a lot. Same weight until it moves faster.'; }
     else { action = 'same'; why = `Missed ${j.tReps} reps once. Same weight, one more go.`; }
-    if (mode === 'linear') { reps = LINEAR.reps; nSets = LINEAR.sets; }
+    if (sc) { reps = sc.lo; nSets = sc.sets; }
+    else if (mode === 'linear') { reps = LINEAR.reps; nSets = LINEAR.sets; }
     else {
       day = lastDay ? ORDER[(ORDER.indexOf(lastDay) + 1) % 3] : 'heavy';
       reps = WAVE[day].reps; nSets = WAVE[day].sets;

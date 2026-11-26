@@ -1,0 +1,182 @@
+// QK programs: original training plans, each built for one goal with its own volume, rep ranges and
+// exercises. They draw on publicly documented training methods (named in `method`), not on any
+// coach's paid programme. The rep targets feed the progression engine, so QK still picks the weight.
+//
+// Item: [exerciseId, sets, reps, restSeconds, note?]
+//   reps: '5' fixed · '8-12' range (double progression) · '30s' time · '400m' distance · '10/side'
+// Volume is summarised per program as working sets per week, so programs can be compared.
+
+const d = (name, focus, items) => ({ name, focus, items });
+
+export const PROGRAMS = [
+  {
+    id: 'gainsEngine', name: 'Gains Engine', goal: 'Gains', level: 'Beginner', days: 3, weeks: 8,
+    tagline: 'Three full-body days. Add weight almost every session.',
+    method: 'Novice linear progression: a few big lifts, low volume, small jumps every session.',
+    plan: [
+      d('Day A', 'Squat · bench · row', [['squat', 3, '5', 180], ['benchPress', 3, '5', 180], ['bentRow', 3, '8', 120], ['plank', 3, '30s', 60]]),
+      d('Day B', 'Deadlift · press · pull', [['deadlift', 2, '5', 180], ['press', 3, '5', 180], ['latPulldown', 3, '10', 90], ['legRaise', 3, '10', 60]]),
+      d('Day C', 'Squat · bench · hinge', [['squat', 3, '5', 180], ['benchPress', 3, '5', 180], ['rdl', 3, '8', 120], ['facePull', 2, '15', 60]]),
+    ],
+  },
+  {
+    id: 'powerPump', name: 'Power & Pump', goal: 'Power building', level: 'Intermediate', days: 4, weeks: 10,
+    tagline: 'Heavy first, then chase the pump. Strength and size together.',
+    method: 'Power-hypertrophy split: each day opens with a heavy compound (4–6 reps) then moves to 8–15 rep bodybuilding work.',
+    plan: [
+      d('Upper power', 'Heavy bench and rows', [['benchPress', 4, '4-6', 180], ['bentRow', 4, '4-6', 180], ['press', 3, '6-8', 120], ['pullUp', 3, '6-10', 120], ['skullCrusher', 3, '8-12', 75], ['barbellCurl', 3, '8-12', 75]]),
+      d('Lower power', 'Heavy squats and pulls', [['squat', 4, '4-6', 180], ['deadlift', 3, '3-5', 210], ['legPress', 3, '8-12', 120], ['lyingLegCurl', 3, '10-12', 75], ['calfRaise', 4, '10-15', 60]]),
+      d('Upper pump', 'Volume for chest, back, arms', [['inclinePress', 4, '8-12', 90], ['cableRow', 4, '10-12', 90], ['dbShoulderPress', 3, '10-12', 90], ['cableFly', 3, '12-15', 60], ['lateralRaise', 4, '12-15', 45], ['pushdown', 3, '12-15', 45], ['hammerCurl', 3, '12-15', 45]]),
+      d('Lower pump', 'Volume for legs and glutes', [['hackSquat', 4, '8-12', 120], ['rdl', 3, '8-12', 120], ['bulgarian', 3, '10-12', 90], ['legExtension', 3, '12-15', 60], ['seatedLegCurl', 3, '12-15', 60], ['hipThrust', 3, '10-12', 90]]),
+    ],
+  },
+  {
+    id: 'hypertrophyLab', name: 'Hypertrophy Lab', goal: 'Muscle building', level: 'Intermediate', days: 5, weeks: 12,
+    tagline: 'Five days, every muscle twice a week, 12–20 hard sets each.',
+    method: 'Research-led hypertrophy: 10–20 weekly sets per muscle, 8–15 reps taken close to failure, each muscle trained twice a week.',
+    plan: [
+      d('Push', 'Chest, shoulders, triceps', [['dbBench', 4, '8-12', 90], ['inclinePress', 3, '8-12', 90], ['dbShoulderPress', 3, '10-12', 90], ['cableFly', 3, '12-15', 60], ['lateralRaise', 4, '12-20', 45], ['ohExtension', 3, '10-15', 60]]),
+      d('Pull', 'Back, rear delts, biceps', [['latPulldown', 4, '8-12', 90], ['chestRow', 4, '8-12', 90], ['dbRow', 3, '10-12', 75], ['rearDeltFly', 3, '12-20', 45], ['preacherCurl', 3, '10-12', 60], ['hammerCurl', 3, '12-15', 60]]),
+      d('Legs', 'Quads, hamstrings, calves', [['hackSquat', 4, '8-12', 120], ['rdl', 4, '8-12', 120], ['legExtension', 3, '12-15', 60], ['lyingLegCurl', 3, '10-15', 60], ['seatedCalf', 4, '12-20', 45]]),
+      d('Upper', 'Chest, back, arms', [['benchPress', 3, '6-10', 120], ['cableRow', 3, '10-12', 90], ['xMachineShoulderPress', 3, '10-12', 75], ['pecDeck', 3, '12-15', 60], ['cableCurl', 3, '12-15', 45], ['pushdown', 3, '12-15', 45]]),
+      d('Lower', 'Glutes, quads, hamstrings', [['legPress', 4, '10-15', 120], ['hipThrust', 4, '8-12', 90], ['bulgarian', 3, '10-12', 75], ['seatedLegCurl', 3, '12-15', 60], ['calfRaise', 4, '12-20', 45]]),
+    ],
+  },
+  {
+    id: 'platformPrep', name: 'Platform Prep', goal: 'Powerlifting', level: 'Advanced', days: 4, weeks: 12,
+    tagline: 'Squat, bench, deadlift. Heavy triples, bench three times a week.',
+    method: 'Powerlifting frequency and wave loading: competition lifts trained often with low reps (1–5), plus close variations to fix weak points.',
+    plan: [
+      d('Squat + bench', 'Heavy squat, volume bench', [['squat', 5, '3', 240], ['benchPress', 5, '5', 180], ['xBoxSquat', 3, '3', 180], ['dbRow', 4, '8-10', 90]]),
+      d('Deadlift', 'Heavy pull, posterior chain', [['deadlift', 4, '2', 270], ['goodMorning', 3, '6', 150], ['latPulldown', 4, '8-10', 90], ['abWheel', 3, '10', 60]]),
+      d('Bench', 'Heavy bench, triceps', [['benchPress', 6, '3', 210], ['closeGrip', 4, '5', 150], ['press', 3, '6', 120], ['pushdown', 3, '10-15', 60]]),
+      d('Squat + bench', 'Volume squat, paused bench', [['squat', 4, '5', 210], ['benchPress', 4, '4', 180], ['rdl', 3, '6', 150], ['facePull', 3, '15', 45]]),
+    ],
+  },
+  {
+    id: 'shredCircuit', name: 'Shred Circuit', goal: 'Fat loss', level: 'All levels', days: 4, weeks: 8,
+    tagline: 'Fast circuits, short rest, and a finisher that keeps you burning.',
+    method: 'Metabolic resistance training: big-muscle moves in circuits of 12–15 reps with 30–45 s rest, then a short conditioning finisher.',
+    plan: [
+      d('Full body A', 'Squat-push-pull circuit', [['gobletSquat', 4, '12-15', 30], ['pushUp', 4, '10-15', 30], ['dbRow', 4, '12-15', 30], ['kbSwing', 4, '15', 45], ['burpee', 3, '30s', 30, 'Finisher']]),
+      d('Full body B', 'Hinge-press-lunge circuit', [['rdl', 4, '12-15', 30], ['dbShoulderPress', 4, '12', 30], ['reverseLunge', 4, '10/side', 30], ['mountainClimber', 4, '30s', 30], ['yRowingStationary', 1, '500m', 0, 'Row it hard']]),
+      d('Conditioning', 'Intervals', [['runIntervals', 1, '6 rounds', 0], ['plank', 3, '45s', 30], ['russianTwist', 3, '20', 30]]),
+      d('Full body C', 'Total-body burn', [['thruster', 4, '12', 45], ['latPulldown', 4, '12-15', 30], ['stepUp', 4, '10/side', 30], ['farmerCarry', 4, '40m', 45], ['yRopeJumping', 5, '40s', 20, 'Finisher']]),
+    ],
+  },
+  {
+    id: 'inferno', name: '10×10 Inferno', goal: 'Muscle building', level: 'Intermediate', days: 4, weeks: 6,
+    tagline: 'Ten sets of ten. Same weight. Brutal, simple, it works.',
+    method: 'German Volume Training (popularised by Charles Poliquin): 10 × 10 at about 60% of max with 60–90 s rest, paired with an opposing muscle.',
+    plan: [
+      d('Chest + back', '10 × 10 pair', [['dbBench', 10, '10', 90, 'Same weight all 10 sets'], ['chestRow', 10, '10', 90], ['inclinePress', 3, '10-12', 60], ['cableRow', 3, '10-12', 60]]),
+      d('Legs + abs', '10 × 10 squat', [['squat', 10, '10', 90, 'Start at ~60% of your max'], ['lyingLegCurl', 10, '10', 90], ['calfRaise', 3, '15-20', 60], ['hangingRaise', 3, '10-15', 60]]),
+      d('Off', 'Rest', []),
+      d('Arms + shoulders', '10 × 10 arms', [['closeGrip', 10, '10', 90], ['barbellCurl', 10, '10', 90], ['lateralRaise', 3, '12-15', 60], ['rearDeltFly', 3, '12-15', 60]]),
+    ].filter(x => x.items.length),
+  },
+  {
+    id: 'athleteMode', name: 'Athlete Mode', goal: 'Strength & conditioning', level: 'Intermediate', days: 3, weeks: 8,
+    tagline: 'Lift heavy, then jump. Strength that turns into speed.',
+    method: 'Contrast training: a heavy lift (3 reps) paired with an explosive jump or throw, plus sprints. Builds force and the speed to use it.',
+    plan: [
+      d('Lower power', 'Squat contrast + sprints', [['squat', 4, '3', 150], ['yFrontBoxJump', 4, '5', 90, 'Right after each squat set'], ['bulgarian', 3, '6/side', 90], ['runSprints', 1, '6 × 20 s', 0]]),
+      d('Upper power', 'Press contrast + throws', [['benchPress', 4, '3', 150], ['yMedicineBallChestPass', 4, '6', 90, 'Right after each bench set'], ['pullUp', 4, '5', 120], ['yOverheadSlam', 3, '8', 60]]),
+      d('Total athlete', 'Clean, hinge, carry', [['yHangClean', 5, '3', 150], ['rdl', 3, '5', 150], ['yLateralBound', 3, '5/side', 90], ['farmerCarry', 4, '30m', 90], ['pallof', 3, '10/side', 45]]),
+    ],
+  },
+  {
+    id: 'springLoaded', name: 'Spring Loaded', goal: 'Plyometrics', level: 'Intermediate', days: 2, weeks: 6,
+    tagline: 'Jump higher, run faster. Low reps, full rest, every rep fast.',
+    method: 'Progressive plyometrics: foot contacts build from about 80 to 120 per session, from low-intensity hops to bounds and depth jumps, with full recovery.',
+    plan: [
+      d('Vertical', 'Jumps and hops', [['yKneeTuckJump', 3, '5', 60], ['yFrontBoxJump', 4, '5', 90], ['yHurdleHops', 4, '6', 90], ['yLinearDepthJump', 3, '4', 120, 'Step off, land, jump straight up'], ['singleCalf', 3, '12/side', 45]]),
+      d('Horizontal', 'Bounds and throws', [['yLateralBound', 4, '5/side', 90], ['ySingleLegHopProgression', 3, '4/side', 90], ['yMedicineBallChestPass', 4, '6', 60], ['yPlyoPushUp', 3, '6', 90], ['runSprints', 1, '6 × 20 s', 0]]),
+    ],
+  },
+  {
+    id: 'raceReady', name: 'Race Ready', goal: 'HYROX', level: 'All levels', days: 4, weeks: 10,
+    tagline: 'Run, station, run. Train the race the way it\'s raced.',
+    method: 'HYROX-specific training: 8 × 1 km runs, each followed by a functional station. Builds running under fatigue ("compromised running").',
+    plan: [
+      d('Engine', 'Intervals + stations', [['runIntervals', 1, '6 rounds', 0], ['hyroxSki', 4, '250m', 60], ['hyroxWallBalls', 4, '20', 60]]),
+      d('Strength', 'Race strength', [['squat', 4, '6', 150], ['deadlift', 3, '5', 180], ['hyroxSledPush', 4, '20m', 90], ['hyroxSledPull', 4, '20m', 90], ['hyroxFarmers', 3, '50m', 60]]),
+      d('Compromised run', 'Run between stations', [['hyroxRun', 4, '1 km', 0, 'Straight into the station'], ['hyroxBurpeeBJ', 4, '20m', 0], ['hyroxRow', 4, '500m', 0], ['hyroxLunges', 4, '20m', 0]]),
+      d('Long run', 'Aerobic base', [['runLong', 1, '50 min', 0], ['plank', 3, '45s', 45]]),
+    ],
+  },
+  {
+    id: 'engineIron', name: 'Engine & Iron', goal: 'Hybrid', level: 'Intermediate', days: 5, weeks: 12,
+    tagline: 'Strong and fit at the same time. Lift three days, run three.',
+    method: 'Concurrent (hybrid) training: heavy, low-volume lifting kept apart from mostly easy running, so strength and endurance both improve.',
+    plan: [
+      d('Lift: lower', 'Heavy legs', [['squat', 4, '5', 180], ['rdl', 3, '6', 150], ['bulgarian', 3, '8/side', 90], ['sidePlank', 3, '30s', 30]]),
+      d('Run: easy', 'Zone 2', [['runEasy', 1, '40 min', 0]]),
+      d('Lift: upper', 'Heavy push and pull', [['benchPress', 4, '5', 180], ['pullUp', 4, '6-8', 120], ['press', 3, '6-8', 120], ['dbRow', 3, '8-10', 90]]),
+      d('Run: quality', 'Tempo', [['runTempo', 1, '25 min', 0], ['singleCalf', 3, '12/side', 45]]),
+      d('Lift + long run', 'Full body, then go long', [['deadlift', 3, '3', 210], ['dbBench', 3, '8-10', 90], ['farmerCarry', 3, '40m', 60], ['runLong', 1, '60 min', 0, 'Later in the day or the next morning']]),
+    ],
+  },
+  {
+    id: 'barSpeed', name: 'Bar Speed', goal: 'Olympic lifting', level: 'Intermediate', days: 3, weeks: 8,
+    tagline: 'Snatch, clean & jerk. Technique first, then load.',
+    method: 'Classic weightlifting cycle: competition lifts in doubles and triples, pulls slightly heavier than the lifts, and front and overhead squats for position.',
+    plan: [
+      d('Snatch', 'Snatch + squat', [['yPowerSnatch', 5, '2', 120], ['ySnatchDeadlift', 4, '3', 120], ['yOverheadSquat', 4, '3', 120], ['backExt', 3, '10', 60]]),
+      d('Clean & jerk', 'Clean, jerk, front squat', [['yHangClean', 5, '2', 120], ['yPushPress', 4, '3', 120], ['frontSquat', 4, '3', 150], ['pullUp', 3, '6', 90]]),
+      d('Full lifts', 'Both lifts, then pulls', [['ySnatch', 6, '1', 120], ['yCleanAndJerk', 6, '1', 150], ['yCleanPull', 3, '3', 120], ['deadBug', 3, '10/side', 45]]),
+    ],
+  },
+  {
+    id: 'gluteLab', name: 'Glute Lab', goal: 'Glutes', level: 'All levels', days: 3, weeks: 10,
+    tagline: 'Build the glutes from every angle: thrust, hinge, lunge, abduct.',
+    method: 'Glute-focused training: hip thrusts and bridges for the top of the movement, hinges and lunges for the stretch, abduction for the upper glutes.',
+    plan: [
+      d('Thrust day', 'Heavy hip thrusts', [['hipThrust', 4, '6-10', 120], ['rdl', 3, '8-10', 120], ['bulgarian', 3, '10/side', 90], ['hipAbduction', 3, '15-20', 45], ['bandedWalk', 2, '20/side', 30]]),
+      d('Squat day', 'Deep squats and lunges', [['gobletSquat', 4, '8-12', 90], ['reverseLunge', 3, '10/side', 75], ['xCablePullThrough', 3, '12-15', 60], ['cableKickback', 3, '12-15/side', 45], ['singleLegBridge', 2, '12/side', 45]]),
+      d('Pump day', 'High reps, short rest', [['xBarbellGluteBridge', 4, '12-15', 60], ['stepUp', 3, '12/side', 60], ['backExt', 3, '15', 45], ['hipAbduction', 4, '20', 30], ['clamshell', 2, '20/side', 30]]),
+    ],
+  },
+  {
+    id: 'coreControl', name: 'Core Control', goal: 'Pilates & mobility', level: 'All levels', days: 3, weeks: 6,
+    tagline: 'A strong, steady core and hips that move freely.',
+    method: 'Pilates mat work (controlled breathing, precise reps) combined with mobility drills for the hips, spine and shoulders.',
+    plan: [
+      d('Core flow', 'Classic mat series', [['pilHundred', 1, '100 beats', 30], ['pilRollUp', 2, '6', 30], ['pilOneLegStretch', 2, '10/side', 30], ['pilDoubleLegStretch', 2, '8', 30], ['pilCrissCross', 2, '10/side', 30], ['pilShoulderBridge', 2, '8', 30]]),
+      d('Mobility', 'Hips, spine, shoulders', [['yInchworm', 2, '6', 30], ['yKneelingHipFlexor', 2, '45s/side', 15], ['y9090Hamstring', 2, '45s/side', 15], ['catCamel', 2, '10', 15], ['thoracicExt', 2, '10', 15], ['wallSlide', 2, '10', 30]]),
+      d('Control', 'Balance and anti-rotation', [['pilSwimming', 3, '20', 30], ['pilSideKick', 2, '10/side', 30], ['deadBug', 3, '10/side', 30], ['birdDog', 3, '8/side', 30], ['sidePlank', 3, '30s', 30], ['pilTeaser', 3, '5', 45]]),
+    ],
+  },
+  {
+    id: 'anywhereBurn', name: 'Anywhere Burn', goal: 'Fat loss · home', level: 'All levels', days: 4, weeks: 6,
+    tagline: 'No equipment, no excuses. Twenty-five minutes anywhere.',
+    method: 'Bodyweight conditioning: timed rounds of full-body moves with short rest, getting harder each week by adding rounds or reps.',
+    plan: [
+      d('Legs + lungs', 'Squats, lunges, jumps', [['xBodyweightSquat', 4, '20', 30], ['xBodyweightWalkingLunge', 4, '12/side', 30], ['jumpSquat', 4, '10', 45], ['wallSit', 3, '45s', 30], ['burpee', 3, '10', 45]]),
+      d('Upper + core', 'Push-ups and planks', [['pushUp', 4, '10-20', 45], ['benchDip', 4, '12-15', 45], ['superman', 3, '12', 30], ['mountainClimber', 4, '30s', 30], ['plank', 3, '45s', 30]]),
+      d('Cardio', 'Easy run or walk', [['runEasy', 1, '25 min', 0]]),
+      d('Total body', 'Everything, fast', [['burpee', 5, '10', 30], ['reverseLunge', 4, '10/side', 30], ['xWidePushUp', 4, '12', 30], ['singleLegBridge', 3, '12/side', 30], ['yKneeTuckJump', 3, '8', 45]]),
+    ],
+  },
+];
+
+/** Reps text → numeric scheme for the progression engine, or null for time / distance work. */
+export function scheme(sets, reps) {
+  const m = /^(\d+)(?:-(\d+))?$/.exec(String(reps).trim());
+  return m ? { sets, lo: +m[1], hi: +(m[2] || m[1]) } : null;
+}
+
+/** Working sets per week (for comparing volume). */
+export const weeklySets = p => p.plan.reduce((a, day) => a + day.items.reduce((b, it) => b + it[1], 0), 0) * p.days / p.plan.length;
+
+/** The day a lifter is on: rotates through the plan each time a training day is logged. */
+export function currentDay(prog, active) {
+  if (!prog || !active) return null;
+  const log = active.log || [], today = new Date().toDateString();
+  const last = log[log.length - 1];
+  if (last && new Date(last.at).toDateString() === today) return { index: last.day, day: prog.plan[last.day], doneToday: true, n: log.length };
+  const index = log.length ? (last.day + 1) % prog.plan.length : 0;
+  return { index, day: prog.plan[index], doneToday: false, n: log.length };
+}
+
+export const byId = id => PROGRAMS.find(p => p.id === id);
