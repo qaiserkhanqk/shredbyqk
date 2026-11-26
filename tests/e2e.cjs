@@ -318,8 +318,8 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.evaluate(() => { document.querySelector('#setup').hidden = true; });
   // Training-day reminders: a calendar file for the planned days.
   await go('progress'); await p.click('#planCard summary').catch(() => {});
-  const [dl] = await Promise.all([p.waitForEvent('download', { timeout: 4000 }).catch(() => null), p.click('#remindCal')]);
-  const ics = dl ? fs.readFileSync(await dl.path(), 'utf8') : '';
+  const [icsDl] = await Promise.all([p.waitForEvent('download', { timeout: 4000 }).catch(() => null), p.click('#remindCal')]);
+  const ics = icsDl ? fs.readFileSync(await icsDl.path(), 'utf8') : '';
   check('reminders: calendar file repeats on the training days', /RRULE:FREQ=WEEKLY;BYDAY=MO,WE/.test(ics), ics.slice(0, 80));
 
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
