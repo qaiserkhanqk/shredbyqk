@@ -44,6 +44,12 @@ export const MOVES = {
   dbRdl: { name: 'Dumbbell Romanian deadlifts', cue: 'Weights close to your legs, back flat.', lib: 'xStiffLeggedDumbbellDeadlift' },
   dbLunge: { name: 'Dumbbell lunges', cue: 'Step back, stay tall.', lib: 'xDumbbellForwardLunge' },
   dbRenegade: { name: 'Renegade rows', cue: 'Plank on the weights, row one side at a time.' },
+  // Home strength moves.
+  chairDips: { name: 'Chair dips', cue: 'Hands on the chair edge, elbows straight back.', lib: 'benchDip' },
+  pikePushUps: { name: 'Pike push-ups', cue: 'Hips high, lower your head between your hands.' },
+  superman: { name: 'Supermans', cue: 'Lift arms and legs, squeeze your back.', lib: 'superman' },
+  wallSit: { name: 'Wall sit', cue: 'Back flat on the wall, thighs parallel. Hold.', lib: 'wallSit' },
+  sideLunge: { name: 'Side lunges', cue: 'Step wide, sit into one hip, chest up.' },
 };
 
 const WARM = [['jacks', 40], ['armCircles', 30], ['hipCircles', 30], ['squats', 40], ['inchworm', 40]];
@@ -86,14 +92,14 @@ export const CLASSES = [
     ],
   },
   {
-    id: 'livingRoom', name: 'Living Room Shred', level: 'All levels', equipment: 'none', quiet: true, tagline: 'No jumping, no noise. Apartment-friendly HIIT that still burns.',
+    id: 'livingRoom', name: 'Living Room Shred', level: 'All levels', equipment: 'none', quiet: true, home: true, tagline: 'No jumping, no noise. Apartment-friendly HIIT that still burns.',
     blocks: [
       { type: 'intervals', name: 'Block 1', rounds: 3, work: 40, rest: 20, moves: ['squats', 'stepJacks', 'pushUps', 'plankTaps'], restAfter: 60 },
       { type: 'intervals', name: 'Block 2', rounds: 3, work: 40, rest: 20, moves: ['curtsyLunge', 'marchKnees', 'bridges', 'flutterKicks'], restAfter: 60 },
     ],
   },
   {
-    id: 'dumbbellBlitz', name: 'Dumbbell Blitz', level: 'Intermediate', equipment: 'dumbbells', tagline: 'Two dumbbells, thirty minutes. Strength and sweat in one.',
+    id: 'dumbbellBlitz', name: 'Dumbbell Blitz', level: 'Intermediate', equipment: 'dumbbells', home: true, tagline: 'Two dumbbells, thirty minutes. Strength and sweat in one.',
     blocks: [
       { type: 'intervals', name: 'Strength', rounds: 3, work: 45, rest: 15, moves: ['dbThruster', 'dbRow', 'dbRdl', 'dbPress'], restAfter: 60 },
       { type: 'intervals', name: 'Burn', rounds: 2, work: 40, rest: 20, moves: ['dbSwing', 'dbLunge', 'dbRenegade', 'climbers'], restAfter: 60 },
@@ -101,7 +107,29 @@ export const CLASSES = [
     ],
   },
   {
-    id: 'coreCrusher', name: 'Core Crusher 15', level: 'All levels', equipment: 'none', tagline: 'Fifteen minutes of abs and core. Add it on after any workout.',
+    id: 'legBurner', name: 'Leg Burner', level: 'All levels', equipment: 'none', home: true, quiet: true, tagline: 'Legs and glutes at home. No jumping, no equipment, lots of burn.',
+    blocks: [
+      { type: 'intervals', name: 'Legs', rounds: 3, work: 45, rest: 15, moves: ['squats', 'lunges', 'sideLunge', 'bridges'], restAfter: 60 },
+      { type: 'intervals', name: 'Burnout', rounds: 2, work: 40, rest: 20, moves: ['pulseSquats', 'curtsyLunge', 'wallSit'] },
+    ],
+  },
+  {
+    id: 'upperHome', name: 'Upper Body at Home', level: 'All levels', equipment: 'none', home: true, quiet: true, tagline: 'Chest, shoulders, arms and back with just a chair.',
+    blocks: [
+      { type: 'intervals', name: 'Push', rounds: 3, work: 40, rest: 20, moves: ['pushUps', 'pikePushUps', 'chairDips'], restAfter: 60 },
+      { type: 'intervals', name: 'Back and core', rounds: 3, work: 40, rest: 20, moves: ['superman', 'plankTaps', 'bearCrawl'] },
+    ],
+  },
+  {
+    id: 'fullBody20', name: '20-Minute Full Body', level: 'All levels', equipment: 'none', home: true, tagline: 'No time? Twenty minutes, whole body, done.',
+    warmup: [['jacks', 30], ['inchworm', 30], ['squats', 30]],
+    blocks: [
+      { type: 'intervals', name: 'Circuit', rounds: 3, work: 40, rest: 20, moves: ['squats', 'pushUps', 'lunges', 'climbers', 'bridges'], restAfter: 45 },
+      { type: 'amrap', name: 'Finisher', secs: 120, moves: [['burpees', 5], ['squats', 10]] },
+    ],
+  },
+  {
+    id: 'coreCrusher', name: 'Core Crusher 15', level: 'All levels', equipment: 'none', home: true, tagline: 'Fifteen minutes of abs and core. Add it on after any workout.',
     warmup: [['climbers', 30], ['inchworm', 30]],
     blocks: [
       { type: 'intervals', name: 'Core', rounds: 3, work: 40, rest: 20, moves: ['crunches', 'russianTwist', 'flutterKicks', 'plankTaps'], restAfter: 30 },

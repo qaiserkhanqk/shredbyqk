@@ -148,7 +148,7 @@ export const PROGRAMS = [
     ],
   },
   {
-    id: 'anywhereBurn', name: 'Anywhere Burn', goal: 'Fat loss · home', level: 'All levels', days: 4, weeks: 6,
+    id: 'anywhereBurn', name: 'Anywhere Burn', goal: 'Fat loss · home', level: 'All levels', days: 4, weeks: 6, home: 'none',
     tagline: 'No equipment, no excuses. Twenty-five minutes anywhere.',
     method: 'Bodyweight conditioning: timed rounds of full-body moves with short rest, getting harder each week by adding rounds or reps.',
     plan: [
@@ -156,6 +156,27 @@ export const PROGRAMS = [
       d('Upper + core', 'Push-ups and planks', [['pushUp', 4, '10-20', 45], ['benchDip', 4, '12-15', 45], ['superman', 3, '12', 30], ['mountainClimber', 4, '30s', 30], ['plank', 3, '45s', 30]]),
       d('Cardio', 'Easy run or walk', [['runEasy', 1, '25 min', 0]]),
       d('Total body', 'Everything, fast', [['burpee', 5, '10', 30], ['reverseLunge', 4, '10/side', 30], ['xWidePushUp', 4, '12', 30], ['singleLegBridge', 3, '12/side', 30], ['yKneeTuckJump', 3, '8', 45]]),
+    ],
+  },
+  {
+    id: 'dumbbellDen', name: 'Dumbbell Den', goal: 'Muscle · home', level: 'All levels', days: 4, weeks: 8, home: 'dumbbells',
+    tagline: 'A pair of dumbbells and a floor. Real muscle-building at home.',
+    method: 'Upper/lower split with dumbbells only: floor presses, rows, goblet squats and split squats in 8–15 reps, with slow lowering to make lighter weights work harder.',
+    plan: [
+      d('Upper A', 'Press and pull', [['xDumbbellFloorPress', 4, '8-12', 90], ['xBentOverDumbbellRow', 4, '8-12', 90], ['xStandingDumbbellShoulderPress', 3, '10-12', 75], ['lateralRaise', 3, '12-15', 45], ['hammerCurl', 3, '10-12', 45]]),
+      d('Lower A', 'Squat and hinge', [['gobletSquat', 4, '10-15', 90], ['xStiffLeggedDumbbellDeadlift', 4, '8-12', 90], ['xDumbbellSplitSquat', 3, '10/side', 75], ['singleLegBridge', 3, '12/side', 45], ['xStandingDumbbellCalfRaise', 3, '15-20', 45]]),
+      d('Upper B', 'Volume', [['pushUp', 4, '10-20', 60], ['dbRow', 4, '10-12', 75], ['xLyingDumbbellTricepsExtension', 3, '10-12', 60], ['curl', 3, '10-12', 45], ['xBandedLateralRaise', 2, '15-20', 30]]),
+      d('Lower B', 'Single leg and glutes', [['reverseLunge', 4, '10/side', 75], ['xPliDumbbellSquat', 3, '12-15', 75], ['xStiffLeggedDumbbellDeadlift', 3, '12', 75], ['deadBug', 3, '10/side', 30], ['sidePlank', 2, '30s', 30]]),
+    ],
+  },
+  {
+    id: 'bandStrong', name: 'Band Strong', goal: 'Strength · home', level: 'Beginner', days: 3, weeks: 6, home: 'bands',
+    tagline: 'Resistance bands and bodyweight. Stronger anywhere, kind on the joints.',
+    method: 'Full-body sessions with bands and bodyweight: controlled reps, a pause at the hardest point, then progress to a stronger band or more reps.',
+    plan: [
+      d('Full body A', 'Squat, push, pull', [['xBandedSquat', 3, '12-15', 60], ['pushUp', 3, '8-15', 60], ['bandPullApart', 3, '15-20', 45], ['xBandedHipThrust', 3, '12-15', 60], ['plank', 3, '30s', 30]]),
+      d('Full body B', 'Hinge, press, glutes', [['xBandGoodMorning', 3, '12-15', 60], ['xBandedShoulderPress', 3, '10-15', 60], ['reverseLunge', 3, '10/side', 60], ['bandedWalk', 3, '15/side', 30], ['superman', 3, '12', 30]]),
+      d('Full body C', 'Legs and core', [['xBandedSquat', 3, '15', 60], ['singleLegBridge', 3, '12/side', 45], ['xBandedLateralRaise', 3, '15', 45], ['xBandedCalfRaise', 3, '20', 30], ['deadBug', 3, '10/side', 30]]),
     ],
   },
 ];
@@ -195,6 +216,8 @@ export const GOALS = [
   { key: 'jump', label: 'Jump higher, run faster', sub: 'Plyometrics', program: 'springLoaded' },
   { key: 'core', label: 'Core and mobility', sub: 'Pilates and stretching', program: 'coreControl' },
   { key: 'home', label: 'Train at home, no equipment', sub: 'Bodyweight workouts', program: 'anywhereBurn' },
+  { key: 'homeDb', label: 'Build muscle at home', sub: 'With a pair of dumbbells', program: 'dumbbellDen' },
+  { key: 'homeBand', label: 'Get stronger at home', sub: 'With resistance bands', program: 'bandStrong' },
 ];
 /** The program for a goal; people new to lifting get the beginner program where one exists. */
 export function pickProgram(goalKey, isNew = false) {

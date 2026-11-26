@@ -6,7 +6,7 @@ import { nextFor } from '../js/progression.js';
 let fail = 0;
 const check = (name, ok, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${ok ? '' : ' ' + extra}`); if (!ok) fail++; };
 
-check('10 to 15 programs', PROGRAMS.length >= 10 && PROGRAMS.length <= 15, PROGRAMS.length);
+check('at least 10 programs (14 core + home programs)', PROGRAMS.length >= 10, PROGRAMS.length);
 check('unique ids and names', new Set(PROGRAMS.map(p => p.id)).size === PROGRAMS.length && new Set(PROGRAMS.map(p => p.name)).size === PROGRAMS.length);
 const missing = PROGRAMS.flatMap(p => p.plan.flatMap(dd => dd.items.filter(it => !LIB[it[0]]).map(it => `${p.id}:${it[0]}`)));
 check('every exercise is in the library', !missing.length, missing.join(' '));
