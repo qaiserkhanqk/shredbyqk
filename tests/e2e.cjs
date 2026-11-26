@@ -37,7 +37,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('first run: training → asks which days', await p.isVisible('#obDays'));
   await p.click('#obDays [data-day="1"]'); await p.click('#obDays [data-day="3"]'); await p.click('#obDone');
   check('today: greets by name', /Sara/.test(await p.textContent('#hello')));
-  check('navigation: 3 tabs (Today, Train, Me)', (await p.$$('.tabs button')).length === 3 && /Me/.test(await p.textContent('.tabs')));
+  check('navigation: 4 tabs (Today, Train, Food, Me)', (await p.$$('.tabs button')).length === 4 && /Food/.test(await p.textContent('.tabs')));
   check('today: one next step with one main button', await p.isVisible('#nextCard') && (await p.textContent('#nextCta')).length > 0, await p.textContent('#nextTitle'));
   check('today: quick buttons for calm, body check and all tools', await p.isVisible('#today [data-go=calm-now]') && await p.isVisible('#today [data-go=vitals]') && await p.isVisible('#today [data-go=body]'));
   await p.click('[data-feel=great]');
