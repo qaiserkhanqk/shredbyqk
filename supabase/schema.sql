@@ -52,6 +52,24 @@ create table if not exists public.events (
   primary key (client_id, at, kind)
 );
 
+-- Food: one row per day (totals and what was eaten; no photos), and places a client added.
+alter table public.profiles add column if not exists food_week jsonb;  -- QK's weekly food report, summarised
+create table if not exists public.food_days (
+  client_id uuid not null references public.profiles (id) on delete cascade,
+  at date not null,
+  kcal int, protein int, carbs int, fat int,
+  water int, steps int,
+  items jsonb,                             -- [{ meal, name, label, kcal, src }]
+  primary key (client_id, at)
+);
+create table if not exists public.places (
+  client_id uuid not null references public.profiles (id) on delete cascade,
+  name text not null,
+  items jsonb,                             -- [{ name, dish, opts }], each tied to a dish model
+  updated_at timestamptz not null default now(),
+  primary key (client_id, name)
+);
+
 -- Coach → client messages (cheers and nudges). QK reads them out when the client opens the app.
 create table if not exists public.messages (
   id bigint generated always as identity primary key,
@@ -79,6 +97,8 @@ alter table public.sessions enable row level security;
 alter table public.checkins enable row level security;
 alter table public.events enable row level security;
 alter table public.messages enable row level security;
+alter table public.food_days enable row level security;
+alter table public.places enable row level security;
 
 -- Profiles
 drop policy if exists "own profile" on public.profiles;
@@ -126,6 +146,16 @@ drop policy if exists "own events" on public.events;
 create policy "own events" on public.events for all using (client_id = auth.uid()) with check (client_id = auth.uid());
 drop policy if exists "coach reads events" on public.events;
 create policy "coach reads events" on public.events for select using (public.is_my_client(client_id));
+
+-- Food and places: the client owns theirs; their coach can read them.
+drop policy if exists "own food" on public.food_days;
+create policy "own food" on public.food_days for all using (client_id = auth.uid()) with check (client_id = auth.uid());
+drop policy if exists "coach reads food" on public.food_days;
+create policy "coach reads food" on public.food_days for select using (public.is_my_client(client_id));
+drop policy if exists "own places" on public.places;
+create policy "own places" on public.places for all using (client_id = auth.uid()) with check (client_id = auth.uid());
+drop policy if exists "coach reads places" on public.places;
+create policy "coach reads places" on public.places for select using (public.is_my_client(client_id));
 
 -- Messages: the coach writes to their own clients; the client reads theirs and marks them read.
 drop policy if exists "coach sends" on public.messages;

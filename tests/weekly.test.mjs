@@ -69,6 +69,12 @@ const m = weekReport({ log: typical, profile: { ...profile, dietGoal: 'lose' }, 
 check('losing weight on a cut → a win', m.wins.some(w => /Down about 0\.3/.test(w)) || m.wins.length === 3, m.wins.join(' | '));
 check('real maintenance from logs + scale', m.maintenance > 0 && /maintain at about/.test(m.notes.join(' ')), String(m.maintenance));
 
+const stepsLow = Object.fromEntries(Array.from({ length: 7 }, (_, i) => [dayKey(NOW - i * DAY), 3500]));
+const sl = weekReport({ log: strong, profile: { ...profile, dietGoal: 'lose', activity: 'high' }, now: NOW, water, steps: stepsLow });
+check('few steps → walk after meals is suggested', sl.focus.some(f => f.id === 'walk'), sl.focus.map(f => f.id).join());
+check('steps disagree with "How active" → gentle note', sl.notes.some(n => /How active/.test(n)));
+const sh = weekReport({ log: strong, profile, now: NOW, water, steps: Object.fromEntries(Array.from({ length: 7 }, (_, i) => [dayKey(NOW - i * DAY), 9500])) });
+check('lots of steps → a win', sh.wins.some(w => /steps a day/.test(w)) || sh.wins.length === 3);
 check('water goal: 80 kg → 11 glasses, +2 on training days', waterGoal(80) === 11 && waterGoal(80, true) === 13);
 check('text for QK lists wins and next week', /Went well:/.test(reportText(r, 'Sara')) && /Next week:/.test(reportText(r)));
 

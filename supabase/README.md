@@ -11,7 +11,7 @@ leaves the phone.
 
 ## 2. Create the tables and privacy rules
 1. In the project: **SQL Editor → New query**.
-2. Paste the whole of `supabase/schema.sql` and press **Run**. It should say "Success".
+2. Paste the whole of `supabase/schema.sql` and press **Run**. It should say "Success". (Already set up before food tracking? Run it again: it adds the `food_days` and `places` tables and keeps your data.)
 
 ## 3. Turn on email codes
 1. **Authentication → Sign In / Providers → Email**: make sure Email is enabled.

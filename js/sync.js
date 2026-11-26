@@ -1,8 +1,11 @@
 // Talks to the coach server (Supabase) over plain HTTPS: no SDK, so nothing extra to download or cache.
 // Used by the client app (sign in with an email code, join a coach, sync numbers, read coach messages)
 // and by the coach dashboard (sign in, list clients, send cheers).
-// Only numbers are sent: sets, reps, weights, form scores, check-ins and app opens. Never video.
+// Only numbers are sent: sets, reps, weights, form scores, check-ins, app opens, and food totals with dish
+// names (no photos). Never video.
 // The fetch function is injected, so this is unit tested without a network.
+
+import { foodDayRows, foodWeekSummary, placeRows } from './foodsync.js';
 
 export class Cloud {
   /** @param o { url, anonKey, fetch, session: { access_token, refresh_token, expires_at, user } | null, onSession } */
@@ -76,7 +79,16 @@ export async function pushAll(cloud, S, mark = {}) {
   const checks = (S.checkins || []).filter(c => c.at > (mark.checkins || 0));
   await cloud.upsert('sessions', sets.map(s => sessionRow(uid, s)), 'client_id,at,ex');
   await cloud.upsert('checkins', checks.map(c => ({ client_id: uid, at: new Date(c.at).toISOString(), data: c })), 'client_id,at');
+  // Food: the last 8 days (re-sent, so edits catch up), places the client added, and the weekly summary.
+  // If the server hasn't got the food tables yet (supabase/schema.sql not re-run), training still syncs.
+  let food = null;
+  try {
+    await cloud.upsert('food_days', foodDayRows(uid, S), 'client_id,at');
+    await cloud.upsert('places', placeRows(uid, S), 'client_id,name');
+    food = foodWeekSummary(S);
+  } catch (e) { console.warn('food sync skipped:', e.message); }
   await cloud.updateMe({
+    ...(food ? { food_week: food } : {}),
     name: S.profile?.name || null, goal: S.profile?.goal || null, weekly_goal: S.profile?.weeklyGoal || null,
     plan: S.plan || null, program: S.program ? { id: S.program.id, block: S.program.block || 1, start: S.program.start, blockStart: S.program.blockStart } : null,
     last_seen: new Date().toISOString(),

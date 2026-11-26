@@ -713,3 +713,19 @@ button.row.food-hit { padding: 11px 0; }
 .qk-line { margin: 0; font-size: .92rem; }
 .weigh { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
 .snap-card { border-color: rgba(var(--z2-rgb),.5); }
+.log-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.log-tools .ghost { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 10px; font-size: .88rem; }
+.log-tools svg { width: 18px; height: 18px; flex: none; }
+.log-tools .listening { background: var(--z2); color: var(--on-cta); border-color: var(--z2); }
+.meal-card { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+.scan-view { position: relative; border-radius: var(--r-md); overflow: hidden; background: #000; aspect-ratio: 4 / 3; }
+.scan-view video { width: 100%; height: 100%; object-fit: cover; }
+.scan-view i { position: absolute; left: 12%; right: 12%; top: 50%; height: 2px; background: var(--z3); box-shadow: 0 0 12px var(--z3); }
+.water.steps input { width: 120px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; color: var(--text); text-align: right; }
+.water.steps .water-btns { align-items: center; }
+.water.steps > div:first-child { display: flex; flex-direction: column; }
+.lang-btn { border: 1px solid var(--line); background: var(--surface); border-radius: 99px; padding: 8px 14px; font: 600 .9rem "Noto Nastaliq Urdu", var(--f-body); cursor: pointer; flex: none; }
+.ur, .ur .display, .ur .eyebrow, .ur button, .ur input { font-family: "Noto Nastaliq Urdu", var(--f-body); letter-spacing: 0; }
+.ur .eyebrow { text-transform: none; font-size: .8rem; }
+.ur .display { line-height: 1.6; }
+.ur .num, .ur .data, .ur .kbig { font-family: var(--f-display); direction: ltr; unicode-bidi: isolate; }

@@ -96,13 +96,26 @@ The app is built so a new client is never faced with a wall of features:
 - **Body scan.** Shows a posture picture with joint angles and asymmetries, plus fixes, and gives body fat by the US Navy method. Readings from a smart scale or InBody can be logged.
 - **Accountability.** Training plan (implementation intention), plan-aware streak, weekly goal and supportive nudges.
 - **Progress.** Body-fat trend, recurring form faults and session history.
-- **Food tracking built for desi food (Food tab).** 101 Pakistani, Indian, fast-food and street-food dishes are worked out from their ingredients, not read from one database row. Examples: karahi, qorma, nihari, haleem, biryani, daal, cholay, roti, paratha, kebabs, samosa, chai.
+- **Food tracking built for desi food (Food tab).** 113 Pakistani, Indian, fast-food, café and street-food dishes are worked out from their ingredients, not read from one database row. Examples: karahi, qorma, nihari, haleem, biryani, daal, cholay, roti, paratha, kebabs, samosa, chai.
   - You answer what you can actually tell: how much (rotis, katori, plate, pieces, with grams), **who cooked it** (home, restaurant, shaadi/dhaba), mostly meat or gravy, and oil on top.
   - Every estimate shows a likely range and where the calories come from ("Oil: 42 g, 61% of the calories"). The app remembers how each person's food is usually cooked.
   - **1,014 Indian recipes** from the Indian Nutrient Databank and USDA ingredients are also searchable. Search works with Urdu, Hindi and English names.
   - **Snap your meal, one tap:** the photo is logged straight away (also from **Snap meal** on Today), with Undo and tap-to-fix. The AI only names dishes from the app's list and counts portions. Calories are computed, it asks 3 times and keeps the consensus, and results are cached by photo, so the same plate gives the same number. The app asks once who usually cooks your food, then remembers it per dish. Needs `tools/food-vision-server.mjs`.
   - **"Which one?"**: "roti" can be a phulka, a tandoori roti, a naan, a roghni naan, a kulcha, a taftan or a paratha. Breads, rice, daal, salans, kebabs, burgers and drinks come as families, one tap apart.
-  - **Places:** fast-food chains (KFC, McDonald's, Hardee's, Burger King, Domino's, Pizza Hut, Subway, OPTP), well-known desi restaurants, and the street carts every city has: bun kebab, rolls, shawarma, chaat, gol gappay, BBQ, broast and nashta. Search "kfc zinger" or "butt karahi". **Add a place** saves a client's own dhaba or cart, with each item tied to the closest dish so the numbers stay realistic.
+  - **Places: 45 restaurants, chains and carts, 170 menu items.**
+    - International chains, with each chain's published values where they exist. No chain publishes Pakistan values, so these come from another country's menu and are labelled with it (e.g. "McDonald's Singapore").
+    - Pakistani chains: Cheezious, Broadway, Burger Lab, Ranchers, Howdy, Kaybees, OPTP, Hot n Spicy and more.
+    - Famous desi restaurants and cafés.
+    - The street carts every city has.
+    - Search "kfc zinger" or "cheezious crown crust". **Add a place** saves a client's own dhaba or cart; each item is tied to the closest dish.
+    - Checked against 20 published values, QK's recipe models are within 10% (median).
+  - **Say it or type it:** "do roti aur chicken karahi", "aadhi plate biryani", "2 big mac from mcdonalds", or in Urdu script. The whole meal becomes one card and one tap to add. Voice uses the phone's speech recognition.
+  - **Barcode scanning** for packaged food: label values from Open Food Facts, which stay on the phone afterwards.
+  - **FatSecret live fallback** when the app's own data has little, through the server, so the key stays private and their data isn't copied.
+  - **Weigh to calibrate:** enter the weight of a photo meal. After 3 of a kind, QK corrects that person's photo portions. The accuracy-study CSV export is for QK's validation study.
+  - **Steps** from Apple Health or Health Connect in the native app (typed in on the web). They feed the weekly report and the "How active" check.
+  - **Urdu interface** for the Food screen (one tap, right-to-left).
+  - **Coach dashboard:** each client's food week (days logged, calories and protein against target, weight trend, what QK suggested, latest meals) and the places they added, all synced. Re-run `supabase/schema.sql` to add the food tables.
   - **Water and weigh-ins:** tap a glass (goal from body weight, +2 on training days); log a weekly weigh-in.
   - **QK's weekly report:** what went well first, then at most two things to *add* next week (protein, veg and fruit, water, dairy, iron, fish, one easy swap), each with the nutrients it brings and a desi tip. It uses training days, weight trend, and gentler advice during rehab. It also estimates real maintenance calories from the logs and the scale. One tap sends it to QK.
   - Daily targets from Mifflin-St Jeor, with protein at 1.8–2.0 g/kg. See [docs/NUTRITION.md](docs/NUTRITION.md) for which databases were chosen and why.
@@ -161,4 +174,11 @@ This simulates a full hip-thrust set (checks the coach's cueing logic) and a wal
 | `js/food.js` | Food screen: one-tap photo, search, the portion and cooking sheet, places, water, weigh-ins, weekly report |
 | `js/menus.js` | Chains, restaurants and street carts with menus mapped to dish models; clients' own places |
 | `js/weekly.js` | QK's weekly food report: wins, two focus points, nutrient notes, weight trend and real maintenance |
+| `js/foodtext.js` | Typed or spoken meals in English, Roman Urdu and Urdu → dishes and portions |
+| `js/barcode.js` | Barcode scanning and Open Food Facts lookup |
+| `js/fatsecret.js` | FatSecret live fallback search (through the server) |
+| `js/calibrate.js` | Learns each person's photo portion sizes from weighings; accuracy-study export |
+| `js/activity.js` | Steps from the phone's health app; activity level from steps and training |
+| `js/foodsync.js` | Food day rows and weekly summary for the coach dashboard |
+| `js/food-ur.js` | Urdu labels for the Food screen |
 | `tools/food-vision-server.mjs` | Tiny server that keeps the AI key off the phone (Claude or OpenAI) |
