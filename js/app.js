@@ -34,6 +34,7 @@ import { WEIGHTED, lastLoad, weekSummary } from './share.js';
 import { initVitals, renderVitals } from './vitals.js';
 import { vitalNotes } from './hr.js';
 import { nextStep } from './today.js';
+import { initFood, renderFood } from './food.js';
 import { landmarksFrom, analyse, render, navyBodyFat, bfCategory, stanceProblem } from './bodyscan.js';
 
 const $ = s => document.querySelector(s);
@@ -49,6 +50,7 @@ const persist = () => {
 ErrorLog.install();
 initCalm({ S, persist: () => persist(), toast: m => toast(m) });
 initVitals({ S, persist: () => persist(), toast: m => toast(m) });
+initFood({ S, persist: () => persist(), toast: m => toast(m) });
 const recorder2 = new SessionRecorder();
 const bar = new BarTracker();
 const VBT_EQUIP = ['Barbell', 'Dumbbell', 'Dumbbells', 'EZ bar', 'Kettlebell'];
@@ -83,6 +85,7 @@ function tab(id) {
   if (id === 'rehab') renderRehab();
   if (id === 'calm') renderCalm();
   if (id === 'vitals') renderVitals();
+  if (id === 'food') renderFood();
   if (id === 'scan') $('#hipWrap').hidden = S.profile.sex === 'male';
   if (id === 'body') { const first = { recover: 'rehab', calm: 'calm' }[S.profile.focus]; const t = first && $(`#body [data-go=${first}]`); if (t) $('#body .page-head').after(t); }
   window.scrollTo(0, 0);
