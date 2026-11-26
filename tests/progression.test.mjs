@@ -37,7 +37,7 @@ n = P.nextFor(SQ, [...day('squat', 0, 80, 8, { target: 8 }), ...day('squat', 3, 
 check('one miss → same weight again', n.kg === 85 && n.action === 'same');
 const twoMiss = [...day('squat', 0, 80, 8, { target: 8 }), ...day('squat', 3, 85, [8, 7, 6], { target: 8 }), ...day('squat', 6, 85, [7, 6, 6], { target: 8 })];
 n = P.nextFor(SQ, twoMiss);
-check('two misses → back off 10% and rotate heavy/medium/light', n.action === 'reset' && n.kg === 85 && n.day === 'heavy' && n.reps === 5 && n.mode === 'wave' && /rotates/.test(n.why), JSON.stringify(n));
+check('two misses → back off 10% and rotate heavy/medium/light (starting on medium)', n.action === 'reset' && n.kg === 77.5 && n.day === 'medium' && n.reps === 8 && n.mode === 'wave' && /rotates/.test(n.why), JSON.stringify(n));
 // base 76.5 → round 77.5; heavy ×1.1 = 85.25 → 85
 
 // Wave: medium after heavy, weights from the base.
@@ -81,5 +81,13 @@ check('year view groups by month', s3.points.length <= 2, s3.points.length);
 const vol = P.weeklyVolume(hist, 4, T0 + 22 * DAY);
 check('weekly volume, oldest first', vol.length === 4 && vol[3] === 70 * 24 && vol[0] === 60 * 24, vol.join());
 
+// Plate maths.
+check('plates: 62.5 kg = bar + 20 + 1.25', P.plates(62.5)?.text === 'Bar + 20 + 1.25 each side', P.plates(62.5)?.text);
+check('plates: 140 kg', P.plates(140).side.join() === '25,25,10');
+check('plates: just the bar', P.plates(20).text === 'Just the bar');
+check('plates: 225 lb = bar + 45 + 45', P.plates(P.fromUnit(225, 'lb'), 'lb').text === 'Bar + 45 + 45 each side');
+check('plates: 135 lb', P.plates(P.fromUnit(135, 'lb'), 'lb').side.join() === '45');
+check('plates: lighter than the bar → none', P.plates(15) === null);
+check('plates: unloadable → none', P.plates(61) === null);
 if (fail) { console.log(`${fail} FAILED`); process.exit(1); }
 console.log('progression: all pass');

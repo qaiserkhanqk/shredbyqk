@@ -1,5 +1,5 @@
 // Programs: every exercise exists, each program is distinct, and rep targets feed the progression engine.
-import { PROGRAMS, scheme, weeklySets, currentDay, byId } from '../js/programs.js';
+import { PROGRAMS, scheme, weeklySets, currentDay, byId, GOALS, pickProgram, defaultDays } from '../js/programs.js';
 import { LIB } from '../js/library.js';
 import { nextFor } from '../js/progression.js';
 
@@ -36,5 +36,11 @@ check('10×10: all clean → +5 kg, still 10 × 10', r.kg === 65 && r.sets === 1
 r = nextFor(LIB.squat, sets(4).map((s, i) => ({ ...s, reps: i < 1 ? 6 : 5, good: 5 })), { scheme: scheme(4, '4-6') });
 check('range on a barbell lift: double progression inside the range', r.kg === 60 && r.reps === 6 && r.action === 'reps', JSON.stringify(r));
 
+// Sign-up goal → program.
+check('every goal starts a real program', GOALS.every(g => byId(g.program) && (!g.beginner || byId(g.beginner))));
+check('every program except the 10×10 specialist block is reachable from a goal', PROGRAMS.filter(p => p.id !== 'inferno').every(p => GOALS.some(g => g.program === p.id || g.beginner === p.id)), PROGRAMS.filter(p => !GOALS.some(g => g.program === p.id || g.beginner === p.id)).map(p => p.id).join());
+check('HYROX goal → Race Ready', pickProgram('hyrox') === 'raceReady' && pickProgram('hyrox', true) === 'raceReady');
+check('new to lifting, build muscle → Gains Engine', pickProgram('muscle', true) === 'gainsEngine' && pickProgram('muscle') === 'hypertrophyLab');
+check('default days spread through the week', defaultDays(3).join() === '1,3,5' && defaultDays(4).length === 4);
 if (fail) { console.log(`${fail} FAILED`); process.exit(1); }
 console.log('programs: all pass');

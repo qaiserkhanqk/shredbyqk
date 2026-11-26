@@ -115,7 +115,7 @@ export function nextFor(item, sets, o = {}) {
     else {
       base = j.kg; reps = Math.min(R.hi, Math.max(R.lo, j.worst + 1)); action = 'reps';
       why = !j.cleanOk ? 'Same weight: tidy up the form before adding reps.' : j.grind ? `Same weight, aim for ${reps} reps: the last reps slowed down a lot.` : `Same weight, aim for ${reps} reps on every set.`;
-      if (!j.cleanOk) reps = Math.max(R.lo, j.worst);
+      if (!j.cleanOk) { reps = Math.max(R.lo, j.worst); action = 'same'; }
     }
     day = undefined;
   } else {
@@ -127,7 +127,7 @@ export function nextFor(item, sets, o = {}) {
     if (sc) { reps = sc.lo; nSets = sc.sets; }
     else if (mode === 'linear') { reps = LINEAR.reps; nSets = LINEAR.sets; }
     else {
-      day = lastDay ? ORDER[(ORDER.indexOf(lastDay) + 1) % 3] : 'heavy';
+      day = lastDay ? ORDER[(ORDER.indexOf(lastDay) + 1) % 3] : 'medium'; // start the wave on the medium day
       reps = WAVE[day].reps; nSets = WAVE[day].sets;
       if (sw) why = 'You stalled on steady jumps, so this lift now rotates heavy, medium and light days. ' + why;
     }
@@ -183,4 +183,18 @@ export function weeklyVolume(sets, n = 8, now = Date.now()) {
     const w = Math.floor((now - s.at) / W); if (w >= 0 && w < n) out[n - 1 - w] += s.kg * s.reps;
   }
   return out;
+}
+
+/**
+ * Plates for each side of the bar.
+ * @returns { bar, side: [plate, ...], text } in the lifter's unit, or null if it can't be loaded exactly.
+ * Standard bars: 20 kg / 45 lb. Plates: 25 20 15 10 5 2.5 1.25 kg, or 45 35 25 10 5 2.5 lb.
+ */
+export function plates(kg, unit = 'kg', bar = unit === 'lb' ? 45 : 20) {
+  const total = Math.round(toUnit(kg, unit) * 100) / 100, set = unit === 'lb' ? [45, 35, 25, 10, 5, 2.5] : [25, 20, 15, 10, 5, 2.5, 1.25];
+  if (total < bar) return null;
+  let left = Math.round((total - bar) / 2 * 100) / 100; const side = [];
+  for (const p of set) while (left >= p - 1e-9) { side.push(p); left = Math.round((left - p) * 100) / 100; }
+  if (left > 0.01) return null;
+  return { bar, side, text: side.length ? `Bar + ${side.join(' + ')} each side` : 'Just the bar' };
 }
