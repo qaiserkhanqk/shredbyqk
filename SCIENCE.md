@@ -47,6 +47,22 @@ Each rule in the app comes from a published principle. This file maps the code t
 
   Simulated people with long thighs, tight ankles, tight hamstrings, short arms and elbows that don't fully straighten show why this matters (`tests/bodymap.test.mjs`). With textbook numbers, some of their full-range reps never count, or they're told to "lock out" past what their joints allow. With their body map those reps count and are clean. They're still cued when they fall short of their own range.
 
+- **Recognising the exercise (`js/detect.js`).** The detector works on a sliding 3.5-second window. It uses:
+  - posture: torso and thighs relative to vertical tell standing, bent over, lying or hanging apart
+  - the range each joint angle moves through (90th minus 10th percentile, so jitter is ignored)
+  - where the hands are relative to the head, shoulders and elbows
+  - whether the body travels while the hands stay fixed (that's a pull-up)
+  - at least one full cycle of the main joint
+
+  It recognises 20 movements within about one rep (`tests/detect.test.mjs`), including with ±4 px of simulated camera jitter, and ignores standing still or half a rep. Pairs a 2D camera can't separate, such as a seated overhead press and a lat pulldown, come with a one-tap alternative. While a new exercise is being recognised, the old one's rules are paused so they don't misread it.
+- **Moving too much (steadiness checks).** Each is measured against the lifter's own position at the start of the rep (`ctx.top`), in torso lengths, so build, stance and camera distance don't matter. Only movement during the rep counts:
+  - torso swing over 12° or hip travel over 0.15 torso lengths on curls and triceps (10° on raises)
+  - torso angle change over 15° on rows
+  - side tilt over 10° on overhead presses
+  - feet sliding over 0.2 torso lengths, or hips shifting sideways over 0.12, on squats
+
+  Clean reps with camera jitter don't trigger them (`tests/steady.test.mjs`).
+- **Squat depth facing the camera.** The knee bends towards the lens, so the 2D knee angle barely changes. Depth comes from how far the hips drop towards the ankles, scaled by shin length, and is mapped onto the same knee-angle thresholds.
 - **Squat: hips rising first.** Judged early in the drive up (40% of the way from the bottom to standing). If the torso has tipped forward more than 10° compared with the bottom position, the hips are rising ahead of the chest and the squat is turning into a good morning, which moves load to the lower back. Comparing with the lifter's own bottom position, not a fixed angle, keeps this fair for long femurs.
 - **Squat: heels lifting.** The heel's height above the toe, as a fraction of foot length, is compared with the lifter's own standing value at the start of the set (so camera tilt cancels out). A rise of more than 0.3 of foot length at the bottom is flagged. Only on free-standing squats, not on a leg press, hack squat or slant board.
 - **Bench: shoulder blades (scapular retraction).** A side-on 2D camera can't see the shoulder blades, so this is a proxy: if the shoulder point rises off the bench by more than 20% of upper-arm length between the bottom and lockout, the shoulders have rolled forward (protracted) instead of staying pinned. Treat it as a screen until it's validated on filmed lifts.

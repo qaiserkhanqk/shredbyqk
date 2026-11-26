@@ -519,3 +519,20 @@ a.ghost { text-decoration: none; text-align: center; display: inline-flex; align
 .tabs nav { box-shadow: 0 8px 28px -12px rgba(18,32,27,.25); }
 .day.on, .yn button.on.no, .crit.met .tick { color: #fff; }
 .orb .core { color: var(--text); }
+
+/* Camera coach: one tap to the camera, QK recognises the exercise */
+.cam-start { display: flex; gap: 14px; align-items: center; width: 100%; text-align: left; cursor: pointer; padding: 16px; border-radius: var(--r-lg);
+  border: 0; color: #fff; background: linear-gradient(120deg, var(--z1), var(--z2)); box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+.cam-start b { display: block; font: 800 1.15rem/1.1 var(--f-display); font-stretch: 112%; margin-bottom: 3px; }
+.cam-start span span { font-size: .9rem; opacity: .92; }
+.cam-start .cam-ic { flex: none; width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.18); }
+.cam-start .cam-ic svg { width: 24px; height: 24px; }
+.quick-btn.cam { font-weight: 700; }
+.detect-chip { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 220px); min-width: 150px; display: flex; flex-wrap: wrap; gap: 6px;
+  justify-content: center; align-items: center; padding: 8px 12px; border-radius: 16px; background: rgba(5,7,12,.82); border: 1px solid #2a3348; color: #fff;
+  font: 700 .85rem/1.25 var(--f-body); text-align: center; }
+.detect-chip.found { border-color: rgba(61,220,151,.6); }
+.detect-chip button { font: 700 .78rem var(--f-body); color: #fff; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2); border-radius: 99px; padding: 4px 10px; cursor: pointer; }
+@media (max-width: 380px) { .detect-chip { max-width: calc(100% - 32px); top: 110px; } }
+.pick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pick-grid button { padding: 10px; font-size: .9rem; }
