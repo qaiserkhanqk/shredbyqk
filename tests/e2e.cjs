@@ -334,9 +334,6 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('builder: a saved program opens ready to start', /QK Signature/.test(await p.textContent('#rsheetBody')) && await p.isVisible('[data-progstart]'));
   await p.click('[data-progstart]'); await p.waitForTimeout(300);
   check('builder: your program runs like any other', /On QK Signature/.test(await p.textContent('#progActive')), await p.textContent('#progActive'));
-  await go('train'); await tap('#progStrip [data-prog=powerPump]'); await p.click('[data-progstop]').catch(() => {}); await p.waitForTimeout(200);
-  await tap('#progStrip [data-prog=powerPump]'); await p.waitForTimeout(150);
-  await p.evaluate(() => { const S = window.__shred?.S; if (S) { S.program = null; } }); await p.evaluate(() => document.querySelector('#rsheet').hidden = true);
 
   // QK classes: start a HIIT class, QK runs it, the finisher is scored and saved.
   await p.goto('https://shred.local/'); await go('train');
