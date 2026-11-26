@@ -34,7 +34,14 @@ const RULES = `For each separate food:
 - meat_share (curries and rice with meat only, else "na"): "more" if mostly meat pieces, "less" if mostly gravy or rice, else "normal".
 - oil (cooked dishes only, else "na"): "oily" if a layer of oil (tarri) shows on top or pools at the edge, "less" if dry, else "normal".
 - confidence: 0 to 1, how sure you are of the dish.
-setting: "restaurant" for a restaurant, dhaba or wedding (karahi pans, foil, branded boxes, buffet), "home" for home, else "unsure".`;
+setting: "restaurant" for a restaurant, dhaba or wedding (karahi pans, foil, branded boxes, buffet), "home" for home, else "unsure".
+scene: "plate" if it's one person's meal; "shared" if it's a dish for several people (a whole karahi pan, a big platter, a
+  basket of naan for the table); "cooking_or_display" if food is being cooked or sold (pots on the stove, a stall's stack,
+  a sweet shop tray); "not_food" if there's no ready-to-eat food (raw meat, a kitchen, a machine).
+  For "shared", give servings for ONE person's share, not the whole dish.
+Include drinks and small bowls at the edges (lassi, raita, chutney is fine to skip).
+Chicken vs mutton/beef: look at the bones (long thin chicken bones vs thick mutton bones), the meat's colour and grain;
+  if unsure, put the other one as the alternative.`;
 
 const catalogueText = catalogue => `Catalogue (id: name, serving unit):\n${catalogue.map(c => `${c.id}: ${c.name} (${c.serving})`).join('\n')}`;
 
@@ -57,9 +64,10 @@ ${RULES}
 ${catalogueText(catalogue)}`;
 
 const schema = ids => ({
-  type: 'object', additionalProperties: false, required: ['items', 'setting'],
+  type: 'object', additionalProperties: false, required: ['items', 'setting', 'scene'],
   properties: {
     setting: { type: 'string', enum: ['home', 'restaurant', 'unsure'] },
+    scene: { type: 'string', enum: ['plate', 'shared', 'cooking_or_display', 'not_food'] },
     items: {
       type: 'array', items: {
         type: 'object', additionalProperties: false,
