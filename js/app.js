@@ -1,6 +1,6 @@
 import * as store from './store.js';
 import { say, registerAvatar, setMuted, greeting, CONFIG } from './coach.js';
-import { EXERCISES, RepEngine, allRules, estimateRIR } from './exercises.js';
+import { EXERCISES, RepEngine, allRules, estimateRIR, TIPS, BREATHING } from './exercises.js';
 import { FeedbackCoach, restSeconds } from './feedback.js';
 import { getVideoLandmarker, drawPose, liveModelName } from './pose.js';
 import { toPx, viewOf, Smoother, bestSide, angle } from './angles.js';
@@ -286,7 +286,8 @@ function openSetup(k) {
   $('#setupEyebrow').textContent = `${item.name} · set ${setsToday(k) + 1}`;
   if (ex) {
     $('#setupTitle').textContent = 'Set up your phone';
-    $('#setupSteps').innerHTML = [ex.setup, 'Shoulders, hips, knees and feet all in frame, with good light.', 'Turn your sound up. QK talks you through the set.'].map(s => `<li>${esc(s)}</li>`).join('');
+    // One line on screen; everything else QK says out loud when the set starts.
+    $('#setupSteps').innerHTML = `<li>${esc(ex.setup)}</li>`;
   } else {
     const c = COACH[coachOf(item)];
     $('#setupTitle').textContent = c.title;
@@ -387,7 +388,7 @@ async function startLive({ mode, source, file, auto = false }) {
   }
 
   if (auto) say('Camera coach. Step back so I can see your whole body, then start your exercise. I\'ll recognise it in a rep or two.', { id: 'auto_intro', priority: 'high' });
-  else if (mode === 'form') say(`${ex.name}. ${ex.hold ? 'Get into position and hold.' : ex.setup + ' Start when you\'re ready.'}`, { id: `setup_${exKey}`, priority: 'high' });
+  else if (mode === 'form') say(setupLine(ex), { id: `setup_${exKey}`, priority: 'high' });
   else if (source !== 'file') { say(TEST[mode].intro(), { id: mode + '_intro', priority: 'high' }); await countdown(3); }
   live.t0 = performance.now();
   cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
@@ -476,6 +477,9 @@ function formFrame(px, ctx, t) {
   if (!engine) {
     // Every camera exercise is judged against the lifter's own body map (not the demo athlete's).
     live.P = live.source !== 'demo' ? personalFor(ex.patternKey, S.profile.body) : null;
+    // NSCA (TSAC Report 80): with a painful or unstable shoulder, avoid full arm extension in pulldowns.
+    const shoulderRehab = S.rehab?.active && COND[S.rehab.active.cond]?.area === 'Shoulder';
+    if (shoulderRehab && ex.patternKey === 'vPull') live.P = { ...(live.P || {}), lockElbow: Math.min(live.P?.lockElbow ?? 155, 140), upT: Math.min(live.P?.upT ?? 150, 135) };
     engine = new RepEngine(ex, ex.view === 'either' ? view : ex.view, live.P); fb = new FeedbackCoach();
   }
   const raw = ex.metrics(px, engine.view), m = { ...raw };
@@ -543,6 +547,18 @@ function formFrame(px, ctx, t) {
   $('#readout').innerHTML = keys.map(k => `<span>${k} ${fmtA(m[k])}</span>`).join('') + (live.lastV ? `<span>${live.lastV.mcv.toFixed(2)} m/s</span>` : '') + `<span class="muted">${engine.view} view</span>` + (live.P ? '<span class="fit">fit to your body</span>' : '');
 }
 
+// What QK says as a set starts: where to put the phone, two short commands, and how to breathe.
+// The breathing safety note is said once per app session, the first time a heavy lift starts.
+let saidBreathSafety = false;
+const LOADED = ['squat', 'rdl', 'lunge', 'bench', 'press', 'row', 'vPull', 'hipThrust', 'dip'];
+function setupLine(ex) {
+  if (ex.hold) return `${ex.name}. Get into position and hold.`;
+  const tips = (TIPS[ex.patternKey] || []).map(t => t[0]).join(' ');
+  const heavy = LOADED.includes(ex.patternKey);
+  const safety = heavy && !saidBreathSafety ? (saidBreathSafety = true, ' ' + BREATHING.safety) : '';
+  return `${ex.name}. ${ex.setup} ${tips}${safety} ${heavy ? BREATHING.cue : 'Start when you\'re ready.'}`.replace(/\s+/g, ' ');
+}
+
 /* ---------- Camera coach: recognise the exercise, then coach it ---------- */
 // While no exercise is known: draw the skeleton with joint angles, feed the detector, keep ~4 s of frames.
 // Once recognised: adopt it and replay those frames so the first reps count. Afterwards keep watching:
@@ -592,7 +608,8 @@ function adoptExercise(res, t, replay) {
   $('#detectChip').classList.add('found'); $('#detectTxt').textContent = `${res.label} ✓`; $('#faultBanner').hidden = true; live.badUntil = 0;
   $('#detectAlt').hidden = !res.alt; if (res.alt) $('#detectAlt').textContent = `Or ${res.alt.label.toLowerCase()}?`;
   $('#detectChange').hidden = false;
-  say(`${res.label}. Got it. Keep going.`, { id: 'det_' + res.key, priority: 'now' });
+  const tip = (TIPS[ex.patternKey] || []).map(t => t[0]).slice(0, 1).join(' ');
+  say(`${res.label}. Got it. ${tip} Keep going.`.replace(/\s+/g, ' '), { id: 'det_' + res.key, priority: 'now' });
   if (replay && live.buf.length) {
     const buf = live.buf.slice(); live.replaying = true;
     try { for (const b of buf) formFrame(b.px, live.ctx, b.t); } finally { live.replaying = false; }
