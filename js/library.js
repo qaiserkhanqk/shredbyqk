@@ -6,6 +6,7 @@
 import { EXERCISES } from './exercises.js';
 import { EXTRA } from './library-extra.js';
 import { MORE } from './library-more.js';
+import { ATHLETE } from './library-athlete.js';
 
 // Training types shown as extra filters next to the muscle groups.
 export const KINDS = { Plyometrics: 'plyo', Olympic: 'olympic', Stretching: 'stretch', Cardio: 'cardio', Running: 'run', HYROX: 'hyrox', Pilates: 'pilates' };
@@ -231,6 +232,7 @@ export const LIBRARY = [
   ...EXTRA.map(([id, name, muscles, equipment, pattern, extra]) => X(id, name, muscles, equipment, pattern, extra)),
   // ---- Plyometrics, Olympic lifts, stretching/mobility and cardio from free-exercise-db ----
   ...MORE.map(([id, name, muscles, equipment, pattern, extra]) => X(id, name, muscles, equipment, pattern, extra)),
+  ...ATHLETE.map(([id, name, muscles, equipment, pattern, extra]) => X(id, name, muscles, equipment, pattern, extra)),
 ];
 
 // Flags that decide which NSCA-based rules apply to an exercise (see exercises.js):

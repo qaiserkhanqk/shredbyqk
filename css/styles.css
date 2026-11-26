@@ -673,6 +673,14 @@ a.ghost { text-decoration: none; text-align: center; display: inline-flex; align
 .recover-card { display: flex; flex-direction: column; gap: 4px; text-align: left; border-color: rgba(127,184,230,.55); cursor: pointer; font: inherit; color: var(--text); }
 .recover-card b { font: 800 1.1rem var(--f-display, inherit); }
 .routine-card .pgoal { color: #5b9fd0; }
+.athlete-start { background: linear-gradient(135deg, #2b3a63, #3d5a9e); }
+.sport-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.sport-grid button, .role-list button, .phase-list button { text-align: left; display: flex; flex-direction: column; gap: 3px; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
+.sport-grid button b { font-size: 1.05rem; }
+.role-list, .phase-list { display: flex; flex-direction: column; gap: 8px; }
+.role-list span, .phase-list span { font-size: .8rem; color: var(--muted); }
+.ath-flag { margin: 0; padding: 10px 12px; border-radius: 12px; background: rgba(229,168,76,.14); border: 1px solid rgba(229,168,76,.5); font-size: .85rem; }
+.ath-gaps { margin: 0; font-size: .78rem; color: var(--muted); }
 .track-chip { position: absolute; top: 104px; left: 16px; display: inline-flex; align-items: center; gap: 7px; pointer-events: none;
   font: 600 .72rem var(--f-data); letter-spacing: .06em; text-transform: uppercase; color: rgba(236,241,236,.75);
   background: rgba(var(--scrim-rgb),.7); border: 1px solid var(--line); padding: 4px 9px; border-radius: 99px; }

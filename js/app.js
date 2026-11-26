@@ -28,6 +28,7 @@ import * as refresh from './refresh.js';
 import { CLOUD, cloudOn } from './cloud-config.js';
 import * as classes from './classes.js';
 import * as routines from './routines.js';
+import * as athletes from './athletes.js';
 import { Cloud, pushAll } from './sync.js';
 import { PROGRAMS, scheme as progScheme, weeklySets, currentDay, byId as builtinById, GOALS, pickProgram, defaultDays } from './programs.js';
 import * as builder from './builder.js';
@@ -292,7 +293,7 @@ COACH.tempo.note = COACH.hold.note = 'A camera can\'t judge this movement reliab
 
 let muscleFilter = 'All', searchQ = '';
 function renderTrain() {
-  renderPrograms(); renderClasses(); renderHome(); renderRecover();
+  renderPrograms(); renderClasses(); renderHome(); renderRecover(); renderAthleteBtn();
   $('#muscleChips').innerHTML = ['All', ...Object.keys(KINDS), ...MUSCLES, 'Rehab'].map(m => `<button type="button" class="mchip ${m === muscleFilter ? 'on' : ''}" data-muscle="${m}" aria-pressed="${m === muscleFilter}">${m}</button>`).join('');
   const q = searchQ.trim().toLowerCase();
   // Physio exercises live under their own Rehab filter so they don't clutter the gym library.
@@ -1670,7 +1671,8 @@ $('#cpRound').onclick = () => { if (!cls) return; cls.score++; $('#cpScore').tex
 
 /* ---------- Workout builder ---------- */
 // Built programs live in S.customPrograms and behave exactly like the built-in ones.
-const programById = id => builtinById(id) || (S.customPrograms || []).find(p => p.id === id) || null;
+const programById = id => builtinById(id) || (S.customPrograms || []).find(p => p.id === id) || athleteProgram(id) || null;
+const athleteProgram = id => { const a = athletes.parseId(id); return a ? athletes.buildProgram(a.sport, a.role, a.phase, LIB) : null; };
 let bd = null, bdDay = 0;
 function openBuilder(p) {
   bd = p ? JSON.parse(JSON.stringify(p)) : builder.blank();
@@ -1733,6 +1735,37 @@ $('#rsheetBody').addEventListener('click', e => {
   if (del) { S.customPrograms = (S.customPrograms || []).filter(p => p.id !== del.dataset.progdel); persist(); closeSheet(); renderPrograms(); toast('Program deleted.'); }
 });
 
+/* ---------- Athletes: sport → position → season ---------- */
+function openAthlete(step = 'sport', pick = {}) {
+  if (step === 'sport') return openSheet(`<div><span class="eyebrow">Train for your sport</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Which sport?</h2></div>
+    <div class="sport-grid">${athletes.SPORTS.map(s => `<button type="button" data-sport="${s.id}"><b>${s.icon} ${esc(s.name)}</b><span class="muted small">${s.roles.length} positions</span></button>`).join('')}</div>
+    <p class="muted small" style="margin:0">More sports coming. Built from sport-science research for each position.</p>`);
+  const sp = athletes.sportById(pick.sport);
+  if (step === 'role') return openSheet(`<div><span class="eyebrow">${sp.icon} ${esc(sp.name)}</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Your position or style</h2></div>
+    <p class="muted small" style="margin:0">${esc(sp.intro)}</p>
+    <div class="role-list">${sp.roles.map(r => `<button type="button" data-role="${r.id}" data-rsport="${sp.id}"><b>${esc(r.name)}</b><span>${esc(r.desc)}</span></button>`).join('')}</div>`);
+  if (step === 'phase') return openSheet(`<div><span class="eyebrow">${sp.icon} ${esc(athletes.roleOf(sp.id, pick.role).name)}</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Where are you in the season?</h2></div>
+    <div class="phase-list">${athletes.PHASES.map(ph => `<button type="button" data-phase="${ph.id}" data-psport="${sp.id}" data-prole="${pick.role}"><b>${ph.name}</b><span>${ph.sub} · ${esc(sp.season[ph.id])}</span></button>`).join('')}</div>`);
+}
+$('#athleteBtn').onclick = () => openAthlete('sport');
+$('#rsheetBody').addEventListener('click', e => {
+  const s1 = e.target.closest('[data-sport]'), r1 = e.target.closest('[data-role]'), p1 = e.target.closest('[data-phase]'), ph = e.target.closest('[data-athphase]');
+  if (s1) openAthlete('role', { sport: s1.dataset.sport });
+  else if (r1) openAthlete('phase', { sport: r1.dataset.rsport, role: r1.dataset.role });
+  else if (p1) { const id = `ath-${p1.dataset.psport}-${p1.dataset.prole}-${p1.dataset.phase}`; S.athlete = { sport: p1.dataset.psport, role: p1.dataset.prole, phase: p1.dataset.phase }; persist(); showProgram(id); }
+  else if (ph) {
+    const a = S.athlete || athletes.parseId(S.program?.id); if (!a) return;
+    const id = `ath-${a.sport}-${a.role}-${ph.dataset.athphase}`; S.athlete = { ...a, phase: ph.dataset.athphase };
+    // On this programme already: switch phase in place (keeps the training log).
+    if (athletes.parseId(S.program?.id)) { S.program = { id, start: Date.now(), blockStart: Date.now(), block: 1, log: [] }; renderToday(); renderPrograms(); toast(`Switched to ${athletes.PHASES.find(x => x.id === ph.dataset.athphase).name}.`); }
+    persist(); showProgram(id);
+  }
+});
+function renderAthleteBtn() {
+  const a = athletes.parseId(S.program?.id), sp = a && athletes.sportById(a.sport), r = a && athletes.roleOf(a.sport, a.role);
+  $('#athleteSub').textContent = r ? `On ${sp.name}: ${r.name} · ${athletes.PHASES.find(p => p.id === a.phase).name}. Tap to change.` : 'Cricket, football, MMA, boxing, padel, tennis, hockey, squash. Built for your position.';
+}
+
 /* ---------- Programs ---------- */
 // The program's rep target for an exercise on today's program day (feeds the progression engine).
 function programScheme(k) {
@@ -1745,6 +1778,7 @@ function logProgramDay(k) {
   (S.program.log ||= []).push({ day: d.index, at: Date.now() }); persist();
 }
 function renderPrograms() {
+  renderAthleteBtn();
   const act = activeProgram(), d = programDay();
   $('#progActive').textContent = act ? `On ${act.name} · ${d.doneToday ? 'today done ✓' : 'next: ' + d.day.name}` : '';
   const all = [...(S.customPrograms || []), ...PROGRAMS];
@@ -1759,6 +1793,9 @@ function showProgram(id) {
     <p style="margin:0">${esc(p.tagline)}</p>
     <p class="muted small" style="margin:0"><b>How it works:</b> ${esc(p.method)} QK picks your weights from how each session went.</p>
     <p class="data small" style="margin:0">${p.days} days a week · ${p.weeks} weeks · about ${Math.round(weeklySets(p))} working sets a week</p>
+    ${p.flag ? `<p class="ath-flag">⚠️ ${esc(p.flag)}</p>` : ''}
+    ${p.gaps ? `<p class="ath-gaps">Evidence note: ${esc(p.gaps)}</p>` : ''}
+    ${p.athlete ? `<div class="seg" role="group" aria-label="Season phase">${athletes.PHASES.map(ph => `<button type="button" data-athphase="${ph.id}" class="${ph.id === p.athlete.phase ? 'on' : ''}">${ph.name}</button>`).join('')}</div>` : ''}
     ${p.plan.map(dd => { const lb = SS.labels(dd.items); return `<div class="prog-day"><h3>${esc(dd.name)} <span class="muted small">· ${esc(dd.focus)}</span></h3><ol>${dd.items.map((it, ix) => `<li>${lb[ix] ? `<span class="ss">${lb[ix]}</span> ` : ''}${esc(LIB[it[0]]?.name || it[0])} <span>${it[1]} × ${esc(it[2])}${it[3] ? ` · rest ${it[3] < 120 ? it[3] + ' s' : it[3] / 60 + ' min'}` : ''}</span>${it[4] ? `<br><span class="muted small">${esc(it[4])}</span>` : ''}</li>`).join('')}</ol></div>`; }).join('')}
     <div class="btn-row"><button class="ghost" type="button" data-progedit="${p.id}">${p.custom ? 'Edit' : 'Copy and edit'}</button>${p.custom && !on ? `<button class="ghost" type="button" data-progdel="${p.id}">Delete</button>` : ''}${on ? '<button class="ghost" type="button" data-progstop>Stop this program</button>' : ''}<button class="cta" type="button" data-progstart="${p.id}">${on ? 'Restart from day 1' : 'Start this program'}</button></div>`);
 }
@@ -2322,6 +2359,7 @@ $('#obDays').onclick = e => { const b = e.target.closest('[data-day]'); if (!b) 
 $('#obDone').onclick = $('#obSkip').onclick = () => finishWelcome();
 function finishWelcome() {
   $('#welcome').hidden = true; bindPlan(); renderPrograms(); renderToday(); tab('today');
+  if (S.profile.goal === 'athlete' && !S.athlete) setTimeout(() => { tab('train'); openAthlete('sport'); }, 600);
   say(`${greeting(S.profile.name)} ${nudgeLine()}`, { id: 'greet', priority: 'high' });
 }
 // The website caches itself for offline use; the native app (native/README.md) ships its files inside, so it skips this.

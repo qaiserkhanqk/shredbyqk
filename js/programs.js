@@ -208,7 +208,7 @@ export const GOALS = [
   { key: 'muscle', label: 'Build muscle', sub: 'Size, shape and definition', program: 'hypertrophyLab', beginner: 'gainsEngine' },
   { key: 'powerbuild', label: 'Strong and muscular', sub: 'Power building', program: 'powerPump', beginner: 'gainsEngine' },
   { key: 'strength', label: 'Get as strong as possible', sub: 'Squat, bench, deadlift', program: 'platformPrep', beginner: 'gainsEngine' },
-  { key: 'athlete', label: 'Perform better at my sport', sub: 'Strength, speed and power', program: 'athleteMode' },
+  { key: 'athlete', label: 'Perform better at my sport', sub: 'Cricket, football, MMA, boxing, padel and more', program: 'athleteMode' },
   { key: 'hyrox', label: 'Race HYROX', sub: 'Running and stations', program: 'raceReady' },
   { key: 'hybrid', label: 'Strong and fit', sub: 'Lifting and running together', program: 'engineIron' },
   { key: 'glutes', label: 'Build my glutes', sub: 'Glute-focused training', program: 'gluteLab' },

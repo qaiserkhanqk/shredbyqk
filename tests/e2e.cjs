@@ -344,6 +344,15 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.evaluate(() => { document.querySelector('#rsheet').hidden = true; });
   check('builder: your program runs like any other', /On QK Signature/.test(await p.textContent('#progActive')), await p.textContent('#progActive'));
 
+  // Athletes: sport → position → season builds a programme; mixed-action bowlers get a warning.
+  await p.goto('https://shred.local/'); await go('train'); await tap('#athleteBtn');
+  check('athletes: 8 sports to choose from', (await p.$$('#rsheetBody [data-sport]')).length === 8);
+  await p.click('[data-sport=cricket]'); await p.click('[data-role=fastMixed]'); await p.click('[data-phase=off]'); await p.waitForTimeout(200);
+  check('athletes: mixed-action fast bowler programme, with the back-injury warning', /Fast bowler: mixed action/.test(await p.textContent('#rsheetBody')) && /lumbar stress/.test(await p.textContent('#rsheetBody')) && /Trap-Bar Deadlift/.test(await p.textContent('#rsheetBody')));
+  await p.click('[data-progstart]'); await p.waitForTimeout(200);
+  check('athletes: it runs like any programme', /On Cricket/.test(await p.textContent('#athleteSub')), await p.textContent('#athleteSub'));
+  await tap('#progStrip [data-prog]'); await p.click('[data-progstop]'); await p.waitForTimeout(200);
+
   // Warm up, stretch & recover: today's drills and cool-down, plus recovery routines, run by QK.
   await p.goto('https://shred.local/'); await go('train');
   check('recover: drills, cool-down and 6 recovery routines on the Train tab', (await p.$$('#recoverStrip [data-routine]')).length === 8);
