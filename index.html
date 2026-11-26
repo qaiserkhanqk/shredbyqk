@@ -85,22 +85,30 @@
 
   <!-- TRAIN -->
   <section class="screen" id="train">
-    <div class="page-head"><div><span class="eyebrow">Form check</span><h1 class="display h1">What are we training?</h1></div></div>
-    <button type="button" class="cam-start" id="camCoach2"><span class="cam-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5zM1 5h15v14H1z"/></svg></span><span><b>Just start moving</b><span>Open the camera and do your exercise. QK recognises it and corrects you live.</span></span></button>
+    <div class="page-head"><div><span class="eyebrow">Train</span><h1 class="display h1" id="trainTitle">Your program</h1></div></div>
+    <div id="progHero"></div>
+
+    <div class="prog-head" id="pickHead"><span class="eyebrow" id="pickEyebrow">Choose your program</span><span class="muted small" id="progActive"></span></div>
+    <div class="chips-scroll" id="collChips" role="group" aria-label="Program type"></div>
+    <div class="prog-list" id="progStrip" role="list"></div>
+    <button class="ghost build-btn" type="button" id="buildNew">+ Build your own program</button>
+
+    <div class="prog-head more-head"><span class="eyebrow">More ways to train</span></div>
     <button type="button" class="cam-start athlete-start" id="athleteBtn"><span class="cam-ic">🏆</span><span><b>Train for your sport</b><span id="athleteSub">Cricket, football, MMA, boxing, padel, tennis, hockey, squash. Built for your position.</span></span></button>
-    <div class="prog-head"><span class="eyebrow">Warm up, stretch &amp; recover</span></div>
-    <div class="prog-strip" id="recoverStrip" role="list"></div>
-    <div class="prog-head"><span class="eyebrow">At home · no gym needed</span></div>
-    <div class="prog-strip" id="homeStrip" role="list"></div>
     <div class="prog-head"><span class="eyebrow">Classes · QK runs them, any time</span></div>
     <div class="prog-strip" id="classStrip" role="list"></div>
-    <div class="prog-head"><span class="eyebrow">Programs</span><span class="muted small" id="progActive"></span></div>
-    <button class="ghost build-btn" type="button" id="buildNew">+ Build your own program</button>
-    <div class="prog-strip" id="progStrip" role="list"></div>
-    <label class="field"><span class="eyebrow">Search</span><input id="exSearch" type="search" placeholder="Search 84 exercises, e.g. row, squat, cable" autocomplete="off"></label>
+    <div class="prog-head"><span class="eyebrow">At home · no gym needed</span></div>
+    <div class="prog-strip" id="homeStrip" role="list"></div>
+    <div class="prog-head"><span class="eyebrow">Warm up, stretch &amp; recover</span></div>
+    <div class="prog-strip" id="recoverStrip" role="list"></div>
+
+    <div class="prog-head more-head"><span class="eyebrow">Single exercises</span><span class="muted small">Train one move with the camera</span></div>
+    <button type="button" class="cam-start" id="camCoach2"><span class="cam-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5zM1 5h15v14H1z"/></svg></span><span><b>Just start moving</b><span>Open the camera and do your exercise. QK recognises it and corrects you live.</span></span></button>
+    <label class="field"><span class="eyebrow">Search</span><input id="exSearch" type="search" placeholder="Search exercises, e.g. row, squat, cable" autocomplete="off"></label>
     <div class="chips-scroll" id="muscleChips" role="group" aria-label="Filter by muscle"></div>
-    <p class="muted small" style="margin:0" id="exCount"></p>
-    <div class="ex-grid" id="exGrid"></div>
+    <button class="ghost" type="button" id="exOpen">Browse all exercises</button>
+    <p class="muted small" style="margin:0" id="exCount" hidden></p>
+    <div class="ex-grid" id="exGrid" hidden></div>
   </section>
 
   <!-- FOOD -->

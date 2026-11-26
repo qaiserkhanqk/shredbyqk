@@ -1,5 +1,5 @@
 // Programs: every exercise exists, each program is distinct, and rep targets feed the progression engine.
-import { PROGRAMS, scheme, weeklySets, currentDay, byId, GOALS, pickProgram, defaultDays } from '../js/programs.js';
+import { PROGRAMS, scheme, weeklySets, currentDay, byId, GOALS, pickProgram, defaultDays, COLLECTIONS, collectionOf } from '../js/programs.js';
 import { LIB } from '../js/library.js';
 import { nextFor } from '../js/progression.js';
 
@@ -42,5 +42,12 @@ check('every program except the 10×10 specialist block is reachable from a goal
 check('HYROX goal → Race Ready', pickProgram('hyrox') === 'raceReady' && pickProgram('hyrox', true) === 'raceReady');
 check('new to lifting, build muscle → Gains Engine', pickProgram('muscle', true) === 'gainsEngine' && pickProgram('muscle') === 'hypertrophyLab');
 check('default days spread through the week', defaultDays(3).join() === '1,3,5' && defaultDays(4).length === 4);
+// Train tab collections: every program in exactly one, no unknown ids.
+const inColl = COLLECTIONS.flatMap(c => c.ids);
+check('collections: every program in exactly one collection', PROGRAMS.every(p => inColl.filter(x => x === p.id).length === 1), PROGRAMS.filter(p => inColl.filter(x => x === p.id).length !== 1).map(p => p.id).join());
+check('collections: no unknown program ids', inColl.every(byId));
+check('collections: lookup', collectionOf('massMonster').key === 'muscle' && collectionOf('nope') === null);
+check('new programs: Strength Builder, Mass Monster, Elite Physique', ['strengthBuilder', 'massMonster', 'elitePhysique'].every(byId));
+check('goals: get stronger → Strength Builder, bigger → Mass Monster, aesthetic → Elite Physique', pickProgram('strength') === 'strengthBuilder' && pickProgram('mass') === 'massMonster' && pickProgram('physique') === 'elitePhysique' && pickProgram('powerlifting') === 'platformPrep');
 if (fail) { console.log(`${fail} FAILED`); process.exit(1); }
 console.log('programs: all pass');

@@ -128,6 +128,40 @@ export const PROGRAMS = [
     ],
   },
   {
+    id: 'strengthBuilder', name: 'Strength Builder', goal: 'Strength', level: 'Intermediate', days: 4, weeks: 10,
+    tagline: 'Four days. One heavy main lift each day. Stronger every week.',
+    method: 'Upper/lower strength split: each day opens with one main lift for 4–5 sets of 3–6, then a second compound and 2–3 accessories for weak points.',
+    plan: [
+      d('Heavy squat', 'Squat, then single-leg and hamstrings', [['squat', 5, '3-5', 210], ['xBoxSquat', 3, '5', 150], ['bulgarian', 3, '8', 90], ['lyingLegCurl', 3, '8-10', 75], ['abWheel', 3, '8-12', 60]]),
+      d('Heavy bench', 'Bench, then rows and triceps', [['benchPress', 5, '3-5', 210], ['bentRow', 4, '6-8', 120], ['closeGrip', 3, '6-8', 120], ['chinUp', 3, '6-10', 90], ['facePull', 3, '15', 45]]),
+      d('Heavy deadlift', 'Deadlift, then the posterior chain', [['deadlift', 4, '3-5', 240], ['frontSquat', 3, '5', 150], ['goodMorning', 3, '8', 120], ['backExt', 3, '10-12', 60], ['plank', 3, '45s', 45]]),
+      d('Heavy press', 'Overhead press, then pulling', [['press', 5, '3-5', 180], ['pullUp', 4, '5-8', 120], ['dbBench', 3, '8-10', 90], ['dbRow', 3, '8-10', 75], ['shrug', 3, '10-12', 60]]),
+    ],
+  },
+  {
+    id: 'massMonster', name: 'Mass Monster', goal: 'Muscle building', level: 'Intermediate', days: 4, weeks: 10,
+    tagline: 'Heavy compounds, high volume, big pumps. Built to add size.',
+    method: 'Mass-gain upper/lower: heavy compounds for 6–10 reps, then high-volume accessories, about 15–20 hard weekly sets for the big muscles.',
+    plan: [
+      d('Upper mass', 'Chest and back, heavy', [['benchPress', 4, '6-8', 150], ['bentRow', 4, '6-8', 150], ['inclinePress', 3, '8-10', 120], ['latPulldown', 3, '8-10', 90], ['chestDip', 3, '8-12', 90], ['barbellCurl', 3, '8-10', 60, '', 'A'], ['skullCrusher', 3, '8-10', 60, '', 'A']]),
+      d('Lower mass', 'Squat-led legs', [['squat', 4, '6-8', 180], ['rdl', 4, '8-10', 150], ['legPress', 3, '10-15', 120], ['legExtension', 3, '12-15', 60], ['seatedLegCurl', 3, '10-12', 60], ['calfRaise', 4, '10-15', 45]]),
+      d('Upper volume', 'Shoulders, back, arms', [['dbShoulderPress', 4, '8-12', 90], ['cableRow', 4, '10-12', 90], ['dbFly', 3, '12-15', 60], ['xChestSupportedTBarRow', 3, '10-12', 75], ['lateralRaise', 4, '12-15', 45], ['xEzBarCurl', 3, '10-12', 45, '', 'A'], ['pushdown', 3, '10-12', 45, '', 'A']]),
+      d('Lower volume', 'Hinge-led legs and glutes', [['deadlift', 3, '5-6', 210], ['hackSquat', 4, '10-12', 120], ['hipThrust', 3, '8-12', 90], ['xDumbbellSplitSquat', 3, '10-12', 75], ['lyingLegCurl', 3, '12-15', 60], ['seatedCalf', 4, '12-20', 45]]),
+    ],
+  },
+  {
+    id: 'elitePhysique', name: 'Elite Physique', goal: 'Physique', level: 'Intermediate', days: 5, weeks: 12,
+    tagline: 'Wide shoulders, full chest, wide back, sharp arms. The V-taper plan.',
+    method: 'Physique emphasis: extra volume for side delts, upper chest, lats and arms to build the V-taper, 8–20 reps taken close to failure, legs trained twice a week.',
+    plan: [
+      d('Chest + back', 'Upper chest and lat width', [['xInclineBarbellBenchPress', 4, '6-10', 120], ['xWideGripLatPulldown', 4, '8-12', 90], ['xInclineDumbbellFly', 3, '10-15', 60], ['xMachineHighRow', 3, '10-12', 75], ['straightArmPulldown', 3, '12-15', 45], ['cableLateral', 3, '15-20', 30]]),
+      d('Legs', 'Quads and hamstrings', [['hackSquat', 4, '8-12', 120], ['rdl', 3, '8-10', 120], ['legExtension', 3, '12-15', 60, '', 'A'], ['seatedLegCurl', 3, '12-15', 60, '', 'A'], ['seatedCalf', 4, '15-20', 30], ['hangingRaise', 3, '10-15', 45]]),
+      d('Shoulders + arms', 'Side delts, biceps, triceps', [['xSeatedBarbellPress', 3, '8-10', 120], ['lateralRaise', 4, '12-20', 45], ['rearDeltFly', 3, '15-20', 45], ['xInclineDumbbellCurl', 3, '10-12', 45, '', 'A'], ['xOverheadCableTricepsExtension', 3, '10-12', 45, '', 'A'], ['xRopeHammerCurl', 3, '12-15', 45, '', 'B'], ['pushdown', 3, '12-15', 45, '', 'B']]),
+      d('Back + chest', 'Back thickness and chest', [['pullUp', 4, '6-10', 120], ['chestRow', 3, '8-12', 90], ['xNeutralGripInclineDumbbellPress', 3, '8-12', 90], ['xLowToHighCableFly', 3, '12-15', 60], ['facePull', 3, '15-20', 45], ['xSeatedLateralRaise', 3, '12-15', 45]]),
+      d('Glutes + legs', 'Glutes, hamstrings, waist', [['hipThrust', 4, '8-12', 90], ['bulgarian', 3, '10-12', 75], ['lyingLegCurl', 3, '10-15', 60], ['legPress', 3, '12-15', 90], ['calfRaise', 3, '12-15', 30], ['abWheel', 3, '8-12', 45]]),
+    ],
+  },
+  {
     id: 'gluteLab', name: 'Glute Lab', goal: 'Glutes', level: 'All levels', days: 3, weeks: 10,
     tagline: 'Build the glutes from every angle: thrust, hinge, lunge, abduct.',
     method: 'Glute-focused training: hip thrusts and bridges for the top of the movement, hinges and lunges for the stretch, abduction for the upper glutes.',
@@ -202,12 +236,32 @@ export function currentDay(prog, active) {
 
 export const byId = id => PROGRAMS.find(p => p.id === id);
 
+/**
+ * How the Train tab groups programs. Each program sits in exactly one collection.
+ * A program's `desc` (optional) is the longer description shown on its card and page; until it is
+ * written, the tagline is shown instead.
+ */
+export const COLLECTIONS = [
+  { key: 'muscle', name: 'Build muscle', sub: 'Size, shape and definition', ids: ['massMonster', 'elitePhysique', 'hypertrophyLab', 'inferno', 'gainsEngine'] },
+  { key: 'strength', name: 'Get strong', sub: 'Heavier every week', ids: ['strengthBuilder', 'powerPump', 'platformPrep'] },
+  { key: 'lean', name: 'Lose fat', sub: 'Burn hard, keep your muscle', ids: ['shredCircuit'] },
+  { key: 'athletic', name: 'Athletic', sub: 'Power, speed and spring', ids: ['athleteMode', 'springLoaded', 'barSpeed'] },
+  { key: 'engine', name: 'Fitness & races', sub: 'HYROX and hybrid', ids: ['raceReady', 'engineIron'] },
+  { key: 'shape', name: 'Shape & mobility', sub: 'Glutes, core and hips', ids: ['gluteLab', 'coreControl'] },
+  { key: 'home', name: 'At home', sub: 'No gym needed', ids: ['anywhereBurn', 'dumbbellDen', 'bandStrong'] },
+];
+/** The collection a program belongs to. */
+export const collectionOf = id => COLLECTIONS.find(c => c.ids.includes(id)) || null;
+
 /** Sign-up goals and the program each one starts. `beginner` is used for people new to lifting. */
 export const GOALS = [
   { key: 'lose', label: 'Lose fat', sub: 'Gym circuits that burn', program: 'shredCircuit' },
   { key: 'muscle', label: 'Build muscle', sub: 'Size, shape and definition', program: 'hypertrophyLab', beginner: 'gainsEngine' },
   { key: 'powerbuild', label: 'Strong and muscular', sub: 'Power building', program: 'powerPump', beginner: 'gainsEngine' },
-  { key: 'strength', label: 'Get as strong as possible', sub: 'Squat, bench, deadlift', program: 'platformPrep', beginner: 'gainsEngine' },
+  { key: 'strength', label: 'Get stronger', sub: 'Heavy squat, bench, deadlift and press', program: 'strengthBuilder', beginner: 'gainsEngine' },
+  { key: 'powerlifting', label: 'Compete in powerlifting', sub: 'Squat, bench, deadlift for a meet', program: 'platformPrep', beginner: 'gainsEngine' },
+  { key: 'mass', label: 'Get bigger, fast', sub: 'Heavy, high-volume mass training', program: 'massMonster', beginner: 'gainsEngine' },
+  { key: 'physique', label: 'Aesthetic physique', sub: 'Shoulders, chest, back and arms: the V-taper', program: 'elitePhysique', beginner: 'gainsEngine' },
   { key: 'athlete', label: 'Perform better at my sport', sub: 'Cricket, football, MMA, boxing, padel and more', program: 'athleteMode' },
   { key: 'hyrox', label: 'Race HYROX', sub: 'Running and stations', program: 'raceReady' },
   { key: 'hybrid', label: 'Strong and fit', sub: 'Lifting and running together', program: 'engineIron' },
