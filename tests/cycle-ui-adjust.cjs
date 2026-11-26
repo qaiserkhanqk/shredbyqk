@@ -37,6 +37,8 @@ const check = (name, ok, detail = '') => { count++; if (!ok) fails++; console.lo
       check('it states the evidence: synthetic only, not validated', /synthetic/i.test(card) && /not been validated/i.test(card));
       check('the dates-only estimate is still shown', (await p.$('#cyEstimate')) !== null);
       check('it never mentions ovulation or fertility', !/ovulat|fertil/i.test(card));
+      // Added with the aee2de8 eligibility fixes: one logged period, so neither model can estimate.
+      check('when neither model can estimate, the card says "Not enough data yet."', /Not enough data yet\./.test(card), card);
       await c.close();
     }
   } catch (e) { check('run completed', false, e.stack); }
