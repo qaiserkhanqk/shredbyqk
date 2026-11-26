@@ -162,8 +162,11 @@ function dueHTML(s, est, today, nowMin) {
 function adjustHTML(s, today) {
   const a = adjustedEstimate(s, today);
   const range = a.status === 'adjusted' ? `<div class="num cy-range">${a.singleDate ? human(a.rangeStart) : `${human(a.rangeStart)} – ${human(a.rangeEnd)}`}</div>` : '';
-  return `<div class="card stack" id="cyAdjusted"><span class="eyebrow">Band-adjusted estimate · research</span>${range}
-    <p class="small">${esc(a.text)}</p>${a.fallback ? `<p class="small" id="cyAdjustedFallback"><b>${esc(a.fallback.text)}</b></p>` : ''}<p class="muted small">${esc(a.why)}</p></div>`;
+  // The last usable overnight reading is shown whenever there is band data, so a stale estimate can't look current.
+  const last = a.reason !== 'band_off' && a.reason !== 'no_consent' ? `<p class="small" id="cyAdjustedLastNight">${esc(a.lastUsableText)}</p>` : '';
+  const overdue = a.status === 'adjusted' && a.overdue ? `<p class="small" id="cyAdjustedOverdue"><b>${esc(a.overdueText)}</b></p>` : '';
+  return `<div class="card stack" id="cyAdjusted"><span class="eyebrow">Band-adjusted estimate · research${a.status === 'adjusted' && a.overdue ? ' · overdue' : ''}</span>${range}${overdue}
+    <p class="small">${esc(a.text)}</p>${last}${a.fallback ? `<p class="small" id="cyAdjustedFallback"><b>${esc(a.fallback.text)}</b></p>` : ''}<p class="muted small">${esc(a.why)}</p></div>`;
 }
 
 function estimateHTML(s, est) {

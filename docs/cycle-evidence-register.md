@@ -27,6 +27,7 @@ Note on studies of other brands: they describe *those* devices and populations. 
 | Range = shortest–longest of the last 6 usable cycles | Transparency: easy to explain from the user's own data | **Unvalidated.** To be measured (coverage and width) in the study. |
 | 15–90 day plausibility, ±2 early pad, 20-day "too variable", stale rule | Display safeguards | Placeholder; needs clinical review |
 | Pattern rules (≥ 3 cycles, ≥ 75%, < 50% outside the window) | Conservative, explainable | Placeholder; to test against personal baselines |
+| Band data freshness: the band-adjusted estimate is used only while the last usable overnight reading is at most 7 nights before today (`FRESHNESS.MAX_NIGHTS_SINCE_USABLE` in `js/cycle/adjust.js`); otherwise the dates-only estimate is shown | Engineering choice: no documented limit existed. Measured from when the night was recorded, not when the band synced | **Provisional; not a clinical threshold.** Validate with the actual band (missed-night patterns, sync delays) before any pilot |
 | Temperature rule ΔT 0.15 °C, 6/3 nights, ≥ 180 min per night | Shaped after the BBT three-over-six rule (E5) | Placeholder; **not fitted**; pre-register before any study |
 | Neutral lock-screen text, encryption, separate store | Privacy by design (GDPR Art. 5 and 25; health data is special-category data under Art. 9) | Legal and DPO review pending |
 
