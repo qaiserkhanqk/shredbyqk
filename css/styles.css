@@ -589,6 +589,19 @@ a.ghost { text-decoration: none; text-align: center; display: inline-flex; align
 .privacy-chip { position: absolute; top: 134px; left: 16px; display: inline-flex; align-items: center; gap: 5px; pointer-events: none;
   font: 600 .66rem var(--f-body); letter-spacing: .04em; color: rgba(236,241,236,.8); background: rgba(var(--scrim-rgb),.6); border: 1px solid var(--line); padding: 3px 8px; border-radius: 99px; }
 .privacy-chip svg { width: 11px; height: 11px; }
+/* QK's plan on Today: every weight decided, nothing to work out. */
+.plan-rows { display: flex; flex-direction: column; }
+.plan-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 10px 0; border-top: 1px solid var(--line); text-align: left; background: none; border-left: 0; border-right: 0; border-bottom: 0; color: var(--text); font: inherit; cursor: pointer; }
+.plan-row b { font-size: .95rem; }
+.plan-row .tgt { font: 700 .9rem var(--f-data); text-align: right; }
+.plan-row .why { font-size: .78rem; color: var(--muted); }
+#planListen { white-space: nowrap; }
+.plan-row .chg { font: 700 .72rem var(--f-data); text-align: right; color: var(--muted); }
+.plan-row.up .chg { color: var(--good); } .plan-row.down .chg { color: var(--warn); } .plan-row.light .chg { color: #7FB8E6; }
+.plates { margin: 4px 0 0; font: 600 .8rem var(--f-data); color: var(--z3); }
+.plan-row .plates { grid-column: 1 / -1; margin: 0; font-size: .74rem; }
+.flow-next { display: flex; gap: 12px; align-items: center; justify-content: space-between; border-color: rgba(92,195,148,.5); }
+.flow-next b { display: block; font: 800 1.05rem var(--f-display, inherit); margin-top: 2px; }
 .track-chip { position: absolute; top: 104px; left: 16px; display: inline-flex; align-items: center; gap: 7px; pointer-events: none;
   font: 600 .72rem var(--f-data); letter-spacing: .06em; text-transform: uppercase; color: rgba(236,241,236,.75);
   background: rgba(var(--scrim-rgb),.7); border: 1px solid var(--line); padding: 4px 9px; border-radius: 99px; }

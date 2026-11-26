@@ -22,6 +22,8 @@ import { FormFX, drawDepthArc } from './fx.js';
 import { TrackHUD } from './hud.js';
 import * as rewards from './rewards.js';
 import * as prog from './progression.js';
+import * as brief from './brief.js';
+import { icsFor, dueToday } from './reminders.js';
 import { PROGRAMS, scheme as progScheme, weeklySets, currentDay, byId as programById } from './programs.js';
 import { ExerciseDetector, PICK_LIST } from './detect.js';
 import { initCalm, renderCalm, startCalmNow } from './calm.js';
@@ -157,9 +159,11 @@ function renderToday() {
 
   const p = S.plan || {};
   $('#sessionMeta').textContent = [p.time, p.place].filter(Boolean).join(' · ');
+  const plan = planToday(), tgt = Object.fromEntries(plan.map(r => [r.id, r]));
   $('#todayList').innerHTML = todayItems().map(([k, sets]) => `<button type="button" class="ex-row" data-train="${k}" style="width:100%;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;cursor:pointer;padding-inline:0"><span class="pic">${icon(iconKey(k))}</span>
     <div><b>${esc(LIB[k].name)}</b>${LIB[k].pattern ? '<span class="tag">QK checks your form</span>' : '<span class="tag" style="color:var(--z3)">QK coaches your tempo</span>'}</div>
-    <span class="sets">${sets}</span></button>`).join('');
+    <span class="sets">${tgt[k]?.rx ? esc(tgt[k].line) : sets}</span></button>`).join('');
+  renderPlan(plan);
 
   // Focus: the most frequent fault, and how often it's been clean recently.
   const tally = {};
@@ -593,10 +597,14 @@ let saidBreathSafety = false;
 const LOADED = ['squat', 'rdl', 'lunge', 'bench', 'press', 'row', 'vPull', 'hipThrust', 'dip'];
 function setupLine(ex) {
   if (ex.hold) return `${ex.name}. Get into position and hold.`;
+  const row = ex.libId ? brief.planRows([ex.libId], { lib: LIB, sets: S.sessions, unit: unit(), light: lightWeek(), schemeFor: programScheme })[0] : null;
+  let target = row?.rx ? ' ' + brief.spokenTarget(row, unit()) : '';
+  const wk = brief.weekOf(Date.now()), P = (S.prog ||= {});
+  if (target && P.briefWeek !== wk) { const sum = brief.summary(planToday().filter(r => r.rx)); if (sum) target = ` New week. ${sum}` + target; P.briefWeek = wk; persist(); }
   const tips = (TIPS[ex.patternKey] || []).map(t => t[0]).join(' ');
   const heavy = LOADED.includes(ex.patternKey);
   const safety = heavy && !saidBreathSafety ? (saidBreathSafety = true, ' ' + BREATHING.safety) : '';
-  return `${ex.name}. ${ex.setup} ${tips}${safety} ${heavy ? BREATHING.cue : 'Start when you\'re ready.'}`.replace(/\s+/g, ' ');
+  return `${ex.name}.${target} ${ex.setup} ${tips}${safety} ${heavy ? BREATHING.cue : 'Start when you\'re ready.'}`.replace(/\s+/g, ' ');
 }
 
 /* ---------- Camera coach: recognise the exercise, then coach it ---------- */
@@ -746,6 +754,7 @@ function endSet() {
     say(`Set done. ${reps} reps, ${good} clean.${better} ${top ? 'One thing for next set: ' + top.cue : 'Great form. Keep it up.'}`, { id: 'summary_' + Date.now(), priority: 'high' });
   }
   if (reps) { stopRest(); $('#restBtn').click(); } // rest starts by itself
+  showFlowNext();
   const pb = $('#playback'); pb.hidden = true;
   const marks = live?.marks || [], fm = $('#faultMarks'); fm.hidden = true;
   if (wasRec) setTimeout(() => {
@@ -776,9 +785,9 @@ $('#anglesBtn').onclick = () => { const on = !showAngles(); try { localStorage.s
 $('#anglesBtn').textContent = showAngles() ? 'Hide angles' : 'Angles';
 $('#endLive').onclick = () => { if (!live) return; ['gait', 'jump', 'sls', 'rom'].includes(live.mode) ? finishTest() : endSet(); };
 $('#flipCam').onclick = () => { const m = live?.mode || 'form'; live && (live.done = true); facing = facing === 'user' ? 'environment' : 'user'; stopLive(); live = null; startLive({ mode: m, source: 'camera' }); };
-$('#doneBtn').onclick = () => { stopRest(); keepAwake(false); $('#summary').hidden = true; tab('today'); };
+$('#doneBtn').onclick = () => { flow = null; stopRest(); keepAwake(false); $('#summary').hidden = true; tab('today'); };
 // After a camera set the phone is already placed, so the next set starts straight away.
-$('#nextSet').onclick = () => { stopRest(); $('#summary').hidden = true; if (lastSource === 'camera' && curEx()) startLive({ mode: 'form', source: 'camera' }); else openSetup(exKey); };
+$('#nextSet').onclick = () => { if (flow) return nextInFlow(); stopRest(); $('#summary').hidden = true; if (lastSource === 'camera' && curEx()) startLive({ mode: 'form', source: 'camera' }); else openSetup(exKey); };
 // Fix a miscount. The form score then leaves this set out, because the camera didn't see the added reps.
 function fixReps(d) {
   if (!lastSet) return;
@@ -799,7 +808,7 @@ $('#restBtn').onclick = () => {
   restTimer = setInterval(() => {
     restLeft = Math.max(0, restLeft - 1); drawRest();
     if (restLeft === 10) say('Ten seconds. Get set up.', { id: 'rest10_' + Date.now(), priority: 'high' });
-    if (restLeft === 0) { stopRest(); restLeft = restTotal; say('Rest over. Let\'s go again.', { id: 'rest0_' + Date.now(), priority: 'high' }); }
+    if (restLeft === 0) { stopRest(); restLeft = restTotal; if (flow && !$('#summary').hidden) return nextInFlow(); say('Rest over. Let\'s go again.', { id: 'rest0_' + Date.now(), priority: 'high' }); }
   }, 1000);
 };
 
@@ -921,6 +930,8 @@ function endGuided() {
   const done = timed ? secs >= 10 : reps > 0;
   if (done) { S.sessions.push({ at: Date.now(), ex: exKey, name: item.name, reps: timed ? 0 : reps, secs: secs || undefined, good: 0, guided: true, kind: item.kind }); persist(); logProgramDay(exKey); }
   say(!done ? 'Ended.' : timed ? `Done. ${Math.floor(secs / 60)} minutes ${secs % 60} seconds.` : mode === 'intervals' ? `Done. ${reps} rounds. Great work.` : `Set done. ${hold ? reps + ' seconds' : reps + ' reps'}. Nice work.`, { id: 'gsum_' + Date.now(), priority: 'high' });
+  // In a workout, rest runs by itself (when there's rest) and QK moves on; otherwise show what's next.
+  if (flow) { showFlowNext(); if (done && !$('#restCard').hidden) { stopRest(); $('#restBtn').click(); } }
 }
 
 /* ---------- Movement tests: gait, jump, single-leg squat ---------- */
@@ -1212,6 +1223,8 @@ function showRx(k) {
   const sc = programScheme(k);
   $('#rxLine').textContent = r ? rxLine(r) : sc ? `First time: ${sc.sets} × ${sc.lo === sc.hi ? sc.lo : sc.lo + '–' + sc.hi}, pick a weight you can do with good form` : 'First time: pick a weight you can lift 8 times with good form';
   $('#rxWhy').textContent = r ? r.why : 'Log the weight after your set and QK plans the next one from how it went.';
+  const pl = r && cls.startsWith('big') ? prog.plates(r.kg, unit()) : null;
+  $('#rxPlates').hidden = !pl; $('#rxPlates').textContent = pl ? pl.text : '';
   $('#rxEditLbl').textContent = `Weight (${unit()})`; $('#rxKg').value = r ? +prog.toUnit(r.kg, unit()).toFixed(2) : '';
   $('#loadKg').value = r ? +prog.toUnit(r.kg, unit()).toFixed(2) : $('#loadKg').value;
 }
@@ -1259,6 +1272,105 @@ function renderStrength() {
 }
 $('#stLift').onchange = renderStrength;
 $('#stRange').onclick = e => { const b = e.target.closest('[data-r]'); if (!b) return; stRange = b.dataset.r; $('#stRange').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); renderStrength(); };
+
+/* ---------- QK's plan: every weight decided before the lifter asks ---------- */
+const planToday = () => brief.planRows(todayItems().map(x => x[0]), { lib: LIB, sets: S.sessions, unit: unit(), light: lightWeek(), schemeFor: programScheme });
+function renderPlan(rows) {
+  const lifts = rows.filter(r => r.change !== 'none'), card = $('#qkPlan');
+  if (!lifts.length) { card.hidden = true; return; }
+  card.hidden = false;
+  const p = activeProgram(), pw = brief.programWeek(S.program, p), newWeek = (S.prog?.briefWeek ?? -1) !== brief.weekOf(Date.now());
+  $('#planEyebrow').textContent = pw ? (pw.finished ? `${p.name} · complete` : `${p.name} · week ${pw.week} of ${pw.of}`) : 'QK\'s plan for today';
+  const known = lifts.filter(r => r.rx);
+  $('#planTitle').textContent = !known.length ? 'Pick your starting weights' : newWeek ? 'New week. Your weights are set.' : 'Your weights are set';
+  $('#planSummary').textContent = pw?.finished ? `You finished ${p.name}. Pick your next program on the Train tab, or keep going and QK keeps progressing you.`
+    : (brief.summary(known) + (known.length ? ' Based on how your last session went. Just follow the numbers.' : ' Do your first set and QK plans every one after it.')).trim();
+  $('#planRows').innerHTML = lifts.map(r => `<button type="button" class="plan-row ${r.change}" data-train="${r.id}"><b>${esc(r.name)}</b><span class="tgt">${esc(r.line)}</span><span class="why">${esc(r.why)}</span><span class="chg">${esc(r.tag || '')}</span>${platesFor(r)}</button>`).join('');
+}
+const platesFor = r => { const pl = r.rx && r.rx.cls?.startsWith('big') ? prog.plates(r.rx.kg, unit()) : null; return pl ? `<span class="plates">${esc(pl.text)}</span>` : ''; };
+// The plan, out loud: the weekly summary then each lift's target.
+function planSpeech() {
+  const rows = planToday().filter(r => r.rx);
+  if (!rows.length) return '';
+  return `${brief.summary(rows)} ${rows.map(r => `${r.name}: ${brief.spokenTarget(r, unit()).replace(/^Today: /, '')}`).join(' ')}`;
+}
+$('#planListen').onclick = () => { const t = planSpeech(); if (t) say(t, { id: 'plan_' + Date.now(), priority: 'now' }); };
+
+/* ---------- One-tap workout: QK walks the lifter through every set ---------- */
+// Start once. After each set the rest timer runs by itself; when it ends, the next set starts (same
+// exercise: the camera reopens straight away) or the next exercise's setup opens. The weights are already
+// filled in, so the lifter only lifts.
+let flow = null;
+function plannedSets(k) {
+  const row = planToday().find(r => r.id === k); if (row?.rx) return row.rx.sets;
+  const it = todayItems().find(x => x[0] === k); return parseInt(it?.[1], 10) || 3;
+}
+const flowNextId = () => flow && flow.items.find(id => setsToday(id) < plannedSets(id));
+function startFlow() {
+  flow = { items: todayItems().map(x => x[0]) };
+  say(`Let's go. ${flow.items.length} exercises today. I'll take you through every set.`, { id: 'flow_start', priority: 'high' });
+  nextInFlow(true);
+}
+function nextInFlow(first) {
+  if (!flow) return;
+  const k = flowNextId();
+  stopRest(); $('#summary').hidden = true; $('#flowNext').hidden = true;
+  if (!k) {
+    flow = null; keepAwake(false); tab('today'); renderToday();
+    say('Workout done. Every set is logged and your next session is already planned.', { id: 'flow_done', priority: 'high' });
+    return toast('Workout done ✓ Next session is planned.');
+  }
+  const n = setsToday(k) + 1, of = plannedSets(k);
+  if (!first && k === exKey && lastSource === 'camera' && exFor(k)) {
+    say(`Set ${n} of ${of}.`, { id: 'flow_set_' + Date.now(), priority: 'high' });
+    return startLive({ mode: 'form', source: 'camera' });
+  }
+  if (!first) tab('today');
+  openSetup(k);
+}
+function showFlowNext() {
+  const k = flowNextId(), box = $('#flowNext');
+  if (!flow) { box.hidden = true; return; }
+  box.hidden = false;
+  if (!k) { $('#flowNextLine').textContent = 'That was the last set'; $('#flowNextSub').textContent = 'Tap Go now to finish. Everything is saved.'; return; }
+  const row = planToday().find(r => r.id === k), n = setsToday(k) + 1, of = plannedSets(k);
+  $('#flowNextLine').textContent = k === exKey ? `Set ${n} of ${of}` : `${LIB[k].name}`;
+  $('#flowNextSub').textContent = k === exKey ? `${LIB[k].name}${row?.rx ? ' · ' + row.line : ''}` : `${of} sets${row?.rx ? ' · ' + row.line : ''}. Set up your phone for it while you rest.`;
+}
+$('#flowGo').onclick = () => nextInFlow();
+$('#planStart').onclick = () => startFlow();
+
+/* ---------- Training-day reminders ---------- */
+$('#remindCal').onclick = () => {
+  const text = icsFor(S.plan, { name: S.profile.name, url: location.href.split('#')[0].split('?')[0] });
+  if (!text) return toast('Pick your training days first.');
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/calendar' }));
+  const a = document.createElement('a'); a.href = url; a.download = 'shred-qk-training.ics'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  toast('Open the file to add it to your calendar.');
+};
+$('#remindNotify').onclick = async () => {
+  if (!('Notification' in window)) return toast('This phone doesn\'t support app notifications. Use the calendar reminders.');
+  const p = await Notification.requestPermission();
+  S.profile.remind = p === 'granted'; persist();
+  toast(p === 'granted' ? 'Done. QK will remind you on training days.' : 'Notifications are off. The calendar reminders still work.');
+  checkReminder();
+};
+// When the app is open on a training day and it's nearly time, show today's plan as a notification.
+async function checkReminder() {
+  if (!S.profile.remind || !('Notification' in window) || Notification.permission !== 'granted') return;
+  const trainedToday = S.sessions.some(x => new Date(x.at).toDateString() === new Date().toDateString());
+  if (!dueToday(S.plan, { trainedToday, notifiedOn: S.prog?.notifiedOn })) return;
+  const rows = planToday().filter(r => r.rx);
+  const body = rows.length ? rows.slice(0, 4).map(r => `${r.name}: ${r.line}`).join('\n') : `${todayName()}: ${todayItems().length} exercises. Your weights are set.`;
+  const title = `Time to train${S.profile.name ? ', ' + S.profile.name : ''}`;
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration?.();
+    reg ? reg.showNotification(title, { body, icon: 'icons/icon.svg', tag: 'qk-train' }) : new Notification(title, { body, tag: 'qk-train' });
+    (S.prog ||= {}).notifiedOn = new Date().toDateString(); persist();
+  } catch {}
+}
+setInterval(checkReminder, 5 * 60e3); document.addEventListener('visibilitychange', () => { if (!document.hidden) checkReminder(); });
 
 /* ---------- Programs ---------- */
 // The program's rep target for an exercise on today's program day (feeds the progression engine).
@@ -1719,7 +1831,7 @@ function renderNext(level) {
     'rehab-morning': () => { tab('rehab'); openMorning(morningDue); },
     rehab: () => tab('rehab'), 'rehab-start': () => tab('rehab'),
     calm: () => { tab('calm'); startCalmNow(); }, rest: () => { tab('calm'); startCalmNow(); },
-    done: () => tab('progress'), workout: () => openSetup(todayItems()[0][0]),
+    done: () => tab('progress'), workout: () => startFlow(),
   };
   $('#nextBtn').onclick = go[step.kind];
   $('#nextAlt').onclick = () => openSetup(todayItems()[0][0]);

@@ -180,3 +180,26 @@ export function currentDay(prog, active) {
 }
 
 export const byId = id => PROGRAMS.find(p => p.id === id);
+
+/** Sign-up goals and the program each one starts. `beginner` is used for people new to lifting. */
+export const GOALS = [
+  { key: 'lose', label: 'Lose fat', sub: 'Gym circuits that burn', program: 'shredCircuit' },
+  { key: 'muscle', label: 'Build muscle', sub: 'Size, shape and definition', program: 'hypertrophyLab', beginner: 'gainsEngine' },
+  { key: 'powerbuild', label: 'Strong and muscular', sub: 'Power building', program: 'powerPump', beginner: 'gainsEngine' },
+  { key: 'strength', label: 'Get as strong as possible', sub: 'Squat, bench, deadlift', program: 'platformPrep', beginner: 'gainsEngine' },
+  { key: 'athlete', label: 'Perform better at my sport', sub: 'Strength, speed and power', program: 'athleteMode' },
+  { key: 'hyrox', label: 'Race HYROX', sub: 'Running and stations', program: 'raceReady' },
+  { key: 'hybrid', label: 'Strong and fit', sub: 'Lifting and running together', program: 'engineIron' },
+  { key: 'glutes', label: 'Build my glutes', sub: 'Glute-focused training', program: 'gluteLab' },
+  { key: 'olympic', label: 'Olympic lifting', sub: 'Snatch and clean & jerk', program: 'barSpeed' },
+  { key: 'jump', label: 'Jump higher, run faster', sub: 'Plyometrics', program: 'springLoaded' },
+  { key: 'core', label: 'Core and mobility', sub: 'Pilates and stretching', program: 'coreControl' },
+  { key: 'home', label: 'Train at home, no equipment', sub: 'Bodyweight workouts', program: 'anywhereBurn' },
+];
+/** The program for a goal; people new to lifting get the beginner program where one exists. */
+export function pickProgram(goalKey, isNew = false) {
+  const g = GOALS.find(x => x.key === goalKey); if (!g) return null;
+  return isNew && g.beginner ? g.beginner : g.program;
+}
+/** Default training days for a program, if the lifter hasn't picked any: spread through the week. */
+export const defaultDays = n => ({ 1: [3], 2: [1, 4], 3: [1, 3, 5], 4: [1, 2, 4, 5], 5: [1, 2, 3, 5, 6], 6: [1, 2, 3, 4, 5, 6] }[n] || [1, 3, 5]);

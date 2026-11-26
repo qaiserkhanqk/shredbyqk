@@ -308,7 +308,19 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('programs: starting one shows it as active', /On Power & Pump/.test(await p.textContent('#progActive')), await p.textContent('#progActive'));
   await go('today');
   check("programs: day 1 is today's workout", /Barbell Bench Press[\s\S]*4×4-6/.test(await p.textContent('#todayList')));
+  check("QK's plan: today's lifts are listed with what to do", await p.isVisible('#qkPlan') && /Power & Pump · week 1 of 10/.test(await p.textContent('#planEyebrow')) && /Barbell Bench Press/.test(await p.textContent('#planRows')), await p.textContent('#qkPlan'));
   await go('train'); await tap('[data-prog=powerPump]'); await p.click('[data-progstop]'); await p.waitForTimeout(200);
+
+  // One-tap workout: Start workout opens the first exercise's setup with its target filled in.
+  await p.goto('https://shred.local/'); await p.waitForTimeout(400);
+  await p.$eval('#planStart', el => el.scrollIntoView({ block: 'center' })); await p.click('#planStart'); await p.waitForTimeout(300);
+  check('workout mode: Start workout opens the next exercise to do (resumes if some sets are done)', await p.isVisible('#setup') && /set \d/.test(await p.textContent('#setupEyebrow')) && await p.isVisible('#rxBox'), await p.textContent('#setupEyebrow'));
+  await p.evaluate(() => { document.querySelector('#setup').hidden = true; });
+  // Training-day reminders: a calendar file for the planned days.
+  await go('progress'); await p.click('#planCard summary').catch(() => {});
+  const [icsDl] = await Promise.all([p.waitForEvent('download', { timeout: 4000 }).catch(() => null), p.click('#remindCal')]);
+  const ics = icsDl ? fs.readFileSync(await icsDl.path(), 'utf8') : '';
+  check('reminders: calendar file repeats on the training days', /RRULE:FREQ=WEEKLY;BYDAY=MO,WE/.test(ics), ics.slice(0, 80));
 
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();
