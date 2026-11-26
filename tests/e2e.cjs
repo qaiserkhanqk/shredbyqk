@@ -293,12 +293,22 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.goto('https://shred.local/'); await go('train'); await p.fill('#exSearch', 'deadlift');
   await tap('[data-train=deadlift]');
   check('setup: one short instruction, no wall of text', (await p.$$('#setupSteps li')).length === 1);
+  check('progression: first weighted set asks for a starting weight', /First time/.test(await p.textContent('#rxLine')), await p.textContent('#rxLine'));
   await p.click('#startCam'); await p.waitForTimeout(1500);
   const spoken = await p.textContent('[data-coach-caption]');
   check('set start: QK tells you what to do ("Bar close to your shins ... Brace, and go.")', /Bar close to your shins/.test(spoken) && /Brace, and go/.test(spoken), spoken);
   check('no "NSCA" anywhere on screen', !/NSCA/.test(await p.textContent('body')));
   await p.click('#endLive'); await p.waitForTimeout(400);
   if (await p.isVisible('#doneBtn')) await p.click('#doneBtn');
+
+  // Programs: pick one on the Train tab and its first day becomes today's workout.
+  await p.goto('https://shred.local/'); await go('train');
+  check('programs: 10+ programs on the Train tab', (await p.$$('#progStrip [data-prog]')).length >= 10);
+  await tap('[data-prog=powerPump]'); await p.click('[data-progstart=powerPump]'); await p.waitForTimeout(300);
+  check('programs: starting one shows it as active', /On Power & Pump/.test(await p.textContent('#progActive')), await p.textContent('#progActive'));
+  await go('today');
+  check("programs: day 1 is today's workout", /Barbell Bench Press[\s\S]*4×4-6/.test(await p.textContent('#todayList')));
+  await go('train'); await tap('[data-prog=powerPump]'); await p.click('[data-progstop]'); await p.waitForTimeout(200);
 
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();

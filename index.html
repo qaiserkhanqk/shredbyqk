@@ -74,6 +74,8 @@
   <section class="screen" id="train">
     <div class="page-head"><div><span class="eyebrow">Form check</span><h1 class="display h1">What are we training?</h1></div></div>
     <button type="button" class="cam-start" id="camCoach2"><span class="cam-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5zM1 5h15v14H1z"/></svg></span><span><b>Just start moving</b><span>Open the camera and do your exercise. QK recognises it and corrects you live.</span></span></button>
+    <div class="prog-head"><span class="eyebrow">Programs</span><span class="muted small" id="progActive"></span></div>
+    <div class="prog-strip" id="progStrip" role="list"></div>
     <label class="field"><span class="eyebrow">Search</span><input id="exSearch" type="search" placeholder="Search 84 exercises, e.g. row, squat, cable" autocomplete="off"></label>
     <div class="chips-scroll" id="muscleChips" role="group" aria-label="Filter by muscle"></div>
     <p class="muted small" style="margin:0" id="exCount"></p>
@@ -303,6 +305,15 @@
       <p class="muted small" style="margin:0" id="rwPerfect"></p>
     </div>
 
+    <div class="card stack" id="strengthCard">
+      <div class="card-head" style="margin:0"><div><span class="eyebrow">Strength</span><h2 class="display h2" id="stTitle">Your lifts</h2></div><span class="data small" id="stDelta"></span></div>
+      <div class="grid2"><label class="field">Lift<select id="stLift"></select></label><div class="seg" id="stRange" role="group" aria-label="Time range"><button type="button" data-r="1M">1M</button><button type="button" data-r="3M" class="on">3M</button><button type="button" data-r="1Y">1Y</button><button type="button" data-r="ALL">All</button></div></div>
+      <div id="stChart"><p class="empty">Log the weight after a set and your strength chart starts here.</p></div>
+      <p class="muted small" style="margin:0" id="stNote"></p>
+      <span class="eyebrow">Weekly volume (weight × reps)</span>
+      <div id="volChart"></div>
+    </div>
+
     <div class="card chart">
       <div class="card-head"><div><span class="eyebrow">Form score</span><div class="num" style="font-size:2rem;margin-top:4px" id="pfScore">–</div></div><span class="data small" id="pfDelta"></span></div>
       <div id="formChart"><p class="empty">Train with the camera twice to see your form trend.</p></div>
@@ -357,6 +368,7 @@
           <label class="field">Sex (body-fat formula)<select id="pSex"><option value="male">Male</option><option value="female">Female</option></select></label>
           <label class="field">Height (cm)<input id="pHeight" type="number" inputmode="decimal"></label>
         </div>
+        <label class="field">Weights in<select id="pUnit"><option value="kg">Kilograms (kg)</option><option value="lb">Pounds (lb)</option></select></label>
         <label class="field">Coach photo (QK's face)<input id="coachPhoto" type="file" accept="image/*"></label>
         <label class="field">Coach voice<select id="voiceSel"></select></label>
         <button class="ghost" type="button" id="testVoice">Test the voice</button>
@@ -424,12 +436,18 @@
     <div><span class="eyebrow" id="setupEyebrow"></span><h2 class="display h2" id="setupTitle" style="margin-top:6px;font-size:1.4rem">Set up your phone</h2></div>
     <ol class="steps" id="setupSteps"></ol>
     <div class="fit-note" id="fitNote" hidden></div>
+    <div class="rx" id="rxBox" hidden>
+      <div class="rx-main"><span class="eyebrow" id="rxEyebrow">QK's target today</span><b id="rxLine"></b><p class="muted small" id="rxWhy"></p></div>
+      <button class="ghost" type="button" id="rxEdit">Change</button>
+      <div class="rx-edit" id="rxEditWrap" hidden><label class="field"><span id="rxEditLbl">Weight</span><input id="rxKg" type="number" inputmode="decimal" step="0.5" min="0"></label><button class="ghost" type="button" id="rxSave">Save</button></div>
+    </div>
     <p class="muted small" id="setupLast" style="margin:0"></p>
     <div class="grid2" id="loadWrap" hidden>
-      <label class="field">Weight (kg) for bar speed<input id="loadKg" type="number" inputmode="decimal" placeholder="e.g. 80"></label>
+      <label class="field"><span><span id="loadKgLbl">Weight (kg)</span> for bar speed</span><input id="loadKg" type="number" inputmode="decimal" placeholder="e.g. 80"></label>
       <p class="muted small" style="margin:0;align-self:end">Tap <b>Calibrate</b> during the set and mark a 45 cm plate for exact speed.</p>
     </div>
     <label class="check"><input type="checkbox" id="recordChk" checked> Record my set so I can watch it back</label>
+    <p class="privacy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span><b>Your video never leaves your phone.</b> QK watches on this device. Nothing is uploaded or saved unless you save it yourself.</span></p>
     <button class="ghost" type="button" id="formTestBtn" hidden>Check my running form (camera)</button>
     <button class="cta" type="button" id="startGuided" hidden><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Start with QK</button>
     <button class="cta" type="button" id="startCam"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M23 7l-7 5 7 5zM1 5h15v14H1z"/></svg>Start camera</button>
@@ -459,6 +477,7 @@
       <div class="media"><video id="video" playsinline muted></video><canvas id="overlay"></canvas></div>
       <div class="rep-big" id="repBig"><span class="num" id="repNum">0</span><small id="repLbl">reps</small></div>
       <div class="readout" id="readout"></div>
+      <div class="privacy-chip" aria-label="Private: video stays on this phone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>On this phone only</div>
       <div class="track-chip" id="trackChip" aria-live="polite"><i></i>Finding you…</div>
       <div class="detect-chip" id="detectChip" hidden><span id="detectTxt"></span><button type="button" id="detectAlt" hidden></button><button type="button" id="detectChange" hidden>Change</button></div>
       <div class="fault-banner" id="faultBanner" hidden aria-live="assertive"><b id="fbWrong"></b><span id="fbFix"></span></div>
@@ -497,7 +516,8 @@
       <div><div class="rep-fix" id="repFix"><button type="button" class="iconbtn" id="repMinus" aria-label="One rep fewer">−</button><div class="num" style="font-size:2.2rem" id="sReps">0</div><button type="button" class="iconbtn" id="repPlus" aria-label="One rep more">+</button></div><span class="muted">reps · <b id="sClean" style="color:var(--text)">0 clean</b></span><p class="muted small" style="margin:8px 0 0" id="sCompare"></p></div>
     </div>
     <div class="card reward" id="sReward" hidden><div class="medal" id="sMedal">★</div><div><b id="sRewardTitle"></b><p class="muted small" id="sRewardSub"></p><div class="bar"><i id="sRewardBar"></i></div></div></div>
-    <div class="card grid2" id="kgWrap" hidden><label class="field">Weight used (kg)<input id="setKg" type="number" inputmode="decimal" step="0.5" min="0" placeholder="e.g. 40"></label><p class="muted small" style="margin:0;align-self:end" id="sLast"></p></div>
+    <div class="card grid2" id="kgWrap" hidden><label class="field"><span id="setKgLbl">Weight used (kg)</span><input id="setKg" type="number" inputmode="decimal" step="0.5" min="0" placeholder="e.g. 40"></label><p class="muted small" style="margin:0;align-self:end" id="sLast"></p></div>
+    <div class="card rx-next" id="sNext" hidden><span class="eyebrow">Next time</span><b id="sNextLine"></b><p class="muted small" id="sNextWhy"></p></div>
     <div class="one-thing" id="sFocusBox"><span class="eyebrow" style="color:var(--warn)">One thing for next set</span><p id="sFocus"></p><p class="why" id="sWhy"></p></div>
     <div class="card"><span class="eyebrow">Range of motion per rep</span><div class="rom-bars" id="romBars" style="margin-top:12px"></div><p class="muted small" style="margin:10px 0 0" id="romNote"></p></div>
     <div class="card stack" id="vbtCard" hidden>

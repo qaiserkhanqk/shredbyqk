@@ -21,9 +21,11 @@ import { analyseBodyMap, personalFor, explainBodyMap, fitLines } from './bodymap
 import { FormFX, drawDepthArc } from './fx.js';
 import { TrackHUD } from './hud.js';
 import * as rewards from './rewards.js';
+import * as prog from './progression.js';
+import { PROGRAMS, scheme as progScheme, weeklySets, currentDay, byId as programById } from './programs.js';
 import { ExerciseDetector, PICK_LIST } from './detect.js';
 import { initCalm, renderCalm, startCalmNow } from './calm.js';
-import { WEIGHTED, lastLoad, lastLoadText, weekSummary } from './share.js';
+import { WEIGHTED, lastLoad, weekSummary } from './share.js';
 import { initVitals, renderVitals } from './vitals.js';
 import { vitalNotes } from './hr.js';
 import { nextStep } from './today.js';
@@ -89,7 +91,12 @@ document.addEventListener('click', e => {
 });
 
 /* ---------- Today ---------- */
-const TODAY = [['hipThrust', '4×10'], ['rdl', '3×10'], ['lunge', '3×12'], ['bandedWalk', '2×20']];
+const TODAY_DEFAULT = [['hipThrust', '4×10'], ['rdl', '3×10'], ['lunge', '3×12'], ['bandedWalk', '2×20']];
+// Today's workout: the next day of the active program, or the starter glute session.
+const activeProgram = () => (S.program?.id ? programById(S.program.id) : null);
+const programDay = () => { const p = activeProgram(); return p ? currentDay(p, S.program) : null; };
+const todayItems = () => { const d = programDay(); return d?.day ? d.day.items.map(it => [it[0], `${it[1]}×${it[2]}`]) : TODAY_DEFAULT; };
+const todayName = () => { const p = activeProgram(), d = programDay(); return p && d ? `${p.name}: ${d.day.name}` : 'Glute Builder'; };
 const ICONS = {
   hipThrust: '<path d="M6 20h9l8-5 8 3M23 15l3 11M6 28h14"/><circle cx="23" cy="13" r="3.5"/>',
   squat: '<circle cx="18" cy="6" r="3.5"/><path d="M18 10l2 10-8 4 2 10M20 20l6 6-2 8"/>',
@@ -150,7 +157,7 @@ function renderToday() {
 
   const p = S.plan || {};
   $('#sessionMeta').textContent = [p.time, p.place].filter(Boolean).join(' · ');
-  $('#todayList').innerHTML = TODAY.map(([k, sets]) => `<button type="button" class="ex-row" data-train="${k}" style="width:100%;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;cursor:pointer;padding-inline:0"><span class="pic">${icon(iconKey(k))}</span>
+  $('#todayList').innerHTML = todayItems().map(([k, sets]) => `<button type="button" class="ex-row" data-train="${k}" style="width:100%;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;cursor:pointer;padding-inline:0"><span class="pic">${icon(iconKey(k))}</span>
     <div><b>${esc(LIB[k].name)}</b>${LIB[k].pattern ? '<span class="tag">QK checks your form</span>' : '<span class="tag" style="color:var(--z3)">QK coaches your tempo</span>'}</div>
     <span class="sets">${sets}</span></button>`).join('');
 
@@ -214,6 +221,9 @@ function bindProfile() {
   $('#pName').onchange = e => { p.name = e.target.value.trim(); persist(); renderToday(); };
   $('#pSex').onchange = e => { p.sex = e.target.value; persist(); };
   $('#pHeight').onchange = e => { p.heightCm = +e.target.value; persist(); };
+  $('#pUnit').value = p.unit || 'kg';
+  $('#pUnit').onchange = e => { p.unit = e.target.value; persist(); unitLabels(); };
+  setTimeout(unitLabels);
   $('#coachPhoto').onchange = async e => { const f = e.target.files[0]; if (!f) return; S.coachPhoto = await downscale(f, 320); persist(); mountOrbs(); toast('Coach photo updated'); };
   const fill = () => {
     const vs = speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'));
@@ -261,6 +271,7 @@ COACH.tempo.note = COACH.hold.note = 'A camera can\'t judge this movement reliab
 
 let muscleFilter = 'All', searchQ = '';
 function renderTrain() {
+  renderPrograms();
   $('#muscleChips').innerHTML = ['All', ...Object.keys(KINDS), ...MUSCLES, 'Rehab'].map(m => `<button type="button" class="mchip ${m === muscleFilter ? 'on' : ''}" data-muscle="${m}" aria-pressed="${m === muscleFilter}">${m}</button>`).join('');
   const q = searchQ.trim().toLowerCase();
   // Physio exercises live under their own Rehab filter so they don't clutter the gym library.
@@ -307,7 +318,9 @@ function openSetup(k) {
   $('#fitView')?.addEventListener('click', () => { $('#setup').hidden = true; showBodyMap(S.profile.body); });
   $('#fitMap')?.addEventListener('click', () => { $('#setup').hidden = true; showBodyMapIntro(); });
   $('#loadWrap').hidden = !vbtOn();
-  $('#setupLast').textContent = lastLoadText(lastLoad(S.sessions, k));
+  const ll = lastLoad(S.sessions, k);
+  $('#setupLast').textContent = ll ? `Last time: ${prog.fmtW(ll.kg, unit())} × ${ll.reps}` : '';
+  showRx(k);
   $('#setup').hidden = false;
 }
 const setsToday = k => { const d = new Date(); d.setHours(0, 0, 0, 0); return S.sessions.filter(s => s.ex === k && s.at >= d.getTime()).length; };
@@ -352,7 +365,8 @@ async function startLive({ mode, source, file, auto = false }) {
   $('#tempoRing').hidden = true;
   if (auto) exKey = null;
   const ex = mode === 'form' && !auto ? curEx() : null;
-  live = { mode, source, frames: [], t0: null, lost: 0, wrong: 0, demo: null, done: false, steps: 0, mPerPx: null, standFrames: [], times: [],
+  const rx = mode === 'form' && !auto ? curRx : null;
+  live = { rx, mode, source, frames: [], t0: null, lost: 0, wrong: 0, demo: null, done: false, steps: 0, mPerPx: null, standFrames: [], times: [],
     auto, det: auto ? new ExerciseDetector() : null, buf: [], sets: [], lastRepT: 0 };
   bar.reset(); recorder2.start({ kind: mode, exercise: mode === 'form' && !auto ? exKey : undefined, gaitMode: mode === 'gait' ? gaitMode : undefined, source, loadKg: mode === 'form' ? parseFloat($('#loadKg').value) || null : undefined });
   engine = null; fb = null; smooth.reset(); motion.reset(); fx.reset(); hud.reset(); comp = null; recorder = null; $('#trackChip').innerHTML = '<i></i>Finding you…'; $('#trackChip').classList.remove('on'); $('#faultBanner').hidden = true;
@@ -716,11 +730,17 @@ function endSet() {
   const weighted = WEIGHTED.includes(LIB[exKey]?.equipment), last = lastLoad(S.sessions, exKey);
   $('#repFix').hidden = !reps || !!hold;
   $('#kgWrap').hidden = !reps || !weighted;
-  $('#setKg').value = parseFloat($('#loadKg').value) || last?.kg || '';
-  $('#sLast').textContent = lastLoadText(last);
+  const preKg = parseFloat($('#loadKg').value) ? prog.fromUnit(parseFloat($('#loadKg').value), unit()) : live?.rx?.kg || last?.kg;
+  $('#setKg').value = preKg ? +prog.toUnit(preKg, unit()).toFixed(2) : '';
+  $('#sNext').hidden = true;
+  $('#sLast').textContent = last ? `Last time: ${prog.fmtW(last.kg, unit())} × ${last.reps}` : '';
   if (reps) {
-    const kg = weighted ? parseFloat($('#setKg').value) || undefined : undefined;
-    S.sessions.push(lastSet = { at: Date.now(), ex: exKey, name: ex.name, reps, good, faults: tally, vl, tempo, roms: roms.map(r => Math.round(r.rom)), kg, demo: live?.source === 'demo' || undefined });
+    const kg = weighted && parseFloat($('#setKg').value) > 0 ? prog.fromUnit(parseFloat($('#setKg').value), unit()) : undefined;
+    const rx = live?.rx;
+    S.sessions.push(lastSet = { at: Date.now(), ex: exKey, name: ex.name, reps, good, faults: tally, vl, tempo, roms: roms.map(r => Math.round(r.rom)), kg, demo: live?.source === 'demo' || undefined,
+      ...(rx ? { target: rx.reps, mode: rx.mode === 'wave' ? 'wave' : undefined, wave: rx.day, rxKg: rx.kg } : {}) });
+    logProgramDay(exKey);
+    showNext();
     persist();
     const better = prevScore != null && score > prevScore ? ` Your form score is up from ${prevScore} to ${score} percent.` : '';
     say(`Set done. ${reps} reps, ${good} clean.${better} ${top ? 'One thing for next set: ' + top.cue : 'Great form. Keep it up.'}`, { id: 'summary_' + Date.now(), priority: 'high' });
@@ -768,7 +788,7 @@ function fixReps(d) {
 }
 $('#repMinus').onclick = () => fixReps(-1);
 $('#repPlus').onclick = () => fixReps(1);
-$('#setKg').onchange = e => { if (!lastSet) return; const kg = parseFloat(e.target.value); lastSet.kg = kg > 0 ? kg : undefined; persist(); };
+$('#setKg').onchange = e => { if (!lastSet) return; const v = parseFloat(e.target.value); lastSet.kg = v > 0 ? prog.fromUnit(v, unit()) : undefined; persist(); showNext(); };
 
 let restLeft = 120, restTotal = 120, restTimer = null;
 function drawRest() { $('#restClock').textContent = `${Math.floor(restLeft / 60)}:${String(restLeft % 60).padStart(2, '0')}`; $('#restArc').style.strokeDashoffset = 201 * (1 - restLeft / restTotal); }
@@ -899,7 +919,7 @@ function endGuided() {
   $('#restWhy').textContent = 'Recovery for the next set'; $('#restCard').hidden = !reps || timed || mode === 'intervals';
   $('#playback').hidden = true;
   const done = timed ? secs >= 10 : reps > 0;
-  if (done) { S.sessions.push({ at: Date.now(), ex: exKey, name: item.name, reps: timed ? 0 : reps, secs: secs || undefined, good: 0, guided: true, kind: item.kind }); persist(); }
+  if (done) { S.sessions.push({ at: Date.now(), ex: exKey, name: item.name, reps: timed ? 0 : reps, secs: secs || undefined, good: 0, guided: true, kind: item.kind }); persist(); logProgramDay(exKey); }
   say(!done ? 'Ended.' : timed ? `Done. ${Math.floor(secs / 60)} minutes ${secs % 60} seconds.` : mode === 'intervals' ? `Done. ${reps} rounds. Great work.` : `Set done. ${hold ? reps + ' seconds' : reps + ' reps'}. Nice work.`, { id: 'gsum_' + Date.now(), priority: 'high' });
 }
 
@@ -1154,8 +1174,130 @@ $('#calcBf').onclick = () => {
   say(`Body fat is about ${Math.round(bf)} percent, in the ${bfCategory(bf, p.sex).toLowerCase()} range.`, { id: 'bf_' + Date.now(), priority: 'high' });
 };
 
+/* ---------- Progression: QK's next weight, units, strength chart ---------- */
+const unit = () => S.profile.unit || 'kg';
+function unitLabels() {
+  const u = unit();
+  $('#setKgLbl').textContent = `Weight used (${u})`; $('#loadKgLbl').textContent = `Weight (${u})`;
+  if (!$('#progress').hidden) renderStrength();
+}
+// Light week: starts by itself when due (every ~7 training weeks, or after 2 lifts backed off) and lasts 7 days.
+function lightWeek() {
+  const P = (S.prog ||= {}), now = Date.now(), W = 7 * 864e5;
+  if (P.lightAt && now - P.lightAt < W) return true;
+  if (prog.lightWeekDue(S.sessions, { now, lastLight: P.lightAt || 0, resets: P.resets || [] })) { P.lightAt = now; persist(); return true; }
+  return false;
+}
+// The prescription for an exercise, with a coach/lifter override if one was set since the last session.
+function rxFor(k) {
+  const item = LIB[k]; if (!item) return null;
+  const r = prog.nextFor(item, S.sessions, { unit: unit(), light: lightWeek(), scheme: programScheme(k) });
+  const o = S.prog?.override?.[k], lastAt = Math.max(0, ...S.sessions.filter(s => s.ex === k).map(s => s.at));
+  if (o && o.at > lastAt) {
+    const base = r || { reps: prog.liftClass(item) === 'small' || prog.liftClass(item) === 'mid' ? prog.RANGE.lo : 8, sets: 3, mode: 'linear', cls: prog.liftClass(item) };
+    return { ...base, kg: o.kg, action: 'set', why: 'Weight set by you.' };
+  }
+  if (r?.action === 'reset') { const P = (S.prog ||= {}); P.resets ||= []; if (!P.resets.some(x => x.ex === k && Date.now() - x.at < 3 * 864e5)) { P.resets.push({ ex: k, at: Date.now() }); persist(); } }
+  return r;
+}
+const rxLine = r => `${r.sets} × ${r.reps} at ${prog.fmtW(r.kg, unit())}${r.day ? ` · ${r.day} day` : ''}`;
+let curRx = null;
+function showRx(k) {
+  const item = LIB[k], cls = prog.liftClass(item); curRx = null;
+  $('#rxEditWrap').hidden = true;
+  if (!cls) { $('#rxBox').hidden = true; return; }
+  const r = rxFor(k); curRx = r;
+  $('#rxBox').hidden = false; $('#rxBox').classList.toggle('lightwk', r?.action === 'light');
+  $('#rxEyebrow').textContent = r?.action === 'light' ? 'Light week' : 'QK\'s target today';
+  const sc = programScheme(k);
+  $('#rxLine').textContent = r ? rxLine(r) : sc ? `First time: ${sc.sets} × ${sc.lo === sc.hi ? sc.lo : sc.lo + '–' + sc.hi}, pick a weight you can do with good form` : 'First time: pick a weight you can lift 8 times with good form';
+  $('#rxWhy').textContent = r ? r.why : 'Log the weight after your set and QK plans the next one from how it went.';
+  $('#rxEditLbl').textContent = `Weight (${unit()})`; $('#rxKg').value = r ? +prog.toUnit(r.kg, unit()).toFixed(2) : '';
+  $('#loadKg').value = r ? +prog.toUnit(r.kg, unit()).toFixed(2) : $('#loadKg').value;
+}
+$('#rxEdit').onclick = () => { $('#rxEditWrap').hidden = !$('#rxEditWrap').hidden; if (!$('#rxEditWrap').hidden) $('#rxKg').focus(); };
+$('#rxSave').onclick = () => {
+  const v = parseFloat($('#rxKg').value); if (!(v > 0) || !exKey) return;
+  const P = (S.prog ||= {}); P.override ||= {}; P.override[exKey] = { kg: prog.fromUnit(v, unit()), at: Date.now() };
+  persist(); showRx(exKey); toast('Saved. QK will build from this weight.');
+};
+// After a set: what QK will ask for next time, and why.
+function showNext() {
+  const item = LIB[exKey], box = $('#sNext');
+  if (!lastSet?.kg || !prog.liftClass(item)) { box.hidden = true; return; }
+  const r = prog.nextFor(item, S.sessions, { unit: unit(), scheme: programScheme(exKey) });
+  if (!r) { box.hidden = true; return; }
+  box.hidden = false; $('#sNextLine').textContent = rxLine(r); $('#sNextWhy').textContent = r.why;
+}
+// Lines for the weekly message to the coach: what QK changed and why, so the coach can step in.
+function progressionLines() {
+  const W = 7 * 864e5, ids = [...new Set(S.sessions.filter(s => s.kg > 0 && !s.demo && Date.now() - s.at < W).map(s => s.ex))];
+  const lines = ids.map(k => { const r = prog.nextFor(LIB[k], S.sessions, { unit: unit() }); return r && LIB[k] ? `${LIB[k].name}: ${rxLine(r)} (${r.why})` : null; }).filter(Boolean);
+  return lines.length ? '\nNext session targets:\n' + lines.join('\n') : '';
+}
+let stRange = '3M';
+function renderStrength() {
+  // Lifts with logged weights, most-trained first; the chart opens on the main one.
+  const n = {}; for (const x of S.sessions) if (x.kg > 0 && !x.demo && !x.guided && LIB[x.ex]) n[x.ex] = (n[x.ex] || 0) + 1;
+  const lifts = Object.keys(n).sort((a, b) => n[b] - n[a]);
+  const sel = $('#stLift'), cur = lifts.includes(sel.value) ? sel.value : lifts[0];
+  sel.innerHTML = lifts.map(k => `<option value="${k}" ${k === cur ? 'selected' : ''}>${esc(LIB[k].name)}</option>`).join('');
+  const u = unit(), vol = prog.weeklyVolume(S.sessions, 8);
+  const vmax = Math.max(1, ...vol);
+  $('#volChart').innerHTML = `<div class="vol-bars" role="img" aria-label="Weekly volume, last 8 weeks">${vol.map((v, i) => `<i class="${i === 7 ? 'now' : ''}" style="height:${Math.max(4, v / vmax * 100)}%" title="${Math.round(prog.toUnit(v, u)).toLocaleString()} ${u}"></i>`).join('')}</div><p class="muted small" style="margin:6px 0 0">This week: ${Math.round(prog.toUnit(vol[7], u)).toLocaleString()} ${u}${vol[6] ? ` · last week ${Math.round(prog.toUnit(vol[6], u)).toLocaleString()} ${u}` : ''}</p>`;
+  if (!cur) { $('#stChart').innerHTML = '<p class="empty">Log the weight after a set and your strength chart starts here.</p>'; $('#stNote').textContent = ''; $('#stDelta').textContent = ''; return; }
+  const { points, change } = prog.strengthSeries(S.sessions, cur, stRange);
+  $('#stTitle').textContent = LIB[cur].name;
+  $('#stDelta').textContent = change == null ? '' : `${change >= 0 ? '+' : ''}${Math.round(change * 100)}%`;
+  $('#stDelta').style.color = change > 0 ? 'var(--good)' : 'var(--muted)';
+  const vals = points.map(p => prog.toUnit(p.e1rm, u));
+  const fmtD = t => new Date(t).toLocaleDateString(undefined, stRange === '1M' || stRange === '3M' ? { day: 'numeric', month: 'short' } : { month: 'short' });
+  $('#stChart').innerHTML = vals.length >= 2 ? lineChart(vals, { min: Math.floor(Math.min(...vals) * 0.95), max: Math.ceil(Math.max(...vals) * 1.03), labels: points.map(p => fmtD(p.t)), marks: points.map(p => p.pr) })
+    : `<p class="empty">${vals.length ? 'One session so far in this range. Train it again to see the line.' : 'No sets of this lift in this range.'}</p>`;
+  const best = Math.max(0, ...points.map(p => p.e1rm)), prs = points.filter(p => p.pr).length;
+  $('#stNote').textContent = vals.length ? `Estimated 1-rep max, best ${prog.fmtW(best, u)}${prs ? ` · ${prs} personal best${prs > 1 ? 's' : ''} (gold dots)` : ''}.` : '';
+}
+$('#stLift').onchange = renderStrength;
+$('#stRange').onclick = e => { const b = e.target.closest('[data-r]'); if (!b) return; stRange = b.dataset.r; $('#stRange').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); renderStrength(); };
+
+/* ---------- Programs ---------- */
+// The program's rep target for an exercise on today's program day (feeds the progression engine).
+function programScheme(k) {
+  const d = programDay(), it = d?.day?.items.find(x => x[0] === k);
+  return it ? progScheme(it[1], it[2]) : undefined;
+}
+// A program day counts as trained when a set of one of its exercises is saved.
+function logProgramDay(k) {
+  const d = programDay(); if (!d || d.doneToday || !d.day.items.some(x => x[0] === k)) return;
+  (S.program.log ||= []).push({ day: d.index, at: Date.now() }); persist();
+}
+function renderPrograms() {
+  const act = activeProgram(), d = programDay();
+  $('#progActive').textContent = act ? `On ${act.name} · ${d.doneToday ? 'today done ✓' : 'next: ' + d.day.name}` : '';
+  const list = act ? [act, ...PROGRAMS.filter(p => p !== act)] : PROGRAMS;
+  $('#progStrip').innerHTML = list.map(p => `<button type="button" role="listitem" class="prog-card ${p === act ? 'on' : ''}" data-prog="${p.id}">
+    <span class="pgoal">${esc(p.goal)}${p === act ? ' · active' : ''}</span><b>${esc(p.name)}</b><p>${esc(p.tagline)}</p>
+    <span class="meta">${p.days} days/week · ${p.weeks} weeks · ~${Math.round(weeklySets(p))} sets/week · ${esc(p.level)}</span></button>`).join('');
+}
+function showProgram(id) {
+  const p = programById(id); if (!p) return;
+  const on = S.program?.id === id;
+  openSheet(`<div><span class="eyebrow">${esc(p.goal)} · ${esc(p.level)}</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.4rem">${esc(p.name)}</h2></div>
+    <p style="margin:0">${esc(p.tagline)}</p>
+    <p class="muted small" style="margin:0"><b>How it works:</b> ${esc(p.method)} QK picks your weights from how each session went.</p>
+    <p class="data small" style="margin:0">${p.days} days a week · ${p.weeks} weeks · about ${Math.round(weeklySets(p))} working sets a week</p>
+    ${p.plan.map(dd => `<div class="prog-day"><h3>${esc(dd.name)} <span class="muted small">· ${esc(dd.focus)}</span></h3><ol>${dd.items.map(it => `<li>${esc(LIB[it[0]]?.name || it[0])} <span>${it[1]} × ${esc(it[2])}${it[3] ? ` · rest ${it[3] < 120 ? it[3] + ' s' : it[3] / 60 + ' min'}` : ''}</span>${it[4] ? `<br><span class="muted small">${esc(it[4])}</span>` : ''}</li>`).join('')}</ol></div>`).join('')}
+    <div class="btn-row">${on ? '<button class="ghost" type="button" data-progstop>Stop this program</button>' : ''}<button class="cta" type="button" data-progstart="${p.id}">${on ? 'Restart from day 1' : 'Start this program'}</button></div>`);
+}
+$('#progStrip').onclick = e => { const b = e.target.closest('[data-prog]'); if (b) showProgram(b.dataset.prog); };
+$('#rsheetBody').addEventListener('click', e => {
+  const st = e.target.closest('[data-progstart]'), sp = e.target.closest('[data-progstop]');
+  if (st) { S.program = { id: st.dataset.progstart, start: Date.now(), log: [] }; persist(); closeSheet(); renderPrograms(); renderToday(); const p = activeProgram(); toast(`${p.name} started. Day 1 is on your Today screen.`); say(`${p.name}. Let's go. Day one is ready on your Today screen.`, { priority: 'high' }); }
+  if (sp) { S.program = null; persist(); closeSheet(); renderPrograms(); renderToday(); toast('Program stopped.'); }
+});
+
 /* ---------- Progress ---------- */
-function lineChart(vals, { min, max, suffix = '', labels }) {
+function lineChart(vals, { min, max, suffix = '', labels, marks }) {
   const W = 360, H = 150, l = 34, r = 12, t = 14, b = 24, n = vals.length;
   const X = i => l + (n === 1 ? 0 : i * (W - l - r) / (n - 1)), Y = v => t + (1 - (v - min) / (max - min || 1)) * (H - t - b);
   let s = `<svg viewBox="0 0 ${W} ${H}" role="img"><defs><linearGradient id="fillG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--z2)" stop-opacity=".35"/><stop offset="1" style="stop-color:var(--z2)" stop-opacity="0"/></linearGradient></defs>`;
@@ -1163,6 +1305,7 @@ function lineChart(vals, { min, max, suffix = '', labels }) {
   labels.forEach((lb, i) => { if (n <= 8 || i % Math.ceil(n / 6) === 0 || i === n - 1) s += `<text x="${X(i)}" y="${H - 6}" text-anchor="middle" style="fill:var(--muted)" font-size="10" font-family="IBM Plex Mono, monospace">${lb}</text>`; });
   const path = vals.map((v, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(' ');
   s += `<path d="${path} L${X(n - 1)} ${H - b} L${X(0)} ${H - b} Z" fill="url(#fillG)"/><path d="${path}" fill="none" stroke="url(#zoneStroke)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+  if (marks) vals.forEach((v, i) => { if (marks[i]) s += `<circle cx="${X(i)}" cy="${Y(v)}" r="4" fill="#E5A84C"/>`; });
   s += `<circle cx="${X(n - 1)}" cy="${Y(vals[n - 1])}" r="9" style="fill:var(--z3)" fill-opacity=".25"/><circle cx="${X(n - 1)}" cy="${Y(vals[n - 1])}" r="4.5" style="fill:var(--text)"/></svg>`;
   return s;
 }
@@ -1193,7 +1336,7 @@ function renderRewards() {
 }
 
 function renderProgress() {
-  renderRewards();
+  renderRewards(); renderStrength();
   const sets = S.sessions.filter(s => s.reps && !s.guided).slice(-12);
   const scores = sets.map(s => Math.round(s.good / s.reps * 100));
   $('#pfScore').textContent = scores.length ? scores[scores.length - 1] + '%' : '–';
@@ -1321,7 +1464,7 @@ $('#sendWeek').onclick = async () => {
   const faultName = id => { for (const k of Object.keys(LIB)) { const r = exFor(k) && allRules(exFor(k)).find(x => x.id === id); if (r) return r.cue; } return id; };
   const rk = S.rehab?.active?.checkins?.slice(-1)[0];
   const light = rk ? painLight({ ...rk, usualMorning: S.rehab.active.usualMorning }, COND[S.rehab.active.cond].painLimit).light : null;
-  const text = weekSummary(S, { faultName, light, isHold: isHoldId });
+  const text = weekSummary(S, { faultName, light, isHold: isHoldId }) + progressionLines();
   try { if (navigator.share) { await navigator.share({ text }); return; } } catch (err) { if (err?.name === 'AbortError') return; }
   try { await navigator.clipboard.writeText(text); toast('Copied. Paste it into WhatsApp or a message to QK.'); }
   catch { $('#weekText').textContent = text; $('#weekText').hidden = false; toast('Select the text below and copy it.'); }
@@ -1566,7 +1709,7 @@ function renderNext(level) {
     trainedToday: S.sessions.some(s => !s.demo && dayKey(s.at) === today) || S.checkins.some(x => dayKey(x.at) === today),
     calmedToday: (S.calm || []).some(x => dayKey(x.at) === today),
     rehab: p ? { name: c.name, phase: p.phase, phases: c.phases.length, morningDue: !!morningDue } : null,
-    workout: { name: 'Glute Builder', minutes: 38, count: TODAY.length },
+    workout: { name: todayName(), minutes: 38, count: todayItems().length },
   });
   $('#nextCard').dataset.kind = step.kind;
   $('#nextEyebrow').textContent = step.eyebrow; $('#nextTitle').textContent = step.title; $('#nextSub').textContent = step.sub; $('#nextCta').textContent = step.cta;
@@ -1576,10 +1719,10 @@ function renderNext(level) {
     'rehab-morning': () => { tab('rehab'); openMorning(morningDue); },
     rehab: () => tab('rehab'), 'rehab-start': () => tab('rehab'),
     calm: () => { tab('calm'); startCalmNow(); }, rest: () => { tab('calm'); startCalmNow(); },
-    done: () => tab('progress'), workout: () => openSetup(TODAY[0][0]),
+    done: () => tab('progress'), workout: () => openSetup(todayItems()[0][0]),
   };
   $('#nextBtn').onclick = go[step.kind];
-  $('#nextAlt').onclick = () => openSetup(TODAY[0][0]);
+  $('#nextAlt').onclick = () => openSetup(todayItems()[0][0]);
 }
 const scale7 = (id, label, lo, hi, v = 3) => `<label class="field slider">${label} <span class="val" id="${id}v">${v}</span><input type="range" min="1" max="7" value="${v}" id="${id}"><span class="muted small" style="display:flex;justify-content:space-between"><span>${lo}</span><span>${hi}</span></span></label>`;
 // One tap: Great / OK / Rough maps onto the Hooper scale (1 = very good ... 7 = very bad).
