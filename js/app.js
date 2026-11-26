@@ -283,7 +283,7 @@ COACH.tempo.note = COACH.hold.note = 'A camera can\'t judge this movement reliab
 
 let muscleFilter = 'All', searchQ = '';
 function renderTrain() {
-  renderPrograms(); renderClasses();
+  renderPrograms(); renderClasses(); renderHome();
   $('#muscleChips').innerHTML = ['All', ...Object.keys(KINDS), ...MUSCLES, 'Rehab'].map(m => `<button type="button" class="mchip ${m === muscleFilter ? 'on' : ''}" data-muscle="${m}" aria-pressed="${m === muscleFilter}">${m}</button>`).join('');
   const q = searchQ.trim().toLowerCase();
   // Physio exercises live under their own Rehab filter so they don't clutter the gym library.
@@ -1498,6 +1498,15 @@ function showClass(id) {
     <button class="cta" type="button" data-classstart="${c.id}">Start class · ${Math.round(t.total / 60)} min</button>`);
 }
 $('#classStrip').onclick = e => { const b = e.target.closest('[data-class]'); if (b) showClass(b.dataset.class); };
+// At home: home programs and the home-friendly classes in one row.
+const HOME_EQ = { none: 'no equipment', dumbbells: 'dumbbells', bands: 'bands' };
+function renderHome() {
+  const act = activeProgram();
+  const progs = PROGRAMS.filter(p => p.home).map(p => `<button type="button" role="listitem" class="prog-card ${p.id === act?.id ? 'on' : ''}" data-prog="${p.id}"><span class="pgoal">Program · ${HOME_EQ[p.home]}</span><b>${esc(p.name)}</b><p>${esc(p.tagline)}</p><span class="meta">${p.days} days/week · ${p.weeks} weeks · ${esc(p.level)}</span></button>`);
+  const sess = classes.CLASSES.filter(c => c.home).map(c => `<button type="button" role="listitem" class="prog-card class-card" data-class="${c.id}"><span class="pgoal">${classes.minutes(c)} min · ${c.equipment === 'dumbbells' ? 'dumbbells' : 'no equipment'}</span><b>${esc(c.name)}</b><p>${esc(c.tagline)}</p><span class="meta">${esc(classes.format(c))}${c.quiet ? ' · no jumping' : ''}</span></button>`);
+  $('#homeStrip').innerHTML = [...sess, ...progs].join('');
+}
+$('#homeStrip').onclick = e => { const c = e.target.closest('[data-class]'), p = e.target.closest('[data-prog]'); if (c) showClass(c.dataset.class); else if (p) showProgram(p.dataset.prog); };
 $('#rsheetBody').addEventListener('click', e => { const b = e.target.closest('[data-classstart]'); if (b) { const quiet = !!$('#classQuiet')?.checked; closeSheet(); startClass(b.dataset.classstart, { quiet }); } });
 
 let cls = null;
