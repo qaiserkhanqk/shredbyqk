@@ -41,9 +41,10 @@ export function consensus(samples) {
       const id = DISH[it.dish] ? it.dish : 'other:' + String(it.other_name || 'unknown').toLowerCase().trim();
       if (seen.has(id)) { const g = by.get(id); g.servings[g.servings.length - 1] += +it.servings || 0; return; } // two piles of the same dish
       seen.add(id);
-      if (!by.has(id)) by.set(id, { id, order: si * 100 + ii, servings: [], meat: [], oil: [], conf: [], name: it.other_name });
+      if (!by.has(id)) by.set(id, { id, order: si * 100 + ii, servings: [], meat: [], oil: [], conf: [], alt: [], name: it.other_name });
       const g = by.get(id);
       g.servings.push(+it.servings || 1); g.meat.push(it.meat_share || 'na'); g.oil.push(it.oil || 'na'); g.conf.push(+it.confidence || 0.5);
+      if (DISH[it.alternative] && it.alternative !== it.dish) g.alt.push(it.alternative);
     });
   });
   const items = [...by.values()].filter(g => g.servings.length >= need).sort((a, b) => a.order - b.order).map(g => ({
@@ -53,6 +54,8 @@ export function consensus(samples) {
     meat: ['less', 'normal', 'more'].includes(mode(g.meat)) ? mode(g.meat) : 'normal',
     oil: ['less', 'normal', 'oily'].includes(mode(g.oil)) ? mode(g.oil) : 'normal',
     confidence: g.conf.reduce((a, b) => a + b, 0) / g.conf.length,
+    // The runner-up the model named most often ("naan, or roghni naan?"), or another dish the samples disagreed on.
+    alternative: g.alt.length ? mode(g.alt) : null,
     agree: g.servings.length / ok.length,
   }));
   const setting = mode(ok.map(s => s.setting || 'unsure'));
@@ -68,9 +71,12 @@ export async function prepareImage(file) {
   const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
   c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
   const dataUrl = c.toDataURL('image/jpeg', 0.82);
+  const sw = Math.min(256, c.width), sh = Math.round(c.height * sw / c.width), sc = document.createElement('canvas'); sc.width = sw; sc.height = sh;
+  sc.getContext('2d').drawImage(c, 0, 0, sw, sh);
+  const quality = imageQuality(sc.getContext('2d').getImageData(0, 0, sw, sh).data, sw, sh);
   const bytes = Uint8Array.from(atob(dataUrl.split(',')[1]), ch => ch.charCodeAt(0));
   const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(b => b.toString(16).padStart(2, '0')).join('');
-  return { dataUrl, hash };
+  return { dataUrl, hash, quality };
 }
 
 const CACHE_KEY = 'shred_food_photo_v1';
@@ -81,17 +87,50 @@ function writeCache(hash, result) {
   try { localStorage.setItem(CACHE_KEY, JSON.stringify(Object.fromEntries(keys.map(k => [k, c[k]])))); } catch {}
 }
 
-export async function recognise(file) {
+/**
+ * Photo → dishes. ctx: { hint: what the person said ("restaurant karahi"), plateCm: their usual plate,
+ * usual: names of dishes they log most }. All three make the model's job easier and its answers steadier.
+ */
+export async function recognise(file, ctx = {}) {
   if (!PHOTO_CONFIG.endpoint) throw new Error('no-endpoint');
-  const { dataUrl, hash } = await prepareImage(file);
-  const hit = readCache()[hash];
-  if (hit) return { ...hit.result, cached: true, dataUrl };
+  const { dataUrl, hash, quality } = await prepareImage(file);
+  const key = hash + '|' + (ctx.hint || '');
+  const hit = readCache()[key];
+  if (hit) return { ...hit.result, cached: true, dataUrl, hash, quality };
   const r = await fetch(PHOTO_CONFIG.endpoint, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image: dataUrl, hash, samples: PHOTO_CONFIG.samples, catalogue: catalogue() }),
+    body: JSON.stringify({ image: dataUrl, hash, samples: PHOTO_CONFIG.samples, catalogue: catalogue(), hint: ctx.hint || '', plateCm: ctx.plateCm || null, usual: ctx.usual || [] }),
   });
   if (!r.ok) throw new Error('server ' + r.status);
   const result = consensus((await r.json()).samples);
-  writeCache(hash, result);
-  return { ...result, cached: false, dataUrl };
+  writeCache(key, result);
+  return { ...result, cached: false, dataUrl, hash, quality };
+}
+
+/**
+ * Is the photo usable? Very dark or very blurry photos make the model guess. Returns { dark, blurry }.
+ * pixels: RGBA bytes of a small grey-scaled copy; blur is the variance of the Laplacian (sharp edges = high).
+ */
+export function imageQuality(pixels, w, h) {
+  const g = new Float32Array(w * h);
+  let sum = 0;
+  for (let i = 0; i < w * h; i++) { g[i] = 0.299 * pixels[i * 4] + 0.587 * pixels[i * 4 + 1] + 0.114 * pixels[i * 4 + 2]; sum += g[i]; }
+  const mean = sum / (w * h);
+  let m = 0, m2 = 0, n = 0;
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+    const i = y * w + x, lap = g[i - 1] + g[i + 1] + g[i - w] + g[i + w] - 4 * g[i];
+    m += lap; m2 += lap * lap; n++;
+  }
+  const variance = m2 / n - (m / n) ** 2;
+  return { brightness: Math.round(mean), sharpness: Math.round(variance), dark: mean < 45, blurry: variance < 25 };
+}
+
+/** Words the app's own parser didn't catch ("kadhi chawal ki plate") → dishes from the catalogue, via the server. */
+export async function askText(text) {
+  if (!PHOTO_CONFIG.endpoint || !text.trim()) return [];
+  const r = await fetch(PHOTO_CONFIG.endpoint.replace(/food-vision$/, 'food-text'), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, catalogue: catalogue() }),
+  });
+  if (!r.ok) throw new Error('server ' + r.status);
+  return consensus((await r.json()).samples).items.filter(i => i.dish);
 }

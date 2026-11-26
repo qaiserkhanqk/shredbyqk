@@ -10,7 +10,8 @@ import * as N from './nutrition.js';
 import { recognise, PHOTO_CONFIG } from './foodphoto.js';
 import { searchPlaces, allPlaces, itemNutrition, suggestDish } from './menus.js';
 import { weekReport, reportText, waterGoal, dayKey } from './weekly.js';
-import { parseMeal, looksLikeMeal } from './foodtext.js';
+import { parseMeal, looksLikeMeal, bestTranscript } from './foodtext.js';
+import { askText } from './foodphoto.js';
 import { lookupBarcode, loadSaved, canScan, scanFrom } from './barcode.js';
 import { portionFactor, factors, studyCSV, studySummary } from './calibrate.js';
 import { canSyncSteps, syncSteps } from './activity.js';
@@ -25,7 +26,7 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 let ctx; // { S, persist, toast, rehab: () => bool }
 let cur = null; // the sheet: { mode: 'food'|'place', ref, opts, name, official, onSave, saveLabel }
 let fsCache = { q: '', list: [] }, fsTimer = null;
-let mealPending = null; // parsed sentence waiting for "Add all"
+let mealPending = null, aiExtra = null; // parsed sentence waiting for "Add all"
 let snap = null; // the last photo added: { dataUrl, ids, unsure, unknown, setting }
 
 const F = () => {
@@ -44,6 +45,16 @@ export function initFood(c) {
     if (m) { const [pid, i] = m.dataset.menu.split('|'); const place = allPlaces(F().places).find(p => p.id === pid); return openMenuItem(place, place.items[+i]); }
     const b = e.target.closest('[data-ref]'); if (b) return openSheet(JSON.parse(b.dataset.ref));
     if (e.target.closest('#addPlaceBtn')) openPlaceSheet($('#foodSearch').value);
+    if (e.target.closest('#mealAskAI')) {
+      const q = $('#foodSearch').value, left = parseMeal(q).unknown.join(', ');
+      e.target.closest('#mealAskAI').textContent = 'Asking…';
+      askText(left).then(found => {
+        if (!found.length) { ctx.toast('QK’s AI didn’t recognise that either. Try searching for it.'); return renderResults(); }
+        aiExtra = { q, items: found.map(it => ({ ref: { t: 'dish', id: it.dish }, opts: { servings: it.servings, meat: it.meat, oil: it.oil }, name: N.DISH[it.dish].name })) };
+        renderResults();
+      }).catch(() => { ctx.toast('Couldn’t reach QK’s AI.'); renderResults(); });
+      return;
+    }
     if (e.target.closest('#mealAddAll') && mealPending) {
       mealPending.forEach(it => addEntry(it.ref, it.opts, 'text', { name: it.name !== N.DISH[it.ref.id]?.name ? it.name : null, official: it.official }));
       mealPending = null; $('#foodSearch').value = ''; renderResults(); renderFood(); ctx.toast('Meal added');
@@ -82,6 +93,7 @@ export function initFood(c) {
     if (e.target.id === 'plItem') renderSuggestions();
   };
   const p = ctx.S.profile;
+  const pl = $('#tPlate'); pl.value = F().plateCm || ''; pl.onchange = () => { F().plateCm = pl.value; ctx.persist(); };
   for (const [id, key] of [['#tWeight', 'weightKg'], ['#tAge', 'age'], ['#tGoal', 'dietGoal'], ['#tActivity', 'activity']]) {
     const el = $(id); el.value = key === 'dietGoal' ? N.dietGoal(p) : p[key] ?? el.value;
     el.onchange = () => { p[key] = el.value; ctx.persist(); renderFood(); };
@@ -142,12 +154,14 @@ function renderResults() {
   if (looksLikeMeal(q)) {
     const m = parseMeal(q);
     if (m.items.length) {
-      mealPending = m.items.map(it => ({ ...it, opts: { ...defaultOpts(it.ref), ...it.opts } }));
+      const extra = aiExtra?.q === q ? aiExtra.items : [];
+      if (extra.length) m.unknown = [];
+      mealPending = [...m.items, ...extra].map(it => ({ ...it, opts: { ...defaultOpts(it.ref), ...it.opts } }));
       const kc = it => it.official ? it.official.kcal * (it.opts.servings || 1) / (it.official.base || 1) : N.estimate(it.ref, it.opts).kcal;
       const tot = mealPending.reduce((a, it) => a + kc(it), 0);
       mealCard = `<div class="meal-card"><span class="eyebrow">${tr('Log this meal')}</span>
         <div class="list">${mealPending.map(it => `<div class="row"><div><b>${esc(it.name)}</b><div class="muted small">${esc(N.serveLabel(N.DISH[it.ref.id], it.opts.servings))}</div></div><span class="r data">${fmt(kc(it))}</span></div>`).join('')}</div>
-        ${m.unknown.length ? `<p class="muted small" style="margin:0">Didn’t catch: ${m.unknown.map(esc).join(', ')}</p>` : ''}
+        ${m.unknown.length ? `<p class="muted small" style="margin:0">Didn’t catch: ${m.unknown.map(esc).join(', ')}${PHOTO_CONFIG.endpoint ? ` · <button type="button" class="linkbtn" id="mealAskAI">Ask QK’s AI</button>` : ''}</p>` : ''}
         <button type="button" class="cta" id="mealAddAll">${tr('Add all')} · ${fmt(tot)} kcal</button></div>`;
     }
   }
@@ -305,10 +319,10 @@ function editEntry(id) {
     ctx.persist(); renderFood(); renderSnap();
   }, 'Save', { name: custom, official: it.official, weigh, weighedG: it.weighedG });
 }
-function removeEntries(ids) {
+function removeEntries(ids, quiet = false) {
   const L = F().log;
   for (const id of ids) { const i = L.findIndex(x => x.id === id); if (i >= 0) L.splice(i, 1); }
-  ctx.persist(); renderFood(); renderSnap();
+  ctx.persist(); if (quiet) return; renderFood(); renderSnap();
 }
 
 /* ---------- Add a place ---------- */
@@ -352,11 +366,20 @@ function onPlaceClick(e) {
 }
 
 /* ---------- One-tap photo ---------- */
-async function runPhoto(file) {
+/** The dishes this person logs most, so the model leans their way when a photo is ambiguous. */
+function usualDishes() {
+  const n = {};
+  for (const e of F().log.slice(-300)) if (e.ref?.t === 'dish' && N.DISH[e.ref.id]) n[e.ref.id] = (n[e.ref.id] || 0) + 1;
+  return Object.entries(n).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([id]) => N.DISH[id].name);
+}
+async function runPhoto(file, hint = null) {
   const box = $('#foodPhotoBox');
+  // Words typed or said before snapping ("restaurant karahi, 2 naan") go with the photo as a hint.
+  if (hint === null) { hint = $('#foodSearch').value.trim(); if (hint) { $('#foodSearch').value = ''; renderResults(); } }
   box.hidden = false; box.innerHTML = '<div class="card snap-card"><b>Adding your meal…</b><p class="muted small" style="margin:6px 0 0">QK is naming each dish and counting portions.</p></div>';
   try {
-    const r = await recognise(file);
+    const r = await recognise(file, { hint, plateCm: +F().plateCm || null, usual: usualDishes() });
+    if (snap?.file === file) removeEntries(snap.ids, true); // re-reading the same photo with a note replaces the first try
     const guess = r.setting === 'restaurant' ? 'restaurant' : r.setting === 'home' ? 'home' : null;
     const photoId = uid();
     const ids = r.items.filter(i => i.dish).map(i => {
@@ -367,11 +390,13 @@ async function runPhoto(file) {
       const opts = { ...defaultOpts(ref), servings, meat: i.meat, oil: i.oil, style, styleKnown: !!pr.style, portionSd: k === 1 ? 0.3 : 0.2 };
       const e = addEntry(ref, opts, 'photo', { photo: photoId });
       e.photoServings = i.servings; e.photoG = N.estimate(ref, { ...opts, servings: i.servings }).grams; // the raw photo estimate, for calibration
+      if (i.alternative && N.DISH[i.alternative]) e.alt = i.alternative;
       return e.id;
     });
     ctx.persist();
-    snap = { dataUrl: r.dataUrl, ids, unsure: r.agreement < 0.75 || r.items.some(i => i.confidence < 0.6), unknown: r.items.filter(i => !i.dish).map(i => i.otherName) };
+    snap = { file, hint, dataUrl: r.dataUrl, ids, quality: r.quality, unsure: r.agreement < 0.75 || r.items.some(i => i.confidence < 0.6), unknown: r.items.filter(i => !i.dish).map(i => i.otherName) };
     renderFood(); renderSnap();
+    box.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
   } catch (err) {
     box.innerHTML = `<div class="card"><b>Couldn’t read the photo</b><p class="muted small" style="margin:6px 0 0">${esc(err.message === 'no-endpoint' ? 'Photo recognition isn’t switched on yet.' : 'Check your connection and try again, or search for the dish.')}</p></div>`;
   }
@@ -389,7 +414,10 @@ function renderSnap() {
     <div class="photo-head"><img src="${snap.dataUrl}" alt="Your meal"><div><span class="eyebrow">${snap.unsure ? 'Added · please check' : 'Added to ' + esc(items[0]?.meal?.toLowerCase() || 'today')}</span><div class="kbig num">${fmt(total)}<small> kcal</small></div>
       <span class="muted small">Tap a dish if QK got it wrong.</span></div></div>
     <div class="list">${items.map(e => `<div class="row"><button type="button" class="food-hit" data-sedit="${e.id}"><div><b>${esc(e.name)}</b><div class="muted small">${esc(e.label)}${N.hasFatChoice(N.DISH[e.ref.id]) && !e.opts.styleKnown ? ' (guess)' : ''}</div></div><span class="r data">${fmt(e.kcal)}</span></button>
-      <button type="button" class="linkbtn del" data-sdel="${e.id}" aria-label="Remove ${esc(e.name)}">✕</button></div>`).join('')}</div>
+      <button type="button" class="linkbtn del" data-sdel="${e.id}" aria-label="Remove ${esc(e.name)}">✕</button></div>
+      ${e.alt && N.DISH[e.alt] ? `<button type="button" class="alt-chip" data-salt="${e.id}">or ${esc(N.DISH[e.alt].name)}?</button>` : ''}`).join('')}</div>
+    ${snap.quality?.dark || snap.quality?.blurry ? `<p class="warn-note small">The photo looks ${snap.quality.dark ? 'dark' : 'blurry'}, so these are rougher guesses. A clear photo from above, in good light, works best.</p>` : ''}
+    <div class="snap-note"><input id="snapHint" placeholder="Add a note: restaurant karahi, 2 naan…" value="${esc(snap.hint || '')}" aria-label="Add a note about this meal"><button type="button" class="ghost" id="snapReread">Re-read</button></div>
     ${snap.unknown.length ? `<p class="muted small" style="margin:0">Also saw ${snap.unknown.map(esc).join(', ')}. Search to add ${snap.unknown.length > 1 ? 'these' : 'it'}.</p>` : ''}
     ${ask ? `<div class="fq"><span class="eyebrow">${tr('Who usually cooks your food?')}</span><div class="seg fseg" role="group"><button type="button" data-usual="home">${tr('Mostly home')}</button><button type="button" data-usual="mixed">${tr('Both')}</button><button type="button" data-usual="out">${tr('Mostly out')}</button></div>
       <p class="muted small fq-why">Asked once, so QK can guess the oil right from now on.</p></div>` : ''}
@@ -398,6 +426,13 @@ function renderSnap() {
 function onSnapClick(e) {
   if (!snap) return;
   const ed = e.target.closest('[data-sedit]'); if (ed) return editEntry(ed.dataset.sedit);
+  const alt = e.target.closest('[data-salt]');
+  if (alt) { // one tap: "naan" → "roghni naan", same portion; the old guess becomes the new alternative
+    const it = byId(alt.dataset.salt), was = it.ref.id, ref = { t: 'dish', id: it.alt };
+    Object.assign(it, entryFrom(ref, { ...defaultOpts(ref), servings: it.opts.servings, meat: it.opts.meat, oil: it.opts.oil, style: it.opts.style, styleKnown: it.opts.styleKnown, portionSd: it.opts.portionSd }), { id: it.id, at: it.at, meal: it.meal });
+    it.alt = was; delete it.photoG; ctx.persist(); renderFood(); return renderSnap();
+  }
+  if (e.target.closest('#snapReread')) { const h = $('#snapHint').value.trim(); if (h && snap.file) runPhoto(snap.file, h); return; }
   const del = e.target.closest('[data-sdel]'); if (del) return removeEntries([del.dataset.sdel]);
   const u = e.target.closest('[data-usual]');
   if (u) {
@@ -461,11 +496,17 @@ function startVoice() {
   const input = $('#foodSearch');
   if (!SR) { input.focus(); input.placeholder = 'Type it: do roti aur chicken karahi'; ctx.toast('Type what you ate, e.g. “do roti aur karahi”'); return; }
   if (rec) { rec.abort(); rec = null; }
-  const lang = F().voiceLang || 'en-IN'; // en-IN understands desi dish names and Roman Urdu best; ur-PK for Urdu
-  rec = new SR(); rec.lang = lang; rec.interimResults = true; rec.maxAlternatives = 1;
-  const btn = $('#foodVoice'); btn.classList.add('listening'); btn.textContent = 'Listening… tap to stop';
-  rec.onresult = e => { input.value = [...e.results].map(r => r[0].transcript).join(' '); renderResults(); };
-  rec.onend = () => { btn.classList.remove('listening'); btn.textContent = 'Say what you ate'; rec = null; renderResults(); };
+  // Urdu screen → Urdu speech; otherwise Indian English, which hears desi dish names and Roman Urdu best.
+  const lang = F().voiceLang || (getLang() === 'ur' ? 'ur-PK' : 'en-IN');
+  rec = new SR(); rec.lang = lang; rec.interimResults = true; rec.maxAlternatives = 3;
+  const btn = $('#foodVoice'), label = btn.querySelector('span');
+  btn.classList.add('listening'); label.textContent = tr('Listening… tap to stop');
+  rec.onresult = e => {
+    // Each piece of speech comes with a few guesses: keep the one that names the most foods.
+    input.value = [...e.results].map(r => r.isFinal ? bestTranscript([...r].map(a => a.transcript)) : r[0].transcript).join(' ');
+    renderResults();
+  };
+  rec.onend = () => { btn.classList.remove('listening'); label.textContent = tr('Say what you ate'); rec = null; renderResults(); };
   rec.onerror = () => ctx.toast('Couldn’t hear that. Try again, or type it.');
   btn.onclick = () => { if (rec) { rec.stop(); } else startVoice(); };
   rec.start();

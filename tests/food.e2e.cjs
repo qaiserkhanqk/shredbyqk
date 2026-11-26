@@ -12,13 +12,16 @@ const num = s => +String(s).replace(/[^\d]/g, '');
 (async () => {
   const b = await chromium.launch();
   const ctx = await b.newContext({ viewport: { width: 400, height: 860 }, deviceScaleFactor: 2, serviceWorkers: 'block' });
-  let visionCalls = 0;
+  let visionCalls = 0, lastVision = null;
   await ctx.route('https://shred.local/**', r => {
     let p = new URL(r.request().url()).pathname; if (p === '/') p = '/index.html';
     if (p === '/food-vision') { // stands in for tools/food-vision-server.mjs: three samples that mostly agree
       visionCalls++;
-      const it = (dish, servings, extra = {}) => ({ dish, servings, meat_share: 'normal', oil: 'normal', confidence: 0.9, other_name: '', ...extra });
-      const samples = [[it('chicken_karahi', 1, { oil: 'oily' }), it('naan', 1)], [it('chicken_karahi', 1.5, { oil: 'oily' }), it('naan', 1)], [it('chicken_karahi', 1), it('naan', 1), it('raita', 1)]]
+      const body = JSON.parse(r.request().postData() || '{}'); lastVision = body;
+      const it = (dish, servings, extra = {}) => ({ dish, servings, meat_share: 'normal', oil: 'normal', confidence: 0.9, other_name: '', alternative: 'none', ...extra });
+      // With a note saying "2 naan", the stand-in model counts two.
+      const naan = /2 naan/.test(body.hint || '') ? 2 : 1;
+      const samples = [[it('chicken_karahi', 1, { oil: 'oily' }), it('naan', naan, { alternative: 'roghni_naan' })], [it('chicken_karahi', 1.5, { oil: 'oily' }), it('naan', naan, { alternative: 'roghni_naan' })], [it('chicken_karahi', 1), it('naan', naan), it('raita', 1)]]
         .map(items => ({ items, setting: 'unsure' }));
       return r.fulfill({ status: 200, body: JSON.stringify({ samples }), headers: { 'content-type': 'application/json' } });
     }
@@ -162,11 +165,22 @@ const num = s => +String(s).replace(/[^\d]/g, '');
   await p.click('#fsSave');
   check('weighed meal shows in "Your portions"', /1 weighed photo meal/.test(await p.textContent('#calInfo')), await p.textContent('#calInfo'));
   await p.click('#snapUndo');
+  check('photo sent with the client\'s usual dishes', Array.isArray(lastVision.usual) && lastVision.usual.length > 0, JSON.stringify(lastVision.usual?.slice(0, 3)));
   check('undo removes the photo meal', (await rows()).length === before);
   await p.setInputFiles('#foodPhoto', path.join(ROOT, 'tests/pose.jpg'));
   await p.waitForSelector('#snapUndo');
   check('same photo again → from cache, no new server call', visionCalls === 1, `calls ${visionCalls}`);
+  check('"or Roghni naan?" chip offered for the naan', /or Roghni naan\?/.test(await p.textContent('#foodPhotoBox')));
+  await p.click('#foodPhotoBox [data-salt]');
+  check('one tap swaps naan → roghni naan, and offers naan back', /Roghni naan/.test(await p.textContent('#foodPhotoBox .list')) && /or Naan\?/.test(await p.textContent('#foodPhotoBox')));
+  const rowsBefore = (await rows()).length;
+  await p.fill('#snapHint', 'restaurant karahi, 2 naan'); await p.click('#snapReread');
+  await p.waitForFunction(() => /2 naans/.test(document.querySelector('#foodPhotoBox')?.textContent || ''), null, { timeout: 8000 });
+  check('a note re-reads the photo and replaces the first try', lastVision.hint === 'restaurant karahi, 2 naan' && (await rows()).length === rowsBefore, `${rowsBefore} → ${(await rows()).length}`);
   await p.click('#snapDone');
+  await p.evaluate(() => { document.querySelector('#foodTargets').open = true; });
+  await p.selectOption('#tPlate', '28');
+  check('usual plate size is saved', await p.evaluate(() => JSON.parse(localStorage.getItem('shred_qk_v1')).food.plateCm === '28'));
 
   // Weekly report: seed a week of meals and weigh-ins, then reload.
   await p.evaluate(async () => {

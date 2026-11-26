@@ -77,6 +77,8 @@ export const ING = {
   sesame: ['Sesame and nigella seeds', 573, 17.7, 23.4, 49.7, 11.8],
   pasta: ['Pasta / noodles, dry', 371, 13, 75, 1.5, 3.2],
   iceCream: ['Ice cream', 207, 3.5, 24, 11, 0.7],
+  orange: ['Orange (malta / kinnow)', 47, 0.9, 11.8, 0.1, 2.4],
+  guava: ['Guava (amrood)', 68, 2.6, 14.3, 1, 5.4],
 };
 const FATS = { oil: 'Oil', ghee: 'Ghee', butter: 'Butter' };
 
@@ -111,10 +113,13 @@ export const DISHES = [
   D('aloo_gosht', 'Aloo gosht', 'aloo gosht potato meat curry', 'curry', 'katori', 240, ['mutton', 80], [['potato', 70], ['onion', 30], ['tomato', 40], ['spices', 6]], F('oil', 12, 22, 28)),
   D('nihari', 'Beef nihari', 'nihari nalli nehari نہاری', 'curry', 'bowl', 250, ['beef', 110], [['atta', 8], ['onion', 15], ['spices', 8]], F('ghee', 18, 35, 45)),
   D('haleem', 'Haleem', 'daleem haleem beef حلیم', 'curry', 'bowl', 250, ['beef', 60], [['dalia', 25], ['chanaDal', 10], ['masoor', 6], ['moong', 4], ['mash', 4], ['onion', 15], ['spices', 6]], F('ghee', 14, 26, 34)),
-  D('qeema', 'Qeema (beef mince)', 'keema kima mince beef qeema', 'curry', 'katori', 170, ['beefMince', 100], [['onion', 30], ['tomato', 40], ['spices', 6]], F('oil', 10, 20, 26)),
+  D('qeema', 'Qeema (beef mince)', 'keema kima mince beef qeema aloo qeema', 'curry', 'katori', 170, ['beefMince', 100], [['onion', 30], ['tomato', 40], ['spices', 6]], F('oil', 10, 20, 26)),
   D('qeema_matar', 'Qeema matar', 'keema matar mince peas', 'curry', 'katori', 200, ['beefMince', 80], [['peas', 50], ['onion', 25], ['tomato', 40], ['spices', 6]], F('oil', 10, 20, 26)),
   D('palak_paneer', 'Palak paneer', 'saag paneer spinach paneer', 'curry', 'katori', 200, ['paneer', 50], [['spinach', 150], ['onion', 20], ['tomato', 20], ['cream', 5], ['spices', 5]], F('ghee', 10, 20, 26)),
-  D('palak_gosht', 'Palak gosht', 'saag gosht spinach meat', 'curry', 'katori', 220, ['mutton', 80], [['spinach', 130], ['onion', 25], ['tomato', 25], ['spices', 6]], F('oil', 12, 22, 28)),
+  D('bhindi_gosht', 'Bhindi gosht', 'bhindi gosht okra meat', 'curry', 'katori', 220, ['mutton', 70], [['okra', 100], ['onion', 25], ['tomato', 30], ['spices', 5]], F('oil', 12, 22, 28)),
+  D('paye', 'Paye (trotters)', 'paye paya siri paye trotters', 'curry', 'bowl', 250, ['beef', 80], [['atta', 5], ['onion', 20], ['spices', 6]], F('ghee', 15, 25, 32)),
+  D('kadhi_pakora', 'Kadhi pakora', 'kadhi karhi pakora', 'curry', 'katori', 200, null, [['dahi', 100], ['besan', 35], ['onion', 15], ['spices', 3]], F('oil', 12, 18, 22)),
+  D('palak_gosht', 'Palak gosht', 'spinach meat', 'curry', 'katori', 220, ['mutton', 80], [['spinach', 130], ['onion', 25], ['tomato', 25], ['spices', 6]], F('oil', 12, 22, 28)),
   D('sarson_saag', 'Sarson ka saag', 'saag sarson mustard greens', 'curry', 'katori', 200, null, [['sarson', 170], ['spinach', 30], ['makki', 8], ['spices', 5]], F('butter', 12, 22, 30)),
   D('cholay', 'Cholay (chana masala)', 'chole chana masala chickpea curry channay', 'curry', 'katori', 200, null, [['kabuli', 50], ['onion', 30], ['tomato', 40], ['spices', 6]], F('oil', 10, 18, 24)),
   D('daal_chana', 'Daal chana', 'chana dal chane ki daal', 'curry', 'katori', 200, null, [['chanaDal', 40], ['onion', 15], ['tomato', 15], ['spices', 3]], F('ghee', 8, 16, 22)),
@@ -138,7 +143,7 @@ export const DISHES = [
   D('matar_pulao', 'Matar pulao', 'peas pulao', 'rice', 'plate', 250, null, [['rice', 70], ['peas', 40], ['onion', 15], ['spices', 2]], F('oil', 8, 14, 18)),
   D('zeera_rice', 'Zeera rice', 'jeera rice cumin rice', 'rice', 'cup', 180, null, [['rice', 60], ['spices', 1]], F('ghee', 5, 10, 12)),
   D('plain_rice', 'Plain boiled rice', 'chawal white rice basmati', 'rice', 'cup', 160, null, [['rice', 55]], NOFAT),
-  D('khichdi', 'Khichdi', 'khichri daal chawal', 'rice', 'katori', 250, null, [['rice', 40], ['moong', 25], ['spices', 2]], F('ghee', 6, 10, 14)),
+  D('khichdi', 'Khichdi', 'khichri', 'rice', 'katori', 250, null, [['rice', 40], ['moong', 25], ['spices', 2]], F('ghee', 6, 10, 14)),
 
   // Breads — one piece.
   D('roti', 'Roti / chapati', 'chapati phulka roti chapatti روٹی', 'bread', 'roti', 44, null, [['atta', 30]], NOFAT, { topping: ['ghee', 5, 'Ghee or butter on top'], sizes: true }),
@@ -147,7 +152,7 @@ export const DISHES = [
   D('paratha', 'Plain paratha', 'paratha parantha lachha paratha پراٹھا', 'bread', 'paratha', 70, null, [['atta', 45]], F('ghee', 8, 15, 20), { sizes: true }),
   D('aloo_paratha', 'Aloo paratha', 'aloo parantha potato paratha', 'bread', 'paratha', 125, null, [['atta', 45], ['potato', 60], ['onion', 5], ['spices', 2]], F('ghee', 10, 18, 24)),
   D('anda_paratha', 'Anda paratha', 'egg paratha', 'bread', 'paratha', 115, ['egg', 50], [['atta', 45]], F('ghee', 12, 20, 24)),
-  D('puri', 'Puri', 'poori halwa puri', 'fried', 'puri', 28, null, [['atta', 20]], F('oil', 5, 7, 8)),
+  D('puri', 'Puri', 'poori', 'fried', 'puri', 28, null, [['atta', 20]], F('oil', 5, 7, 8)),
   D('makki_roti', 'Makki ki roti', 'makai roti corn roti', 'bread', 'roti', 65, null, [['makki', 45]], NOFAT, { topping: ['butter', 8, 'Makhan on top'] }),
   D('roghni_naan', 'Roghni naan', 'roghni naan roghani sesame naan', 'bread', 'naan', 125, null, [['maida', 90], ['milk', 15], ['dahi', 10], ['egg', 5], ['sugar', 3], ['sesame', 3]], F('ghee', 8, 10, 12)),
   D('garlic_naan', 'Garlic naan', 'garlic naan', 'bread', 'naan', 105, null, [['maida', 80], ['dahi', 8], ['milk', 10], ['spices', 3]], F('butter', 8, 10, 12)),
@@ -161,7 +166,7 @@ export const DISHES = [
 
   // BBQ and kebabs.
   D('chicken_tikka', 'Chicken tikka / tandoori (leg piece)', 'tikka tandoori chicken leg piece bbq', 'bbq', 'piece', 120, ['chicken', 160], [['dahi', 15], ['spices', 4]], F('oil', 3, 6, 8)),
-  D('chicken_boti', 'Chicken boti (one seekh)', 'boti tikka boti malai boti', 'bbq', 'seekh', 100, ['chicken', 130], [['dahi', 10], ['spices', 3]], F('oil', 4, 7, 9)),
+  D('chicken_boti', 'Chicken boti (one seekh)', 'boti malai boti', 'bbq', 'seekh', 100, ['chicken', 130], [['dahi', 10], ['spices', 3]], F('oil', 4, 7, 9)),
   D('seekh_kebab', 'Seekh kebab', 'seekh kabab beef kebab', 'bbq', 'kebab', 45, ['beefMince', 60], [['onion', 5], ['spices', 2]], F('oil', 1, 3, 4)),
   D('chapli_kebab', 'Chapli kebab', 'chapli kabab peshawari', 'fried', 'kebab', 120, ['beefMince', 110], [['tomato', 15], ['onion', 15], ['egg', 10], ['makki', 5], ['spices', 4]], F('ghee', 8, 15, 18)),
   D('shami_kebab', 'Shami kebab', 'shami kabab', 'fried', 'kebab', 45, ['beef', 25], [['chanaDal', 12], ['egg', 5], ['spices', 2]], F('oil', 4, 6, 7)),
@@ -193,7 +198,8 @@ export const DISHES = [
   D('creamy_pasta', 'Creamy chicken pasta', 'pasta alfredo fettuccine creamy chicken pasta', 'fastfood', 'plate', 350, ['chicken', 80], [['pasta', 90], ['cream', 40], ['cheese', 20], ['spices', 3]], F('oil', 6, 10, 12)),
   D('lasagna', 'Lasagna', 'lasagne lasagna', 'fastfood', 'portion', 300, ['beefMince', 70], [['pasta', 60], ['mozzarella', 40], ['cream', 20], ['tomato', 60]], F('oil', 6, 10, 12)),
   D('grilled_chicken_meal', 'Grilled chicken with sauce, rice and veg', 'grilled chicken steak moroccan tarragon chicken fillet cafe', 'fastfood', 'plate', 400, ['chickenBreast', 200], [['rice', 50], ['mixedVeg', 80], ['cream', 20], ['spices', 3]], F('oil', 8, 12, 15)),
-  D('chow_mein', 'Chicken chow mein', 'chow mein noodles chinese', 'fastfood', 'plate', 350, ['chicken', 70], [['pasta', 80], ['mixedVeg', 80], ['ketchup', 10]], F('oil', 10, 16, 20)),
+  D('egg_fried_rice', 'Egg fried rice', 'egg fried rice chinese rice', 'fastfood', 'plate', 300, ['egg', 50], [['rice', 80], ['mixedVeg', 60], ['ketchup', 5]], F('oil', 10, 16, 20)),
+  D('chow_mein', 'Chicken chow mein', 'chow mein chowmein noodles chinese', 'fastfood', 'plate', 350, ['chicken', 70], [['pasta', 80], ['mixedVeg', 80], ['ketchup', 10]], F('oil', 10, 16, 20)),
   D('cheesy_pizza_slice', 'Pizza slice (Pakistani, extra cheese)', 'cheezious broadway pizza max crown crust stuffed crust kabab crust', 'fastfood', 'slice', 130, ['chicken', 25], [['maida', 42], ['mozzarella', 35], ['mayo', 6], ['capsicum', 8]], F('oil', 5, 6, 7)),
   D('cola', 'Cola / soft drink (can)', 'pepsi coke 7up sprite soft drink', 'drink', 'can', 345, null, [['sugar', 36]], NOFAT),
   D('milkshake', 'Milkshake', 'shake mango shake', 'drink', 'glass', 300, null, [['milk', 250], ['sugar', 25], ['cream', 20]], NOFAT),
@@ -210,6 +216,7 @@ export const DISHES = [
   // Sweets.
   D('zarda', 'Zarda (sweet rice)', 'zarda meethay chawal', 'sweet', 'plate', 200, null, [['rice', 60], ['sugar', 30], ['nuts', 5]], F('ghee', 12, 15, 18)),
   D('kunafa', 'Kunafa', 'kunafa knafeh', 'sweet', 'piece', 150, null, [['vermicelli', 40], ['mozzarella', 30], ['sugar', 30]], F('ghee', 15, 18, 20)),
+  D('biscuits', 'Biscuits (3)', 'biscuit biscuits cookies rusk papay', 'sweet', 'pack', 30, null, [['maida', 20], ['sugar', 6]], F('oil', 5, 5, 5)),
   D('donut', 'Glazed donut', 'donut doughnut krispy kreme dunkin', 'sweet', 'donut', 55, null, [['maida', 25], ['sugar', 12], ['milk', 5]], F('oil', 9, 10, 11)),
   D('ice_cream', 'Ice cream (2 scoops)', 'ice cream scoop baskin robbins kulfi', 'sweet', 'cup', 140, null, [['iceCream', 140]], NOFAT),
   D('kheer', 'Kheer', 'rice kheer chawal ki kheer', 'sweet', 'katori', 150, null, [['milk', 150], ['rice', 12], ['sugar', 15], ['nuts', 3]], NOFAT),
@@ -223,6 +230,15 @@ export const DISHES = [
   D('kehwa', 'Kehwa (green tea)', 'kehwa qehwa green tea', 'drink', 'cup', 150, null, [['sugar', 5]], NOFAT),
   D('sweet_lassi', 'Lassi (sweet)', 'meethi lassi', 'drink', 'glass', 300, null, [['dahi', 200], ['milk', 50], ['sugar', 25]], NOFAT),
   D('salted_lassi', 'Lassi (salted)', 'namkeen lassi chaas', 'drink', 'glass', 300, null, [['dahi', 200]], NOFAT),
+
+  // Fruit and milk (by the piece or glass).
+  D('banana', 'Banana (kela)', 'kela kelay banana', 'fruit', 'banana', 100, null, [['banana', 100]], NOFAT),
+  D('apple', 'Apple (seb)', 'seb apple', 'fruit', 'apple', 150, null, [['apple', 150]], NOFAT),
+  D('mango', 'Mango (aam)', 'aam mango', 'fruit', 'mango', 200, null, [['mango', 200]], NOFAT),
+  D('orange', 'Orange (malta / kinnow)', 'malta kinnow kinu orange santra', 'fruit', 'orange', 130, null, [['orange', 130]], NOFAT),
+  D('guava', 'Guava (amrood)', 'amrood guava', 'fruit', 'guava', 150, null, [['guava', 150]], NOFAT),
+  D('dates', 'Dates (khajoor)', 'khajoor khajoorain dates', 'fruit', 'date', 8, null, [['dates', 8]], NOFAT),
+  D('milk_glass', 'Milk (glass)', 'doodh milk glass of milk', 'drink', 'glass', 250, null, [['milk', 250]], NOFAT),
 
   // Eggs and sides.
   D('anda_fry', 'Fried egg (anda fry)', 'fried egg anda', 'egg', 'egg', 46, ['egg', 50], [], F('oil', 4, 6, 8)),

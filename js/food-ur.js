@@ -17,7 +17,7 @@ const UR = {
   'Save': 'محفوظ کریں', 'Undo': 'واپس', 'Done': 'ٹھیک ہے', 'Log this meal': 'یہ کھانا درج کریں', 'Add all': 'سب شامل کریں',
   'Went well': 'اچھا رہا', 'For next week': 'اگلے ہفتے کے لیے', 'Worth knowing': 'جاننے کے قابل', "QK's food report": 'QK کی کھانے کی رپورٹ',
   'Send my week to QK': 'میرا ہفتہ QK کو بھیجیں', 'Weigh-in (kg)': 'وزن (کلو)', 'Who usually cooks your food?': 'آپ کا کھانا عموماً کون پکاتا ہے؟',
-  'Mostly home': 'زیادہ تر گھر', 'Both': 'دونوں', 'Mostly out': 'زیادہ تر باہر', 'likely': 'اندازاً', 'Likely': 'اندازاً', 'training day': 'ٹریننگ کا دن', 'From your phone’s health app': 'فون کی ہیلتھ ایپ سے', 'From your phone’s health app or watch': 'فون کی ہیلتھ ایپ یا گھڑی سے',
+  'Mostly home': 'زیادہ تر گھر', 'Both': 'دونوں', 'Mostly out': 'زیادہ تر باہر', 'likely': 'اندازاً', 'Listening… tap to stop': 'سن رہا ہوں… روکنے کے لیے ٹیپ کریں', 'Likely': 'اندازاً', 'training day': 'ٹریننگ کا دن', 'From your phone’s health app': 'فون کی ہیلتھ ایپ سے', 'From your phone’s health app or watch': 'فون کی ہیلتھ ایپ یا گھڑی سے',
 };
 let lang = 'en';
 export const setLang = l => { lang = l === 'ur' ? 'ur' : 'en'; };
