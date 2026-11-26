@@ -85,6 +85,21 @@ The two columns differ because Commons categories are noisy: thali photos sit in
 | 59 | [2013 Sechseläuten - 'Samosa' und 'Pakora' - Limmat](https://commons.wikimedia.org/wiki/File:2013_Sechsel%C3%A4uten_-_%27Samosa%27_und_%27Pakora%27_-_Limmatquai_2013-04-14_17-37-05_(P7700).JPG) | CC BY-SA 3.0 | Pakora | pakora ×1, samosa ×0.5 | 425 | exact |
 | 60 | [*Gulabjamun*.jpg](https://commons.wikimedia.org/wiki/File:*Gulabjamun*.jpg) | CC BY-SA 4.0 | Gulab jamun | gulab_jamun ×6 | 1118 | dish right, but a frying pan, not a plate |
 
+## First live run: Gemini 3 Flash (26 November 2026)
+
+Run through the real recognition server with a free Gemini key (`gemini-3-flash-preview`, 3 samples per photo).
+54 of the 60 photos downloaded this time. **The free tier stopped the run after 17 photos**: it allows 20 requests
+per model per day, and each photo uses 3, so about 6 photos a day per model.
+
+| Of the 17 photos it finished | |
+|---|---|
+| Main dish right | **12 (71%)**: all three haleem, both rotis, three chapli kebabs, two gulab jamun, two jalebi |
+| Fixable with one tap | 4: two parathas read as tandoori roti or aloo paratha (same bread family), pakoray as samosa + pakoray, kheer behind puri and aloo matar |
+| Wrong | 1: a chai photo read as plain rice |
+
+Too few photos to compare with the earlier blind read; finish the run with a paid key. The free tier can't serve
+clients either: even one client logging three meals a day would use up the daily limit.
+
 ## Repeat it against the live server
 
 ```bash
