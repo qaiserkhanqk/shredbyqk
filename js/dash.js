@@ -5,6 +5,7 @@
 //   on track  – everything else
 import { lifetimeClean, progress as rewardProgress } from './rewards.js';
 import { e1rm } from './progression.js';
+import { foodCard, foodDayRows, foodWeekSummary } from './foodsync.js';
 
 const D = 864e5;
 export const weekStart = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime(); }; // Monday
@@ -16,7 +17,7 @@ const score = sets => { const xs = sets.filter(s => !s.guided && s.reps); const 
  * @param p profile row, @param sets session rows, @param opens event rows, @param checks checkin rows
  * @param o { now, names: id → exercise name }
  */
-export function clientCard(p, sets = [], opens = [], checks = [], { now = Date.now(), names = {} } = {}) {
+export function clientCard(p, sets = [], opens = [], checks = [], { now = Date.now(), names = {}, food = [] } = {}) {
   sets = sets.map(s => ({ ...s, at: ms(s.at) })).sort((a, b) => a.at - b.at);
   const seenTimes = [...opens.map(e => ms(e.at)), ...sets.map(s => s.at), ...checks.map(c => ms(c.at)), p.last_seen ? ms(p.last_seen) : 0].filter(Boolean);
   const lastSeen = seenTimes.length ? Math.max(...seenTimes) : null;
@@ -50,6 +51,7 @@ export function clientCard(p, sets = [], opens = [], checks = [], { now = Date.n
     lastWorkout: lastSet ? { at: lastSet.at, exercises: [...new Set(lastDay.map(s => s.name || names[s.ex] || s.ex))] } : null,
     cleanReps: clean, medal: rewardProgress(clean).earned.at(-1) || null,
     checkin: checks.length ? checks.map(c => ({ ...c, at: ms(c.at) })).sort((a, b) => b.at - a.at)[0] : null,
+    food: foodCard(p.food_week, food, now),
   };
 }
 
@@ -87,7 +89,13 @@ export function demoData(now = Date.now()) {
   // Maya: opened the app, not trained this week.
   train('d5', 10, 'hipThrust', 'Barbell Hip Thrust', 80, 10); opens.push({ client_id: 'd5', at: now - 3600e3 });
   // Jon: never opened.
-  return { profiles, sets, opens, checks: [] };
+  // Food for two sample clients: Sara logs well; Lena logs little and eats out.
+  const dk = d => new Date(now - d * D).toISOString().slice(0, 10), food = [];
+  for (let d = 0; d < 6; d++) food.push({ client_id: 'd1', at: dk(d), kcal: 2350 + d * 40, protein: 138, carbs: 260, fat: 75, water: 9, steps: 8200, items: [{ meal: 'Lunch', name: 'Chicken tikka / tandoori (leg piece)', kcal: 260 }, { meal: 'Dinner', name: 'Daal masoor', kcal: 230 }] });
+  for (const d of [1, 4]) food.push({ client_id: 'd3', at: dk(d), kcal: 2650, protein: 70, carbs: 300, fat: 120, water: 4, steps: 3900, items: [{ meal: 'Dinner', name: 'KFC · Zinger Burger', kcal: 420 }, { meal: 'Dinner', name: 'Butt Karahi · Chicken karahi (per person)', kcal: 713 }] });
+  profiles[0].food_week = { logged: 6, kcal: 2450, protein: 138, target: { kcal: 2600, protein: 130 }, focus: ['Add colour: salad or fruit with two meals'], wins: ['Protein averaged 138 g a day'], weightPerWeek: 0.2 };
+  profiles[2].food_week = { logged: 2, kcal: 2650, protein: 70, target: { kcal: 1850, protein: 130 }, focus: ['Add a protein to each meal', 'One easy swap a day'], wins: [], weightPerWeek: null };
+  return { profiles, sets, opens, checks: [], food };
 }
 
 export const LOCAL_ID = 'this-phone';
@@ -101,5 +109,6 @@ export function localClient(S, now = Date.now()) {
   const opens = [{ client_id: LOCAL_ID, at: now }]; // you're looking at it on this device right now
   const profile = { id: LOCAL_ID, name: `${S.profile?.name || 'You'} (this phone)`, goal: S.profile?.goal, weekly_goal: S.profile?.weeklyGoal || S.plan?.days?.length || 3, plan: S.plan,
     program: S.program ? { id: S.program.id, block: S.program.block || 1, name: (S.customPrograms || []).find(p => p.id === S.program.id)?.name } : null };
-  return { profile, sets, opens, checks: (S.checkins || []).map(c => ({ ...c, client_id: LOCAL_ID })) };
+  profile.food_week = foodWeekSummary(S, now);
+  return { profile, sets, opens, checks: (S.checkins || []).map(c => ({ ...c, client_id: LOCAL_ID })), food: foodDayRows(LOCAL_ID, S, now) };
 }

@@ -26,19 +26,19 @@ async function load() {
     state.raw = demoData(now);
     // Your own training on this device joins the sample clients, at the top.
     const me = localClient(store.get('shred_qk_v1'), now);
-    if (me) { state.raw.profiles.unshift(me.profile); state.raw.sets.push(...me.sets); state.raw.opens.push(...me.opens); state.raw.checks.push(...me.checks); }
+    if (me) { state.raw.profiles.unshift(me.profile); state.raw.sets.push(...me.sets); state.raw.opens.push(...me.opens); state.raw.checks.push(...me.checks); (state.raw.food ||= []).push(...me.food); }
   }
   else {
     const me = await cloud.me();
     if (me?.role !== 'coach') { showLogin('This account isn\'t set up as a coach yet. See supabase/README.md, step 4.'); return; }
     $('#cdMe').innerHTML = `${esc(me.name || '')}<br>Client invite code: <code>${esc(me.invite_code)}</code>`;
     const profiles = await cloud.clients(), ids = profiles.map(p => p.id), from = new Date(now - 70 * D).toISOString();
-    const [sets, opens, checks, sent] = await Promise.all([cloud.since('sessions', ids, from), cloud.since('events', ids, from), cloud.since('checkins', ids, from), cloud.sent(new Date(now - 14 * D).toISOString())]);
-    state.raw = { profiles, sets, opens, checks };
+    const [sets, opens, checks, sent, food] = await Promise.all([cloud.since('sessions', ids, from), cloud.since('events', ids, from), cloud.since('checkins', ids, from), cloud.sent(new Date(now - 14 * D).toISOString()), cloud.since('food_days', ids, new Date(now - 14 * D).toISOString().slice(0, 10)).catch(() => [])]);
+    state.raw = { profiles, sets, opens, checks, food };
     state.sent = {}; for (const m of sent) (state.sent[m.client_id] ||= []).push(m);
   }
-  const { profiles, sets, opens, checks } = state.raw, by = (rows, id) => rows.filter(r => r.client_id === id);
-  state.cards = sortCards(profiles.map(p => clientCard(p, by(sets, p.id), by(opens, p.id), by(checks, p.id), { now, names })));
+  const { profiles, sets, opens, checks, food = [] } = state.raw, by = (rows, id) => rows.filter(r => r.client_id === id);
+  state.cards = sortCards(profiles.map(p => clientCard(p, by(sets, p.id), by(opens, p.id), by(checks, p.id), { now, names, food: by(food, p.id) })));
   // Demo: your own row first, so you can find yourself.
   const mine = state.cards.findIndex(c => c.id === LOCAL_ID); if (mine > 0) state.cards.unshift(...state.cards.splice(mine, 1));
   render();
@@ -78,6 +78,7 @@ function renderDetail() {
       <span>Most common fault (4 weeks)</span><span>${fault ? `${esc(fault)} ×${c.topFault.n}` : '–'}</span>
       <span>Clean reps, all time</span><span>${c.cleanReps}${c.medal ? ` · ${esc(c.medal.name)}` : ''}</span>
     </div>
+    ${foodHTML(c.food)}
     <div class="cd-msg">
       <span class="eyebrow">${kind === 'cheer' ? 'Send a cheer' : 'Send a nudge'} · QK says it when they open the app</span>
       <div class="cd-tpl">${TEMPLATES[kind].map((t, i) => `<button type="button" data-tpl="${kind}:${i}">${esc(fill(t, c.name))}</button>`).join('')}</div>
@@ -85,6 +86,21 @@ function renderDetail() {
       <button class="cta" type="button" id="cdSendMsg" data-kind="${kind}">Send to ${esc(c.name.split(' ')[0])}</button>
       ${sent.length ? `<p class="cd-sent">Last sent ${ago(Date.parse(sent[0].created_at))}: “${esc(sent[0].body)}”${sent[0].read_at ? ' · read' : ''}</p>` : ''}
     </div>`;
+}
+
+function foodHTML(f) {
+  if (!f) return '<div class="cd-food"><span class="eyebrow">Food</span><p class="muted small" style="margin:4px 0 0">No food logged yet.</p></div>';
+  const t = f.target, pct = (v, g) => g ? ` (${Math.round(v / g * 100)}%)` : '';
+  return `<div class="cd-food"><span class="eyebrow">Food · last 7 days</span>
+    <div class="cd-kv">
+      <span>Days logged</span><span>${f.daysLogged} of 7</span>
+      <span>Calories a day</span><span>${f.avgKcal == null ? '–' : f.avgKcal.toLocaleString()}${t ? ` / ${t.kcal.toLocaleString()} target${pct(f.avgKcal, t.kcal)}` : ''}</span>
+      <span>Protein a day</span><span>${f.avgProtein == null ? '–' : f.avgProtein + ' g'}${t ? ` / ${t.protein} g${pct(f.avgProtein, t.protein)}` : ''}</span>
+      <span>Weight trend</span><span>${f.weightPerWeek == null ? '–' : `${f.weightPerWeek > 0 ? '+' : ''}${f.weightPerWeek} kg / week`}</span>
+      ${f.maintenance ? `<span>Real maintenance (logs + scale)</span><span>${f.maintenance.toLocaleString()} kcal</span>` : ''}
+      <span>QK suggested</span><span>${f.focus.length ? esc(f.focus.join(' · ')) : '–'}</span>
+      ${f.lastDay ? `<span>Latest day (${esc(String(f.lastDay.at).slice(0, 10))})</span><span>${esc((f.lastDay.items || []).slice(0, 4).map(i => i.name).join(', '))}${(f.lastDay.items || []).length > 4 ? '…' : ''}</span>` : ''}
+    </div></div>`;
 }
 
 $('#cdList').onclick = e => { const b = e.target.closest('[data-client]'); if (!b) return; state.sel = b.dataset.client; render(); if (innerWidth < 820) $('#cdDetail').scrollIntoView({ behavior: 'smooth' }); };

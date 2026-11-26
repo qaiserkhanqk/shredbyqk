@@ -67,3 +67,22 @@ npx cap sync
 1. Body check → Heart rate. The camera preview is hidden in the native app; the flash should come on and the *Signal* line should show the frame rate (e.g. `240 fps`).
 2. Turn on **Check it against a chest strap**, wear a Polar H10 (or similar) and take 10+ HRV readings over a few mornings, typing in the strap's number each time.
 3. Export the comparisons and run `npm run validate shred-camera-vs-strap-….csv` for bias, typical error and agreement (ICC). Turn on the correction if it helps.
+
+## Steps (Apple Health / Health Connect)
+
+`native/ios/StepsPlugin.swift` and `native/android/StepsPlugin.kt` give the Food tab each day's step count. QK's weekly report uses it (a walk suggestion, and a check on the "How active" setting). Like the pulse camera, they **have not been compiled yet**. On the web the client types their steps in.
+
+**iPhone:**
+1. Add `StepsPlugin.swift` to the App target.
+2. Register it next to the pulse camera: `bridge?.registerPluginInstance(StepsPlugin())`.
+3. In *Signing & Capabilities*, add **HealthKit**.
+4. In `Info.plist`, add `NSHealthShareUsageDescription` ("Shred reads your daily steps to plan your food and training.").
+
+**Android:**
+1. Add `implementation "androidx.health.connect:connect-client:1.1.0"` to `app/build.gradle`.
+2. Copy `StepsPlugin.kt` into `android/app/src/main/java/com/shredbyqk/app/`.
+3. Register it in `MainActivity` with `registerPlugin(StepsPlugin::class.java)`.
+4. Add `<uses-permission android:name="android.permission.health.READ_STEPS"/>` to the manifest.
+5. Ask for the permission once from `MainActivity` with `PermissionController.createRequestPermissionResultContract()`. The plugin only reads, and returns "permission" until it's granted.
+
+Check a day's count against the Health / Fit app before release.

@@ -323,5 +323,10 @@ The full reasoning and the database comparison are in [docs/NUTRITION.md](docs/N
 | Vitamin D and B12 are "worth asking your doctor to test", never prescribed | Vitamin D deficiency is very common in South Asia; supplements and doses are a doctor's call |
 | Real maintenance = average logged intake − weight change × 7,700 kcal/kg | Energy content of body-weight change (~7,700 kcal/kg, Hall 2008). It needs 2+ weeks of weigh-ins and 5+ logged days, and corrects any steady under- or over-logging |
 | Report tone: wins first, at most two focus points, each an addition or swap; no blaming words (tested) | Gain-framed, autonomy-supportive feedback sustains behaviour change better than criticism (self-determination theory; Teixeira et al. 2012, IJBNPA) |
+| Recipe models are validated against chains' published values | Across 20 items (McDonald's, KFC, Hardee's, Burger King, Subway, Dunkin', Krispy Kreme, Baskin-Robbins), the median error is 10% and the worst 30% (KFC regular fries are a smaller portion). Checked in `tests/menus.test.mjs` |
+| Another country's official value gets a ±10% range | Same recipe, but Pakistani portions and suppliers can differ |
+| Personal portion calibration: median of (weighed ÷ photo grams), per kind of food, after 3 weighings, latest 15, clamped ×0.6–×1.6 | People serve themselves consistently, and the camera misjudges the same katori the same way. The median resists one-off mistakes |
+| Steps: under 5,000 a day is low, 5,000–10,000 moderate, over 10,000 active; training 4+ days moves you up a level | Tudor-Locke et al. 2011 (IJBNPA) step-count bands |
+| A 15-minute walk after the biggest meal when steps are low | Light walking after meals lowers the blood-sugar rise (Buffey et al. 2022, Sports Medicine) |
 
 Limits: the fat grams per dish are modelling assumptions until real plates are weighed. That is the most useful next step. Photo portions of curries are rough (±30%). Counted items (rotis, kebabs, samosas) are much better. Ingredient values are rounded USDA SR Legacy figures, and mutton uses goat meat.

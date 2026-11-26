@@ -16,6 +16,8 @@ import { DISHES, DISH } from './nutrition.js';
 export const PHOTO_CONFIG = {
   // Your server route (see tools/food-vision-server.mjs). Keep the AI key on the server, never in the app.
   endpoint: '',
+  // Optional live fallback search (FatSecret) on the same server, e.g. 'https://your-server/food-search'.
+  searchEndpoint: '',
   samples: 3,
   maxSide: 768, // a bigger image costs more and doesn't help the model count rotis
 };
