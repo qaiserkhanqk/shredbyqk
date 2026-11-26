@@ -293,6 +293,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.goto('https://shred.local/'); await go('train'); await p.fill('#exSearch', 'deadlift');
   await tap('[data-train=deadlift]');
   check('setup: one short instruction, no wall of text', (await p.$$('#setupSteps li')).length === 1);
+  check('progression: first weighted set asks for a starting weight', /First time/.test(await p.textContent('#rxLine')), await p.textContent('#rxLine'));
   await p.click('#startCam'); await p.waitForTimeout(1500);
   const spoken = await p.textContent('[data-coach-caption]');
   check('set start: QK tells you what to do ("Bar close to your shins ... Brace, and go.")', /Bar close to your shins/.test(spoken) && /Brace, and go/.test(spoken), spoken);

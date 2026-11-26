@@ -281,3 +281,19 @@ Real fingers are noisier than these videos, so the real-world check below still 
 - The body map is a bodyweight measurement. Under a heavy bar, depth and lean can differ, so re-map every few weeks. Some limits are estimates from 2D proportions (pressing depth from arm length); validate them on filmed lifts. Dip depth (limited by shoulder extension) isn't measured yet.
 - Thresholds are evidence-informed starting points. **They must be tuned on real client footage reviewed by QK**, and this is the most important next step.
 - The posture scan is a screen, not a diagnosis. Anyone with pain is told to see a physio.
+
+
+## Progression: how QK picks the next weight (`js/progression.js`)
+
+| Rule | Why |
+|---|---|
+| Beginners add weight every session while reps are hit cleanly (3 × 8) | Linear and undulating periodisation give the same 1RM gains in untrained people (Moesgaard et al. 2022, Sports Med, doi:10.1007/s40279-021-01636-1) |
+| After two misses a barbell lift moves to a weekly wave: heavy 4 × 5 (×1.10), medium 3 × 8, light 3 × 12 (×0.85) | Undulating beat linear for 1RM in trained lifters, ES 0.61 (Moesgaard 2022). Older review: no difference (Harries 2015, doi:10.1519/JSC.0000000000000712) |
+| Dumbbell, machine, cable and isolation lifts: double progression in 8–12 reps, then the smallest weight step | Rep progression and load progression gave similar results (Plotkin et al. 2022, PeerJ, doi:10.7717/peerj.14142) |
+| The jump depends on last time: reps hit, rep-speed loss under 30%, 80%+ reps clean | Autoregulated loading matches or beats fixed loading (Hickmott 2022, doi:10.1186/s40798-021-00404-9; Zhang 2021, doi:10.3389/fphys.2021.651112). Velocity loss tracks reps in reserve (González-Badillo 2017, doi:10.1055/s-0042-120324; Rodríguez-Rosell 2020, doi:10.1519/JSC.0000000000002881) |
+| Steps: lower-body barbell 5 kg / 10 lb, upper-body barbell 2.5 kg / 5 lb, dumbbell & machine 2.5 kg / 5 lb, isolation 1 kg / 2.5 lb. Barbells round to 2.5 kg / 5 lb | Smallest loadable jumps in a normal gym |
+| Two misses in a row: back off 10% | Common coaching practice; lets the lifter rebuild momentum |
+| Light week every ~7 training weeks, or when 2+ lifts backed off in 3 weeks: same weight, a third fewer sets | A full week off cost strength (Coleman et al. 2024, PeerJ, doi:10.7717/peerj.16777); coaches mostly cut volume 0–25% (De Marco 2024, doi:10.1519/JSC.0000000000004932) |
+| Strength chart: estimated 1RM (Epley, up to 12 reps), best per session / week / month | Standard estimate; reps above 12 are too unreliable |
+
+Limits: the trials are short (5–10 weeks) and mostly young men. The coach or lifter can override any weight.

@@ -21,9 +21,10 @@ import { analyseBodyMap, personalFor, explainBodyMap, fitLines } from './bodymap
 import { FormFX, drawDepthArc } from './fx.js';
 import { TrackHUD } from './hud.js';
 import * as rewards from './rewards.js';
+import * as prog from './progression.js';
 import { ExerciseDetector, PICK_LIST } from './detect.js';
 import { initCalm, renderCalm, startCalmNow } from './calm.js';
-import { WEIGHTED, lastLoad, lastLoadText, weekSummary } from './share.js';
+import { WEIGHTED, lastLoad, weekSummary } from './share.js';
 import { initVitals, renderVitals } from './vitals.js';
 import { vitalNotes } from './hr.js';
 import { nextStep } from './today.js';
@@ -214,6 +215,9 @@ function bindProfile() {
   $('#pName').onchange = e => { p.name = e.target.value.trim(); persist(); renderToday(); };
   $('#pSex').onchange = e => { p.sex = e.target.value; persist(); };
   $('#pHeight').onchange = e => { p.heightCm = +e.target.value; persist(); };
+  $('#pUnit').value = p.unit || 'kg';
+  $('#pUnit').onchange = e => { p.unit = e.target.value; persist(); unitLabels(); };
+  setTimeout(unitLabels);
   $('#coachPhoto').onchange = async e => { const f = e.target.files[0]; if (!f) return; S.coachPhoto = await downscale(f, 320); persist(); mountOrbs(); toast('Coach photo updated'); };
   const fill = () => {
     const vs = speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'));
@@ -307,7 +311,9 @@ function openSetup(k) {
   $('#fitView')?.addEventListener('click', () => { $('#setup').hidden = true; showBodyMap(S.profile.body); });
   $('#fitMap')?.addEventListener('click', () => { $('#setup').hidden = true; showBodyMapIntro(); });
   $('#loadWrap').hidden = !vbtOn();
-  $('#setupLast').textContent = lastLoadText(lastLoad(S.sessions, k));
+  const ll = lastLoad(S.sessions, k);
+  $('#setupLast').textContent = ll ? `Last time: ${prog.fmtW(ll.kg, unit())} × ${ll.reps}` : '';
+  showRx(k);
   $('#setup').hidden = false;
 }
 const setsToday = k => { const d = new Date(); d.setHours(0, 0, 0, 0); return S.sessions.filter(s => s.ex === k && s.at >= d.getTime()).length; };
@@ -352,7 +358,8 @@ async function startLive({ mode, source, file, auto = false }) {
   $('#tempoRing').hidden = true;
   if (auto) exKey = null;
   const ex = mode === 'form' && !auto ? curEx() : null;
-  live = { mode, source, frames: [], t0: null, lost: 0, wrong: 0, demo: null, done: false, steps: 0, mPerPx: null, standFrames: [], times: [],
+  const rx = mode === 'form' && !auto ? curRx : null;
+  live = { rx, mode, source, frames: [], t0: null, lost: 0, wrong: 0, demo: null, done: false, steps: 0, mPerPx: null, standFrames: [], times: [],
     auto, det: auto ? new ExerciseDetector() : null, buf: [], sets: [], lastRepT: 0 };
   bar.reset(); recorder2.start({ kind: mode, exercise: mode === 'form' && !auto ? exKey : undefined, gaitMode: mode === 'gait' ? gaitMode : undefined, source, loadKg: mode === 'form' ? parseFloat($('#loadKg').value) || null : undefined });
   engine = null; fb = null; smooth.reset(); motion.reset(); fx.reset(); hud.reset(); comp = null; recorder = null; $('#trackChip').innerHTML = '<i></i>Finding you…'; $('#trackChip').classList.remove('on'); $('#faultBanner').hidden = true;
@@ -716,11 +723,16 @@ function endSet() {
   const weighted = WEIGHTED.includes(LIB[exKey]?.equipment), last = lastLoad(S.sessions, exKey);
   $('#repFix').hidden = !reps || !!hold;
   $('#kgWrap').hidden = !reps || !weighted;
-  $('#setKg').value = parseFloat($('#loadKg').value) || last?.kg || '';
-  $('#sLast').textContent = lastLoadText(last);
+  const preKg = parseFloat($('#loadKg').value) ? prog.fromUnit(parseFloat($('#loadKg').value), unit()) : live?.rx?.kg || last?.kg;
+  $('#setKg').value = preKg ? +prog.toUnit(preKg, unit()).toFixed(2) : '';
+  $('#sNext').hidden = true;
+  $('#sLast').textContent = last ? `Last time: ${prog.fmtW(last.kg, unit())} × ${last.reps}` : '';
   if (reps) {
-    const kg = weighted ? parseFloat($('#setKg').value) || undefined : undefined;
-    S.sessions.push(lastSet = { at: Date.now(), ex: exKey, name: ex.name, reps, good, faults: tally, vl, tempo, roms: roms.map(r => Math.round(r.rom)), kg, demo: live?.source === 'demo' || undefined });
+    const kg = weighted && parseFloat($('#setKg').value) > 0 ? prog.fromUnit(parseFloat($('#setKg').value), unit()) : undefined;
+    const rx = live?.rx;
+    S.sessions.push(lastSet = { at: Date.now(), ex: exKey, name: ex.name, reps, good, faults: tally, vl, tempo, roms: roms.map(r => Math.round(r.rom)), kg, demo: live?.source === 'demo' || undefined,
+      ...(rx ? { target: rx.reps, mode: rx.mode === 'wave' ? 'wave' : undefined, wave: rx.day, rxKg: rx.kg } : {}) });
+    showNext();
     persist();
     const better = prevScore != null && score > prevScore ? ` Your form score is up from ${prevScore} to ${score} percent.` : '';
     say(`Set done. ${reps} reps, ${good} clean.${better} ${top ? 'One thing for next set: ' + top.cue : 'Great form. Keep it up.'}`, { id: 'summary_' + Date.now(), priority: 'high' });
@@ -768,7 +780,7 @@ function fixReps(d) {
 }
 $('#repMinus').onclick = () => fixReps(-1);
 $('#repPlus').onclick = () => fixReps(1);
-$('#setKg').onchange = e => { if (!lastSet) return; const kg = parseFloat(e.target.value); lastSet.kg = kg > 0 ? kg : undefined; persist(); };
+$('#setKg').onchange = e => { if (!lastSet) return; const v = parseFloat(e.target.value); lastSet.kg = v > 0 ? prog.fromUnit(v, unit()) : undefined; persist(); showNext(); };
 
 let restLeft = 120, restTotal = 120, restTimer = null;
 function drawRest() { $('#restClock').textContent = `${Math.floor(restLeft / 60)}:${String(restLeft % 60).padStart(2, '0')}`; $('#restArc').style.strokeDashoffset = 201 * (1 - restLeft / restTotal); }
@@ -1154,8 +1166,93 @@ $('#calcBf').onclick = () => {
   say(`Body fat is about ${Math.round(bf)} percent, in the ${bfCategory(bf, p.sex).toLowerCase()} range.`, { id: 'bf_' + Date.now(), priority: 'high' });
 };
 
+/* ---------- Progression: QK's next weight, units, strength chart ---------- */
+const unit = () => S.profile.unit || 'kg';
+function unitLabels() {
+  const u = unit();
+  $('#setKgLbl').textContent = `Weight used (${u})`; $('#loadKgLbl').textContent = `Weight (${u})`;
+  if (!$('#progress').hidden) renderStrength();
+}
+// Light week: starts by itself when due (every ~7 training weeks, or after 2 lifts backed off) and lasts 7 days.
+function lightWeek() {
+  const P = (S.prog ||= {}), now = Date.now(), W = 7 * 864e5;
+  if (P.lightAt && now - P.lightAt < W) return true;
+  if (prog.lightWeekDue(S.sessions, { now, lastLight: P.lightAt || 0, resets: P.resets || [] })) { P.lightAt = now; persist(); return true; }
+  return false;
+}
+// The prescription for an exercise, with a coach/lifter override if one was set since the last session.
+function rxFor(k) {
+  const item = LIB[k]; if (!item) return null;
+  const r = prog.nextFor(item, S.sessions, { unit: unit(), light: lightWeek() });
+  const o = S.prog?.override?.[k], lastAt = Math.max(0, ...S.sessions.filter(s => s.ex === k).map(s => s.at));
+  if (o && o.at > lastAt) {
+    const base = r || { reps: prog.liftClass(item) === 'small' || prog.liftClass(item) === 'mid' ? prog.RANGE.lo : 8, sets: 3, mode: 'linear', cls: prog.liftClass(item) };
+    return { ...base, kg: o.kg, action: 'set', why: 'Weight set by you.' };
+  }
+  if (r?.action === 'reset') { const P = (S.prog ||= {}); P.resets ||= []; if (!P.resets.some(x => x.ex === k && Date.now() - x.at < 3 * 864e5)) { P.resets.push({ ex: k, at: Date.now() }); persist(); } }
+  return r;
+}
+const rxLine = r => `${r.sets} × ${r.reps} at ${prog.fmtW(r.kg, unit())}${r.day ? ` · ${r.day} day` : ''}`;
+let curRx = null;
+function showRx(k) {
+  const item = LIB[k], cls = prog.liftClass(item); curRx = null;
+  $('#rxEditWrap').hidden = true;
+  if (!cls) { $('#rxBox').hidden = true; return; }
+  const r = rxFor(k); curRx = r;
+  $('#rxBox').hidden = false; $('#rxBox').classList.toggle('lightwk', r?.action === 'light');
+  $('#rxEyebrow').textContent = r?.action === 'light' ? 'Light week' : 'QK\'s target today';
+  $('#rxLine').textContent = r ? rxLine(r) : 'First time: pick a weight you can lift 8 times with good form';
+  $('#rxWhy').textContent = r ? r.why : 'Log the weight after your set and QK plans the next one from how it went.';
+  $('#rxEditLbl').textContent = `Weight (${unit()})`; $('#rxKg').value = r ? +prog.toUnit(r.kg, unit()).toFixed(2) : '';
+  $('#loadKg').value = r ? +prog.toUnit(r.kg, unit()).toFixed(2) : $('#loadKg').value;
+}
+$('#rxEdit').onclick = () => { $('#rxEditWrap').hidden = !$('#rxEditWrap').hidden; if (!$('#rxEditWrap').hidden) $('#rxKg').focus(); };
+$('#rxSave').onclick = () => {
+  const v = parseFloat($('#rxKg').value); if (!(v > 0) || !exKey) return;
+  const P = (S.prog ||= {}); P.override ||= {}; P.override[exKey] = { kg: prog.fromUnit(v, unit()), at: Date.now() };
+  persist(); showRx(exKey); toast('Saved. QK will build from this weight.');
+};
+// After a set: what QK will ask for next time, and why.
+function showNext() {
+  const item = LIB[exKey], box = $('#sNext');
+  if (!lastSet?.kg || !prog.liftClass(item)) { box.hidden = true; return; }
+  const r = prog.nextFor(item, S.sessions, { unit: unit() });
+  if (!r) { box.hidden = true; return; }
+  box.hidden = false; $('#sNextLine').textContent = rxLine(r); $('#sNextWhy').textContent = r.why;
+}
+// Lines for the weekly message to the coach: what QK changed and why, so the coach can step in.
+function progressionLines() {
+  const W = 7 * 864e5, ids = [...new Set(S.sessions.filter(s => s.kg > 0 && !s.demo && Date.now() - s.at < W).map(s => s.ex))];
+  const lines = ids.map(k => { const r = prog.nextFor(LIB[k], S.sessions, { unit: unit() }); return r && LIB[k] ? `${LIB[k].name}: ${rxLine(r)} (${r.why})` : null; }).filter(Boolean);
+  return lines.length ? '\nNext session targets:\n' + lines.join('\n') : '';
+}
+let stRange = '3M';
+function renderStrength() {
+  // Lifts with logged weights, most-trained first; the chart opens on the main one.
+  const n = {}; for (const x of S.sessions) if (x.kg > 0 && !x.demo && !x.guided && LIB[x.ex]) n[x.ex] = (n[x.ex] || 0) + 1;
+  const lifts = Object.keys(n).sort((a, b) => n[b] - n[a]);
+  const sel = $('#stLift'), cur = lifts.includes(sel.value) ? sel.value : lifts[0];
+  sel.innerHTML = lifts.map(k => `<option value="${k}" ${k === cur ? 'selected' : ''}>${esc(LIB[k].name)}</option>`).join('');
+  const u = unit(), vol = prog.weeklyVolume(S.sessions, 8);
+  const vmax = Math.max(1, ...vol);
+  $('#volChart').innerHTML = `<div class="vol-bars" role="img" aria-label="Weekly volume, last 8 weeks">${vol.map((v, i) => `<i class="${i === 7 ? 'now' : ''}" style="height:${Math.max(4, v / vmax * 100)}%" title="${Math.round(prog.toUnit(v, u)).toLocaleString()} ${u}"></i>`).join('')}</div><p class="muted small" style="margin:6px 0 0">This week: ${Math.round(prog.toUnit(vol[7], u)).toLocaleString()} ${u}${vol[6] ? ` · last week ${Math.round(prog.toUnit(vol[6], u)).toLocaleString()} ${u}` : ''}</p>`;
+  if (!cur) { $('#stChart').innerHTML = '<p class="empty">Log the weight after a set and your strength chart starts here.</p>'; $('#stNote').textContent = ''; $('#stDelta').textContent = ''; return; }
+  const { points, change } = prog.strengthSeries(S.sessions, cur, stRange);
+  $('#stTitle').textContent = LIB[cur].name;
+  $('#stDelta').textContent = change == null ? '' : `${change >= 0 ? '+' : ''}${Math.round(change * 100)}%`;
+  $('#stDelta').style.color = change > 0 ? 'var(--good)' : 'var(--muted)';
+  const vals = points.map(p => prog.toUnit(p.e1rm, u));
+  const fmtD = t => new Date(t).toLocaleDateString(undefined, stRange === '1M' || stRange === '3M' ? { day: 'numeric', month: 'short' } : { month: 'short' });
+  $('#stChart').innerHTML = vals.length >= 2 ? lineChart(vals, { min: Math.floor(Math.min(...vals) * 0.95), max: Math.ceil(Math.max(...vals) * 1.03), labels: points.map(p => fmtD(p.t)), marks: points.map(p => p.pr) })
+    : `<p class="empty">${vals.length ? 'One session so far in this range. Train it again to see the line.' : 'No sets of this lift in this range.'}</p>`;
+  const best = Math.max(0, ...points.map(p => p.e1rm)), prs = points.filter(p => p.pr).length;
+  $('#stNote').textContent = vals.length ? `Estimated 1-rep max, best ${prog.fmtW(best, u)}${prs ? ` · ${prs} personal best${prs > 1 ? 's' : ''} (gold dots)` : ''}.` : '';
+}
+$('#stLift').onchange = renderStrength;
+$('#stRange').onclick = e => { const b = e.target.closest('[data-r]'); if (!b) return; stRange = b.dataset.r; $('#stRange').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); renderStrength(); };
+
 /* ---------- Progress ---------- */
-function lineChart(vals, { min, max, suffix = '', labels }) {
+function lineChart(vals, { min, max, suffix = '', labels, marks }) {
   const W = 360, H = 150, l = 34, r = 12, t = 14, b = 24, n = vals.length;
   const X = i => l + (n === 1 ? 0 : i * (W - l - r) / (n - 1)), Y = v => t + (1 - (v - min) / (max - min || 1)) * (H - t - b);
   let s = `<svg viewBox="0 0 ${W} ${H}" role="img"><defs><linearGradient id="fillG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--z2)" stop-opacity=".35"/><stop offset="1" style="stop-color:var(--z2)" stop-opacity="0"/></linearGradient></defs>`;
@@ -1163,6 +1260,7 @@ function lineChart(vals, { min, max, suffix = '', labels }) {
   labels.forEach((lb, i) => { if (n <= 8 || i % Math.ceil(n / 6) === 0 || i === n - 1) s += `<text x="${X(i)}" y="${H - 6}" text-anchor="middle" style="fill:var(--muted)" font-size="10" font-family="IBM Plex Mono, monospace">${lb}</text>`; });
   const path = vals.map((v, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(' ');
   s += `<path d="${path} L${X(n - 1)} ${H - b} L${X(0)} ${H - b} Z" fill="url(#fillG)"/><path d="${path}" fill="none" stroke="url(#zoneStroke)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+  if (marks) vals.forEach((v, i) => { if (marks[i]) s += `<circle cx="${X(i)}" cy="${Y(v)}" r="4" fill="#E5A84C"/>`; });
   s += `<circle cx="${X(n - 1)}" cy="${Y(vals[n - 1])}" r="9" style="fill:var(--z3)" fill-opacity=".25"/><circle cx="${X(n - 1)}" cy="${Y(vals[n - 1])}" r="4.5" style="fill:var(--text)"/></svg>`;
   return s;
 }
@@ -1193,7 +1291,7 @@ function renderRewards() {
 }
 
 function renderProgress() {
-  renderRewards();
+  renderRewards(); renderStrength();
   const sets = S.sessions.filter(s => s.reps && !s.guided).slice(-12);
   const scores = sets.map(s => Math.round(s.good / s.reps * 100));
   $('#pfScore').textContent = scores.length ? scores[scores.length - 1] + '%' : '–';
@@ -1321,7 +1419,7 @@ $('#sendWeek').onclick = async () => {
   const faultName = id => { for (const k of Object.keys(LIB)) { const r = exFor(k) && allRules(exFor(k)).find(x => x.id === id); if (r) return r.cue; } return id; };
   const rk = S.rehab?.active?.checkins?.slice(-1)[0];
   const light = rk ? painLight({ ...rk, usualMorning: S.rehab.active.usualMorning }, COND[S.rehab.active.cond].painLimit).light : null;
-  const text = weekSummary(S, { faultName, light, isHold: isHoldId });
+  const text = weekSummary(S, { faultName, light, isHold: isHoldId }) + progressionLines();
   try { if (navigator.share) { await navigator.share({ text }); return; } } catch (err) { if (err?.name === 'AbortError') return; }
   try { await navigator.clipboard.writeText(text); toast('Copied. Paste it into WhatsApp or a message to QK.'); }
   catch { $('#weekText').textContent = text; $('#weekText').hidden = false; toast('Select the text below and copy it.'); }

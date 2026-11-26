@@ -556,6 +556,19 @@ a.ghost { text-decoration: none; text-align: center; display: inline-flex; align
 .medals .silver span { background: radial-gradient(circle at 35% 30%, #F4F6F5, #A9B3B0); }
 .medals .gold span { background: radial-gradient(circle at 35% 30%, #FBE7A1, #E5A84C); }
 .medals .platinum span { background: radial-gradient(circle at 35% 30%, #E8F6F8, #8FC3CB); }
+/* Progression: today's target, next time, strength chart. */
+.rx { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; align-items: start; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+.rx-main b, .rx-next b { display: block; font: 800 1.15rem var(--f-display, inherit); margin-top: 2px; }
+.rx-main p, .rx-next p { margin: 4px 0 0; }
+.rx.lightwk { border-color: rgba(127,184,230,.6); }
+.rx-edit { grid-column: 1 / -1; display: flex; gap: 8px; align-items: end; }
+.rx-edit .field { flex: 1; }
+.seg { display: flex; gap: 4px; align-self: end; background: var(--surface-2); border-radius: 99px; padding: 3px; }
+.seg button { flex: 1; border: 0; background: none; color: var(--muted); font: 700 .78rem var(--f-data); padding: 7px 0; border-radius: 99px; cursor: pointer; }
+.seg button.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.vol-bars { display: flex; gap: 6px; align-items: end; height: 70px; }
+.vol-bars i { flex: 1; background: var(--surface-2); border-radius: 5px 5px 2px 2px; min-height: 3px; }
+.vol-bars i.now { background: linear-gradient(180deg, var(--z2), var(--good)); }
 .track-chip { position: absolute; top: 104px; left: 16px; display: inline-flex; align-items: center; gap: 7px; pointer-events: none;
   font: 600 .72rem var(--f-data); letter-spacing: .06em; text-transform: uppercase; color: rgba(236,241,236,.75);
   background: rgba(var(--scrim-rgb),.7); border: 1px solid var(--line); padding: 4px 9px; border-radius: 99px; }
