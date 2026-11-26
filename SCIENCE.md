@@ -314,4 +314,14 @@ The full reasoning and the database comparison are in [docs/NUTRITION.md](docs/N
 | Targets: Mifflin-St Jeor × activity (1.375 / 1.55 / 1.725), −20% to lose fat, +10% to gain | Mifflin-St Jeor is the most accurate of the common resting-energy equations in non-obese adults (Frankenfield et al. 2005, J Am Diet Assoc) |
 | Protein 1.8 g/kg (2.0 g/kg when losing fat) | Gains plateau around 1.6 g/kg, with a 95% CI up to 2.2 (Morton et al. 2018, Br J Sports Med); higher intakes help keep muscle in a deficit (ISSN position stand 2017) |
 
+| One-tap photo logging, fixed afterwards if needed | Logging that takes seconds is done more often. Consistent logging matters more for results than per-meal precision, and the weekly report's weight check corrects for systematic error |
+| Fast food and street food are recipe models labelled "QK estimate"; official chain values override them when added | Few chains publish Pakistani nutrition values; a recipe model is closer than a user-typed number |
+| Weekly report: veg and fruit target 400 g a day, potatoes excluded | WHO healthy diet fact sheet (at least 400 g of fruit and vegetables a day) |
+| Fibre about 14 g per 1,000 kcal | Dietary Guidelines for Americans 2020–2025 |
+| Water about 35 ml per kg (8–16 glasses), plus 2 on training days | EFSA 2010 adequate intakes (2.0 L women, 2.5 L men, from drinks and food); sweat losses in training |
+| Iron advice for women, with chai an hour away from meals | Women's iron needs are about twice men's; tea polyphenols reduce non-haem iron absorption (Hurrell et al. 1999, Br J Nutr) |
+| Vitamin D and B12 are "worth asking your doctor to test", never prescribed | Vitamin D deficiency is very common in South Asia; supplements and doses are a doctor's call |
+| Real maintenance = average logged intake − weight change × 7,700 kcal/kg | Energy content of body-weight change (~7,700 kcal/kg, Hall 2008). It needs 2+ weeks of weigh-ins and 5+ logged days, and corrects any steady under- or over-logging |
+| Report tone: wins first, at most two focus points, each an addition or swap; no blaming words (tested) | Gain-framed, autonomy-supportive feedback sustains behaviour change better than criticism (self-determination theory; Teixeira et al. 2012, IJBNPA) |
+
 Limits: the fat grams per dish are modelling assumptions until real plates are weighed. That is the most useful next step. Photo portions of curries are rough (±30%). Counted items (rotis, kebabs, samosas) are much better. Ingredient values are rounded USDA SR Legacy figures, and mutton uses goat meat.

@@ -490,7 +490,8 @@ a.ghost { text-decoration: none; text-align: center; display: inline-flex; align
 .card.next details summary .small { margin-left: auto; }
 .qk-says { display: flex; gap: 8px; align-items: baseline; border-top: 1px solid var(--line); padding-top: 10px; font-size: .9rem; color: var(--text-2); }
 .qk-says #nudge { flex: 1; min-width: 0; }
-.quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.quick-btn { min-width: 0; text-align: center; }
 .quick-btn { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 6px; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--surface); font-weight: 650; font-size: .88rem; cursor: pointer; }
 .quick-btn svg { width: 22px; height: 22px; color: var(--z1); }
 .ready-q { display: flex; justify-content: space-between; align-items: center; }
@@ -660,3 +661,28 @@ button.row.food-hit { padding: 11px 0; }
 .photo-head img { width: 96px; height: 96px; object-fit: cover; border-radius: var(--r-md); }
 .food-how { margin: 0 2px; }
 #foodTargets summary { cursor: pointer; font-weight: 650; display: flex; justify-content: space-between; gap: 8px; }
+.ftag.place { border-color: var(--z3); color: var(--text-2); }
+.add-place { margin-top: 10px; }
+.chips-scroll.fam { flex-wrap: nowrap; }
+.water { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
+.water .eyebrow { display: block; margin-bottom: 6px; }
+.glasses { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
+.glasses i { width: 12px; height: 18px; border-radius: 3px 3px 5px 5px; border: 1.5px solid var(--z2); opacity: .45; }
+.glasses i.on { background: var(--z2); opacity: 1; }
+.water-btns { display: flex; gap: 8px; flex: none; }
+.water-btns .iconbtn { font-size: 1.2rem; width: 44px; height: 44px; }
+.water-btns .plus { background: var(--z2); color: var(--on-cta); border-color: var(--z2); }
+.wk-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center; }
+.wk-stats > div { background: var(--surface-2); border-radius: var(--r-sm); padding: 8px 4px; display: flex; flex-direction: column; min-width: 0; }
+.wk-stats b { font-size: 1.05rem; } .wk-stats span { font-size: .68rem; color: var(--muted); }
+.wk-block { display: flex; flex-direction: column; gap: 6px; }
+.wins { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.wins li { padding-left: 24px; position: relative; font-size: .9rem; }
+.wins li::before { content: "✓"; position: absolute; left: 0; top: 0; width: 18px; height: 18px; border-radius: 50%; background: rgba(var(--good-rgb),.15); color: var(--good); font: 700 .7rem/18px var(--f-body); text-align: center; }
+.focus { background: linear-gradient(135deg, rgba(var(--z1-rgb),.14), rgba(var(--z3-rgb),.08)); border-radius: var(--r-md); padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.focus p { margin: 0; font-size: .86rem; color: var(--text-2); }
+.focus .tip { color: var(--text); }
+.focus .nut { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.qk-line { margin: 0; font-size: .92rem; }
+.weigh { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+.snap-card { border-color: rgba(var(--z2-rgb),.5); }

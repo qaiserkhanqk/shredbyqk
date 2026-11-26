@@ -101,7 +101,7 @@ check('portion is the median, not the mean', c.items[0].servings === 1);
 check('oil cue is the majority', c.items[0].oil === 'oily');
 check('agreement reported', c.agreement > 0.6 && c.agreement < 1);
 check('same samples → same consensus', JSON.stringify(consensus([s([it('nihari', 1)]), s([it('nihari', 1)])])) === JSON.stringify(consensus([s([it('nihari', 1)]), s([it('nihari', 1)])])));
-check('unknown dish ids become "other" names', consensus([s([it('pizza_slice', 2, { other_name: 'Pizza' })])]).items[0].otherName === 'Pizza');
+check('unknown dish ids become "other" names', consensus([s([it('sushi_roll', 2, { other_name: 'Sushi' })])]).items[0].otherName === 'Sushi');
 check('two piles of the same dish are added', consensus([s([it('roti', 1), it('roti', 2)])]).items[0].servings === 3);
 check('broken samples are ignored', consensus([null, { error: 'x' }, s([it('chai', 1)])]).items[0].dish === 'chai');
 

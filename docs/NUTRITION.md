@@ -8,7 +8,7 @@ So Shred uses three free sources, plus its own dish models on top:
 
 | Source | What it gives | Licence | Used for |
 |---|---|---|---|
-| **Desi dish models** (`js/nutrition.js`, written for this app) | 71 Pakistani and Indian dishes as recipes: meat, masala, and fat by who cooked it | Ours | Everything people eat most: karahi, qorma, nihari, haleem, biryani, pulao, daal, cholay, roti, paratha, naan, kebabs, samosa, pakoray, chai, lassi, sweets |
+| **Desi dish models** (`js/nutrition.js`, written for this app) | 101 Pakistani, Indian, fast-food and street-food dishes as recipes: meat, masala, and fat by who cooked it | Ours | Everything people eat most: karahi, qorma, nihari, haleem, biryani, pulao, daal, cholay, roti, paratha, naan, kebabs, samosa, pakoray, chai, lassi, sweets |
 | **Indian Nutrient Databank (INDB)**, 2024 | 1,014 standard Indian recipes, per 100 g and per serving, built on ICMR-NIN IFCT 2017 | Open access paper and data on GitHub; **no licence file** (see below) | Search for anything the dish models don't cover (dhokla, upma, idli, regional sabzis…) |
 | **USDA FoodData Central** (SR Legacy) | Raw ingredients: meat, flours, lentils, oils, dairy, vegetables | Public domain (CC0) | The ingredient values inside every dish model; searchable ingredients |
 
@@ -81,6 +81,32 @@ OPENAI_API_KEY=... OPENAI_MODEL=gpt-4o node tools/food-vision-server.mjs
 ```
 
 Then set `PHOTO_CONFIG.endpoint` in `js/foodphoto.js`. Keep the key on the server, never in the app.
+
+## FatSecret and MyFitnessPal
+
+- **FatSecret's** API is free, including for commercial use, but its terms allow keeping its data for at most 24 hours (except fields marked storable, like the food ID). Copying it into our own database isn't allowed. It *can* be used as a live fallback search through the same server, with only the food ID saved in the log.
+- **MyFitnessPal** has no public API: access is partner-only and its licence is personal use. Its data can't be extracted.
+- Their desi entries are mostly typed in by users anyway, which is the problem this app solves.
+
+## No weighing: one-tap photos and the weekly report
+
+Clients don't weigh anything. A photo is logged in one tap, and each dish can be fixed with a tap. One photo is roughly ±25–30% for curries and much better for counted items (rotis, kebabs, pieces). Across a week the errors partly cancel. The weigh-ins then show whether the logs run high or low: the report works out real maintenance calories from the logs and the scale (`js/weekly.js`).
+
+The weekly report:
+- opens with what went well
+- gives at most two things to add next week (protein, veg and fruit, water, dairy, iron for women, fibre, fish, or one easy swap when cutting), with the nutrients each brings and a desi way to do it
+- adds gentle notes about vitamin D and B12 tests
+
+During rehab it never pushes a calorie cut.
+
+## Places: chains, restaurants and carts
+
+No public database lists Pakistani restaurant and cart menus with nutrition. `js/menus.js` seeds:
+- the big chains
+- well-known desi restaurants
+- the street-food formats every cart sells
+
+Every item points at a dish model with that place's portion and oil level. When a chain publishes official values, add them as `official` on the item and they replace the estimate. Clients add their own places with **Add a place**: they pick the closest dish, so the numbers stay realistic. Places are stored on the phone for now. With a backend, places added by one client could be shared with all (after QK reviews them).
 
 ## Making it more accurate over time
 

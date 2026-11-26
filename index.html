@@ -70,6 +70,7 @@
     </div>
 
     <div class="quick" role="group" aria-label="Quick tools">
+      <button type="button" class="quick-btn" id="snapMeal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Snap meal</button>
       <button type="button" class="quick-btn" data-go="calm-now"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>Calm now</button>
       <button type="button" class="quick-btn" data-go="vitals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-5 4 10 2-5h6"/></svg>Body check</button>
       <button type="button" class="quick-btn" data-go="body"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>All tools</button>
@@ -94,12 +95,13 @@
   <section class="screen" id="food">
     <div class="page-head"><div><span class="eyebrow">Food</span><h1 class="display h1">What did you eat?</h1></div></div>
     <div class="card stack" id="foodToday"></div>
-    <button type="button" class="cam-start" id="foodPhotoBtn"><span class="cam-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span><span><b>Snap your plate</b><span>QK names each dish and counts the portions. You tell it who cooked it.</span></span></button>
+    <button type="button" class="cam-start" id="foodPhotoBtn"><span class="cam-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span><span><b>Snap your meal</b><span>One photo and it’s logged. QK names each dish and counts the portions; tap to fix anything.</span></span></button>
     <input type="file" accept="image/*" capture="environment" id="foodPhoto" hidden>
     <div id="foodPhotoBox" hidden></div>
-    <label class="field"><span class="eyebrow">Search</span><input id="foodSearch" type="search" placeholder="Karahi, roti, daal, biryani, chai…" autocomplete="off"></label>
+    <label class="field"><span class="eyebrow">Search</span><input id="foodSearch" type="search" placeholder="Karahi, roti, KFC zinger, gol gappay…" autocomplete="off"></label>
     <div class="card" id="foodResults" hidden></div>
     <div class="card"><div class="card-head"><b>Today’s food</b></div><div class="list" id="foodLog"></div></div>
+    <div class="card stack" id="foodWeek"></div>
     <details class="card" id="foodTargets">
       <summary>Your targets <span class="muted small" id="tSummary"></span></summary>
       <div class="stack" style="margin-top:14px">
