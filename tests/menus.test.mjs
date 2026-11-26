@@ -1,5 +1,5 @@
 // Places and menus, and how QK's recipe models compare with chains' published values. Run: node tests/menus.test.mjs
-import { PLACES, searchPlaces, itemNutrition, suggestDish } from '../js/menus.js';
+import { PLACES, searchPlaces, itemNutrition, suggestDish, allPlaces } from '../js/menus.js';
 import { estimate, DISH } from '../js/nutrition.js';
 import { parseMeal } from '../js/foodtext.js';
 let fails = 0;
@@ -30,5 +30,16 @@ const said = parseMeal('2 big mac from mcdonalds aur ek medium fries');
 check('"2 big mac from mcdonalds" → McDonald\'s Big Mac × 2 (official)', said.items[0]?.name === "McDonald's · Big Mac" && said.items[0].opts.servings / said.items[0].opts.menuBase === 2 && said.items[0].official, JSON.stringify(said.items.map(i => i.name)));
 check('"cheezious pizza" → a Cheezious slice', /Cheezious/.test(parseMeal('cheezious pizza')?.items[0]?.name || ''));
 check('add-a-place suggestions find burgers for "chicken cheese burger"', suggestDish('chicken cheese burger').some(d => d.id === 'chicken_burger'));
+// Local places, city by city
+check('"nagina burger" → Nagina Burger Point (Islamabad)', top('nagina burger')?.place.id === 'nagina-burger' && top('nagina burger').place.city === 'Islamabad');
+check('typos still find it ("nagina burgr")', top('nagina burgr')?.place.id === 'nagina-burger');
+check('"cheezius" → Cheezious, not another pizza place', top('cheezius')?.place.id === 'cheezious');
+check('city + dish: "peshawar chapli" → a Peshawar place', top('peshawar chapli')?.place.city === 'Peshawar');
+check('your city ranks first ("nihari" in Karachi)', searchPlaces('nihari', [], 5, 'Karachi')[0]?.place.city === 'Karachi');
+check('"bhindi" does not find Bundu Khan', !searchPlaces('bhindi').some(r => r.place.id === 'bundu-khan'));
+check('"nagina burger" said in a meal → their anda shami burger', parseMeal('nagina burger aur chai').items[0]?.name === 'Nagina Burger Point · Anda shami burger');
+check('a sweets shop is not named by "sweet"', !/Sweet/.test(parseMeal('sweet lassi').items[0]?.name || ''));
+check('every local place has a city and a source', allPlaces().filter(p => p.type === 'Local').every(p => p.city && /^https?:/.test(p.url)));
+
 console.log(fails ? `\n${fails} FAILED` : '\nall menu checks passed');
 process.exit(fails ? 1 : 0);

@@ -8,6 +8,7 @@
 //   FATSECRET_CLIENT_ID=... FATSECRET_CLIENT_SECRET=...   # optional: live fallback search, GET /food-search?q=
 //
 // Then set PHOTO_CONFIG.endpoint in js/foodphoto.js to http(s)://<host>:8787/food-vision.
+// POST /food-text understands meal descriptions the app's own parser couldn't.
 //
 // The model is asked to IDENTIFY and MEASURE, never to give calories (see js/foodphoto.js for why).
 // It answers through a strict JSON schema whose dish field is an enum of the app's catalogue, it is
@@ -21,28 +22,39 @@ const PROVIDER = process.env.ANTHROPIC_API_KEY ? 'anthropic' : process.env.OPENA
 const MODEL = PROVIDER === 'anthropic' ? (process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5') : (process.env.OPENAI_MODEL || 'gpt-4o');
 const cache = new Map(); // hash → samples
 
-const PROMPT = catalogue => `You are the food-recognition step of a calorie tracker for Pakistani and Indian food.
-Do NOT estimate calories, grams of fat or macros. Only identify and measure what is on the plate.
-
-For each separate food you can see:
+const RULES = `For each separate food:
 - dish: pick the closest id from the catalogue below. Use "other" only if nothing is close, and then name it in other_name.
-- servings: how many of that dish's serving unit are visible (the unit is given per dish). Count breads, kebabs,
-  samosas, eggs and pieces one by one. For curries and rice judge volume against the plate or bowl:
-  a katori is about 200 g (a small bowl, about 1 cup); a full dinner plate of rice is about 300 g. Use halves (0.5, 1.5).
-  If only part of a roti or naan is left, count what is left.
-  Be exact about breads, they differ a lot: a thin phulka, a roti/chapati, a big tandoori roti, a naan, a roghni naan
-  (glossy with sesame), a kulcha, taftan or sheermal (sweet, yellowish), a paratha (layered, oily sheen) or a puri (puffed, fried).
-  Fast food counts too: burgers, fried chicken, fries, pizza slices, shawarma and rolls are in the catalogue.
-- meat_share (curries and rice with meat only, else "na"): "more" if the serving is mostly meat pieces,
-  "less" if it is mostly gravy or rice with few pieces, else "normal".
-- oil (cooked dishes only, else "na"): "oily" if you can see a layer of oil (tarri) on top or pooled at the edge,
-  "less" if it looks dry or lightly cooked, else "normal".
+- alternative: the second most likely catalogue id for the same food (another member of its family is typical:
+  naan vs roghni naan, chicken karahi vs chicken handi), or "none" if you're sure.
+- servings: how many of that dish's serving unit (given per dish). Count breads, kebabs, samosas, eggs and pieces one
+  by one. For curries and rice judge volume: a katori is about 200 g (a small bowl, about 1 cup); a full dinner plate of
+  rice is about 300 g. Use halves (0.5, 1.5). If only part of a roti or naan is left, count what is left.
+  Breads differ a lot: a thin phulka, a roti/chapati, a big tandoori roti, a naan, a roghni naan (glossy, sesame),
+  a kulcha, taftan or sheermal (sweet, yellowish), a paratha (layered, oily sheen) or a puri (puffed, fried).
+- meat_share (curries and rice with meat only, else "na"): "more" if mostly meat pieces, "less" if mostly gravy or rice, else "normal".
+- oil (cooked dishes only, else "na"): "oily" if a layer of oil (tarri) shows on top or pools at the edge, "less" if dry, else "normal".
 - confidence: 0 to 1, how sure you are of the dish.
-setting: "restaurant" if this looks like a restaurant, dhaba or wedding (karahi pans, foil, branded boxes, buffet),
-"home" if it looks like home, else "unsure".
+setting: "restaurant" for a restaurant, dhaba or wedding (karahi pans, foil, branded boxes, buffet), "home" for home, else "unsure".`;
 
-Catalogue (id: name, serving unit):
-${catalogue.map(c => `${c.id}: ${c.name} (${c.serving})`).join('\n')}`;
+const catalogueText = catalogue => `Catalogue (id: name, serving unit):\n${catalogue.map(c => `${c.id}: ${c.name} (${c.serving})`).join('\n')}`;
+
+// Photo: what the person told us helps more than anything a camera can infer.
+const PHOTO_PROMPT = (catalogue, x = {}) => `You are the food-recognition step of a calorie tracker for Pakistani and Indian food.
+Do NOT estimate calories, grams of fat or macros. Only identify and measure what is on the plate.
+${x.plateCm ? `Scale: this person's usual dinner plate is about ${x.plateCm} cm across; a katori is about 10 cm. Use them to judge volume.\n` : ''}${x.hint ? `The person says: "${String(x.hint).slice(0, 200)}". Trust it for what the food is and who cooked it; still count portions from the photo.\n` : ''}${x.usual?.length ? `Foods this person often eats (prefer these when the photo is ambiguous): ${x.usual.slice(0, 15).join(', ')}.\n` : ''}
+${RULES}
+
+${catalogueText(catalogue)}`;
+
+// Text: words the app's own parser didn't catch ("kadhi chawal ki plate").
+const TEXT_PROMPT = (catalogue, text) => `You are the meal-understanding step of a calorie tracker for Pakistani and Indian food.
+Someone described what they ate, in English, Roman Urdu or Urdu: "${String(text).slice(0, 300)}".
+Map it to catalogue dishes with portions. Do NOT estimate calories. If nothing in the catalogue is close, use "other".
+Use "na" for meat_share and oil unless the words say so, and "unsure" for setting unless they mention a restaurant or home.
+
+${RULES}
+
+${catalogueText(catalogue)}`;
 
 const schema = ids => ({
   type: 'object', additionalProperties: false, required: ['items', 'setting'],
@@ -51,9 +63,10 @@ const schema = ids => ({
     items: {
       type: 'array', items: {
         type: 'object', additionalProperties: false,
-        required: ['dish', 'other_name', 'servings', 'meat_share', 'oil', 'confidence'],
+        required: ['dish', 'alternative', 'other_name', 'servings', 'meat_share', 'oil', 'confidence'],
         properties: {
           dish: { type: 'string', enum: [...ids, 'other'] },
+          alternative: { type: 'string', enum: [...ids, 'none'] },
           other_name: { type: 'string' },
           servings: { type: 'number' },
           meat_share: { type: 'string', enum: ['less', 'normal', 'more', 'na'] },
@@ -65,49 +78,58 @@ const schema = ids => ({
   },
 });
 
-async function askAnthropic(image, catalogue) {
-  const [, mediaType, data] = image.match(/^data:(image\/[a-z]+);base64,(.+)$/) || [];
+async function askAnthropic({ image, text, ids }) {
+  const content = [{ type: 'text', text }];
+  if (image) { const [, mediaType, data] = image.match(/^data:(image\/[a-z]+);base64,(.+)$/) || []; content.unshift({ type: 'image', source: { type: 'base64', media_type: mediaType, data } }); }
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
       model: MODEL, max_tokens: 1500,
-      tools: [{ name: 'report_plate', description: 'Report the foods on the plate.', input_schema: schema(catalogue.map(c => c.id)) }],
+      tools: [{ name: 'report_plate', description: 'Report the foods.', input_schema: schema(ids) }],
       tool_choice: { type: 'tool', name: 'report_plate' },
-      messages: [{ role: 'user', content: [
-        { type: 'image', source: { type: 'base64', media_type: mediaType, data } },
-        { type: 'text', text: PROMPT(catalogue) },
-      ] }],
+      messages: [{ role: 'user', content }],
     }),
   });
   if (!r.ok) throw new Error(`anthropic ${r.status}: ${(await r.text()).slice(0, 300)}`);
-  const j = await r.json();
-  return j.content.find(b => b.type === 'tool_use')?.input;
+  return (await r.json()).content.find(b => b.type === 'tool_use')?.input;
 }
 
-async function askOpenAI(image, catalogue) {
+async function askOpenAI({ image, text, ids }) {
+  const content = [{ type: 'text', text }];
+  if (image) content.push({ type: 'image_url', image_url: { url: image } });
   const r = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
     body: JSON.stringify({
       model: MODEL,
-      response_format: { type: 'json_schema', json_schema: { name: 'plate', strict: true, schema: schema(catalogue.map(c => c.id)) } },
-      messages: [{ role: 'user', content: [{ type: 'text', text: PROMPT(catalogue) }, { type: 'image_url', image_url: { url: image } }] }],
+      response_format: { type: 'json_schema', json_schema: { name: 'plate', strict: true, schema: schema(ids) } },
+      messages: [{ role: 'user', content }],
     }),
   });
   if (!r.ok) throw new Error(`openai ${r.status}: ${(await r.text()).slice(0, 300)}`);
   return JSON.parse((await r.json()).choices[0].message.content);
 }
 
-async function recognise({ image, hash, samples = 3, catalogue }) {
-  if (hash && cache.has(hash)) return cache.get(hash);
-  const ask = PROVIDER === 'anthropic' ? askAnthropic : askOpenAI;
+async function ask(job, samples) {
+  const fn = PROVIDER === 'anthropic' ? askAnthropic : askOpenAI;
   const n = Math.min(5, Math.max(1, samples | 0));
-  const out = (await Promise.allSettled(Array.from({ length: n }, () => ask(image, catalogue))))
-    .filter(s => s.status === 'fulfilled' && s.value).map(s => s.value);
+  const out = (await Promise.allSettled(Array.from({ length: n }, () => fn(job)))).filter(s => s.status === 'fulfilled' && s.value).map(s => s.value);
   if (!out.length) throw new Error('every request failed');
-  if (hash) { cache.set(hash, out); if (cache.size > 500) cache.delete(cache.keys().next().value); }
   return out;
+}
+const remember = (key, v) => { cache.set(key, v); if (cache.size > 500) cache.delete(cache.keys().next().value); return v; };
+
+async function recognise({ image, hash, samples = 3, catalogue, hint = '', plateCm = null, usual = [] }) {
+  const key = hash && `${hash}|${hint}`; // the same photo with a different note is a different question
+  if (key && cache.has(key)) return cache.get(key);
+  const out = await ask({ image, text: PHOTO_PROMPT(catalogue, { hint, plateCm, usual }), ids: catalogue.map(c => c.id) }, samples);
+  return key ? remember(key, out) : out;
+}
+async function understand({ text, catalogue }) {
+  const key = 'text|' + text.toLowerCase().trim();
+  if (cache.has(key)) return cache.get(key);
+  return remember(key, await ask({ text: TEXT_PROMPT(catalogue, text), ids: catalogue.map(c => c.id) }, 1));
 }
 
 // FatSecret live search (optional). Their terms don't allow keeping their data beyond 24 hours, so this
@@ -142,13 +164,15 @@ http.createServer(async (req, res) => {
     try { res.setHeader('content-type', 'application/json'); return res.end(JSON.stringify({ foods: await fatsecretSearch(q.slice(0, 80)) })); }
     catch (e) { console.error(e.message); res.statusCode = 502; return res.end('{"foods":[]}'); }
   }
-  if (req.method !== 'POST' || !req.url.startsWith('/food-vision')) { res.statusCode = 404; return res.end(); }
+  if (req.method !== 'POST' || !/^\/food-(vision|text)/.test(req.url)) { res.statusCode = 404; return res.end(); }
   let body = '';
   for await (const chunk of req) { body += chunk; if (body.length > 6e6) { res.statusCode = 413; return res.end(); } }
   try {
     const q = JSON.parse(body);
-    if (!/^data:image\//.test(q.image || '') || !Array.isArray(q.catalogue)) throw new Error('bad request');
-    const samples = await recognise(q);
+    if (!Array.isArray(q.catalogue)) throw new Error('bad request');
+    let samples;
+    if (req.url.startsWith('/food-text')) { if (!q.text) throw new Error('bad request'); samples = await understand(q); }
+    else { if (!/^data:image\//.test(q.image || '')) throw new Error('bad request'); samples = await recognise(q); }
     res.setHeader('content-type', 'application/json');
     res.end(JSON.stringify({ samples }));
   } catch (e) {

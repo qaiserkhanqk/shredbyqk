@@ -755,9 +755,12 @@ button.row.food-hit { padding: 11px 0; }
 .scan-view i { position: absolute; left: 12%; right: 12%; top: 50%; height: 2px; background: var(--z3); box-shadow: 0 0 12px var(--z3); }
 .water.steps input { width: 120px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; color: var(--text); text-align: right; }
 .water.steps .water-btns { align-items: center; }
-.water.steps > div:first-child { display: flex; flex-direction: column; }
+.water.steps > div:first-child { display: flex; flex-direction: column; align-items: flex-start; flex: 1; min-width: 0; }
 .lang-btn { border: 1px solid var(--line); background: var(--surface); border-radius: 99px; padding: 8px 14px; font: 600 .9rem "Noto Nastaliq Urdu", var(--f-body); cursor: pointer; flex: none; }
 .ur, .ur .display, .ur .eyebrow, .ur button, .ur input { font-family: "Noto Nastaliq Urdu", var(--f-body); letter-spacing: 0; }
 .ur .eyebrow { text-transform: none; font-size: .8rem; }
 .ur .display { line-height: 1.6; }
 .ur .num, .ur .data, .ur .kbig { font-family: var(--f-display); direction: ltr; unicode-bidi: isolate; }
+.alt-chip { align-self: flex-start; margin: -4px 0 8px; border: 1px dashed var(--z2); background: none; color: var(--z2); border-radius: 99px; padding: 4px 10px; font: 600 .78rem var(--f-body); cursor: pointer; }
+.snap-note { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.snap-note input { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; color: var(--text); min-width: 0; }
