@@ -24,7 +24,8 @@ import * as rewards from './rewards.js';
 import * as prog from './progression.js';
 import * as brief from './brief.js';
 import { icsFor, dueToday } from './reminders.js';
-import { PROGRAMS, scheme as progScheme, weeklySets, currentDay, byId as programById } from './programs.js';
+import * as refresh from './refresh.js';
+import { PROGRAMS, scheme as progScheme, weeklySets, currentDay, byId as programById, GOALS, pickProgram, defaultDays } from './programs.js';
 import { ExerciseDetector, PICK_LIST } from './detect.js';
 import { initCalm, renderCalm, startCalmNow } from './calm.js';
 import { WEIGHTED, lastLoad, weekSummary } from './share.js';
@@ -95,7 +96,7 @@ document.addEventListener('click', e => {
 /* ---------- Today ---------- */
 const TODAY_DEFAULT = [['hipThrust', '4×10'], ['rdl', '3×10'], ['lunge', '3×12'], ['bandedWalk', '2×20']];
 // Today's workout: the next day of the active program, or the starter glute session.
-const activeProgram = () => (S.program?.id ? programById(S.program.id) : null);
+const activeProgram = () => { const d = S.program?.id ? programById(S.program.id) : null; return d && S.program.plan ? { ...d, plan: S.program.plan } : d; };
 const programDay = () => { const p = activeProgram(); return p ? currentDay(p, S.program) : null; };
 const todayItems = () => { const d = programDay(); return d?.day ? d.day.items.map(it => [it[0], `${it[1]}×${it[2]}`]) : TODAY_DEFAULT; };
 const todayName = () => { const p = activeProgram(), d = programDay(); return p && d ? `${p.name}: ${d.day.name}` : 'Glute Builder'; };
@@ -159,6 +160,7 @@ function renderToday() {
 
   const p = S.plan || {};
   $('#sessionMeta').textContent = [p.time, p.place].filter(Boolean).join(' · ');
+  rollMonth();
   const plan = planToday(), tgt = Object.fromEntries(plan.map(r => [r.id, r]));
   $('#todayList').innerHTML = todayItems().map(([k, sets]) => `<button type="button" class="ex-row" data-train="${k}" style="width:100%;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;cursor:pointer;padding-inline:0"><span class="pic">${icon(iconKey(k))}</span>
     <div><b>${esc(LIB[k].name)}</b>${LIB[k].pattern ? '<span class="tag">QK checks your form</span>' : '<span class="tag" style="color:var(--z3)">QK coaches your tempo</span>'}</div>
@@ -1216,7 +1218,9 @@ let curRx = null;
 function showRx(k) {
   const item = LIB[k], cls = prog.liftClass(item); curRx = null;
   $('#rxEditWrap').hidden = true;
-  if (!cls) { $('#rxBox').hidden = true; return; }
+  $('#swapBtn').hidden = !inPlan(k);
+  if (!cls) { $('#rxBox').hidden = !inPlan(k); if (inPlan(k)) { $('#rxLine').textContent = LIB[k].name; $('#rxWhy').textContent = 'Part of your program. Not for you? Swap it.'; $('#rxEyebrow').textContent = 'In your program'; $('#rxPlates').hidden = true; $('#rxEdit').hidden = true; } return; }
+  $('#rxEdit').hidden = false;
   const r = rxFor(k); curRx = r;
   $('#rxBox').hidden = false; $('#rxBox').classList.toggle('lightwk', r?.action === 'light');
   $('#rxEyebrow').textContent = r?.action === 'light' ? 'Light week' : 'QK\'s target today';
@@ -1276,15 +1280,19 @@ $('#stRange').onclick = e => { const b = e.target.closest('[data-r]'); if (!b) r
 /* ---------- QK's plan: every weight decided before the lifter asks ---------- */
 const planToday = () => brief.planRows(todayItems().map(x => x[0]), { lib: LIB, sets: S.sessions, unit: unit(), light: lightWeek(), schemeFor: programScheme });
 function renderPlan(rows) {
-  const lifts = rows.filter(r => r.change !== 'none'), card = $('#qkPlan');
+  // With a program, every item of the day is listed (runs and stations too); without one, only weighted lifts.
+  const sets = Object.fromEntries(todayItems()), prg = !!activeProgram();
+  const lifts = rows.filter(r => r.change !== 'none' || prg).map(r => (r.change === 'none' ? { ...r, line: (sets[r.id] || '').replace('×', ' × '), why: LIB[r.id]?.pattern ? 'QK counts your reps and checks your form.' : 'QK coaches you through it by voice.', tag: '' } : r));
+  const card = $('#qkPlan');
   if (!lifts.length) { card.hidden = true; return; }
   card.hidden = false;
-  const p = activeProgram(), pw = brief.programWeek(S.program, p), newWeek = (S.prog?.briefWeek ?? -1) !== brief.weekOf(Date.now());
-  $('#planEyebrow').textContent = pw ? (pw.finished ? `${p.name} · complete` : `${p.name} · week ${pw.week} of ${pw.of}`) : 'QK\'s plan for today';
-  const known = lifts.filter(r => r.rx);
-  $('#planTitle').textContent = !known.length ? 'Pick your starting weights' : newWeek ? 'New week. Your weights are set.' : 'Your weights are set';
-  $('#planSummary').textContent = pw?.finished ? `You finished ${p.name}. Pick your next program on the Train tab, or keep going and QK keeps progressing you.`
-    : (brief.summary(known) + (known.length ? ' Based on how your last session went. Just follow the numbers.' : ' Do your first set and QK plans every one after it.')).trim();
+  const p = activeProgram(), newWeek = (S.prog?.briefWeek ?? -1) !== brief.weekOf(Date.now());
+  const mw = p ? Math.min(4, Math.floor((Date.now() - (S.program.blockStart || S.program.start)) / (7 * 864e5)) + 1) : 0, pw = null;
+  $('#planEyebrow').textContent = p ? `${p.name} · month ${S.program.block || 1} · week ${mw} of 4` : 'QK\'s plan for today';
+  renderNews();
+  const known = lifts.filter(r => r.rx), needW = lifts.some(r => r.change === 'new');
+  $('#planTitle').textContent = known.length ? (newWeek ? 'New week. Your weights are set.' : 'Your weights are set') : needW ? 'Pick your starting weights' : `Today: ${programDay()?.day?.name || 'your workout'}`;
+  $('#planSummary').textContent = (brief.summary(known) + (known.length ? ' Based on how your last session went. Just follow the numbers.' : needW ? ' Do your first set and QK plans every one after it.' : ' Tap Start workout and follow QK.')).trim();
   $('#planRows').innerHTML = lifts.map(r => `<button type="button" class="plan-row ${r.change}" data-train="${r.id}"><b>${esc(r.name)}</b><span class="tgt">${esc(r.line)}</span><span class="why">${esc(r.why)}</span><span class="chg">${esc(r.tag || '')}</span>${platesFor(r)}</button>`).join('');
 }
 const platesFor = r => { const pl = r.rx && r.rx.cls?.startsWith('big') ? prog.plates(r.rx.kg, unit()) : null; return pl ? `<span class="plates">${esc(pl.text)}</span>` : ''; };
@@ -1372,6 +1380,51 @@ async function checkReminder() {
 }
 setInterval(checkReminder, 5 * 60e3); document.addEventListener('visibilitychange', () => { if (!document.hidden) checkReminder(); });
 
+/* ---------- Monthly refresh: new month, same formula ---------- */
+const MONTH = 28 * 864e5;
+const inPlan = k => !!activeProgram()?.plan.some(d => d.items.some(it => it[0] === k));
+// Reps done cleanly in the last 4 weeks (form quality for the volume decision).
+const cleanRate = () => { const from = Date.now() - MONTH, xs = S.sessions.filter(x => x.at >= from && !x.demo && !x.guided && x.reps); const r = xs.reduce((a, x) => a + x.reps, 0); return r ? xs.reduce((a, x) => a + Math.min(x.good || 0, x.reps), 0) / r : 1; };
+function rollMonth() {
+  const P = S.program, def = P?.id && programById(P.id); if (!def) return;
+  P.blockStart ||= P.start; P.block ||= 1;
+  if (Date.now() - P.blockStart < MONTH) return;
+  const nb = refresh.nextBlock(def, { block: P.block, plan: P.plan || def.plan }, { lib: LIB, avoid: S.prefs?.avoid || [], compliance: refresh.compliance(P, def.days), clean: cleanRate() });
+  Object.assign(P, { block: nb.block, plan: nb.plan, blockStart: Date.now(), news: { block: nb.block, changes: nb.changes, note: nb.note, seen: false } });
+  persist();
+  say(`Month ${nb.block} of ${def.name} is ready. ${nb.changes.length} new exercises, same formula. ${nb.note}`, { id: 'month_' + nb.block, priority: 'high' });
+}
+function renderNews() {
+  const n = S.program?.news, box = $('#planNews');
+  if (!n || n.seen) { box.hidden = true; return; }
+  box.hidden = false;
+  $('#newsTitle').textContent = `Month ${n.block} is ready: new exercises, same formula`;
+  $('#newsNote').textContent = n.note;
+  $('#newsList').innerHTML = n.changes.slice(0, 6).map(c => `<li>${esc(LIB[c.from]?.name || c.from)} → <b>${esc(LIB[c.to]?.name || c.to)}</b></li>`).join('') + (n.changes.length > 6 ? `<li class="muted">and ${n.changes.length - 6} more</li>` : '');
+}
+$('#newsOk').onclick = () => { if (S.program?.news) { S.program.news.seen = true; persist(); renderNews(); } };
+// Swap an exercise the lifter doesn't like: similar options, and it never comes back in later months.
+$('#swapBtn').onclick = () => {
+  const k = exKey, plan = activeProgram()?.plan; if (!plan) return;
+  const exclude = plan.flatMap(d => d.items.map(it => it[0]));
+  const opts = refresh.alternatives(k, LIB, { avoid: S.prefs?.avoid || [], exclude });
+  if (!opts.length) return toast('No close alternatives for this one.');
+  $('#setup').hidden = true;
+  openSheet(`<div><span class="eyebrow">Swap exercise</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Instead of ${esc(LIB[k].name)}</h2></div>
+    <p class="muted small" style="margin:0">Same muscles, same sets and reps. QK won't bring ${esc(LIB[k].name)} back in later months.</p>
+    <div class="swap-list">${opts.map(id => `<button type="button" class="ghost" data-swapto="${id}"><b>${esc(LIB[id].name)}</b><span>${esc(LIB[id].muscles.slice(0, 3).join(' · '))} · ${esc(LIB[id].equipment)}${LIB[id].pattern ? ' · form check' : ''}</span></button>`).join('')}</div>`);
+  $('#rsheetBody').dataset.swapFrom = k;
+};
+$('#rsheetBody').addEventListener('click', e => {
+  const b = e.target.closest('[data-swapto]'); if (!b) return;
+  const from = $('#rsheetBody').dataset.swapFrom, to = b.dataset.swapto, plan = activeProgram()?.plan; if (!from || !plan) return;
+  S.program.plan = refresh.swapIn(plan, from, to);
+  (S.prefs ||= {}).avoid = [...new Set([...(S.prefs.avoid || []), from])];
+  persist(); closeSheet(); renderToday(); renderPrograms();
+  toast(`Swapped. ${LIB[to].name} from now on.`);
+  openSetup(to);
+});
+
 /* ---------- Programs ---------- */
 // The program's rep target for an exercise on today's program day (feeds the progression engine).
 function programScheme(k) {
@@ -1386,14 +1439,13 @@ function logProgramDay(k) {
 function renderPrograms() {
   const act = activeProgram(), d = programDay();
   $('#progActive').textContent = act ? `On ${act.name} · ${d.doneToday ? 'today done ✓' : 'next: ' + d.day.name}` : '';
-  const list = act ? [act, ...PROGRAMS.filter(p => p !== act)] : PROGRAMS;
-  $('#progStrip').innerHTML = list.map(p => `<button type="button" role="listitem" class="prog-card ${p === act ? 'on' : ''}" data-prog="${p.id}">
-    <span class="pgoal">${esc(p.goal)}${p === act ? ' · active' : ''}</span><b>${esc(p.name)}</b><p>${esc(p.tagline)}</p>
+  const list = act ? [act, ...PROGRAMS.filter(p => p.id !== act.id)] : PROGRAMS;
+  $('#progStrip').innerHTML = list.map(p => `<button type="button" role="listitem" class="prog-card ${p.id === act?.id ? 'on' : ''}" data-prog="${p.id}">
+    <span class="pgoal">${esc(p.goal)}${p.id === act?.id ? ` · month ${S.program.block || 1}` : ''}</span><b>${esc(p.name)}</b><p>${esc(p.tagline)}</p>
     <span class="meta">${p.days} days/week · ${p.weeks} weeks · ~${Math.round(weeklySets(p))} sets/week · ${esc(p.level)}</span></button>`).join('');
 }
 function showProgram(id) {
-  const p = programById(id); if (!p) return;
-  const on = S.program?.id === id;
+  const on = S.program?.id === id, p = on ? activeProgram() : programById(id); if (!p) return;
   openSheet(`<div><span class="eyebrow">${esc(p.goal)} · ${esc(p.level)}</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.4rem">${esc(p.name)}</h2></div>
     <p style="margin:0">${esc(p.tagline)}</p>
     <p class="muted small" style="margin:0"><b>How it works:</b> ${esc(p.method)} QK picks your weights from how each session went.</p>
@@ -1404,7 +1456,7 @@ function showProgram(id) {
 $('#progStrip').onclick = e => { const b = e.target.closest('[data-prog]'); if (b) showProgram(b.dataset.prog); };
 $('#rsheetBody').addEventListener('click', e => {
   const st = e.target.closest('[data-progstart]'), sp = e.target.closest('[data-progstop]');
-  if (st) { S.program = { id: st.dataset.progstart, start: Date.now(), log: [] }; persist(); closeSheet(); renderPrograms(); renderToday(); const p = activeProgram(); toast(`${p.name} started. Day 1 is on your Today screen.`); say(`${p.name}. Let's go. Day one is ready on your Today screen.`, { priority: 'high' }); }
+  if (st) { S.program = { id: st.dataset.progstart, start: Date.now(), blockStart: Date.now(), block: 1, log: [] }; persist(); closeSheet(); renderPrograms(); renderToday(); const p = activeProgram(); toast(`${p.name} started. Day 1 is on your Today screen.`); say(`${p.name}. Let's go. Day one is ready on your Today screen.`, { priority: 'high' }); }
   if (sp) { S.program = null; persist(); closeSheet(); renderPrograms(); renderToday(); toast('Program stopped.'); }
 });
 
@@ -1923,7 +1975,8 @@ if (S.profile.name) {
 // Home-screen shortcut or a shared link: ?calm=now opens Sukoon.
 if (new URLSearchParams(location.search).has('calm') || location.hash === '#calm') { $('#welcome').hidden = true; tab('calm'); startCalmNow(); }
 // First run: three short questions, then straight to Today.
-const obStep = n => { ['ob1', 'ob2', 'ob3'].forEach((id, i) => $('#' + id).hidden = i !== n - 1); $('#obIntro').hidden = n !== 1; };
+const OB_STEPS = ['ob1', 'ob2', 'ob3', 'obGoal', 'obExp'];
+const obStep = n => { const id = typeof n === 'number' ? ['ob1', 'ob2', 'ob3'][n - 1] : n; OB_STEPS.forEach(x => $('#' + x).hidden = x !== id); $('#obIntro').hidden = id !== 'ob1'; };
 $('#welcomeBtn').onclick = () => {
   const nm = $('#welcomeName').value.trim();
   if (nm && !S.profile.name) { S.profile.name = nm; $('#pName').value = nm; persist(); }
@@ -1933,15 +1986,33 @@ $('#welcomeBtn').onclick = () => {
 $('#ob2').onclick = e => {
   const b = e.target.closest('[data-focus]'); if (!b) return;
   S.profile.focus = b.dataset.focus; persist();
-  if (b.dataset.focus === 'train') { drawObDays(); return obStep(3); }
+  if (b.dataset.focus === 'train') { drawObGoals(); return obStep('obGoal'); }
   finishWelcome();
 };
+// Goal → program. People new to lifting get the beginner program where the goal has one.
+let obGoalKey = null;
+function drawObGoals() { $('#obGoals').innerHTML = GOALS.map(g => `<button type="button" data-goal="${g.key}"><b>${esc(g.label)}</b><span>${esc(g.sub)}</span></button>`).join(''); }
+$('#obGoals').onclick = e => {
+  const b = e.target.closest('[data-goal]'); if (!b) return;
+  obGoalKey = b.dataset.goal; S.profile.goal = obGoalKey; persist();
+  if (GOALS.find(g => g.key === obGoalKey)?.beginner) return obStep('obExp');
+  chooseProgram(pickProgram(obGoalKey));
+};
+$('#obExp').onclick = e => { const b = e.target.closest('[data-exp]'); if (!b) return; S.profile.experience = b.dataset.exp; persist(); chooseProgram(pickProgram(obGoalKey, b.dataset.exp === 'new')); };
+function chooseProgram(id) {
+  const p = programById(id); if (!p) return;
+  S.program = { id, start: Date.now(), blockStart: Date.now(), block: 1, log: [] };
+  if (!S.plan.days.length) { S.plan.days = defaultDays(p.days); S.profile.weeklyGoal = p.days; }
+  persist(); drawObDays();
+  $('#obDaysNote').textContent = `QK picked ${p.name}: ${p.tagline} It's ${p.days} days a week, so QK suggested days. Change them to fit your life.`;
+  obStep(3);
+}
 const OB_ORDER = [1, 2, 3, 4, 5, 6, 0], OB_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 function drawObDays() { $('#obDays').innerHTML = OB_ORDER.map(d => `<button type="button" class="day ${S.plan.days.includes(d) ? 'on' : ''}" data-day="${d}" aria-pressed="${S.plan.days.includes(d)}">${OB_NAMES[d]}</button>`).join(''); }
 $('#obDays').onclick = e => { const b = e.target.closest('[data-day]'); if (!b) return; const d = +b.dataset.day, i = S.plan.days.indexOf(d); i >= 0 ? S.plan.days.splice(i, 1) : S.plan.days.push(d); if (S.plan.days.length) S.profile.weeklyGoal = S.plan.days.length; persist(); drawObDays(); };
 $('#obDone').onclick = $('#obSkip').onclick = () => finishWelcome();
 function finishWelcome() {
-  $('#welcome').hidden = true; bindPlan(); tab('today');
+  $('#welcome').hidden = true; bindPlan(); renderPrograms(); renderToday(); tab('today');
   say(`${greeting(S.profile.name)} ${nudgeLine()}`, { id: 'greet', priority: 'high' });
 }
 // The website caches itself for offline use; the native app (native/README.md) ships its files inside, so it skips this.

@@ -63,6 +63,7 @@
 
     <div class="card stack" id="qkPlan" hidden>
       <div class="card-head" style="margin:0"><div><span class="eyebrow" id="planEyebrow">QK's plan for today</span><h2 class="display h2" id="planTitle">Your weights are set</h2></div><button class="linkbtn" type="button" id="planListen" aria-label="Hear the plan"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Hear it</button></div>
+      <div class="news" id="planNews" hidden><b id="newsTitle"></b><p class="muted small" id="newsNote"></p><ul id="newsList"></ul><button class="ghost" type="button" id="newsOk">Got it</button></div>
       <p class="muted small" style="margin:0" id="planSummary"></p>
       <div class="plan-rows" id="planRows"></div>
       <button class="cta" type="button" id="planStart"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Start workout</button>
@@ -447,7 +448,7 @@
     <div class="fit-note" id="fitNote" hidden></div>
     <div class="rx" id="rxBox" hidden>
       <div class="rx-main"><span class="eyebrow" id="rxEyebrow">QK's target today</span><b id="rxLine"></b><p class="plates" id="rxPlates" hidden></p><p class="muted small" id="rxWhy"></p></div>
-      <button class="ghost" type="button" id="rxEdit">Change</button>
+      <div class="rx-btns"><button class="ghost" type="button" id="rxEdit">Change</button><button class="ghost" type="button" id="swapBtn" hidden>Swap</button></div>
       <div class="rx-edit" id="rxEditWrap" hidden><label class="field"><span id="rxEditLbl">Weight</span><input id="rxKg" type="number" inputmode="decimal" step="0.5" min="0"></label><button class="ghost" type="button" id="rxSave">Save</button></div>
     </div>
     <p class="muted small" id="setupLast" style="margin:0"></p>
@@ -635,9 +636,21 @@
     </div>
     <p class="note" style="margin:0">Everything else stays one tap away.</p>
   </div>
+  <div class="ob" id="obGoal" hidden>
+    <h2 class="display h2">What's your goal?</h2>
+    <p class="note" style="margin:0">QK picks your program. You can change it any time on the Train tab.</p>
+    <div class="ob-pick ob-goals" id="obGoals" role="group" aria-label="What's your goal?"></div>
+  </div>
+  <div class="ob" id="obExp" hidden>
+    <h2 class="display h2">How long have you been lifting weights?</h2>
+    <div class="ob-pick" role="group" aria-label="How long have you been lifting weights?">
+      <button type="button" data-exp="new"><b>New, or under 6 months</b><span>QK starts you on the basics and adds weight every session</span></button>
+      <button type="button" data-exp="trained"><b>6 months or more</b><span>QK gives you a full program for your goal</span></button>
+    </div>
+  </div>
   <div class="ob" id="ob3" hidden>
     <h2 class="display h2">Which days will you train?</h2>
-    <p class="note" style="margin:0">Pick the days you can really make. People who plan their days are far more likely to keep going.</p>
+    <p class="note" style="margin:0" id="obDaysNote">Pick the days you can really make. People who plan their days are far more likely to keep going.</p>
     <div class="days" id="obDays"></div>
     <button class="cta" type="button" id="obDone">Done</button>
     <button class="linkbtn" type="button" id="obSkip">Skip for now</button>

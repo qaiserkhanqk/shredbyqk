@@ -23,7 +23,8 @@ export function alternatives(id, lib, { avoid = [], exclude = [], n = 6 } = {}) 
     return s;
   };
   return Object.values(lib)
-    .filter(x => x.id !== id && !x.rehab && !avoid.includes(x.id) && !exclude.includes(x.id) && (me.pattern ? x.pattern === me.pattern : (x.kind || 'gym') === (me.kind || 'gym')))
+    // Same type of training (HYROX with HYROX, Olympic with Olympic) and, for camera lifts, the same movement.
+    .filter(x => x.id !== id && !x.rehab && !avoid.includes(x.id) && !exclude.includes(x.id) && (x.kind || 'gym') === (me.kind || 'gym') && (!me.pattern || x.pattern === me.pattern))
     .map(x => ({ id: x.id, s: score(x) }))
     .filter(x => x.s >= 4)
     .sort((a, b) => b.s - a.s || a.id.localeCompare(b.id))
@@ -43,6 +44,8 @@ export function repsFor(reps, phase) {
 }
 
 const KEEP_MAIN = ['Powerlifting', 'Olympic lifting', 'Gains'];
+// Race stations and run sessions are the sport itself: they keep their place, only reps and volume move.
+const FIXED_KINDS = ['hyrox', 'run'];
 
 /**
  * Build the next block.
@@ -62,7 +65,7 @@ export function nextBlock(def, cur, { lib, avoid = [], compliance = 1, clean = 1
     const items = day.items.map((it, ii) => {
       const orig = base.items[ii] || it;
       let id = it[0];
-      if (!(keepMain && ii === 0)) {
+      if (!(keepMain && ii === 0) && !FIXED_KINDS.includes(lib[orig[0]]?.kind)) {
         // Rotate through the original exercise and its close alternatives, never repeating last month's.
         const pool = [orig[0], ...alternatives(orig[0], lib, { avoid, n: 4 })].filter(x => !avoid.includes(x) && lib[x]);
         const next = pool.find(x => x !== it[0] && !used.has(x)) || it[0];
@@ -70,8 +73,9 @@ export function nextBlock(def, cur, { lib, avoid = [], compliance = 1, clean = 1
       }
       let sets = orig[1];
       const main = ii < 2;
-      if (volume === 'less' && !main) sets = Math.max(2, sets - 1);
-      if (volume === 'more' && main && sets < 10) sets += 1;
+      // Single-session items (a run, a timed piece) keep one set; volume moves on the set-based work.
+      if (volume === 'less' && !main && sets > 2) sets -= 1;
+      if (volume === 'more' && main && sets > 1 && sets < 10) sets += 1;
       return [id, sets, repsFor(orig[2], phase), orig[3], orig[4]].filter((x, k) => k < 4 || x);
     });
     return { ...day, items };

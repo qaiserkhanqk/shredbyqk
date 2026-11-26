@@ -34,6 +34,11 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.fill('#welcomeName', 'Sara'); await p.click('#welcomeBtn');
   check('first run: asks what they want help with', await p.isVisible('[data-focus=train]') && await p.isVisible('[data-focus=recover]') && await p.isVisible('[data-focus=calm]'));
   await p.click('[data-focus=train]');
+  check('first run: asks their goal', await p.isVisible('#obGoals') && (await p.$$('#obGoals [data-goal]')).length >= 10);
+  await p.click('[data-goal=muscle]');
+  check('first run: asks how long they have been lifting', await p.isVisible('[data-exp=new]'));
+  await p.click('[data-exp=trained]');
+  check('first run: picks the program and suggests days', /Hypertrophy Lab/.test(await p.textContent('#obDaysNote')), await p.textContent('#obDaysNote'));
   check('first run: training → asks which days', await p.isVisible('#obDays'));
   await p.click('#obDays [data-day="1"]'); await p.click('#obDays [data-day="3"]'); await p.click('#obDone');
   check('today: greets by name', /Sara/.test(await p.textContent('#hello')));
@@ -308,7 +313,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('programs: starting one shows it as active', /On Power & Pump/.test(await p.textContent('#progActive')), await p.textContent('#progActive'));
   await go('today');
   check("programs: day 1 is today's workout", /Barbell Bench Press[\s\S]*4×4-6/.test(await p.textContent('#todayList')));
-  check("QK's plan: today's lifts are listed with what to do", await p.isVisible('#qkPlan') && /Power & Pump · week 1 of 10/.test(await p.textContent('#planEyebrow')) && /Barbell Bench Press/.test(await p.textContent('#planRows')), await p.textContent('#qkPlan'));
+  check("QK's plan: today's lifts are listed with what to do", await p.isVisible('#qkPlan') && /Power & Pump · month 1 · week 1 of 4/.test(await p.textContent('#planEyebrow')) && /Barbell Bench Press/.test(await p.textContent('#planRows')), await p.textContent('#qkPlan'));
   await go('train'); await tap('[data-prog=powerPump]'); await p.click('[data-progstop]'); await p.waitForTimeout(200);
 
   // One-tap workout: Start workout opens the first exercise's setup with its target filled in.
@@ -320,7 +325,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await go('progress'); await p.click('#planCard summary').catch(() => {});
   const [icsDl] = await Promise.all([p.waitForEvent('download', { timeout: 4000 }).catch(() => null), p.click('#remindCal')]);
   const ics = icsDl ? fs.readFileSync(await icsDl.path(), 'utf8') : '';
-  check('reminders: calendar file repeats on the training days', /RRULE:FREQ=WEEKLY;BYDAY=MO,WE/.test(ics), ics.slice(0, 80));
+  check('reminders: calendar file repeats on the training days', /RRULE:FREQ=WEEKLY;BYDAY=TU,FR,SA/.test(ics), ics.slice(0, 80));
 
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();
