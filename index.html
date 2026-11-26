@@ -412,6 +412,17 @@
       </div>
     </details>
 
+    <details class="card" id="coachLink" hidden>
+      <summary>Your coach</summary>
+      <div class="stack" style="margin-top:14px">
+        <p class="muted small" style="margin:0" id="clStatus">Connect to your coach so they can see your training and cheer you on. Only numbers are shared (sets, reps, weights, form scores). Your videos never leave your phone.</p>
+        <div class="stack" id="clStep1"><label class="field">Your email<input id="clEmail" type="email" autocomplete="email" placeholder="you@example.com"></label><button class="cta" type="button" id="clSend">Email me a code</button></div>
+        <div class="stack" id="clStep2" hidden><label class="field">6-digit code from the email<input id="clCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></label><button class="cta" type="button" id="clVerify">Confirm</button></div>
+        <div class="stack" id="clStep3" hidden><label class="field">Your coach's invite code<input id="clInvite" autocapitalize="characters" placeholder="e.g. QK7F3A"></label><button class="cta" type="button" id="clJoin">Connect</button></div>
+        <button class="linkbtn" type="button" id="clOut" hidden>Disconnect from this phone</button>
+      </div>
+    </details>
+
     <details class="card" id="studioCard">
       <summary>Studio: record QK's voice</summary>
       <div class="stack" style="margin-top:14px">
