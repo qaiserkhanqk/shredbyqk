@@ -49,6 +49,14 @@ Irregular cycles (shortest-to-longest variation above the pre-registered thresho
 - **Q3:** sensitivity and specificity against the reference, including anovulatory cycles; the distribution of timing error. It is reported as **retrospective** detection only.
 - **Q5:** false alerts per cycle are a primary metric; an extra feature must not add alert burden without benefit.
 - Missing data: report it as observed. Run sensitivity analyses only as secondary.
+- **Band-data freshness (provisional, must be validated before a pilot):**
+  - The setting is `ADJUST_PARAMS.MAX_MISSING_RECENT_NIGHTS = 3` in `js/cycle/adjust.js`. After more than 3 nights in a row without a usable overnight reading, the band-adjusted estimate stops using band data and shows the logged-period estimate.
+  - The value matches the gap the temperature rule already tolerates; it is a data-continuity choice, **not a clinical threshold**.
+  - Before a pilot, measure with the actual band:
+    - how often usable nights go missing in normal wear;
+    - how Q2 accuracy changes as the limit varies, for example 1–7 nights;
+    - how often the estimate drops back to dates only.
+  - Pre-register the value used.
 
 ## 6. Decision rules
 - Turn on **symptomForecast** only if Q5 beats both personal baselines on precision **and** false alerts per cycle.

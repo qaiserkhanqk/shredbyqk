@@ -13,7 +13,7 @@ import { readFlags, setFlag, FLAG_DEFS } from './flags.js';
 import { clinicianSummary, summaryText, SUMMARY_MONTHS } from './summary.js';
 import { learningStage } from './learning.js';
 import { companionToday, answerCheckIn, dismissCompanion, setCompanionName, companionName } from './companion.js';
-import { adjustedEstimate } from './adjust.js';
+import { adjustedEstimate, cardLines } from './adjust.js';
 import * as PG from './pregnancy.js';
 import { midlifeObservations, SOURCES as MIDLIFE_SOURCES, INTRO as MIDLIFE_INTRO } from './midlife.js';
 import { comfortSuggestions, pendingComfortQuestions, logComfortTry, answerComfort, deleteComfort, ANSWERS, REVIEW_STATUS } from './comfort.js';
@@ -160,10 +160,12 @@ function dueHTML(s, est, today, nowMin) {
 /* Band-adjusted estimate (js/cycle/adjust.js, research flag temperatureEstimate). Shown next to the dates-only estimate,
    never instead of it, and labelled as research with the evidence stated (synthetic only). */
 function adjustHTML(s, today) {
-  const a = adjustedEstimate(s, today);
-  const range = a.status === 'adjusted' ? `<div class="num cy-range">${a.singleDate ? human(a.rangeStart) : `${human(a.rangeStart)} – ${human(a.rangeEnd)}`}</div>` : '';
-  return `<div class="card stack" id="cyAdjusted"><span class="eyebrow">Band-adjusted estimate · research</span>${range}
-    <p class="small">${esc(a.text)}</p>${a.fallback ? `<p class="small" id="cyAdjustedFallback"><b>${esc(a.fallback.text)}</b></p>` : ''}<p class="muted small">${esc(a.why)}</p></div>`;
+  const l = cardLines(adjustedEstimate(s, today));
+  return `<div class="card stack" id="cyAdjusted"><span class="eyebrow">Band-adjusted estimate · research</span>${l.range ? `<div class="num cy-range">${esc(l.range)}</div>` : ''}
+    ${l.overdue ? `<p class="small cy-alert" id="cyAdjustedOverdue"><b>${esc(l.overdue)}</b></p>` : ''}
+    <p class="small">${esc(l.text)}</p>${l.fallback ? `<p class="small" id="cyAdjustedFallback"><b>${esc(l.fallback)}</b></p>` : ''}
+    ${l.askToLog ? '<button class="ghost" type="button" data-act="goLog">Log my period</button>' : ''}
+    ${l.lastReading ? `<p class="muted small" id="cyAdjustedLastReading">${esc(l.lastReading)}</p>` : ''}<p class="muted small">${esc(l.why)}</p></div>`;
 }
 
 function estimateHTML(s, est) {
@@ -452,6 +454,7 @@ async function onClick(e) {
     pregEndedAck: () => act(s => { const l = s.pregnancies?.at(-1); if (l) l.ackd = true; }),
     ppEnd: () => act(s => PG.finishPostpartum(s), 'Postpartum mode is off'),
     pregDelete: () => { if (!confirm('Delete all your pregnancy and postpartum records, including those symptoms? This can\'t be undone.')) return; return act(s => PG.deletePregnancyRecords(s), 'Pregnancy records deleted'); },
+    goLog: () => { const el = root.querySelector('#cyLog'); el?.scrollIntoView?.({ block: 'start' }); el?.querySelector('#cyDate')?.focus(); }, // she logs it; nothing is logged for her
     companionName: () => { const v = root.querySelector('#cyCompanionName')?.value ?? ''; return act(s => setCompanionName(s, v), 'Name saved'); },
     comfortTry: () => act((s, t) => logComfortTry(s, t, ds.opt, { today: t }), 'Noted. You can tell us later whether it helped.'),
     comfortAnswer: () => act(s => answerComfort(s, ds.id, ds.ans), 'Thanks, noted'),

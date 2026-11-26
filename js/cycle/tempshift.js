@@ -27,6 +27,9 @@ export const SHIFT_PARAMS = Object.freeze({ BASELINE: 6, CONFIRM: 3, DELTA: 0.15
 // 0.4.0 (competitor-gap work): nights marked with alcohol, a late night or a hot or cold room are left out too, as
 // unwell and travelling nights already were. The detection rule is unchanged.
 export const SHIFT_VERSION = 'three-over-six-skin-0.4.0-night-aggregated-onset-interval-disruptors-research';
+/** The data-quality rules this rule applies to a night, as one test (used for band-data freshness in adjust.js):
+ *  a skin-temperature night with status 'ok', a value, no time-zone change, and not marked disturbed by the user. */
+export const isUsableNight = (s, n) => n.metric === 'skin_temp' && n.status === 'ok' && n.value != null && !(n.flags || []).includes('tz_change') && !nightDisrupted(s, n.night);
 const BASELINE_LIMIT = 'This rule cannot see a rise that begins while its 6-night baseline is still forming.';
 
 export function retrospectiveShift(s, cycleStart, asOf, params = SHIFT_PARAMS) {
