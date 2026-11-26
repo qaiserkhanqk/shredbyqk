@@ -1,0 +1,8 @@
+FAIL in her range: "Has your period started?" with today / yesterday / 2 days ago / another day  — Has your period started?You're in your estimated range. Only you can tell us; a missing entry is never read as "no bleeding". Yes, todaySpotting onlyNot yetAsk later
+FAIL run completed  — page.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('#cyCheck [data-act=logStartOn][data-date="2026-11-25"]')[22m
+
+    at /home/user/shredbyqk/tests/cycle-ui-checkins.cjs:34:15
+ok   no JavaScript errors
+2 FAILED of 3
