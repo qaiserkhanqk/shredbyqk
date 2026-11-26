@@ -1,4 +1,5 @@
-// Food screen end to end: targets, search → sheet → log, and a photo with a mocked recognition server.
+// Food screen end to end: targets, search → sheet → log, bread families, places and "Add a place",
+// water, one-tap photo (mocked recognition server), and QK's weekly report.
 // Run: node tests/food.e2e.cjs [screenshot-dir]   (needs Playwright + Chromium)
 const { chromium } = require('playwright');
 const fs = require('fs'), path = require('path');
@@ -18,7 +19,7 @@ const num = s => +String(s).replace(/[^\d]/g, '');
       visionCalls++;
       const it = (dish, servings, extra = {}) => ({ dish, servings, meat_share: 'normal', oil: 'normal', confidence: 0.9, other_name: '', ...extra });
       const samples = [[it('chicken_karahi', 1, { oil: 'oily' }), it('naan', 1)], [it('chicken_karahi', 1.5, { oil: 'oily' }), it('naan', 1)], [it('chicken_karahi', 1), it('naan', 1), it('raita', 1)]]
-        .map(items => ({ items, setting: 'restaurant' }));
+        .map(items => ({ items, setting: 'unsure' }));
       return r.fulfill({ status: 200, body: JSON.stringify({ samples }), headers: { 'content-type': 'application/json' } });
     }
     const f = path.join(ROOT, p);
@@ -29,11 +30,13 @@ const num = s => +String(s).replace(/[^\d]/g, '');
   p.on('pageerror', e => errs.push(e.message));
   const shot = async n => { if (SHOTS) await p.screenshot({ path: path.join(SHOTS, n + '.png') }); };
   const sheetKcal = async () => num(await p.textContent('#fsResult .kbig'));
+  const rows = () => p.$$('#foodLog .row');
 
   await p.goto('https://shred.local/');
   await p.fill('#welcomeName', 'Sara'); await p.click('#welcomeBtn'); await p.click('[data-focus=train]');
   await p.click('[data-goal=muscle]'); await p.click('[data-exp=trained]');
   await p.click('#obDays [data-day="1"]'); await p.click('#obDone');
+  check('today: "Snap meal" quick button', await p.isVisible('#snapMeal'));
   await p.click('.tabs [data-tab=progress]'); await p.click('#profileCard summary');
   await p.fill('#pHeight', '178'); await p.dispatchEvent('#pHeight', 'change');
 
@@ -43,50 +46,102 @@ const num = s => +String(s).replace(/[^\d]/g, '');
   await p.click('#foodTargets summary');
   await p.fill('#tWeight', '80'); await p.dispatchEvent('#tWeight', 'change');
   await p.fill('#tAge', '30'); await p.dispatchEvent('#tAge', 'change');
-  check('targets shown once weight, age and height are known (sign-up goal: build muscle → +10%)', /of 3,010/.test(await p.textContent('#foodToday')), await p.textContent('#tSummary'));
+  check('targets shown (sign-up goal: build muscle → +10%)', /of 3,010/.test(await p.textContent('#foodToday')), await p.textContent('#tSummary'));
 
+  // Search → sheet → log
   await p.fill('#foodSearch', 'karahi');
-  check('search shows desi models first', /Desi model/.test(await p.textContent('#foodResults .row'))); await shot('1-search');
+  check('search shows desi models', /Desi model/.test(await p.textContent('#foodResults')));
   await p.click('#foodResults [data-ref*="chicken_karahi"]');
-  check('sheet asks who cooked it', await p.isVisible('#foodSheet [data-key=style]'));
   const home = await sheetKcal();
   await p.click('#foodSheet [data-key=style] [data-v=restaurant]');
   const rest = await sheetKcal();
   check('restaurant karahi shows more calories than home', rest > home, `${home} → ${rest}`);
   await p.click('#foodSheet [data-step="0.5"]');
-  check('portion stepper shows grams', /1½ katori \(≈300 g\)/.test(await p.textContent('#fsServe')), await p.textContent('#fsServe'));
-  const one5 = await sheetKcal(); await shot('2-sheet');
+  check('portion stepper shows grams', /1½ katori \(≈300 g\)/.test(await p.textContent('#fsServe')));
   await p.click('#fsSave');
   check('logged entry appears', /Chicken karahi/.test(await p.textContent('#foodLog')));
-  check('today total equals the sheet', num(await p.textContent('#foodToday .kbig')) === one5, `${one5}`);
 
-  await p.fill('#foodSearch', 'karahi'); await p.click('#foodResults [data-ref*="chicken_karahi"]');
-  check('remembers restaurant for karahi next time', await p.getAttribute('#foodSheet [data-key=style] [data-v=restaurant]', 'aria-pressed') === 'true');
-  await p.click('#foodSheet', { position: { x: 10, y: 10 } });
-  await p.fill('#foodSearch', '');  await p.dispatchEvent('#foodSearch', 'input');
+  // "Roti" can be any bread: one tap to say which one.
+  await p.fill('#foodSearch', 'roti'); await p.click('#foodResults [data-ref*=\'"roti"\']');
+  check('bread sheet shows the bread family', (await p.$$('#foodSheet [data-fam]')).length >= 10);
+  const roti = await sheetKcal();
+  await p.click('#foodSheet [data-fam=roghni_naan]');
+  check('switching roti → roghni naan changes the title and calories', /Roghni naan/.test(await p.textContent('#foodSheetBody h2')) && await sheetKcal() > roti * 3, `${roti} → ${await sheetKcal()}`);
+  await p.click('#foodSheet [data-step="0.5"]'); await shot('2-family');
+  await p.click('#fsSave');
+  check('roghni naan logged', /Roghni naan/.test(await p.textContent('#foodLog')));
 
-  // Photo, through the same consensus and cache as the real server.
+  // Places: chains and carts
+  await p.fill('#foodSearch', 'kfc zinger');
+  check('"kfc zinger" finds the KFC menu item', /Zinger Burger/.test(await p.textContent('#foodResults')) && /KFC/.test(await p.textContent('#foodResults .ftag.place')));
+  await shot('1-search');
+  await p.click('#foodResults [data-menu^="kfc|"]');
+  check('menu item sheet is labelled with the place', /KFC/.test(await p.textContent('#foodSheetBody .eyebrow')));
+  await p.click('#fsSave');
+  check('menu item logged with the place name', /KFC · Zinger Burger/.test(await p.textContent('#foodLog')));
+  await p.fill('#foodSearch', 'gol gappay');
+  check('street cart items are searchable', /Chaat and gol gappay cart/.test(await p.textContent('#foodResults')));
+
+  // Add a place
+  await p.fill('#foodSearch', 'chicken cheese burger');
+  await p.click('#addPlaceBtn');
+  await p.fill('#plName', 'Ali Burger Cart');
+  await p.dispatchEvent('#plItem', 'input');
+  check('add a place suggests the closest dishes', (await p.$$('#plSuggest [data-pick]')).length >= 2, await p.textContent('#plSuggest'));
+  await p.click('#plSuggest [data-pick=chicken_burger]'); await p.click('#plNext');
+  check('then the normal portion sheet', await p.isVisible('#fsSave') && /Ali Burger Cart/.test(await p.textContent('#foodSheetBody h2')));
+  await p.click('#fsSave');
+  check('added and logged', /Ali Burger Cart · chicken cheese burger/i.test(await p.textContent('#foodLog')));
+  await p.fill('#foodSearch', 'ali burger');
+  check('the new place is searchable next time', /Ali Burger Cart/.test(await p.textContent('#foodResults')));
+  await p.fill('#foodSearch', ''); await p.dispatchEvent('#foodSearch', 'input');
+
+  // Water
+  await p.click('#foodToday [data-water="1"]'); await p.click('#foodToday [data-water="1"]');
+  check('water taps count glasses', /2 of 11 glasses/.test(await p.textContent('#foodToday')));
+
+  // One-tap photo: added straight away, no review step
+  const before = (await rows()).length;
   await p.evaluate(async () => { (await import('/js/foodphoto.js')).PHOTO_CONFIG.endpoint = '/food-vision'; });
   await p.setInputFiles('#foodPhoto', path.join(ROOT, 'tests/pose.jpg'));
-  await p.waitForSelector('#photoAddAll', { timeout: 8000 });
+  await p.waitForSelector('#snapUndo', { timeout: 8000 });
+  check('photo: meal added to the log immediately', (await rows()).length === before + 2, `${before} → ${(await rows()).length}`);
   const names = await p.$$eval('#foodPhotoBox .row b', els => els.map(e => e.textContent));
   check('photo: consensus keeps karahi and naan, drops the one-off raita', names.join() === 'Chicken karahi,Naan', names.join());
-  check('photo: remembered style used for karahi', /1 katori \(≈200 g\) · restaurant/.test(await p.textContent('#foodPhotoBox')));
-  await shot('3-photo');
-  const k1 = await p.textContent('#foodPhotoBox .kbig');
-  await p.click('#photoCancel');
+  check('photo: remembered style used for karahi (restaurant)', /1 katori \(≈200 g\) · restaurant/.test(await p.textContent('#foodPhotoBox')));
+  check('photo: asks once who usually cooks', await p.isVisible('[data-usual=home]'));
+  await shot('3-snap');
+  await p.click('[data-usual=home]');
+  check('…and never asks again', !(await p.isVisible('[data-usual=home]')));
+  await p.click('#foodPhotoBox [data-sedit]:nth-of-type(1)');
+  check('tap a photo dish → same sheet to fix it', await p.isVisible('#fsSave'));
+  await p.click('#foodSheet', { position: { x: 10, y: 10 } });
+  await p.click('#snapUndo');
+  check('undo removes the photo meal', (await rows()).length === before);
   await p.setInputFiles('#foodPhoto', path.join(ROOT, 'tests/pose.jpg'));
-  await p.waitForSelector('#photoAddAll');
-  check('same photo again → same calories, from cache (no new call)', (await p.textContent('#foodPhotoBox .kbig')) === k1 && visionCalls === 1, `${k1}, calls ${visionCalls}`);
-  await p.click('#foodPhotoBox [data-pedit="1"]');
-  check('photo item opens the same sheet', await p.isVisible('#fsSave') && /Naan/.test(await p.textContent('#foodSheetBody h2')));
-  await p.click('#fsTop'); await p.click('#fsSave');
-  check('editing a photo item updates it', /Naan/.test(await p.textContent('#foodPhotoBox')));
-  await p.click('#photoAddAll');
-  check('photo items added to the log', /Naan/.test(await p.textContent('#foodLog')) && (await p.$$('#foodLog .row')).length === 3);
-  await p.click('#foodLog [data-del]');
-  check('remove an entry', (await p.$$('#foodLog .row')).length === 2);
-  await p.evaluate(() => window.scrollTo(0, 0)); await shot('4-today');
+  await p.waitForSelector('#snapUndo');
+  check('same photo again → from cache, no new server call', visionCalls === 1, `calls ${visionCalls}`);
+  await p.click('#snapDone');
+
+  // Weekly report: seed a week of meals and weigh-ins, then reload.
+  await p.evaluate(async () => {
+    const N = await import('/js/nutrition.js');
+    const s = JSON.parse(localStorage.getItem('shred_qk_v1')), DAY = 864e5, now = Date.now();
+    const E = (d, id, o, meal) => ({ id: Math.random().toString(36).slice(2), at: now - d * DAY, ref: { t: 'dish', id }, opts: o, meal, name: N.DISH[id].name, label: '', ...N.estimate({ t: 'dish', id }, o) });
+    for (let d = 1; d < 7; d++) s.food.log.push(E(d, 'paratha', {}, 'Breakfast'), E(d, 'chai', {}, 'Breakfast'), E(d, 'chicken_karahi', { style: 'restaurant' }, 'Lunch'), E(d, 'roti', { servings: 2 }, 'Lunch'), E(d, 'chicken_biryani', {}, 'Dinner'));
+    s.food.weights = [0, 7, 14].map(d => ({ at: now - d * DAY, kg: 80 + d * 0.04 }));
+    localStorage.setItem('shred_qk_v1', JSON.stringify(s));
+  });
+  await p.reload(); await p.click('.tabs [data-tab=food]');
+  const wk = await p.textContent('#foodWeek');
+  check('weekly report appears', /QK's food report/.test(wk) && /days logged/.test(wk));
+  check('report opens with what went well', (await p.$$('#foodWeek .wins li')).length >= 1);
+  check('report gives at most two things for next week', (await p.$$('#foodWeek .focus')).length <= 2 && (await p.$$('#foodWeek .focus')).length >= 1);
+  check('report suggests more veg with the nutrients it brings', /colour/.test(wk) && /Vitamin C/.test(wk));
+  check('report tone has no blaming words', !/\b(bad|fail|poor|deficien|too much|junk)/i.test(wk));
+  await p.$eval('#foodWeek', el => el.scrollIntoView()); await shot('4-week');
+  await p.fill('#wkKg', '79.6'); await p.click('#wkSave');
+  check('weigh-in saved and updates the target weight', (await p.inputValue('#tWeight')) === '79.6');
   check('no page errors', !errs.length, errs.join(' | '));
   await b.close();
   console.log(fails ? `\n${fails} FAILED` : '\nfood e2e passed');

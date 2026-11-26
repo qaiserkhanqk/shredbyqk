@@ -28,6 +28,9 @@ For each separate food you can see:
   samosas, eggs and pieces one by one. For curries and rice judge volume against the plate or bowl:
   a katori is about 200 g (a small bowl, about 1 cup); a full dinner plate of rice is about 300 g. Use halves (0.5, 1.5).
   If only part of a roti or naan is left, count what is left.
+  Be exact about breads, they differ a lot: a thin phulka, a roti/chapati, a big tandoori roti, a naan, a roghni naan
+  (glossy with sesame), a kulcha, taftan or sheermal (sweet, yellowish), a paratha (layered, oily sheen) or a puri (puffed, fried).
+  Fast food counts too: burgers, fried chicken, fries, pizza slices, shawarma and rolls are in the catalogue.
 - meat_share (curries and rice with meat only, else "na"): "more" if the serving is mostly meat pieces,
   "less" if it is mostly gravy or rice with few pieces, else "normal".
 - oil (cooked dishes only, else "na"): "oily" if you can see a layer of oil (tarri) on top or pooled at the edge,
