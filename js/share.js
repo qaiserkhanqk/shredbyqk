@@ -13,8 +13,10 @@ export const lastLoadText = l => l ? `Last time: ${+l.kg} kg × ${l.reps}` : '';
 const DAY = 864e5;
 const scoreOf = list => { list = list.filter(s => !s.guided && !s.edited && !s.demo); const r = list.reduce((a, s) => a + s.reps, 0); return r ? Math.round(list.reduce((a, s) => a + s.good, 0) / r * 100) : null; };
 
+import { earnedBetween } from './rewards.js';
+
 // Plain-text summary of the last 7 days, to send to the coach. Text only: no video, no body points.
-export function weekSummary(S, { now = Date.now(), faultName = id => id, light = null } = {}) {
+export function weekSummary(S, { now = Date.now(), faultName = id => id, light = null, isHold = null } = {}) {
   const from = now - 7 * DAY, prevFrom = from - 7 * DAY;
   const sets = (S.sessions || []).filter(s => s.at >= from && !s.demo), prevSets = (S.sessions || []).filter(s => s.at >= prevFrom && s.at < from && !s.demo);
   const days = new Set([...sets, ...(S.checkins || []).filter(c => c.at >= from)].map(s => new Date(s.at).toDateString())).size;
@@ -37,9 +39,16 @@ export function weekSummary(S, { now = Date.now(), faultName = id => id, light =
     score != null ? `Form score ${score}%${prev != null ? ` (last week ${prev}%)` : ''}` : null,
     top ? `Most common fault: ${faultName(top[0])} (${top[1]}×)` : null,
     prs.length ? `New best weights: ${prs.join(', ')}` : null,
+    rewardLine(earnedBetween(S.sessions || [], from, now + 1, isHold)),
     ready ? `Readiness check-ins: ${ready}` : null,
     light ? `Rehab pain light: ${light}` : null,
     calm.length ? `Sukoon sessions: ${calm.length}` : null,
   ];
   return lines.filter(Boolean).join('\n');
+}
+
+// Rewards this week, so the coach knows who to cheer on.
+function rewardLine(r) {
+  const parts = [...r.tiers.map(t => `${t.name} (${t.n} clean reps)`), r.perfect ? `${r.perfect} perfect set${r.perfect === 1 ? '' : 's'}` : null].filter(Boolean);
+  return parts.length ? `Rewards earned: ${parts.join(', ')}` : null;
 }

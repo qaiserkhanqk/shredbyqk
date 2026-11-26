@@ -19,6 +19,8 @@ import { LIBRARY, LIB, MUSCLES, KINDS, exFor } from './library.js';
 import { HipThrustDemo, SquatDemo, BenchDemo, WalkDemo, BodyMapDemo, BODYMAP_SECS, BODYMAP_DEMO_STEPS, DEMO_W, DEMO_H } from './demo.js';
 import { analyseBodyMap, personalFor, explainBodyMap, fitLines } from './bodymap.js';
 import { FormFX, drawDepthArc } from './fx.js';
+import { TrackHUD } from './hud.js';
+import * as rewards from './rewards.js';
 import { ExerciseDetector, PICK_LIST } from './detect.js';
 import { initCalm, renderCalm, startCalmNow } from './calm.js';
 import { WEIGHTED, lastLoad, lastLoadText, weekSummary } from './share.js';
@@ -281,6 +283,7 @@ let exKey = 'hipThrust';
 // Simulated demo lifters are for automated tests only: hidden unless ?demo or localStorage qk_demo=1.
 const DEMO = (() => { try { return /[?&]demo\b/.test(location.search) || localStorage.getItem('qk_demo') === '1'; } catch { return false; } })();
 const curEx = () => exFor(exKey);
+const isHoldId = id => !!exFor(id)?.hold;
 function openSetup(k) {
   exKey = k; const item = LIB[k], ex = exFor(k);
   $('#setupEyebrow').textContent = `${item.name} · set ${setsToday(k) + 1}`;
@@ -319,6 +322,18 @@ $('#videoFile').onchange = e => { const f = e.target.files[0]; e.target.value = 
 let live = null, fb = null, engine = null, stream = null, recorder = null, chunks = [], facing = 'user', raf = 0;
 const smooth = new Smoother(0.55);
 const fx = new FormFX();
+// Visible tracking: lock-on scan, body brackets, rep read-out and the LIVE chip (see hud.js).
+const hud = new TrackHUD();
+let chipT = 0;
+function hudFrame(ctx, px, s, t, seen) {
+  const mirror = $('#viewport').classList.contains('mirror');
+  hud.draw(ctx, px, s, t, { mirror, seen });
+  if (t - chipT > 500) {
+    chipT = t; const el = $('#trackChip');
+    el.classList.toggle('on', hud.locked);
+    el.innerHTML = hud.locked ? `<i></i>Live · ${hud.points(px)} points · ${hud.fps()} fps` : '<i></i>Finding you…';
+  }
+}
 const motion = new MotionTracker();
 
 // Keep the screen on during a set and the rest after it, so the phone doesn't lock mid-session.
@@ -340,9 +355,9 @@ async function startLive({ mode, source, file, auto = false }) {
   live = { mode, source, frames: [], t0: null, lost: 0, wrong: 0, demo: null, done: false, steps: 0, mPerPx: null, standFrames: [], times: [],
     auto, det: auto ? new ExerciseDetector() : null, buf: [], sets: [], lastRepT: 0 };
   bar.reset(); recorder2.start({ kind: mode, exercise: mode === 'form' && !auto ? exKey : undefined, gaitMode: mode === 'gait' ? gaitMode : undefined, source, loadKg: mode === 'form' ? parseFloat($('#loadKg').value) || null : undefined });
-  engine = null; fb = null; smooth.reset(); motion.reset(); fx.reset(); comp = null; recorder = null; $('#faultBanner').hidden = true;
+  engine = null; fb = null; smooth.reset(); motion.reset(); fx.reset(); hud.reset(); comp = null; recorder = null; $('#trackChip').innerHTML = '<i></i>Finding you…'; $('#trackChip').classList.remove('on'); $('#faultBanner').hidden = true;
   $('#formMeters').hidden = mode !== 'form'; $('#gaitMeters').hidden = mode === 'form';
-  $('#repBig').hidden = mode !== 'form'; $('#cueHint').hidden = mode !== 'form';
+  $('#repBig').hidden = mode !== 'form'; $('#trackChip').hidden = mode !== 'form'; $('#cueHint').hidden = mode !== 'form';
   $('#repNum').textContent = '0'; $('#repLbl').textContent = ex?.hold ? 'seconds' : 'reps'; $('#dots').innerHTML = ''; $('#cleanCt').textContent = '0 clean'; $('#vlKnob').style.left = '0%'; $('#vlTxt').textContent = 'fresh';
   $('#gSteps').textContent = '0'; $('#gProg').style.width = '0'; $('#gStepsLbl').textContent = mode === 'gait' ? 'Steps seen' : 'Time';
   const testName = { rom: TEST.rom?.label || 'Measurement', gait: `Gait · ${gaitMode === 'run' ? 'running' : 'walking'}`, jump: 'Jump test', sls: 'Single-leg squat knee test', bodymap: 'Map my body' };
@@ -481,6 +496,7 @@ function formFrame(px, ctx, t) {
     const shoulderRehab = S.rehab?.active && COND[S.rehab.active.cond]?.area === 'Shoulder';
     if (shoulderRehab && ex.patternKey === 'vPull') live.P = { ...(live.P || {}), lockElbow: Math.min(live.P?.lockElbow ?? 155, 140), upT: Math.min(live.P?.upT ?? 150, 135) };
     engine = new RepEngine(ex, ex.view === 'either' ? view : ex.view, live.P); fb = new FeedbackCoach();
+    live.cleanBase = rewards.lifetimeClean(S.sessions, isHoldId); // reward milestones count from here
   }
   const raw = ex.metrics(px, engine.view), m = { ...raw };
   for (const k of ['knee', 'hip', 'elbow', 'torsoLean', 'heelLift', 'shY', 'hipY']) if (raw[k] != null) m[k] = smooth.push(k, raw[k]);
@@ -488,7 +504,7 @@ function formFrame(px, ctx, t) {
   // Confidence gate: low-confidence landmarks give wrong angles, so stay quiet instead.
   if (raw.s.conf < 0.55) {
     if (++live.lost === 45) speak('Move back a little. I need to see your whole body.', { id: 'not_visible', priority: 'high' });
-    drawPose(ctx, px, { color: 'rgba(237,240,246,.35)' }); return;
+    drawPose(ctx, px, { color: 'rgba(237,240,246,.35)' }); if (!quiet) hudFrame(ctx, px, raw.s, t, false); return;
   }
   live.lost = 0;
   if (ex.view !== 'either' && view !== ex.view) { if (++live.wrong === 60) speak(ex.view === 'side' ? 'Turn side-on to the camera for this one.' : 'Face the camera for this one.', { id: 'wrong_view', priority: 'high' }); }
@@ -529,6 +545,15 @@ function formFrame(px, ctx, t) {
     const awaiting = fb.awaitingFix;
     const line = ev.type === 'live' ? fb.onLive(ev.faults[0]) : ev.type === 'rep' ? fb.onRep(ev) : fb.onContinuousFault(ev.faults[0]);
     if (line) say(line.text, line);
+    if (ev.type === 'rep') {
+      // Rep read-out on the body and a shout at clean-streak milestones. No vibration: the phone is
+      // propped up or on the floor, and a buzz can shift it out of position.
+      const streak = hud.rep(t, engine.reps, !ev.faults.length);
+      const tier = !ev.faults.length && live.source !== 'demo' ? rewards.crossed(live.cleanBase + engine.goodReps - 1, live.cleanBase + engine.goodReps) : null;
+      if (tier) { hud.celebrate(t, `${tier.n} clean reps`, tier.name); say(rewards.cheer(tier, S.profile.name), { id: 'tier_' + tier.n, priority: 'now' }); }
+      else if (!line && [5, 10, 15, 20].includes(streak)) say(`${streak} clean in a row. That's how it's done.`, { id: 'streak_' + streak, priority: 'low' });
+      else if (!line && streak === 3) hud.celebrate(t, '3 clean in a row', 'On fire');
+    }
     // On screen, at the same moment as the voice: what's wrong, what to do, and the graphic on the body.
     const cued = line?.id && ev.faults.find(f => line.id === f.id || line.id === f.id + '_short');
     if (line?.id?.startsWith('yes_')) { fx.fixed(awaiting, t); showBanner(awaiting, true); markFault(awaiting, true); }
@@ -543,6 +568,7 @@ function formFrame(px, ctx, t) {
   if (ex.primary === 'knee') drawDepthArc(ctx, s.kn, s.hip, s.an, m.knee, { start: ex.upT + 10, target: 100 });
   else if (ex.primary === 'elbow') drawDepthArc(ctx, s.el, s.sh, s.wr, m.elbow, { start: ex.upT + 15, target: 95 });
   fx.draw(ctx, px, s, t, { mirror: $('#viewport').classList.contains('mirror') });
+  hudFrame(ctx, px, s, t, true);
   const keys = ex.primary === 'elbow' ? ['elbow', 'hip'] : ['hip', 'knee'];
   $('#readout').innerHTML = keys.map(k => `<span>${k} ${fmtA(m[k])}</span>`).join('') + (live.lastV ? `<span>${live.lastV.mcv.toFixed(2)} m/s</span>` : '') + `<span class="muted">${engine.view} view</span>` + (live.P ? '<span class="fit">fit to your body</span>' : '');
 }
@@ -574,6 +600,7 @@ function autoFrame(px, ctx, t) {
     recorder2.push(t, px);
     const s = bestSide(px), seen = s.conf >= 0.55;
     drawPose(ctx, px, { color: seen ? '#9FD0B6' : 'rgba(237,240,246,.35)', labels: seen ? [{ at: s.kn, value: angle(s.hip, s.kn, s.an) }, { at: s.hip, value: angle(s.sh, s.hip, s.kn) }, { at: s.el, value: angle(s.sh, s.el, s.wr) }] : [] });
+    hudFrame(ctx, px, s, t, seen);
     if (!seen) { if (++live.lost === 45) say('Step back so I can see your whole body, head to feet.', { id: 'not_visible', priority: 'high' }); }
     else live.lost = 0;
     live.searchT ??= t;
@@ -600,7 +627,7 @@ function autoFrame(px, ctx, t) {
 
 function adoptExercise(res, t, replay) {
   exKey = res.id; live.detected = res; live.lastRepT = t;
-  engine = null; fb = null; smooth.reset(); motion.reset(); fx.reset();
+  engine = null; fb = null; smooth.reset(); motion.reset(); fx.reset(); hud.streak = 0;
   live.held = 0; live.goodHeld = 0; live.lastT = null; live.lastSec = null; live.wrong = 0;
   const ex = curEx();
   $('#liveEyebrow').textContent = ex.name; $('#liveTitle').textContent = `Set ${setsToday(exKey) + 1}`;
@@ -679,6 +706,7 @@ function endSet() {
   $('#sTable').innerHTML = `<span>Lowering time</span><span>${avg('ecc')} s</span><span>Lifting time</span><span>${avg('con')} s</span>
     <span>Slowing down by the end</span><span class="${vl >= .3 ? 'hot' : ''}">${Math.round(vl * 100)}%</span><span>Reps left in the tank</span><span>${tempo.length >= 3 ? estimateRIR(vl) : '–'}</span>${driftTxt}`;
   renderVBT(ex, reps);
+  renderSetReward({ reps, good, hold, demo: live?.source === 'demo' });
   recorder2.finish({ reps, good, faults: tally });
   const rest = restSeconds(ex.patternKey, vl); restLeft = rest; restTotal = rest; drawRest();
   $('#restWhy').textContent = vl >= .3 ? 'Longer, because you went close to failure' : 'Recovery for the next set';
@@ -1139,7 +1167,33 @@ function lineChart(vals, { min, max, suffix = '', labels }) {
   return s;
 }
 
+// The reward line on the set summary: a milestone passed in this set, a perfect set, or how close
+// the next milestone is. The clean-rep total doesn't include this set yet (it's saved after this).
+function renderSetReward({ reps, good, hold, demo }) {
+  const box = $('#sReward');
+  if (!reps || hold || demo) { box.hidden = true; return; }
+  const before = rewards.lifetimeClean(S.sessions, isHoldId), after = before + Math.min(good, reps);
+  const tier = rewards.crossed(before, after), perfect = rewards.isPerfect(reps, good), pr = rewards.progress(after);
+  box.hidden = false; box.classList.toggle('won', !!(tier || perfect));
+  $('#sMedal').textContent = tier || perfect ? '★' : '↑';
+  $('#sRewardTitle').textContent = tier ? `${tier.name} unlocked: ${tier.n} clean reps` : perfect ? `Perfect set: all ${reps} reps clean` : `+${Math.min(good, reps)} clean reps`;
+  $('#sRewardSub').textContent = pr.next ? `${pr.left} more clean rep${pr.left === 1 ? '' : 's'} to ${pr.next.name} (${pr.next.n}).` : `${after} clean reps. Every medal earned.`;
+  $('#sRewardBar').style.width = Math.round(pr.frac * 100) + '%';
+  if (perfect && !tier) say(`Perfect set. All ${reps} reps clean.`, { id: 'perfect', priority: 'high' });
+}
+
+function renderRewards() {
+  const total = rewards.lifetimeClean(S.sessions, isHoldId), pr = rewards.progress(total), perfect = rewards.perfectSets(S.sessions, isHoldId);
+  $('#rwTotal').textContent = total;
+  $('#rwTitle').textContent = pr.earned.length ? pr.earned[pr.earned.length - 1].name : 'Clean reps';
+  $('#rwNext').textContent = pr.next ? `${pr.left} more clean rep${pr.left === 1 ? '' : 's'} to ${pr.next.name}. Only reps with good form count.` : 'Every medal earned. Legend.';
+  $('#rwBar').style.width = Math.round(pr.frac * 100) + '%';
+  $('#rwMedals').innerHTML = rewards.TIERS.map(t => `<div class="${total >= t.n ? 'on ' + t.medal : ''}"><span>${t.n >= 1000 ? t.n / 1000 + 'k' : t.n}</span>${esc(t.name)}</div>`).join('');
+  $('#rwPerfect').textContent = perfect ? `${perfect} perfect set${perfect === 1 ? '' : 's'} (5+ reps, every one clean).` : 'Perfect set: 5 or more reps, every one clean.';
+}
+
 function renderProgress() {
+  renderRewards();
   const sets = S.sessions.filter(s => s.reps && !s.guided).slice(-12);
   const scores = sets.map(s => Math.round(s.good / s.reps * 100));
   $('#pfScore').textContent = scores.length ? scores[scores.length - 1] + '%' : '–';
@@ -1267,7 +1321,7 @@ $('#sendWeek').onclick = async () => {
   const faultName = id => { for (const k of Object.keys(LIB)) { const r = exFor(k) && allRules(exFor(k)).find(x => x.id === id); if (r) return r.cue; } return id; };
   const rk = S.rehab?.active?.checkins?.slice(-1)[0];
   const light = rk ? painLight({ ...rk, usualMorning: S.rehab.active.usualMorning }, COND[S.rehab.active.cond].painLimit).light : null;
-  const text = weekSummary(S, { faultName, light });
+  const text = weekSummary(S, { faultName, light, isHold: isHoldId });
   try { if (navigator.share) { await navigator.share({ text }); return; } } catch (err) { if (err?.name === 'AbortError') return; }
   try { await navigator.clipboard.writeText(text); toast('Copied. Paste it into WhatsApp or a message to QK.'); }
   catch { $('#weekText').textContent = text; $('#weekText').hidden = false; toast('Select the text below and copy it.'); }

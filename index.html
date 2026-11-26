@@ -295,6 +295,14 @@
       </div>
     </div>
 
+    <div class="card stack" id="rewardsCard">
+      <div class="card-head" style="margin:0"><div><span class="eyebrow">Rewards</span><h2 class="display h2" id="rwTitle">Clean reps</h2></div><span class="num" style="font-size:1.6rem" id="rwTotal">0</span></div>
+      <p class="muted small" style="margin:0" id="rwNext"></p>
+      <div class="bar"><i id="rwBar"></i></div>
+      <div class="medals" id="rwMedals"></div>
+      <p class="muted small" style="margin:0" id="rwPerfect"></p>
+    </div>
+
     <div class="card chart">
       <div class="card-head"><div><span class="eyebrow">Form score</span><div class="num" style="font-size:2rem;margin-top:4px" id="pfScore">–</div></div><span class="data small" id="pfDelta"></span></div>
       <div id="formChart"><p class="empty">Train with the camera twice to see your form trend.</p></div>
@@ -451,6 +459,7 @@
       <div class="media"><video id="video" playsinline muted></video><canvas id="overlay"></canvas></div>
       <div class="rep-big" id="repBig"><span class="num" id="repNum">0</span><small id="repLbl">reps</small></div>
       <div class="readout" id="readout"></div>
+      <div class="track-chip" id="trackChip" aria-live="polite"><i></i>Finding you…</div>
       <div class="detect-chip" id="detectChip" hidden><span id="detectTxt"></span><button type="button" id="detectAlt" hidden></button><button type="button" id="detectChange" hidden>Change</button></div>
       <div class="fault-banner" id="faultBanner" hidden aria-live="assertive"><b id="fbWrong"></b><span id="fbFix"></span></div>
       <div class="countdown num" id="countdown" hidden></div>
@@ -487,6 +496,7 @@
       <svg viewBox="0 0 120 120" role="img" id="scoreRing" aria-label="Form score"></svg>
       <div><div class="rep-fix" id="repFix"><button type="button" class="iconbtn" id="repMinus" aria-label="One rep fewer">−</button><div class="num" style="font-size:2.2rem" id="sReps">0</div><button type="button" class="iconbtn" id="repPlus" aria-label="One rep more">+</button></div><span class="muted">reps · <b id="sClean" style="color:var(--text)">0 clean</b></span><p class="muted small" style="margin:8px 0 0" id="sCompare"></p></div>
     </div>
+    <div class="card reward" id="sReward" hidden><div class="medal" id="sMedal">★</div><div><b id="sRewardTitle"></b><p class="muted small" id="sRewardSub"></p><div class="bar"><i id="sRewardBar"></i></div></div></div>
     <div class="card grid2" id="kgWrap" hidden><label class="field">Weight used (kg)<input id="setKg" type="number" inputmode="decimal" step="0.5" min="0" placeholder="e.g. 40"></label><p class="muted small" style="margin:0;align-self:end" id="sLast"></p></div>
     <div class="one-thing" id="sFocusBox"><span class="eyebrow" style="color:var(--warn)">One thing for next set</span><p id="sFocus"></p><p class="why" id="sWhy"></p></div>
     <div class="card"><span class="eyebrow">Range of motion per rep</span><div class="rom-bars" id="romBars" style="margin-top:12px"></div><p class="muted small" style="margin:10px 0 0" id="romNote"></p></div>

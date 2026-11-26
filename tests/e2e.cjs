@@ -262,6 +262,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await tap('#camCoach');
   check('camera coach: opens straight into the camera, looking for the exercise', await p.isVisible('#live') && /recognise/.test(await p.textContent('#detectTxt')));
   await p.waitForFunction(() => /Biceps curls/.test(document.querySelector('#detectTxt').textContent), null, { timeout: 8000 }).catch(() => {});
+  check('camera coach: LIVE chip shows QK has locked on and is tracking', /Live · \d+ points · \d+ fps/.test(await p.textContent('#trackChip')), await p.textContent('#trackChip'));
   check('camera coach: recognises curls within a rep or two', /Biceps curls/.test(await p.textContent('#detectTxt')), await p.textContent('#detectTxt'));
   await p.waitForFunction(() => /Swinging your body/.test(document.querySelector('#faultBanner')?.textContent || ''), null, { timeout: 9000 }).catch(() => {});
   check('camera coach: catches the body swing live ("Swinging your body")', /Swinging your body/.test(await p.textContent('#faultBanner')));
