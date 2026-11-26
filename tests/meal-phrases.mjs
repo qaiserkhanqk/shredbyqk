@@ -1,8 +1,10 @@
-// Accuracy of "say it / type it" on a realistic phrase set. Run: node tests/meal-phrases.mjs [--fail-under 95]
+// Accuracy of "say it / type it" on realistic phrase sets in tests/phrases/.
+// Run: node tests/meal-phrases.mjs [holdout.json | blind.json] [--fail-under 95]
+//   meal-phrases.json: tuned on; holdout.json: written after, then fixed; blind.json: scored once before any fix (85%).
 import fs from 'node:fs';
 import { parseMeal } from '../js/foodtext.js';
-const file = process.argv.find(a => a.endsWith('.json')) || './fixtures/meal-phrases.json';
-const set = JSON.parse(fs.readFileSync(new URL(file.startsWith('.') ? file : './fixtures/' + file, import.meta.url)));
+const file = process.argv.find(a => a.endsWith('.json')) || 'meal-phrases.json';
+const set = JSON.parse(fs.readFileSync(new URL('./phrases/' + file.replace(/^.*\//, ''), import.meta.url)));
 const fmt = n => String(Math.round(n * 100) / 100);
 let ok = 0; const bad = [];
 for (let [text, want] of set) {
