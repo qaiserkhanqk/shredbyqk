@@ -582,6 +582,13 @@ a.ghost { text-decoration: none; text-align: center; display: inline-flex; align
 .prog-day h3 { margin: 0 0 6px; font-size: .95rem; }
 .prog-day ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; font-size: .88rem; }
 .prog-day li span { color: var(--muted); font-family: var(--f-data); font-size: .8rem; }
+/* Privacy: video stays on the phone. */
+.privacy { display: flex; gap: 8px; align-items: flex-start; margin: 0; font-size: .8rem; color: var(--muted); }
+.privacy svg { flex: none; width: 16px; height: 16px; margin-top: 1px; color: var(--good); }
+.privacy b { color: var(--text); }
+.privacy-chip { position: absolute; top: 134px; left: 16px; display: inline-flex; align-items: center; gap: 5px; pointer-events: none;
+  font: 600 .66rem var(--f-body); letter-spacing: .04em; color: rgba(236,241,236,.8); background: rgba(var(--scrim-rgb),.6); border: 1px solid var(--line); padding: 3px 8px; border-radius: 99px; }
+.privacy-chip svg { width: 11px; height: 11px; }
 .track-chip { position: absolute; top: 104px; left: 16px; display: inline-flex; align-items: center; gap: 7px; pointer-events: none;
   font: 600 .72rem var(--f-data); letter-spacing: .06em; text-transform: uppercase; color: rgba(236,241,236,.75);
   background: rgba(var(--scrim-rgb),.7); border: 1px solid var(--line); padding: 4px 9px; border-radius: 99px; }
