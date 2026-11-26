@@ -297,3 +297,21 @@ Real fingers are noisier than these videos, so the real-world check below still 
 | Strength chart: estimated 1RM (Epley, up to 12 reps), best per session / week / month | Standard estimate; reps above 12 are too unreliable |
 
 Limits: the trials are short (5–10 weeks) and mostly young men. The coach or lifter can override any weight.
+
+## Food: desi calorie estimates (`js/nutrition.js`, `js/foodphoto.js`)
+
+The full reasoning and the database comparison are in [docs/NUTRITION.md](docs/NUTRITION.md).
+
+| Rule | Why |
+|---|---|
+| Desi dishes are computed from a recipe (raw meat + base ingredients + fat), not read from one database row | The same karahi ranges from about 280 to 480 kcal per katori depending on the oil. A single value is wrong for most plates |
+| Fat per serving depends on who cooked it (home / restaurant / shaadi-dhaba) | Fat is the largest and least visible source of error. Home values are set so home-style dishes match INDB recipes (9 dishes within 25%, median ≈10%) |
+| Meat share moves the gravy, and the oil moves with the gravy | A katori of mostly pieces carries less masala and oil. Fat scales as 0.3 + 0.7 × gravy share, because pieces stay coated |
+| Meat is counted raw and edible (bone excluded); cooked weight ≈ 70% of raw | USDA yield tables for stewed and grilled meat |
+| Fried foods count oil **absorbed**, not oil in the pan | INDB counts all frying oil, giving 577 kcal/100 g for a samosa; absorbed-oil models land at 260–330 |
+| Every estimate shows a likely range: √((portion SD × total)² + (fat SD × fat kcal)² + (0.15 × meat kcal)²) | Portion SD is 10% for counted items, 20% for katori and plate, 30% from a photo. Fat SD is 25% if you said who cooked it, 40% if not. The day's range combines dishes as √Σsd², since errors on separate dishes partly cancel |
+| Photo: the model identifies and measures only; calories come from the dish models | Asking a language model for calories gives a different number each time. Fixed catalogue ids, a strict schema, 3 samples with majority dish and median portion, and caching by image hash make the same plate give the same answer |
+| Targets: Mifflin-St Jeor × activity (1.375 / 1.55 / 1.725), −20% to lose fat, +10% to gain | Mifflin-St Jeor is the most accurate of the common resting-energy equations in non-obese adults (Frankenfield et al. 2005, J Am Diet Assoc) |
+| Protein 1.8 g/kg (2.0 g/kg when losing fat) | Gains plateau around 1.6 g/kg, with a 95% CI up to 2.2 (Morton et al. 2018, Br J Sports Med); higher intakes help keep muscle in a deficit (ISSN position stand 2017) |
+
+Limits: the fat grams per dish are modelling assumptions until real plates are weighed. That is the most useful next step. Photo portions of curries are rough (±30%). Counted items (rotis, kebabs, samosas) are much better. Ingredient values are rounded USDA SR Legacy figures, and mutton uses goat meat.
