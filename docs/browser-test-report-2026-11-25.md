@@ -45,3 +45,15 @@ npm run test:browsers
 ```
 
 For the research dashboard in WebKit over local http, set `RESEARCH_E2E_INSECURE_COOKIES=1` (see finding 3).
+
+## Re-run on d96884a (2026-11-26): WebKit 26.6 and Firefox 155
+**The version tested** includes the stale-band fix, the band eligibility fixes and the calibrated dates-only range.
+
+**Results:**
+- Every browser test file passed separately in both browsers: 16 files and **308 checks per browser**, plus the 6-check accessibility audit. There were 0 failures.
+- New since the first run: `tests/cycle-ui-adjust-freshness.cjs` (8) and `research/tests/e2e-https.cjs` (5). The HTTPS dashboard test passed in WebKit with the default Secure cookie.
+
+**As before:**
+- In WebKit, the plain-http dashboard files ran in the labelled local-cookie mode.
+- Not tested here, because the browser builds lack the feature: recording in WebKit (no MediaRecorder) and pose analysis in Firefox (no WebGL). Each log says so in a `note` line.
+- Still not tested: real iPhone or Mac Safari.
