@@ -6,7 +6,9 @@
 
 // Moves: name, a short cue QK says as the move starts, optional `lib` (library id, for form check and
 // video-free demos) and `jump` (high impact; quiet versions swap these out for apartments).
-export const MOVES = {
+import { MOVES as ROUTINE_MOVES } from './routines.js';
+
+const CLASS_MOVES = {
   jacks: { name: 'Jumping jacks', cue: 'Light on your toes, arms all the way up.', jump: true, quiet: 'stepJacks' },
   stepJacks: { name: 'Step jacks', cue: 'Step out wide, arms overhead. No jumping.' },
   highKnees: { name: 'High knees', cue: 'Knees to hip height, pump your arms.', jump: true, quiet: 'marchKnees' },
@@ -51,6 +53,9 @@ export const MOVES = {
   wallSit: { name: 'Wall sit', cue: 'Back flat on the wall, thighs parallel. Hold.', lib: 'wallSit' },
   sideLunge: { name: 'Side lunges', cue: 'Step wide, sit into one hip, chest up.' },
 };
+
+// One move list for classes and routines (stretches, drills, foam rolling).
+export const MOVES = { ...CLASS_MOVES, ...ROUTINE_MOVES };
 
 const WARM = [['jacks', 40], ['armCircles', 30], ['hipCircles', 30], ['squats', 40], ['inchworm', 40]];
 const COOL = [['breathe', 60], ['hipCircles', 30], ['breathe', 30]];
@@ -162,6 +167,12 @@ export function timeline(cls, { quiet = !!cls.quiet } = {}) {
       }
     } else if (b.type === 'emom') {
       for (let i = 0; i < b.minutes; i++) { const [m, reps] = b.moves[i % b.moves.length]; add({ kind: 'emom', move: mv(m, quiet), reps, secs: 60, label: b.name, block: b.name, round: i + 1, of: b.minutes }); }
+    } else if (b.type === 'flow') {
+      // Timed moves back to back; one-sided moves get a segment per side.
+      for (const [m, s] of b.moves) {
+        if (MOVES[m]?.sides) { add({ kind: 'hold', move: m, secs: s, side: 1, label: b.name, block: b.name }); add({ kind: 'hold', move: m, secs: s, side: 2, label: b.name, block: b.name }); }
+        else add({ kind: 'hold', move: m, secs: s, label: b.name, block: b.name });
+      }
     } else if (b.type === 'amrap') {
       add({ kind: 'amrap', moves: b.moves.map(([m, reps]) => [mv(m, quiet), reps]), secs: b.secs, label: b.name, block: b.name });
     }
@@ -174,7 +185,7 @@ export function timeline(cls, { quiet = !!cls.quiet } = {}) {
 export const minutes = cls => Math.round(timeline(cls).total / 60);
 /** Work-to-rest summary for the class card, e.g. "40 on / 20 off". */
 export function format(cls) {
-  const t = cls.blocks.map(b => (b.type === 'intervals' ? `${b.work} on / ${b.rest} off` : b.type === 'tabata' ? 'Tabata' : b.type === 'emom' ? 'EMOM' : 'AMRAP finisher'));
+  const t = cls.blocks.map(b => (b.type === 'intervals' ? `${b.work} on / ${b.rest} off` : b.type === 'tabata' ? 'Tabata' : b.type === 'emom' ? 'EMOM' : b.type === 'flow' ? `${b.moves.length} moves, guided` : 'AMRAP finisher'));
   return [...new Set(t)].join(' · ');
 }
 
@@ -185,6 +196,8 @@ export function callout(seg, next) {
   if (seg.kind === 'emom') return `Minute ${seg.round}. ${seg.reps} ${name(seg.move).toLowerCase()}. Go!`;
   if (seg.kind === 'amrap') return `Finisher! As many rounds as you can: ${seg.moves.map(([m, r]) => `${r} ${name(m).toLowerCase()}`).join(', ')}. Tap the screen after every round. Go!`;
   const m = MOVES[seg.move];
+  if (seg.kind === 'hold' && seg.side === 2) return 'Switch sides.';
+  if (seg.kind === 'hold' && seg.side === 1) return `${m?.name || seg.move}. ${m?.cue || ''} First side.`.trim();
   return `${m?.name || seg.move}. ${m?.cue || ''}`.trim();
 }
 

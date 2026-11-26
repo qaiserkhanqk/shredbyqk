@@ -90,7 +90,7 @@ export async function pushAll(cloud, S, mark = {}) {
   await cloud.updateMe({
     ...(food ? { food_week: food } : {}),
     name: S.profile?.name || null, goal: S.profile?.goal || null, weekly_goal: S.profile?.weeklyGoal || null,
-    plan: S.plan || null, program: S.program ? { id: S.program.id, block: S.program.block || 1, start: S.program.start, blockStart: S.program.blockStart } : null,
+    plan: S.plan || null, program: S.program ? { id: S.program.id, name: (S.customPrograms || []).find(p => p.id === S.program.id)?.name, block: S.program.block || 1, start: S.program.start, blockStart: S.program.blockStart } : null,
     last_seen: new Date().toISOString(),
   });
   return {
