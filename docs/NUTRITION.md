@@ -8,7 +8,7 @@ So Shred uses three free sources, plus its own dish models on top:
 
 | Source | What it gives | Licence | Used for |
 |---|---|---|---|
-| **Desi dish models** (`js/nutrition.js`, written for this app) | 101 Pakistani, Indian, fast-food and street-food dishes as recipes: meat, masala, and fat by who cooked it | Ours | Everything people eat most: karahi, qorma, nihari, haleem, biryani, pulao, daal, cholay, roti, paratha, naan, kebabs, samosa, pakoray, chai, lassi, sweets |
+| **Desi dish models** (`js/nutrition.js`, written for this app) | 113 Pakistani, Indian, fast-food, café and street-food dishes as recipes: meat, masala, and fat by who cooked it | Ours | Everything people eat most: karahi, qorma, nihari, haleem, biryani, pulao, daal, cholay, roti, paratha, naan, kebabs, samosa, pakoray, chai, lassi, sweets |
 | **Indian Nutrient Databank (INDB)**, 2024 | 1,014 standard Indian recipes, per 100 g and per serving, built on ICMR-NIN IFCT 2017 | Open access paper and data on GitHub; **no licence file** (see below) | Search for anything the dish models don't cover (dhokla, upma, idli, regional sabzis…) |
 | **USDA FoodData Central** (SR Legacy) | Raw ingredients: meat, flours, lentils, oils, dairy, vegetables | Public domain (CC0) | The ingredient values inside every dish model; searchable ingredients |
 
@@ -114,3 +114,34 @@ Every item points at a dish model with that place's portion and oil level. When 
 - **QK's own recipes.** Add your meal plans as dish models (exact grams), so clients following them log with zero error.
 - **Barcode scanning** with Open Food Facts for packaged food.
 - **Let users save their own recipes** from ingredients (the engine already supports it: a recipe is just ingredients and fat).
+
+## How Shred compares (November 2026)
+
+Facts about other apps come from their store listings and press coverage (see the sources in the chat history), not from testing them side by side. "Not mentioned" means their listing doesn't describe it, not that it's missing.
+
+| | **Shred** | **Calorify** (PK) | **Kalorist** (PK) | **MyFitnessPal** | **HealthifyMe** | **MacroFactor** |
+|---|---|---|---|---|---|---|
+| Desi dishes | 113 recipe models + 1,014 INDB recipes | 750+ home and street dishes | Desi foods | User-entered | Large Indian database | Generic |
+| Oil, who cooked it, meat vs gravy | **Yes, with a range** | Not mentioned | Not mentioned | No | Not mentioned | No |
+| Restaurants and carts | 45 places / 170 items, 20 with official values; clients add their own | **223 chains / 12,500+ items** | Local cafés | Large, mostly Western | Indian chains | Few |
+| Photo logging | One tap, same answer every time, learns your portions | Not mentioned | Not mentioned | Meal Scan + Cal AI | Snap | Yes |
+| Say it / type the meal (Urdu, Roman Urdu) | **Yes** | Not mentioned | Not mentioned | English voice | Ria AI chat | Text describe |
+| Barcode | Yes (Open Food Facts) | Not mentioned | Not mentioned | Yes | Yes | Yes |
+| Calories needed, from weight trend | Yes | Not mentioned | Not mentioned | No | No | **Yes** |
+| Weekly coaching report | **Wins first, two additions, nutrients, rehab-aware** | Not mentioned | KalCoach AI | Basic reports | Coach (paid) | Weekly check-in |
+| Coach sees clients' food | **Yes (QK's dashboard)** | No | No | Friends only | Paid coaches | No |
+| Training, form camera, rehab | **Yes** | No | No | Basic | Workouts | No |
+| Urdu interface | Food screen | Not mentioned | Not mentioned | No | Hindi | No |
+| Published accuracy check | Recipe models vs 20 published values: 10% median | Labels each value official / derived / estimated | Not mentioned | Third-party tests | 60–70% recognition at launch | Third-party tests |
+
+### Where Shred is ahead
+- It estimates the oil, the main source of error in desi food, and says so ("Oil: 42 g, 61% of the calories").
+- Photos give the same answer every time and learn each person's portions from weighings.
+- You can log a whole meal by saying or typing it in Roman Urdu or Urdu.
+- Food, training, rehab and coaching are in one app. QK sees each client's food week next to their training, and the weekly report is written to motivate, not to judge.
+
+### Where it is still behind
+- **Restaurant coverage.** Calorify has about 70 times more menu items. Closing the gap is data work: collect chain menus (foodpanda pages, menus) and map each item to a dish model, as `js/menus.js` does. Client-added places, reviewed by QK, help grow it.
+- **Proof of accuracy on desi plates.** The tooling exists (weigh-to-calibrate and the CSV export). The 50–100 plate study itself still has to be done with a scale and real food.
+- **Packaged food breadth.** Open Food Facts covers fewer Pakistani products than MyFitnessPal's 20 million entries. FatSecret's live fallback helps.
+- **Untested pieces.** The native steps plugins are uncompiled. Photo recognition and FatSecret haven't run against the live services yet.

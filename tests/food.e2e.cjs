@@ -26,6 +26,9 @@ const num = s => +String(s).replace(/[^\d]/g, '');
     if (!fs.existsSync(f)) return r.fulfill({ status: 404, body: '' });
     r.fulfill({ status: 200, body: fs.readFileSync(f), headers: { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' } });
   });
+  // Open Food Facts stand-in: one made-up product.
+  await ctx.route('https://world.openfoodfacts.org/**', r => r.fulfill({ status: 200, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' },
+    body: JSON.stringify({ status: 1, product: { product_name: 'Test Biscuit', brands: 'Brand A', serving_quantity: '25', serving_size: '1 pack (25 g)', nutriments: { 'energy-kcal_100g': 480, proteins_100g: 6.5, carbohydrates_100g: 68, fat_100g: 20 } } }) }));
   const p = await ctx.newPage(); const errs = [];
   p.on('pageerror', e => errs.push(e.message));
   const shot = async n => { if (SHOTS) await p.screenshot({ path: path.join(SHOTS, n + '.png') }); };
@@ -46,7 +49,7 @@ const num = s => +String(s).replace(/[^\d]/g, '');
   await p.click('#foodTargets summary');
   await p.fill('#tWeight', '80'); await p.dispatchEvent('#tWeight', 'change');
   await p.fill('#tAge', '30'); await p.dispatchEvent('#tAge', 'change');
-  check('targets shown (sign-up goal: build muscle → +10%)', /of 3,010/.test(await p.textContent('#foodToday')), await p.textContent('#tSummary'));
+  check('targets shown (sign-up goal: build muscle → +10%)', /\/ 3,010/.test(await p.textContent('#foodToday')), await p.textContent('#tSummary'));
 
   // Search → sheet → log
   await p.fill('#foodSearch', 'karahi');
@@ -98,7 +101,46 @@ const num = s => +String(s).replace(/[^\d]/g, '');
 
   // Water
   await p.click('#foodToday [data-water="1"]'); await p.click('#foodToday [data-water="1"]');
-  check('water taps count glasses', /2 of 11 glasses/.test(await p.textContent('#foodToday')));
+  check('water taps count glasses', /2 \/ 11 glasses/.test(await p.textContent('#foodToday')));
+
+
+  // Type (or say) the whole meal
+  await p.fill('#foodSearch', 'do roti aur kfc zinger');
+  check('typed meal → one "Log this meal" card', await p.isVisible('#mealAddAll') && /KFC · Zinger Burger/.test(await p.textContent('#foodResults .meal-card')));
+  await p.click('#mealAddAll');
+  check('Add all logs every item', /KFC · Zinger Burger/.test(await p.textContent('#foodLog')) && /Roti \/ chapati/.test(await p.textContent('#foodLog')));
+  check('voice button is there (falls back to typing without speech support)', await p.isVisible('#foodVoice'));
+
+  // Official chain values
+  await p.fill('#foodSearch', 'big mac');
+  await p.click('#foodResults [data-menu^="mcdonalds|"]');
+  check('official values are labelled with their country', /official values \(McDonald's Singapore\)/.test(await p.textContent('#foodSheetBody .eyebrow')) && await sheetKcal() === 558);
+  await p.click('#foodSheet [data-step="0.5"]');
+  check('menu items count in items ("1½ × Big Mac" = 837 kcal)', /1½ × Big Mac/.test(await p.textContent('#fsServe')) && await sheetKcal() === 837, `${await p.textContent('#fsServe')} ${await sheetKcal()}`);
+  await p.click('#foodSheet', { position: { x: 10, y: 10 } });
+
+  // Barcode (typed, since headless Chrome has no barcode camera)
+  await p.click('#foodScan');
+  await p.fill('#scanCode', '8964000000001'); await p.click('#scanLook');
+  await p.waitForSelector('#fsSave');
+  check('barcode → product sheet with label values', /Brand A · Test Biscuit/.test(await p.textContent('#foodSheetBody h2')) && await sheetKcal() === 120);
+  await p.click('#fsSave');
+  check('packaged food logged', /Test Biscuit/.test(await p.textContent('#foodLog')));
+  await p.fill('#foodSearch', 'biscuit');
+  check('scanned products are searchable afterwards', /Barcode/.test(await p.textContent('#foodResults')));
+  await p.fill('#foodSearch', ''); await p.dispatchEvent('#foodSearch', 'input');
+
+  // Steps
+  await p.fill('#stepsToday', '6500'); await p.dispatchEvent('#stepsToday', 'change');
+  check('steps typed in are saved', await p.evaluate(() => Object.values(JSON.parse(localStorage.getItem('shred_qk_v1')).food.steps).includes(6500)));
+
+  // Urdu
+  await p.click('#foodLang');
+  check('Urdu: heading and direction switch', (await p.textContent('#food h1')) === 'آپ نے کیا کھایا؟' && (await p.getAttribute('#food', 'dir')) === 'rtl');
+  check('Urdu: today card labels', /آج کھایا/.test(await p.textContent('#foodToday')));
+  await shot('5-urdu');
+  await p.click('#foodLang');
+  check('back to English', (await p.textContent('#food h1')) === 'What did you eat?');
 
   // One-tap photo: added straight away, no review step
   const before = (await rows()).length;
@@ -115,7 +157,10 @@ const num = s => +String(s).replace(/[^\d]/g, '');
   check('…and never asks again', !(await p.isVisible('[data-usual=home]')));
   await p.click('#foodPhotoBox [data-sedit]:nth-of-type(1)');
   check('tap a photo dish → same sheet to fix it', await p.isVisible('#fsSave'));
-  await p.click('#foodSheet', { position: { x: 10, y: 10 } });
+  check('photo meals can be weighed (optional)', await p.isVisible('#fsWeighed'));
+  await p.fill('#fsWeighed', '260'); await p.dispatchEvent('#fsWeighed', 'input');
+  await p.click('#fsSave');
+  check('weighed meal shows in "Your portions"', /1 weighed photo meal/.test(await p.textContent('#calInfo')), await p.textContent('#calInfo'));
   await p.click('#snapUndo');
   check('undo removes the photo meal', (await rows()).length === before);
   await p.setInputFiles('#foodPhoto', path.join(ROOT, 'tests/pose.jpg'));
@@ -142,6 +187,11 @@ const num = s => +String(s).replace(/[^\d]/g, '');
   await p.$eval('#foodWeek', el => el.scrollIntoView()); await shot('4-week');
   await p.fill('#wkKg', '79.6'); await p.click('#wkSave');
   check('weigh-in saved and updates the target weight', (await p.inputValue('#tWeight')) === '79.6');
+  // Coach dashboard (sample mode): this phone's food shows on its card.
+  await p.goto('https://shred.local/coach.html'); await p.waitForTimeout(700);
+  await p.click('.cd-row'); await p.waitForTimeout(200);
+  check('coach dashboard shows the client\'s food week', /Food · last 7 days/.test(await p.textContent('#cdDetail')) && /QK suggested/.test(await p.textContent('#cdDetail')));
+  await shot('6-coach');
   check('no page errors', !errs.length, errs.join(' | '));
   await b.close();
   console.log(fails ? `\n${fails} FAILED` : '\nfood e2e passed');

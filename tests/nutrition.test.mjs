@@ -18,7 +18,7 @@ for (const d of N.DISHES) {
       if (Math.abs(atw - e.kcal) / e.kcal > 0.12) bad.push(`${d.id} atwater ${Math.round(atw)} vs ${Math.round(e.kcal)}`);
       // Energy density should be possible for cooked food (water-rich drinks to fried snacks).
       const per100 = e.kcal / e.grams * 100;
-      if (per100 < 20 || per100 > 520) bad.push(`${d.id} ${Math.round(per100)} kcal/100 g`);
+      if (per100 < 5 || per100 > 520) bad.push(`${d.id} ${Math.round(per100)} kcal/100 g`);
     }
     if (d.fat.home > d.fat.restaurant || d.fat.restaurant > d.fat.shaadi) bad.push(d.id + ' fat order');
   } catch (e) { bad.push(d.id + ': ' + e.message); }

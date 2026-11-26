@@ -37,3 +37,5 @@ body.coach-page { background: var(--ink); color: var(--text); min-height: 100vh;
 .cd-tpl { display: flex; flex-wrap: wrap; gap: 6px; }
 .cd-tpl button { font-size: .78rem; padding: 6px 10px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); cursor: pointer; text-align: left; }
 .cd-sent { font-size: .8rem; color: var(--muted); margin: 0; }
+.cd-food { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.cd-food .cd-kv span:nth-child(even) { text-align: right; }

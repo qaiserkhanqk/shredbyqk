@@ -75,6 +75,8 @@ export const ING = {
   ketchup: ['Ketchup and chutney', 101, 1, 27, 0.1, 0.3],
   cabbage: ['Cabbage and lettuce', 25, 1.3, 5.8, 0.1, 2.5],
   sesame: ['Sesame and nigella seeds', 573, 17.7, 23.4, 49.7, 11.8],
+  pasta: ['Pasta / noodles, dry', 371, 13, 75, 1.5, 3.2],
+  iceCream: ['Ice cream', 207, 3.5, 24, 11, 0.7],
 };
 const FATS = { oil: 'Oil', ghee: 'Ghee', butter: 'Butter' };
 
@@ -141,7 +143,7 @@ export const DISHES = [
   // Breads — one piece.
   D('roti', 'Roti / chapati', 'chapati phulka roti chapatti روٹی', 'bread', 'roti', 44, null, [['atta', 30]], NOFAT, { topping: ['ghee', 5, 'Ghee or butter on top'], sizes: true }),
   D('tandoori_roti', 'Tandoori roti', 'tandoor roti naan roti', 'bread', 'roti', 80, null, [['atta', 55]], NOFAT, { topping: ['butter', 6, 'Butter on top'] }),
-  D('naan', 'Naan', 'plain naan butter naan roghni', 'bread', 'naan', 100, null, [['maida', 80], ['dahi', 8], ['milk', 10], ['sugar', 2]], F('oil', 4, 5, 6), { topping: ['butter', 8, 'Butter naan'] }),
+  D('naan', 'Naan', 'plain naan butter naan khamiri', 'bread', 'naan', 100, null, [['maida', 80], ['dahi', 8], ['milk', 10], ['sugar', 2]], F('oil', 4, 5, 6), { topping: ['butter', 8, 'Butter naan'] }),
   D('paratha', 'Plain paratha', 'paratha parantha lachha paratha پراٹھا', 'bread', 'paratha', 70, null, [['atta', 45]], F('ghee', 8, 15, 20), { sizes: true }),
   D('aloo_paratha', 'Aloo paratha', 'aloo parantha potato paratha', 'bread', 'paratha', 125, null, [['atta', 45], ['potato', 60], ['onion', 5], ['spices', 2]], F('ghee', 10, 18, 24)),
   D('anda_paratha', 'Anda paratha', 'egg paratha', 'bread', 'paratha', 115, ['egg', 50], [['atta', 45]], F('ghee', 12, 20, 24)),
@@ -177,15 +179,22 @@ export const DISHES = [
   D('zinger_burger', 'Zinger / crispy chicken burger', 'zinger krunch crispy chicken burger kfc', 'fastfood', 'burger', 200, ['chickenBreast', 110], [['bun', 60], ['maida', 15], ['mayo', 12], ['cabbage', 10]], F('oil', 8, 10, 12)),
   D('mighty_zinger', 'Double fillet burger (Mighty Zinger)', 'mighty zinger double', 'fastfood', 'burger', 300, ['chickenBreast', 210], [['bun', 65], ['maida', 28], ['mayo', 16], ['cheese', 14], ['cabbage', 12]], F('oil', 15, 18, 20)),
   D('beef_burger', 'Beef burger (two patties, cheese)', 'big mac whopper beef burger hardees', 'fastfood', 'burger', 220, ['beefMince', 90], [['bun', 75], ['cheese', 14], ['mayo', 15], ['cabbage', 20], ['ketchup', 5]], NOFAT),
-  D('chicken_burger', 'Chicken patty burger', 'mcchicken chicken burger patty', 'fastfood', 'burger', 160, ['chickenMince', 75], [['bun', 60], ['maida', 15], ['mayo', 8], ['cabbage', 10]], F('oil', 8, 8, 10)),
+  D('chicken_burger', 'Chicken patty burger', 'mcchicken chicken burger patty', 'fastfood', 'burger', 150, ['chickenMince', 65], [['bun', 55], ['maida', 12], ['mayo', 6], ['cabbage', 10]], F('oil', 6, 6, 8)),
   D('fried_chicken', 'Fried chicken piece', 'hot and crispy kfc piece broast fried chicken', 'fastfood', 'piece', 110, ['chickenSkin', 100], [['maida', 12], ['spices', 2]], F('oil', 8, 10, 12)),
   D('broast', 'Broast (quarter)', 'broast chicken quarter', 'fastfood', 'quarter', 260, ['chickenSkin', 200], [['maida', 25], ['spices', 3]], F('oil', 18, 22, 25)),
   D('nuggets', 'Chicken nuggets (6 pieces)', 'nuggets mcnuggets', 'fastfood', 'box', 100, ['chickenMince', 70], [['maida', 15]], F('oil', 10, 12, 12)),
   D('fries', 'French fries (regular)', 'fries chips french fries', 'fastfood', 'regular', 110, null, [['potato', 230]], F('oil', 14, 16, 18)),
   D('pizza_slice', 'Pizza slice (medium, chicken)', 'pizza slice dominos pizza hut chicken tikka fajita', 'fastfood', 'slice', 110, ['chicken', 15], [['maida', 40], ['mozzarella', 25], ['tomato', 15]], F('oil', 4, 5, 6)),
   D('club_sandwich', 'Club sandwich', 'club sandwich', 'fastfood', 'sandwich', 230, ['chicken', 60], [['bread', 90], ['egg', 25], ['mayo', 15], ['cheese', 14], ['cabbage', 15], ['tomato', 15]], NOFAT),
-  D('sub_6', 'Sub sandwich (6 inch, chicken)', 'subway sub chicken tikka teriyaki', 'fastfood', 'sub', 230, ['chickenBreast', 70], [['bread', 75], ['cheese', 14], ['cabbage', 25], ['tomato', 20], ['mayo', 10]], NOFAT),
+  D('sub_6', 'Sub sandwich (6 inch, chicken)', 'subway sub chicken tikka teriyaki', 'fastfood', 'sub', 200, ['chickenBreast', 70], [['bread', 75], ['cabbage', 25], ['tomato', 20], ['mayo', 6]], NOFAT, { topping: ['cheese', 14, 'Cheese'] }),
   D('shawarma', 'Chicken shawarma', 'shawarma shwarma wrap', 'fastfood', 'shawarma', 200, ['chicken', 70], [['maida', 50], ['mayo', 20], ['cabbage', 30], ['spices', 3]], F('oil', 4, 6, 8)),
+  D('wings', 'Chicken wings (6)', 'wings hot wings korean wings', 'fastfood', 'serving', 150, ['chickenSkin', 150], [['maida', 10], ['ketchup', 15]], F('oil', 10, 12, 14)),
+  D('loaded_fries', 'Loaded fries', 'loaded fries nashville bomber elote', 'fastfood', 'regular', 220, ['chicken', 40], [['potato', 230], ['cheese', 25], ['mayo', 15]], F('oil', 14, 16, 18)),
+  D('creamy_pasta', 'Creamy chicken pasta', 'pasta alfredo fettuccine creamy chicken pasta', 'fastfood', 'plate', 350, ['chicken', 80], [['pasta', 90], ['cream', 40], ['cheese', 20], ['spices', 3]], F('oil', 6, 10, 12)),
+  D('lasagna', 'Lasagna', 'lasagne lasagna', 'fastfood', 'portion', 300, ['beefMince', 70], [['pasta', 60], ['mozzarella', 40], ['cream', 20], ['tomato', 60]], F('oil', 6, 10, 12)),
+  D('grilled_chicken_meal', 'Grilled chicken with sauce, rice and veg', 'grilled chicken steak moroccan tarragon chicken fillet cafe', 'fastfood', 'plate', 400, ['chickenBreast', 200], [['rice', 50], ['mixedVeg', 80], ['cream', 20], ['spices', 3]], F('oil', 8, 12, 15)),
+  D('chow_mein', 'Chicken chow mein', 'chow mein noodles chinese', 'fastfood', 'plate', 350, ['chicken', 70], [['pasta', 80], ['mixedVeg', 80], ['ketchup', 10]], F('oil', 10, 16, 20)),
+  D('cheesy_pizza_slice', 'Pizza slice (Pakistani, extra cheese)', 'cheezious broadway pizza max crown crust stuffed crust kabab crust', 'fastfood', 'slice', 130, ['chicken', 25], [['maida', 42], ['mozzarella', 35], ['mayo', 6], ['capsicum', 8]], F('oil', 5, 6, 7)),
   D('cola', 'Cola / soft drink (can)', 'pepsi coke 7up sprite soft drink', 'drink', 'can', 345, null, [['sugar', 36]], NOFAT),
   D('milkshake', 'Milkshake', 'shake mango shake', 'drink', 'glass', 300, null, [['milk', 250], ['sugar', 25], ['cream', 20]], NOFAT),
 
@@ -199,6 +208,10 @@ export const DISHES = [
   D('bhutta', 'Bhutta (roasted corn)', 'bhutta corn cob makai', 'street', 'cob', 100, null, [['makki', 35]], NOFAT),
 
   // Sweets.
+  D('zarda', 'Zarda (sweet rice)', 'zarda meethay chawal', 'sweet', 'plate', 200, null, [['rice', 60], ['sugar', 30], ['nuts', 5]], F('ghee', 12, 15, 18)),
+  D('kunafa', 'Kunafa', 'kunafa knafeh', 'sweet', 'piece', 150, null, [['vermicelli', 40], ['mozzarella', 30], ['sugar', 30]], F('ghee', 15, 18, 20)),
+  D('donut', 'Glazed donut', 'donut doughnut krispy kreme dunkin', 'sweet', 'donut', 55, null, [['maida', 25], ['sugar', 12], ['milk', 5]], F('oil', 9, 10, 11)),
+  D('ice_cream', 'Ice cream (2 scoops)', 'ice cream scoop baskin robbins kulfi', 'sweet', 'cup', 140, null, [['iceCream', 140]], NOFAT),
   D('kheer', 'Kheer', 'rice kheer chawal ki kheer', 'sweet', 'katori', 150, null, [['milk', 150], ['rice', 12], ['sugar', 15], ['nuts', 3]], NOFAT),
   D('gulab_jamun', 'Gulab jamun', 'gulab jaman', 'fried', 'piece', 40, null, [['khoya', 12], ['maida', 4], ['sugar', 20]], F('ghee', 4, 5, 5)),
   D('gajar_halwa', 'Gajar ka halwa', 'gajrela carrot halwa', 'sweet', 'katori', 150, null, [['carrot', 140], ['milk', 100], ['sugar', 20], ['khoya', 10], ['nuts', 3]], F('ghee', 10, 15, 20)),
@@ -207,6 +220,7 @@ export const DISHES = [
 
   // Drinks.
   D('chai', 'Chai (doodh patti)', 'tea doodh patti chai milk tea چائے', 'drink', 'cup', 150, null, [['milk', 100], ['sugar', 10]], NOFAT),
+  D('kehwa', 'Kehwa (green tea)', 'kehwa qehwa green tea', 'drink', 'cup', 150, null, [['sugar', 5]], NOFAT),
   D('sweet_lassi', 'Lassi (sweet)', 'meethi lassi', 'drink', 'glass', 300, null, [['dahi', 200], ['milk', 50], ['sugar', 25]], NOFAT),
   D('salted_lassi', 'Lassi (salted)', 'namkeen lassi chaas', 'drink', 'glass', 300, null, [['dahi', 200]], NOFAT),
 
@@ -226,8 +240,9 @@ fam('Daal', ['daal_masoor', 'daal_moong', 'daal_chana', 'daal_mash', 'daal_makha
 fam('Chicken salan', ['chicken_karahi', 'chicken_handi', 'chicken_qorma', 'chicken_salan', 'chicken_jalfrezi', 'butter_chicken']);
 fam('Mutton and beef', ['mutton_karahi', 'mutton_qorma', 'aloo_gosht', 'palak_gosht', 'nihari', 'haleem', 'qeema', 'qeema_matar']);
 fam('Kebab and BBQ', ['seekh_kebab', 'chapli_kebab', 'shami_kebab', 'chicken_tikka', 'chicken_boti']);
+fam('Pizza and pasta', ['pizza_slice', 'cheesy_pizza_slice', 'creamy_pasta', 'lasagna', 'chow_mein']);
 fam('Burger', ['zinger_burger', 'mighty_zinger', 'beef_burger', 'chicken_burger', 'anda_shami_burger', 'bun_kebab']);
-fam('Fried chicken', ['fried_chicken', 'broast', 'nuggets']);
+fam('Fried chicken', ['fried_chicken', 'broast', 'nuggets', 'wings']);
 fam('Eggs', ['boiled_egg', 'anda_fry', 'omelette', 'anda_curry']);
 fam('Lassi and drinks', ['chai', 'sweet_lassi', 'salted_lassi', 'milkshake', 'cola']);
 export const family = d => (d?.fam ? DISHES.filter(x => x.fam === d.fam) : []);
@@ -341,12 +356,24 @@ export function lookup(ref) {
   if (ref.t === 'dish') return DISH[ref.id] && { ref, name: DISH[ref.id].name, food: DISH[ref.id] };
   if (ref.t === 'indb') return INDB_BY[ref.id] && { ref, name: INDB_BY[ref.id][1], food: INDB_BY[ref.id] };
   if (ref.t === 'ing') return ING[ref.id] && { ref, name: ING[ref.id][0], food: ING[ref.id] };
+  if (ref.t === 'bc') return PRODUCTS[ref.id] && { ref, name: PRODUCTS[ref.id].name, food: PRODUCTS[ref.id] };
   return null;
 }
 export function estimate(ref, opts = {}) {
   if (ref.t === 'dish') return estimateDish(DISH[ref.id], opts);
   if (ref.t === 'indb') return estimateIndb(INDB_BY[ref.id], opts);
+  if (ref.t === 'bc') return PRODUCTS[ref.id] ? estimateProduct(PRODUCTS[ref.id], opts) : { kcal: 0, protein: 0, carbs: 0, fat: 0, fibre: 0, grams: 0, low: 0, high: 0, parts: { fat: 0, meat: 0, rest: 0 } };
   return estimateIng(ref.id, opts.grams ?? 100);
+}
+
+// Packaged foods from a barcode (Open Food Facts). Label values are per 100 g, so they're precise.
+const PRODUCTS = {};
+export const registerProduct = p => { if (p?.code) PRODUCTS[p.code] = p; return p; };
+export function estimateProduct(p, opts = {}) {
+  const grams = opts.grams ?? (opts.servings ?? 1) * (p.servingG || 100), m = grams / 100, v = p.per100;
+  const k = v.kcal * m;
+  return { kcal: k, protein: v.protein * m, carbs: v.carbs * m, fat: v.fat * m, fibre: (v.fibre || 0) * m, grams,
+    low: round10(k * 0.95), high: round10(k * 1.05), parts: { fat: v.fat * m * 9, meat: 0, rest: k - v.fat * m * 9 } };
 }
 
 // Search: desi dish models first (they handle oil and portions), then INDB recipes, then ingredients.

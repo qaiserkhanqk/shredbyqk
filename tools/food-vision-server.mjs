@@ -5,6 +5,7 @@
 //   ANTHROPIC_API_KEY=... node tools/food-vision-server.mjs          # Claude (default model claude-sonnet-5-5)
 //   OPENAI_API_KEY=...    node tools/food-vision-server.mjs          # OpenAI (set OPENAI_MODEL, default gpt-4o)
 //   PORT=8787 ALLOW_ORIGIN=https://you.github.io node tools/food-vision-server.mjs
+//   FATSECRET_CLIENT_ID=... FATSECRET_CLIENT_SECRET=...   # optional: live fallback search, GET /food-search?q=
 //
 // Then set PHOTO_CONFIG.endpoint in js/foodphoto.js to http(s)://<host>:8787/food-vision.
 //
@@ -12,6 +13,7 @@
 // It answers through a strict JSON schema whose dish field is an enum of the app's catalogue, it is
 // asked `samples` times in parallel, and the app keeps the consensus. Answers are cached by image hash.
 import http from 'node:http';
+import { parseFatSecret } from '../js/fatsecret.js';
 
 const PORT = +process.env.PORT || 8787;
 const ORIGIN = process.env.ALLOW_ORIGIN || '*';
@@ -108,10 +110,38 @@ async function recognise({ image, hash, samples = 3, catalogue }) {
   return out;
 }
 
+// FatSecret live search (optional). Their terms don't allow keeping their data beyond 24 hours, so this
+// only passes results through; the app stores a food in the client's own diary when they log it.
+let fsToken = null, fsExpires = 0;
+async function fatsecretToken() {
+  if (fsToken && Date.now() < fsExpires - 60e3) return fsToken;
+  const auth = Buffer.from(`${process.env.FATSECRET_CLIENT_ID}:${process.env.FATSECRET_CLIENT_SECRET}`).toString('base64');
+  const r = await fetch('https://oauth.fatsecret.com/connect/token', { method: 'POST', headers: { authorization: `Basic ${auth}`, 'content-type': 'application/x-www-form-urlencoded' }, body: 'grant_type=client_credentials&scope=basic' });
+  if (!r.ok) throw new Error(`fatsecret token ${r.status}`);
+  const j = await r.json(); fsToken = j.access_token; fsExpires = Date.now() + j.expires_in * 1000;
+  return fsToken;
+}
+async function fatsecretSearch(q) {
+  const u = new URL('https://platform.fatsecret.com/rest/server.api');
+  u.search = new URLSearchParams({ method: 'foods.search', search_expression: q, format: 'json', max_results: '12' });
+  const r = await fetch(u, { headers: { authorization: `Bearer ${await fatsecretToken()}` } });
+  if (!r.ok) throw new Error(`fatsecret ${r.status}`);
+  let foods = (await r.json())?.foods?.food || [];
+  if (!Array.isArray(foods)) foods = [foods];
+  return foods.map(f => ({ id: String(f.food_id), name: [f.brand_name, f.food_name].filter(Boolean).join(' · '), ...parseFatSecret(f.food_description) }))
+    .filter(f => Number.isFinite(f.kcal));
+}
+
 http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', ORIGIN);
   res.setHeader('Access-Control-Allow-Headers', 'content-type');
   if (req.method === 'OPTIONS') return res.end();
+  if (req.method === 'GET' && req.url.startsWith('/food-search')) {
+    const q = new URL(req.url, 'http://x').searchParams.get('q') || '';
+    if (!process.env.FATSECRET_CLIENT_ID || q.length < 2) { res.setHeader('content-type', 'application/json'); return res.end('{"foods":[]}'); }
+    try { res.setHeader('content-type', 'application/json'); return res.end(JSON.stringify({ foods: await fatsecretSearch(q.slice(0, 80)) })); }
+    catch (e) { console.error(e.message); res.statusCode = 502; return res.end('{"foods":[]}'); }
+  }
   if (req.method !== 'POST' || !req.url.startsWith('/food-vision')) { res.statusCode = 404; return res.end(); }
   let body = '';
   for await (const chunk of req) { body += chunk; if (body.length > 6e6) { res.statusCode = 413; return res.end(); } }

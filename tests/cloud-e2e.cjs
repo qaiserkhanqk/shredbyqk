@@ -9,7 +9,7 @@ let fails = 0;
 const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? '  — ' + detail : ''}`); if (!ok) fails++; };
 
 // Fake Supabase: the auth endpoints and the handful of REST calls the app makes, with the same privacy rules.
-const DB = { users: {}, profiles: {}, sessions: [], events: [], checkins: [], messages: [] };
+const DB = { users: {}, profiles: {}, sessions: [], events: [], checkins: [], messages: [], food_days: [], places: [] };
 const COACH = 'coach-1'; DB.profiles[COACH] = { id: COACH, role: 'coach', name: 'QK', invite_code: 'QKTEST' };
 let tokenN = 0; const tokens = {};
 function fakeSupabase(route) {
@@ -33,7 +33,7 @@ function fakeSupabase(route) {
   if (p === '/rest/v1/rpc/join_coach') { const c = Object.values(DB.profiles).find(x => x.invite_code === body.code.toUpperCase()); if (!c) return json(400, { message: 'No coach with that code' }); DB.profiles[uid].coach_id = c.id; return json(200, c.name); }
   if (p === '/rest/v1/profiles' && req.method() === 'GET') { if (q('id')) return json(200, [DB.profiles[q('id').slice(3)]].filter(x => x && (x.id === uid || x.coach_id === uid))); return json(200, Object.values(DB.profiles).filter(x => x.coach_id === uid)); }
   if (p === '/rest/v1/profiles' && req.method() === 'PATCH') { const { role, invite_code, coach_id, ...ok } = body; Object.assign(DB.profiles[uid], ok); return json(204); }
-  for (const t of ['sessions', 'events', 'checkins']) if (p === '/rest/v1/' + t) {
+  for (const t of ['sessions', 'events', 'checkins', 'food_days', 'places']) if (p === '/rest/v1/' + t) {
     if (req.method() === 'POST') { for (const r of [].concat(body)) { if ((r.client_id || uid) !== uid) return json(403, { message: 'RLS' }); const row = { ...r, client_id: uid, at: r.at || new Date().toISOString() }; const i = DB[t].findIndex(x => x.client_id === uid && x.at === row.at && x.ex === row.ex); i >= 0 ? (DB[t][i] = row) : DB[t].push(row); } return json(201); }
     return json(200, DB[t].filter(r => inList('client_id').includes(r.client_id) && mine(r.client_id)));
   }

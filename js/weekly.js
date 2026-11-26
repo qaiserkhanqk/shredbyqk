@@ -8,6 +8,7 @@
 // Inputs come from what the app already has: the food log, water taps, weigh-ins, training sessions,
 // the training plan, the profile (targets) and whether the person is in rehab.
 import { targets, dietGoal, ingredientsOf, GROUP_OF, MILK_EQ, DISH, estimate } from './nutrition.js';
+import { avgSteps, activityFromSteps } from './activity.js';
 
 const DAY = 864e5;
 const FRIED_FAST = /zinger|chicken_burger|fried_chicken|broast|nuggets|fries|bun_kebab|anda_shami|samosa_chaat|gol_gappay/;
@@ -91,7 +92,8 @@ export function weekReport(o) {
     fruitDays: stats.filter(s => s.fruit >= 80).length,
   };
   const trend = weightTrend(o.weights || [], now);
-  const report = { days: keys, logged: n, trained: trainDays.size, avg: A, week, target: t, goal, trend, water: { avg: waterAvg, okDays: waterOk, goal: waterGoal(kg) }, wins: [], focus: [], notes: [], enough: n >= 3 };
+  const steps = avgSteps(o.steps || {}, keys);
+  const report = { days: keys, logged: n, trained: trainDays.size, avg: A, week, target: t, goal, trend, water: { avg: waterAvg, okDays: waterOk, goal: waterGoal(kg) }, steps, wins: [], focus: [], notes: [], enough: n >= 3 };
   if (!report.enough) {
     report.line = n ? `${n} full day${n > 1 ? 's' : ''} logged so far. Snap your meals for a few more days and QK will read your week.` : 'Snap your meals this week and QK will read your week for you.';
     return report;
@@ -109,6 +111,7 @@ export function weekReport(o) {
   if (waterAvg && waterOk >= 4) W.push(`You reached your water goal on ${waterOk} days.`);
   if (t && Math.abs(A.kcal - t.kcal) <= t.kcal * 0.1) W.push(`Your calories averaged ${fmt(A.kcal)} a day, within 10% of your target.`);
   if (trend && goalMovesRight(goal, trend.perWeek)) W.push(trendWin(goal, trend.perWeek));
+  if (steps >= 8000) W.push(`About ${fmt(steps)} steps a day. Moving between workouts is what keeps fat loss easy.`);
   if (!W.length) W.push(n >= 3 ? `You logged ${n} days. Starting is the hardest part, and you've started.` : 'You started. That\'s the hardest part.');
   report.wins = W.slice(0, 3);
 
@@ -130,6 +133,9 @@ export function weekReport(o) {
   if (t && (goal !== 'lose' || o.rehab) && A.kcal < t.kcal * 0.75) F.push({ id: 'kcal-low', score: o.rehab ? 9 : 7, title: 'Eat enough to recover',
     why: `You averaged ${fmt(A.kcal)} kcal against ${fmt(t.kcal)}. ${o.rehab ? 'Healing tissue needs energy; this isn\'t the time to under-eat.' : 'Under-eating stalls muscle gain and makes training feel heavy.'}`,
     tip: 'Add a snack you enjoy: a banana with peanut butter, a glass of milk, a handful of nuts, or an extra roti at lunch.' });
+  if (steps !== null && steps < 5000) F.push({ id: 'walk', score: goal === 'lose' ? 7 : 5, title: 'A 15-minute walk after your biggest meal',
+    why: `You averaged about ${fmt(steps)} steps a day. A short walk after eating lowers the blood-sugar rise from roti and rice, and adds 1,500–2,000 steps.`,
+    tip: 'After lunch or dinner, walk before you sit down: round the block, the mall, or up and down the stairs.' });
   if (A.dairy < 250) F.push({ id: 'dairy', score: 6, title: 'A katori of dahi or a glass of milk a day',
     why: 'Dairy was light this week. It\'s the easiest source of calcium and protein, and milk is often fortified with vitamin D.',
     tip: 'Raita with lunch, lassi after training, or doodh before bed.', nutrients: ['Calcium', 'Vitamin D', 'Protein'] });
@@ -154,6 +160,8 @@ export function weekReport(o) {
   /* ---------- Worth knowing (gentle, food first) ---------- */
   if (A.dairy < 250 && week.fishDays === 0) report.notes.push('Vitamin D comes mostly from sunlight, and many people in Pakistan and India are low. 15–20 minutes of sun on your arms helps, and a blood test is worth asking your doctor about.');
   if (week.meatDays === 0 && week.eggDays === 0 && A.dairy < 250) report.notes.push('Vitamin B12 is found almost only in animal foods. If you mostly eat vegetarian, ask your doctor about checking B12.');
+  const act = activityFromSteps(steps, trainDays.size);
+  if (act && p.activity && act !== p.activity) report.notes.push(`Your steps and training suggest “How active” should be ${({ low: 'Train 1–2 days', mid: 'Train 3–5 days', high: 'Train 6–7 days or a physical job' })[act]}. Change it under Your targets for a more accurate calorie target.`);
   if (A.unknownShare > 0.4) report.notes.push('Many of your foods came from the recipe list, so the veg and dairy counts may be partial.');
 
   // Real maintenance from the scale: what you ate, minus what the weight change says you stored.
