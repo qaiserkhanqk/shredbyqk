@@ -5,17 +5,27 @@
 //  - Tracking frame: corner brackets that follow the body and breathe softly while it is tracked.
 //  - Rep read: at the end of every rep a ripple runs up the joints (QK checking the rep), then the rep
 //    number pops above the head, green if clean, red if not, with the clean streak ("3 in a row").
+//  - Rewards: a milestone (100 clean reps, a perfect set) bursts confetti around the lifter with the
+//    reward's name, so the moment is felt, not just logged.
 // Cheap on purpose: a few arcs and lines per frame, no allocations in the hot path beyond small arrays.
 import { tag } from './fx.js';
 
 const C = { good: '#5CC394', bad: '#E46E66', aim: '#9FD0B6' };
-const LOCK_MS = 1100, REP_MS = 1300, LOST_MS = 1500;
+const LOCK_MS = 1100, REP_MS = 1300, LOST_MS = 1500, PARTY_MS = 2800;
+const CONFETTI = ['#5CC394', '#9FD0B6', '#E5A84C', '#F2D06B', '#ffffff', '#7FB8E6'];
 const JOINTS = [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28, 31, 32];
 const easeOut = x => 1 - Math.pow(1 - x, 3);
 
 export class TrackHUD {
   constructor() { this.reset(); }
-  reset() { this.lockT = null; this.lastSeen = -1e9; this.pops = []; this.streak = 0; this.best = 0; this.box = null; this.fpsT = []; }
+  reset() { this.lockT = null; this.lastSeen = -1e9; this.pops = []; this.streak = 0; this.best = 0; this.box = null; this.fpsT = []; this.party = null; }
+
+  /** A reward moment: confetti and a badge with `title` (and a smaller `sub` line). */
+  celebrate(t, title, sub = '') {
+    let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const bits = Array.from({ length: 70 }, () => ({ a: -Math.PI / 2 + (rnd() - 0.5) * 2.6, v: 0.5 + rnd() * 0.9, c: CONFETTI[Math.floor(rnd() * CONFETTI.length)], s: 0.5 + rnd() * 0.8, spin: (rnd() - 0.5) * 12 }));
+    this.party = { t0: t, title, sub, bits };
+  }
   get locked() { return this.lockT != null; }
 
   /** A finished rep. Returns the clean streak so the app can praise milestones. */
@@ -55,6 +65,7 @@ export class TrackHUD {
     if (lk < 1) this.lockOn(ctx, px, b, u, lk, o);
     this.brackets(ctx, b, u, t, lk);
     this.repRead(ctx, px, s, b, u, t, o);
+    if (this.party) this.drawParty(ctx, b, u, t, o);
     ctx.restore();
     return ev;
   }
@@ -117,5 +128,26 @@ export class TrackHUD {
   }
 }
 
-/** Short buzz on phones that support it (Android). iOS ignores it. */
-export function buzz(pattern) { try { navigator.vibrate?.(pattern); } catch {} }
+TrackHUD.prototype.drawParty = function (ctx, b, u, t, o) {
+  const p = this.party, k = (t - p.t0) / PARTY_MS;
+  if (k >= 1) { this.party = null; return; }
+  const cx = (b[0] + b[2]) / 2, cy = b[1] + (b[3] - b[1]) * 0.25, R = (b[3] - b[1]) * 0.9;
+  // Confetti bursts out from the chest and falls.
+  for (const q of p.bits) {
+    const d = easeOut(Math.min(1, k * 1.6)) * R * q.v, x = cx + Math.cos(q.a) * d, y = cy + Math.sin(q.a) * d + k * k * R * 0.9;
+    ctx.save(); ctx.globalAlpha = k < 0.7 ? 1 : (1 - k) / 0.3; ctx.translate(x, y); ctx.rotate(q.spin * k);
+    ctx.fillStyle = q.c; ctx.fillRect(-u * 0.45 * q.s, -u * 0.2 * q.s, u * 0.9 * q.s, u * 0.4 * q.s); ctx.restore();
+  }
+  // Badge: a ring that draws itself, with the reward's name.
+  const a = k < 0.1 ? k / 0.1 : k > 0.8 ? (1 - k) / 0.2 : 1, by = Math.max(u * 9, b[1] - u * 2);
+  ctx.save(); ctx.globalAlpha = Math.max(0, a);
+  ctx.strokeStyle = '#F2D06B'; ctx.lineWidth = u * 0.5; ctx.shadowColor = '#F2D06B'; ctx.shadowBlur = u * 2;
+  ctx.beginPath(); ctx.arc(cx, by - u * 4, u * 3, -Math.PI / 2, -Math.PI / 2 + easeOut(Math.min(1, k * 3)) * Math.PI * 2); ctx.stroke();
+  ctx.shadowBlur = 0; ctx.translate(cx, by - u * 4); if (o.mirror) ctx.scale(-1, 1);
+  ctx.fillStyle = '#F2D06B'; ctx.font = `900 ${u * 3}px "Archivo", system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('★', 0, u * 0.2);
+  ctx.restore();
+  ctx.globalAlpha = Math.max(0, a);
+  tag(ctx, { x: cx - u * 7, y: by + u * 0.6 }, p.title, '#F2D06B', u * 1.5, o);
+  if (p.sub) tag(ctx, { x: cx - u * 6, y: by + u * 3.4 }, p.sub, C.good, u * 1.1, o);
+  ctx.globalAlpha = 1;
+};

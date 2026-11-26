@@ -538,6 +538,24 @@ a.ghost { text-decoration: none; text-align: center; display: inline-flex; align
 .pick-grid button { padding: 10px; font-size: .9rem; }
 
 /* LIVE tracking chip: a pulsing dot while QK has the body locked. */
+/* Rewards: clean-rep medals and the reward line on the set summary. */
+.reward { display: flex; gap: 14px; align-items: center; border-color: rgba(242,208,107,.5); }
+.reward b { font: 800 1.05rem var(--f-display, inherit); }
+.reward p { margin: 2px 0 8px; }
+.medal { flex: none; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 1.5rem; color: #3a2c05;
+  background: radial-gradient(circle at 35% 30%, #FBE7A1, #E5A84C); box-shadow: 0 0 0 3px rgba(242,208,107,.3); }
+.bar { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--good), #F2D06B); transition: width .6s; }
+.medals { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.medals div { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; font: 600 .68rem var(--f-body); color: var(--muted); }
+.medals span { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font: 800 .72rem var(--f-data); color: var(--muted);
+  background: var(--surface-2); border: 1px dashed var(--line); }
+.medals .on { color: var(--text); }
+.medals .on span { border: 0; color: #2b2105; }
+.medals .bronze span { background: radial-gradient(circle at 35% 30%, #F3C9A0, #B97A45); }
+.medals .silver span { background: radial-gradient(circle at 35% 30%, #F4F6F5, #A9B3B0); }
+.medals .gold span { background: radial-gradient(circle at 35% 30%, #FBE7A1, #E5A84C); }
+.medals .platinum span { background: radial-gradient(circle at 35% 30%, #E8F6F8, #8FC3CB); }
 .track-chip { position: absolute; top: 104px; left: 16px; display: inline-flex; align-items: center; gap: 7px; pointer-events: none;
   font: 600 .72rem var(--f-data); letter-spacing: .06em; text-transform: uppercase; color: rgba(236,241,236,.75);
   background: rgba(var(--scrim-rgb),.7); border: 1px solid var(--line); padding: 4px 9px; border-radius: 99px; }
