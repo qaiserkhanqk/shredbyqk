@@ -72,7 +72,7 @@ function renderDetail() {
       <span>Sets this week</span><span>${c.sets}</span>
       <span>Volume this week</span><span>${c.volume.toLocaleString()} kg</span>
       <span>Form score this week (last week)</span><span>${c.form == null ? '–' : c.form + '%'}${c.formPrev == null ? '' : ` (${c.formPrev}%)`}</span>
-      <span>Program</span><span>${prog ? `${esc(prog.name)} · month ${c.program.block || 1}` : '–'}</span>
+      <span>Program</span><span>${prog || c.program?.name ? `${esc(prog?.name || c.program.name)} · month ${c.program.block || 1}` : '–'}</span>
       <span>Last workout</span><span>${c.lastWorkout ? `${ago(c.lastWorkout.at)}: ${esc(c.lastWorkout.exercises.slice(0, 3).join(', '))}` : '–'}</span>
       <span>Personal bests this week</span><span>${c.prs.length ? esc(c.prs.map(p => p.name).join(', ')) : '–'}</span>
       <span>Most common fault (4 weeks)</span><span>${fault ? `${esc(fault)} ×${c.topFault.n}` : '–'}</span>

@@ -28,7 +28,8 @@ import * as refresh from './refresh.js';
 import { CLOUD, cloudOn } from './cloud-config.js';
 import * as classes from './classes.js';
 import { Cloud, pushAll } from './sync.js';
-import { PROGRAMS, scheme as progScheme, weeklySets, currentDay, byId as programById, GOALS, pickProgram, defaultDays } from './programs.js';
+import { PROGRAMS, scheme as progScheme, weeklySets, currentDay, byId as builtinById, GOALS, pickProgram, defaultDays } from './programs.js';
+import * as builder from './builder.js';
 import { ExerciseDetector, PICK_LIST } from './detect.js';
 import { initCalm, renderCalm, startCalmNow } from './calm.js';
 import { WEIGHTED, lastLoad, weekSummary } from './share.js';
@@ -1581,6 +1582,70 @@ $('#cpSkip').onclick = () => { if (cls) { cls.done += Math.max(0, cls.left); nex
 $('#cpEnd').onclick = () => finishClass(false);
 $('#cpRound').onclick = () => { if (!cls) return; cls.score++; $('#cpScore').textContent = cls.score; say(String(cls.score), { id: 'rnd_' + cls.score, priority: 'now' }); };
 
+/* ---------- Workout builder ---------- */
+// Built programs live in S.customPrograms and behave exactly like the built-in ones.
+const programById = id => builtinById(id) || (S.customPrograms || []).find(p => p.id === id) || null;
+let bd = null, bdDay = 0;
+function openBuilder(p) {
+  bd = p ? JSON.parse(JSON.stringify(p)) : builder.blank();
+  $('#bdName').value = bd.name; $('#bdTag').value = bd.tagline || ''; $('#bdErr').hidden = true;
+  $('#builder').hidden = false; drawBuilder();
+}
+function drawBuilder() {
+  $('#bdDays').innerHTML = bd.plan.map((d, di) => `<div class="bd-day" data-day="${di}">
+    <div class="bd-day-head"><input data-dname="${di}" value="${esc(d.name)}" aria-label="Day name"><button type="button" data-ddel="${di}" aria-label="Remove day" title="Remove day">✕</button></div>
+    ${d.items.length ? '<div class="bd-cols"><span>Exercise</span><span>Sets</span><span>Reps</span><span>Rest s</span><span></span></div>' : ''}
+    ${d.items.map((it, ii) => `<div class="bd-item"><b>${esc(LIB[it[0]]?.name || it[0])}</b>
+      <input data-f="1" data-d="${di}" data-i="${ii}" value="${it[1]}" inputmode="numeric" aria-label="Sets">
+      <input data-f="2" data-d="${di}" data-i="${ii}" value="${esc(it[2])}" aria-label="Reps">
+      <input data-f="3" data-d="${di}" data-i="${ii}" value="${it[3]}" inputmode="numeric" aria-label="Rest seconds">
+      <span class="bd-btns"><button type="button" data-up="${di}:${ii}" aria-label="Move up">↑</button><button type="button" data-down="${di}:${ii}" aria-label="Move down">↓</button><button type="button" data-rm="${di}:${ii}" aria-label="Remove">✕</button></span></div>`).join('')}
+    <button class="ghost" type="button" data-add="${di}">+ Add exercise</button></div>`).join('');
+}
+$('#builder').addEventListener('input', () => { $('#bdErr').hidden = true; });
+$('#bdDays').addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset.dname != null) bd.plan[+t.dataset.dname].name = t.value;
+  if (t.dataset.f) bd.plan[+t.dataset.d].items[+t.dataset.i][+t.dataset.f] = t.value;
+});
+$('#bdDays').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const [di, ii] = (b.dataset.up || b.dataset.down || b.dataset.rm || '').split(':').map(Number);
+  if (b.dataset.up) bd.plan[di].items = builder.move(bd.plan[di].items, ii, -1);
+  else if (b.dataset.down) bd.plan[di].items = builder.move(bd.plan[di].items, ii, 1);
+  else if (b.dataset.rm) bd.plan[di].items.splice(ii, 1);
+  else if (b.dataset.ddel) { if (bd.plan.length > 1) bd.plan.splice(+b.dataset.ddel, 1); }
+  else if (b.dataset.add) { bdDay = +b.dataset.add; $('#bdSearchTitle').textContent = `Add to ${bd.plan[bdDay].name || 'this day'}`; $('#bdQ').value = ''; $('#bdSearch').hidden = false; drawSearch(); $('#bdQ').focus(); return; }
+  drawBuilder();
+});
+function drawSearch() {
+  const q = $('#bdQ').value.trim(), inDay = bd.plan[bdDay].items.map(it => it[0]);
+  const hits = q ? builder.search(LIB, q) : builder.search(LIB, '', { limit: 0 });
+  $('#bdResults').innerHTML = q ? (hits.map(x => `<button type="button" data-pick="${x.id}" class="${inDay.includes(x.id) ? 'added' : ''}"><b>${esc(x.name)}</b><span>${esc((x.muscles || []).slice(0, 2).join(' · '))} · ${esc(x.equipment)}${x.pattern ? ' · form check' : ''}${inDay.includes(x.id) ? ' · added ✓' : ''}</span></button>`).join('') || '<p class="empty">Nothing matches. Try another word.</p>') : '<p class="empty">Type an exercise, muscle or piece of equipment.</p>';
+}
+$('#bdQ').oninput = drawSearch;
+$('#bdResults').onclick = e => { const b = e.target.closest('[data-pick]'); if (!b) return; const id = b.dataset.pick; if (!bd.plan[bdDay].items.some(it => it[0] === id)) { bd.plan[bdDay].items.push([id, ...builder.defaults(LIB[id])]); drawSearch(); toast(`Added ${LIB[id].name}`); } };
+$('#bdSearchClose').onclick = () => { $('#bdSearch').hidden = true; drawBuilder(); };
+$('#bdAddDay').onclick = () => { bd.plan.push({ name: `Day ${bd.plan.length + 1}`, focus: '', items: [] }); drawBuilder(); };
+$('#bdCancel').onclick = () => { bd = null; $('#builder').hidden = true; };
+$('#bdSave').onclick = () => {
+  bd.name = $('#bdName').value; bd.tagline = $('#bdTag').value;
+  const errs = builder.validate(bd, LIB);
+  if (errs.length) { $('#bdErr').textContent = errs.slice(0, 3).join(' '); $('#bdErr').hidden = false; return; }
+  const p = builder.finalize(bd), list = (S.customPrograms ||= []), i = list.findIndex(x => x.id === p.id);
+  i >= 0 ? (list[i] = p) : list.unshift(p);
+  // Editing the program you're on updates this month's plan too.
+  if (S.program?.id === p.id) S.program.plan = p.plan;
+  persist(); bd = null; $('#builder').hidden = true; renderPrograms(); renderToday(); toast(`Saved "${p.name}". Tap it to start.`);
+  showProgram(p.id);
+};
+$('#buildNew').onclick = () => openBuilder();
+$('#rsheetBody').addEventListener('click', e => {
+  const ed = e.target.closest('[data-progedit]'), del = e.target.closest('[data-progdel]');
+  if (ed) { const p = programById(ed.dataset.progedit); closeSheet(); openBuilder(p.custom ? p : builder.fromTemplate(p)); }
+  if (del) { S.customPrograms = (S.customPrograms || []).filter(p => p.id !== del.dataset.progdel); persist(); closeSheet(); renderPrograms(); toast('Program deleted.'); }
+});
+
 /* ---------- Programs ---------- */
 // The program's rep target for an exercise on today's program day (feeds the progression engine).
 function programScheme(k) {
@@ -1595,9 +1660,10 @@ function logProgramDay(k) {
 function renderPrograms() {
   const act = activeProgram(), d = programDay();
   $('#progActive').textContent = act ? `On ${act.name} · ${d.doneToday ? 'today done ✓' : 'next: ' + d.day.name}` : '';
-  const list = act ? [act, ...PROGRAMS.filter(p => p.id !== act.id)] : PROGRAMS;
+  const all = [...(S.customPrograms || []), ...PROGRAMS];
+  const list = act ? [act, ...all.filter(p => p.id !== act.id)] : all;
   $('#progStrip').innerHTML = list.map(p => `<button type="button" role="listitem" class="prog-card ${p.id === act?.id ? 'on' : ''}" data-prog="${p.id}">
-    <span class="pgoal">${esc(p.goal)}${p.id === act?.id ? ` · month ${S.program.block || 1}` : ''}</span><b>${esc(p.name)}</b><p>${esc(p.tagline)}</p>
+    <span class="pgoal">${p.custom ? 'Yours' : esc(p.goal)}${p.id === act?.id ? ` · month ${S.program.block || 1}` : ''}</span><b>${esc(p.name)}</b><p>${esc(p.tagline)}</p>
     <span class="meta">${p.days} days/week · ${p.weeks} weeks · ~${Math.round(weeklySets(p))} sets/week · ${esc(p.level)}</span></button>`).join('');
 }
 function showProgram(id) {
@@ -1607,7 +1673,7 @@ function showProgram(id) {
     <p class="muted small" style="margin:0"><b>How it works:</b> ${esc(p.method)} QK picks your weights from how each session went.</p>
     <p class="data small" style="margin:0">${p.days} days a week · ${p.weeks} weeks · about ${Math.round(weeklySets(p))} working sets a week</p>
     ${p.plan.map(dd => `<div class="prog-day"><h3>${esc(dd.name)} <span class="muted small">· ${esc(dd.focus)}</span></h3><ol>${dd.items.map(it => `<li>${esc(LIB[it[0]]?.name || it[0])} <span>${it[1]} × ${esc(it[2])}${it[3] ? ` · rest ${it[3] < 120 ? it[3] + ' s' : it[3] / 60 + ' min'}` : ''}</span>${it[4] ? `<br><span class="muted small">${esc(it[4])}</span>` : ''}</li>`).join('')}</ol></div>`).join('')}
-    <div class="btn-row">${on ? '<button class="ghost" type="button" data-progstop>Stop this program</button>' : ''}<button class="cta" type="button" data-progstart="${p.id}">${on ? 'Restart from day 1' : 'Start this program'}</button></div>`);
+    <div class="btn-row"><button class="ghost" type="button" data-progedit="${p.id}">${p.custom ? 'Edit' : 'Copy and edit'}</button>${p.custom && !on ? `<button class="ghost" type="button" data-progdel="${p.id}">Delete</button>` : ''}${on ? '<button class="ghost" type="button" data-progstop>Stop this program</button>' : ''}<button class="cta" type="button" data-progstart="${p.id}">${on ? 'Restart from day 1' : 'Start this program'}</button></div>`);
 }
 $('#progStrip').onclick = e => { const b = e.target.closest('[data-prog]'); if (b) showProgram(b.dataset.prog); };
 $('#rsheetBody').addEventListener('click', e => {

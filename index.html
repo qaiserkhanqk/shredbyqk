@@ -88,6 +88,7 @@
     <div class="prog-head"><span class="eyebrow">Classes · QK runs them, any time</span></div>
     <div class="prog-strip" id="classStrip" role="list"></div>
     <div class="prog-head"><span class="eyebrow">Programs</span><span class="muted small" id="progActive"></span></div>
+    <button class="ghost build-btn" type="button" id="buildNew">+ Build your own program</button>
     <div class="prog-strip" id="progStrip" role="list"></div>
     <label class="field"><span class="eyebrow">Search</span><input id="exSearch" type="search" placeholder="Search 84 exercises, e.g. row, squat, cable" autocomplete="off"></label>
     <div class="chips-scroll" id="muscleChips" role="group" aria-label="Filter by muscle"></div>
@@ -707,6 +708,23 @@
 
 <div class="sheet-wrap" id="foodSheet" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-label="Food" id="foodSheetBody"></div>
+</div>
+
+<!-- Workout builder -->
+<div class="builder" id="builder" hidden>
+  <div class="bd-top"><button class="linkbtn" type="button" id="bdCancel">Cancel</button><b>Build a program</b><button class="linkbtn" type="button" id="bdSave">Save</button></div>
+  <div class="bd-body">
+    <label class="field">Program name<input id="bdName" placeholder="e.g. QK Summer Shred" maxlength="40"></label>
+    <label class="field">Short description (optional)<input id="bdTag" placeholder="What it's for, in one line" maxlength="90"></label>
+    <div id="bdDays"></div>
+    <button class="ghost" type="button" id="bdAddDay">+ Add a day</button>
+    <p class="cd-err" id="bdErr" hidden></p>
+  </div>
+  <div class="bd-search" id="bdSearch" hidden>
+    <div class="bd-top"><button class="linkbtn" type="button" id="bdSearchClose">Done</button><b id="bdSearchTitle">Add exercises</b><span></span></div>
+    <input id="bdQ" type="search" placeholder="Search: squat, dumbbell chest, glutes…" autocomplete="off">
+    <div class="bd-results" id="bdResults"></div>
+  </div>
 </div>
 
 <!-- Class player: a full-screen class QK runs by voice -->

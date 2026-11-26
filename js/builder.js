@@ -37,7 +37,7 @@ export function validate(p, lib) {
 }
 
 /** A new, empty program for the builder. */
-export const blank = (now = Date.now()) => ({ id: 'my-' + now.toString(36), name: '', goal: 'Custom', level: 'Custom', days: 3, weeks: 8, custom: true, tagline: '', method: 'Built in Shred by QK. QK picks your weights from how each session went.', plan: [{ name: 'Day 1', focus: '', items: [] }] });
+export const blank = (now = Date.now()) => ({ id: 'my-' + now.toString(36), name: '', goal: 'Your program', level: 'Built by you', days: 3, weeks: 8, custom: true, tagline: '', method: 'Your own program, built in Shred by QK.', plan: [{ name: 'Day 1', focus: '', items: [] }] });
 
 /** Finish a draft: tidy names, set days to the number of planned days. */
 export function finalize(draft) {
@@ -55,7 +55,7 @@ export function search(lib, q, { limit = 30, exclude = [] } = {}) {
 }
 
 /** Start a custom program from a built-in one (so a coach can tweak a template). */
-export const fromTemplate = (p, now = Date.now()) => ({ ...JSON.parse(JSON.stringify(p)), id: 'my-' + now.toString(36), name: `${p.name} (my version)`, custom: true, home: p.home });
+export const fromTemplate = (p, now = Date.now()) => ({ ...JSON.parse(JSON.stringify(p)), id: 'my-' + now.toString(36), name: `${p.name} (my version)`, custom: true, home: p.home, level: 'Built by you', method: `Your version of ${p.name}. ${p.method}` });
 
 /** Move an item within a day (drag-free reordering with up/down buttons). */
 export function move(items, i, dir) {
