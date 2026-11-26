@@ -200,6 +200,11 @@ A 5–15 minute session: rate tension (0–10) → slow breathing with optional 
     - kneeling or overhead-cable curls and crunches, where the camera angle doesn't match the pattern
   - Each kept exercise inherits its pattern's NSCA-based rules and the lifter's personal limits.
   - Flags on each exercise scope the rules: free-standing squat, bench with feet down, or a rule that doesn't apply. For example, a preacher curl's arm rests on the pad at an angle, so the "elbow swing" check is off. That also fixed two existing false alarms, on the preacher curl and the conventional deadlift. A deadlift's knees bend by design, so "squatting, not hinging" no longer fires on it or on the kettlebell swing.
+- **More training types (`js/library-more.js`, `js/library.js`).**
+  - From free-exercise-db: plyometrics (58), Olympic lifts (35), stretching and mobility (121) and cardio (14). Strongman entries are left out, and only names, equipment, muscles and level are used.
+  - `tools/import-categories.py` gives each one a coaching mode and a guide in the app's own words. Olympic squat, press and hinge variants use the matching camera checks; the full lifts are labelled as needing a coach, because they're too fast and complex for a phone to judge reliably.
+  - Running sessions and HYROX are hand-written. HYROX uses the race order and distances (8 × 1 km run plus SkiErg, sled push, sled pull, burpee broad jump, row, farmer's carry, sandbag lunges and wall balls); weights vary by division, so the app points to hyrox.com.
+  - Pilates follows the classical mat order from Joseph Pilates' *Return to Life Through Contrology* (1945), with guides in the app's own words.
 - **Not yet verified:** NSCA text, wording against the manual itself (it couldn't be fetched); the exact ankle dorsiflexion cut-off (no consensus value was found, so the app uses a conservative 28° shin angle and doesn't quote a "typical" number).
 
 ## 12. Body check: heart rate, HRV and alertness with only the phone (`js/hr.js`, `js/vitals.js`)

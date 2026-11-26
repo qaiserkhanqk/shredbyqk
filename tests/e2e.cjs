@@ -272,6 +272,22 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.click('#doneBtn');
   await p.evaluate(() => { delete window.__qkFeed; });
 
+  // New training types: filters, a HYROX stopwatch and running intervals.
+  await p.goto('https://shred.local/'); await go('train');
+  await p.click('[data-muscle="HYROX"]');
+  check('library: HYROX filter lists the run and 8 stations', /^9 exercises/.test(await p.textContent('#exCount')), await p.textContent('#exCount'));
+  await tap('[data-train=hyroxSki]');
+  check('HYROX station: stopwatch coaching', /QK times you/.test(await p.textContent('#setupTitle')));
+  await p.click('#startGuided'); await p.waitForTimeout(14000); await p.click('#endLive'); await p.waitForTimeout(400);
+  check('HYROX station: time saved', /^0:1\d$/.test(await p.textContent('#sReps')), await p.textContent('#sReps'));
+  await p.click('#doneBtn'); await go('train'); await p.click('[data-muscle="Running"]');
+  await tap('[data-train=runSprints]'); await p.click('#startGuided'); await p.waitForTimeout(6500);
+  check('running intervals: "Go" with the time left, round 1 of 8', /Go \d:\d\d/.test(await p.textContent('#tempoWord')) && /of 8 rounds/.test(await p.textContent('#repLbl')), await p.textContent('#tempoWord'));
+  await p.click('#endLive'); await p.waitForTimeout(300); await p.click('#doneBtn');
+  const kindCounts = [];
+  for (const k of ['Plyometrics', 'Olympic', 'Stretching', 'Cardio', 'Pilates']) { await go('train'); await p.click(`[data-muscle="${k}"]`); kindCounts.push(parseInt(await p.textContent('#exCount'))); }
+  check('library: plyometrics, Olympic, stretching, cardio and Pilates filters all list exercises', kindCounts.every(n => n > 0), kindCounts.join(','));
+
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();
   console.log(fails ? `${fails} FAILED` : 'ALL PASS'); process.exit(fails ? 1 : 0);
