@@ -82,6 +82,8 @@
   <section class="screen" id="train">
     <div class="page-head"><div><span class="eyebrow">Form check</span><h1 class="display h1">What are we training?</h1></div></div>
     <button type="button" class="cam-start" id="camCoach2"><span class="cam-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5zM1 5h15v14H1z"/></svg></span><span><b>Just start moving</b><span>Open the camera and do your exercise. QK recognises it and corrects you live.</span></span></button>
+    <div class="prog-head"><span class="eyebrow">Classes · QK runs them, any time</span></div>
+    <div class="prog-strip" id="classStrip" role="list"></div>
     <div class="prog-head"><span class="eyebrow">Programs</span><span class="muted small" id="progActive"></span></div>
     <div class="prog-strip" id="progStrip" role="list"></div>
     <label class="field"><span class="eyebrow">Search</span><input id="exSearch" type="search" placeholder="Search 84 exercises, e.g. row, squat, cable" autocomplete="off"></label>
@@ -412,6 +414,8 @@
       </div>
     </details>
 
+    <a class="card coach-dash-link" href="coach.html" id="coachDashLink"><span><b>Coach dashboard</b><span class="muted small">See who's training, who isn't, and send cheers.</span></span><span aria-hidden="true">→</span></a>
+
     <details class="card" id="coachLink" hidden>
       <summary>Your coach</summary>
       <div class="stack" style="margin-top:14px">
@@ -699,6 +703,21 @@
 
 <div class="sheet-wrap" id="foodSheet" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-label="Food" id="foodSheetBody"></div>
+</div>
+
+<!-- Class player: a full-screen class QK runs by voice -->
+<div class="class-player" id="classPlayer" hidden>
+  <div class="cp-top"><span class="eyebrow" id="cpBlock"></span><button class="iconbtn" type="button" id="cpEnd" aria-label="End class">✕</button></div>
+  <div class="cp-bar"><i id="cpBar"></i></div>
+  <div class="cp-main">
+    <span class="cp-kind" id="cpKind"></span>
+    <h2 class="display cp-move" id="cpMove"></h2>
+    <p class="cp-cue" id="cpCue"></p>
+    <div class="cp-ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="52" fill="none" stroke-width="10" class="cp-track"/><circle id="cpArc" cx="60" cy="60" r="52" fill="none" stroke-width="10" stroke-linecap="round" stroke-dasharray="327" transform="rotate(-90 60 60)"/></svg><div class="cp-time num" id="cpTime">0:00</div></div>
+    <button class="cta cp-round" type="button" id="cpRound" hidden>+1 round <span id="cpScore">0</span></button>
+    <p class="cp-next" id="cpNext"></p>
+  </div>
+  <div class="cp-ctrl"><button class="ghost" type="button" id="cpPause">Pause</button><button class="ghost" type="button" id="cpSkip">Skip</button></div>
 </div>
 
 <div class="toast" id="toast" hidden></div>

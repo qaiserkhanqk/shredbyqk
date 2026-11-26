@@ -26,6 +26,7 @@ import * as brief from './brief.js';
 import { icsFor, dueToday } from './reminders.js';
 import * as refresh from './refresh.js';
 import { CLOUD, cloudOn } from './cloud-config.js';
+import * as classes from './classes.js';
 import { Cloud, pushAll } from './sync.js';
 import { PROGRAMS, scheme as progScheme, weeklySets, currentDay, byId as programById, GOALS, pickProgram, defaultDays } from './programs.js';
 import { ExerciseDetector, PICK_LIST } from './detect.js';
@@ -282,7 +283,7 @@ COACH.tempo.note = COACH.hold.note = 'A camera can\'t judge this movement reliab
 
 let muscleFilter = 'All', searchQ = '';
 function renderTrain() {
-  renderPrograms();
+  renderPrograms(); renderClasses();
   $('#muscleChips').innerHTML = ['All', ...Object.keys(KINDS), ...MUSCLES, 'Rehab'].map(m => `<button type="button" class="mchip ${m === muscleFilter ? 'on' : ''}" data-muscle="${m}" aria-pressed="${m === muscleFilter}">${m}</button>`).join('');
   const q = searchQ.trim().toLowerCase();
   // Physio exercises live under their own Rehab filter so they don't clutter the gym library.
@@ -1455,6 +1456,13 @@ function renderCoachLink() {
   $('#clStatus').textContent = coach ? `Connected to ${coach} ✓ Your sessions sync automatically. Only numbers are shared; your videos never leave your phone.`
     : signed ? 'Signed in. Now enter your coach\'s invite code.' : 'Connect to your coach so they can see your training and cheer you on. Only numbers are shared (sets, reps, weights, form scores). Your videos never leave your phone.';
 }
+// Demo (no server yet): messages sent to "this phone" from the dashboard demo are read out here.
+function demoInbox() {
+  if (cloud) return;
+  let msgs = []; try { msgs = JSON.parse(localStorage.getItem('qk_demo_inbox') || '[]'); localStorage.removeItem('qk_demo_inbox'); } catch {}
+  msgs.forEach((m, i) => setTimeout(() => { say(`Message from your coach. ${m.body}`, { id: 'demomsg_' + m.id, priority: 'high' }); toast(`Coach: ${m.body}`); }, 1500 + i * 6000));
+}
+if (!cloud) { demoInbox(); document.addEventListener('visibilitychange', () => { if (!document.hidden) demoInbox(); }); }
 if (cloud) {
   $('#clSend').onclick = async () => { const e = $('#clEmail').value.trim(); if (!e) return; try { await cloud.sendCode(e); $('#clStep2').hidden = false; toast('Code sent. Check your email.'); } catch (err) { toast(err.message); } };
   $('#clVerify').onclick = async () => { try { await cloud.verify($('#clEmail').value, $('#clCode').value); renderCoachLink(); } catch (err) { toast(err.message); } };
@@ -1469,6 +1477,100 @@ if (cloud) {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) syncNow(); });
   addEventListener('online', syncNow); setInterval(syncNow, 5 * 60e3);
 }
+
+/* ---------- QK classes: on-demand classes run by voice ---------- */
+function renderClasses() {
+  S.classes ||= [];
+  $('#classStrip').innerHTML = classes.CLASSES.map(c => { const best = classes.bestScore(S.classes, c.id), done = S.classes.filter(r => r.class === c.id).length;
+    return `<button type="button" role="listitem" class="prog-card class-card" data-class="${c.id}"><span class="pgoal">${classes.minutes(c)} min · ${esc(c.level)}</span><b>${esc(c.name)}</b><p>${esc(c.tagline)}</p>
+      <span class="meta">${esc(classes.format(c))}${c.equipment === 'dumbbells' ? ' · dumbbells' : ' · no equipment'}${done ? ` · done ${done}×${best ? `, best ${best} rounds` : ''}` : ''}</span></button>`; }).join('');
+}
+function showClass(id) {
+  const c = classes.byId(id); if (!c) return;
+  const t = classes.timeline(c), best = classes.bestScore(S.classes || [], id);
+  const blocks = c.blocks.map(b => `<div class="prog-day"><h3>${esc(b.name)} <span class="muted small">· ${b.type === 'intervals' ? `${b.rounds} rounds, ${b.work} s on / ${b.rest} s off` : b.type === 'tabata' ? '8 × 20 s on / 10 s off' : b.type === 'emom' ? `${b.minutes} minutes, every minute` : `${b.secs / 60} minutes, as many rounds as possible`}</span></h3>
+    <ol>${(b.moves || []).map(m => { const [id2, reps] = Array.isArray(m) ? m : [m]; return `<li>${esc(classes.MOVES[id2].name)}${reps ? ` <span>${reps} reps</span>` : ''}</li>`; }).join('')}</ol></div>`).join('');
+  openSheet(`<div><span class="eyebrow">QK class · ${classes.minutes(c)} min · ${esc(c.level)}</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.4rem">${esc(c.name)}</h2></div>
+    <p style="margin:0">${esc(c.tagline)}</p>
+    <p class="muted small" style="margin:0">QK calls every move and counts you down. Warm-up and cool-down included. Prop your phone up where you can see it.${best ? ` Your best finisher: ${best} rounds.` : ''}</p>
+    ${c.quiet ? '' : '<label class="check"><input type="checkbox" id="classQuiet"> Quiet mode: no jumping (apartments, sore knees)</label>'}
+    ${blocks}
+    <button class="cta" type="button" data-classstart="${c.id}">Start class · ${Math.round(t.total / 60)} min</button>`);
+}
+$('#classStrip').onclick = e => { const b = e.target.closest('[data-class]'); if (b) showClass(b.dataset.class); };
+$('#rsheetBody').addEventListener('click', e => { const b = e.target.closest('[data-classstart]'); if (b) { const quiet = !!$('#classQuiet')?.checked; closeSheet(); startClass(b.dataset.classstart, { quiet }); } });
+
+let cls = null;
+function startClass(id, { quiet = false } = {}) {
+  const c = classes.byId(id), { segs, total } = classes.timeline(c, { quiet: quiet || c.quiet });
+  cls = { c, segs, total, i: -1, left: 0, done: 0, paused: false, score: 0, t0: Date.now(), last: Date.now(), timer: null };
+  $('#classPlayer').hidden = false; keepAwake(true);
+  say(`${c.name}. ${Math.round(total / 60)} minutes. Let's warm up.`, { id: 'class_start', priority: 'now' });
+  setTimeout(() => { if (cls) { nextSeg(); cls.timer = setInterval(tickClass, 250); } }, 2500);
+}
+function nextSeg() {
+  if (!cls) return;
+  cls.i++;
+  if (cls.i >= cls.segs.length) return finishClass(true);
+  const s = cls.segs[cls.i], nx = cls.segs[cls.i + 1];
+  cls.left = s.secs; cls.half = false; cls.counted = 0;
+  const rest = s.kind === 'rest';
+  $('#classPlayer').classList.toggle('rest', rest);
+  $('#cpBlock').textContent = `${s.block}${s.round ? ` · ${s.kind === 'emom' ? 'minute' : 'round'} ${s.round} of ${s.of}` : ''}`;
+  $('#cpKind').textContent = { warmup: 'Warm-up', work: 'Work', rest: s.label, emom: `${s.reps} reps`, amrap: 'Finisher · as many rounds as you can', cooldown: 'Cool-down' }[s.kind];
+  const name = m => classes.MOVES[m]?.name || m;
+  $('#cpMove').innerHTML = rest ? 'Rest' : s.kind === 'amrap' ? s.moves.map(([m, r]) => `<span>${r} ${esc(name(m))}</span>`).join('') : esc(name(s.move));
+  $('#cpMove').classList.toggle('list', s.kind === 'amrap');
+  $('#cpCue').textContent = rest ? '' : s.kind === 'amrap' ? 'Tap +1 after every full round.' : (classes.MOVES[s.move]?.cue || '');
+  $('#cpNext').textContent = nx ? `Next: ${nx.kind === 'rest' ? 'rest' : nx.kind === 'amrap' ? 'finisher' : name(nx.move)}` : 'Last one!';
+  $('#cpRound').hidden = s.kind !== 'amrap'; $('#cpScore').textContent = cls.score;
+  say(classes.callout(s, nx), { id: 'cls_' + cls.i + '_' + Date.now(), priority: 'now' });
+  drawClass();
+}
+function tickClass() {
+  if (!cls || cls.paused) { if (cls) cls.last = Date.now(); return; }
+  const now = Date.now(), dt = (now - cls.last) / 1000; cls.last = now;
+  cls.left -= dt; cls.done += dt;
+  const s = cls.segs[cls.i], sec = Math.ceil(cls.left);
+  if (s && s.kind !== 'rest' && sec <= 3 && sec >= 1 && cls.counted !== sec) { cls.counted = sec; say(String(sec), { id: 'cd_' + cls.i + '_' + sec, priority: 'now' }); }
+  if (s && s.kind === 'work' && s.secs >= 40 && !cls.half && cls.left <= s.secs / 2) { cls.half = true; say('Halfway. Keep pushing!', { id: 'half_' + cls.i, priority: 'low' }); }
+  if (cls.left <= 0) return nextSeg();
+  drawClass();
+}
+function drawClass() {
+  const s = cls.segs[cls.i]; if (!s) return;
+  const left = Math.max(0, Math.ceil(cls.left));
+  $('#cpTime').textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+  $('#cpArc').style.strokeDashoffset = 327 * (1 - Math.max(0, cls.left) / s.secs);
+  $('#cpBar').style.width = Math.min(100, cls.done / cls.total * 100) + '%';
+}
+function finishClass(complete) {
+  if (!cls) return;
+  clearInterval(cls.timer); keepAwake(false);
+  const c = cls.c, mins = Math.max(1, Math.round((Date.now() - cls.t0) / 60000)), hadAmrap = cls.segs.some(s => s.kind === 'amrap');
+  const best = classes.bestScore(S.classes || [], c.id), score = hadAmrap ? cls.score : null;
+  $('#classPlayer').hidden = true;
+  const done = complete || cls.done >= cls.total * 0.5;
+  cls = null;
+  if (!done) { toast('Class ended early. No worries, come back to it.'); return; }
+  const beat = score != null && best && score > best;
+  say(`${c.name} done! ${mins} minutes.${score != null ? ` ${score} rounds on the finisher.${beat ? ' New best!' : best ? ` Your best is ${best}.` : ''}` : ''} How hard was that?`, { id: 'class_done', priority: 'now' });
+  openSheet(`<div><span class="eyebrow">Class done</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.4rem">${esc(c.name)} ✓</h2></div>
+    <p style="margin:0">${mins} minutes${score != null ? ` · finisher <b>${score} rounds</b>${beat ? ' · new best!' : best ? ` (best ${best})` : ''}` : ''}</p>
+    <label class="field slider">How hard was it? <span class="val" id="crpeV">7</span><input type="range" min="1" max="10" value="7" id="crpe"></label>
+    <button class="cta" type="button" id="classSave">Save</button>`);
+  $('#crpe').oninput = e => ($('#crpeV').textContent = e.target.value);
+  $('#classSave').onclick = () => {
+    const rpe = +$('#crpe').value, at = Date.now();
+    (S.classes ||= []).push({ at, class: c.id, name: c.name, minutes: mins, score, rpe });
+    S.loads.push({ at, rpe, minutes: mins });
+    persist(); closeSheet(); renderClasses(); renderToday(); toast(`Saved. ${mins} minutes${score != null ? `, ${score} rounds` : ''}.`);
+  };
+}
+$('#cpPause').onclick = () => { if (!cls) return; cls.paused = !cls.paused; $('#cpPause').textContent = cls.paused ? 'Resume' : 'Pause'; say(cls.paused ? 'Paused.' : 'And go!', { priority: 'now' }); };
+$('#cpSkip').onclick = () => { if (cls) { cls.done += Math.max(0, cls.left); nextSeg(); } };
+$('#cpEnd').onclick = () => finishClass(false);
+$('#cpRound').onclick = () => { if (!cls) return; cls.score++; $('#cpScore').textContent = cls.score; say(String(cls.score), { id: 'rnd_' + cls.score, priority: 'now' }); };
 
 /* ---------- Programs ---------- */
 // The program's rep target for an exercise on today's program day (feeds the progression engine).

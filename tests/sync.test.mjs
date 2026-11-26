@@ -51,6 +51,9 @@ await pushAll(c, S, mark);
 check('second sync sends nothing new', srv.db.sessions.length === 2 && srv.db.checkins.length === 1);
 S.sessions.push({ at: now, ex: 'row', reps: 8, good: 8, kg: 50 }); mark = await pushAll(c, S, mark);
 check('a new set is sent on the next sync', srv.db.sessions.length === 3 && mark.sessions === now);
+S.classes = [{ at: now + 1, class: 'ignite20', name: 'Ignite 20', minutes: 21, score: null, rpe: 6 }]; mark = await pushAll(c, S, mark);
+check('a finished class syncs as a training day', srv.db.sessions.length === 4 && srv.db.sessions.at(-1).ex === 'class:ignite20' && srv.db.sessions.at(-1).secs === 1260 && srv.db.sessions.at(-1).guided);
+await pushAll(c, S, mark); check('and only once', srv.db.sessions.length === 4);
 
 const msgs = await c.unread(); await c.markRead(msgs.map(m => m.id));
 check('coach messages read and marked', msgs[0].body === 'Great week, Sara!' && srv.calls.some(x => x.method === 'PATCH' && x.path === '/rest/v1/messages?id=in.(7)'));

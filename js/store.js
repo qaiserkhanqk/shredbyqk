@@ -13,7 +13,7 @@ export function save(s) {
 const day = d => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
 
 export function activeDays(s) {
-  return new Set([...s.sessions.map(x => day(x.at)), ...s.checkins.map(x => day(x.at))]);
+  return new Set([...s.sessions.map(x => day(x.at)), ...s.checkins.map(x => day(x.at)), ...(s.classes || []).map(x => day(x.at))]);
 }
 
 // Streak = consecutive days kept "on plan". Unplanned rest days don't break it (rest is part of

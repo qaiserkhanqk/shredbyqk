@@ -89,3 +89,17 @@ export function demoData(now = Date.now()) {
   // Jon: never opened.
   return { profiles, sets, opens, checks: [] };
 }
+
+export const LOCAL_ID = 'this-phone';
+/** A finished class as a guided set, so it counts as a training day. */
+export const classRow = c => ({ at: c.at, ex: 'class:' + c.class, name: c.name, reps: 0, good: 0, secs: (c.minutes || 0) * 60, guided: true });
+export const DEMO_INBOX = 'qk_demo_inbox';
+/** Demo mode: the training saved on this device (the app's local state) as one more client. */
+export function localClient(S, now = Date.now()) {
+  if (!S?.profile?.name && !(S?.sessions || []).length) return null;
+  const sets = [...(S.sessions || []).filter(s => !s.demo), ...(S.classes || []).map(classRow)].map(s => ({ ...s, client_id: LOCAL_ID }));
+  const opens = [{ client_id: LOCAL_ID, at: now }]; // you're looking at it on this device right now
+  const profile = { id: LOCAL_ID, name: `${S.profile?.name || 'You'} (this phone)`, goal: S.profile?.goal, weekly_goal: S.profile?.weeklyGoal || S.plan?.days?.length || 3, plan: S.plan,
+    program: S.program ? { id: S.program.id, block: S.program.block || 1 } : null };
+  return { profile, sets, opens, checks: (S.checkins || []).map(c => ({ ...c, client_id: LOCAL_ID })) };
+}

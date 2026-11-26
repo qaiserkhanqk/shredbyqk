@@ -327,6 +327,20 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   const ics = icsDl ? fs.readFileSync(await icsDl.path(), 'utf8') : '';
   check('reminders: calendar file repeats on the training days', /RRULE:FREQ=WEEKLY;BYDAY=TU,FR,SA/.test(ics), ics.slice(0, 80));
 
+  // QK classes: start a HIIT class, QK runs it, the finisher is scored and saved.
+  await p.goto('https://shred.local/'); await go('train');
+  check('classes: HIIT classes on the Train tab', (await p.$$('#classStrip [data-class]')).length >= 6);
+  await tap('[data-class=ignite20]'); await p.click('[data-classstart]'); await p.waitForTimeout(3200);
+  check('classes: the player runs the warm-up', await p.isVisible('#classPlayer') && /Warm-up/.test(await p.textContent('#cpBlock')), await p.textContent('#cpBlock'));
+  for (let i = 0; i < 80 && await p.isVisible('#classPlayer'); i++) { await p.click('#cpSkip'); await p.waitForTimeout(30); }
+  await p.waitForTimeout(300);
+  check('classes: finished class asks how hard it was', await p.isVisible('#classSave'));
+  await p.click('#classSave'); await p.waitForTimeout(200);
+  check('classes: the class is saved', /done 1×/.test(await p.textContent('[data-class=ignite20] .meta')));
+  // Coach dashboard demo: this phone's training is the first client.
+  await p.goto('https://shred.local/coach.html'); await p.waitForTimeout(700);
+  check('dashboard demo: your own training is the first client, with sample clients', /\(this phone\)/.test(await p.textContent('.cd-row')) && (await p.$$('.cd-row')).length >= 7, (await p.textContent('.cd-row')).replace(/\s+/g, ' '));
+
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();
   console.log(fails ? `${fails} FAILED` : 'ALL PASS'); process.exit(fails ? 1 : 0);
