@@ -1,0 +1,39 @@
+/* Coach dashboard (coach.html). Uses the app's tokens from styles.css. */
+body.coach-page { background: var(--ink); color: var(--text); min-height: 100vh; }
+.cd { max-width: 1180px; margin: 0 auto; padding: 24px 16px 60px; display: flex; flex-direction: column; gap: 16px; }
+.cd-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.cd-me { font-size: .85rem; color: var(--muted); text-align: right; }
+.cd-me code { font: 700 1rem var(--f-data); color: var(--text); background: var(--surface-2); padding: 3px 8px; border-radius: 8px; }
+.cd-demo { margin: 0; background: var(--surface-2); border: 1px dashed var(--line-strong); border-radius: 12px; padding: 10px 14px; font-size: .88rem; }
+.cd-err { margin: 0; color: var(--bad); font-size: .88rem; }
+.cd-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.cd-stat { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; }
+.cd-stat b { display: block; font: 800 1.8rem var(--f-display, inherit); }
+.cd-stat span { font-size: .78rem; color: var(--muted); }
+.cd-stat.bad b { color: var(--bad); } .cd-stat.warn b { color: var(--warn); } .cd-stat.good b { color: var(--good); }
+.cd-tools { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.cd-tools .seg { flex: 1 1 320px; max-width: 460px; }
+.cd-tools input { flex: 1 1 180px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--text); font: inherit; }
+.cd-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 820px) { .cd-grid { grid-template-columns: 1fr; } }
+.cd-list { display: flex; flex-direction: column; gap: 8px; }
+.cd-row { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 12px; align-items: center; text-align: left; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
+.cd-row.sel { border-color: var(--good); box-shadow: 0 0 0 2px rgba(92,195,148,.25); }
+.cd-dot { width: 12px; height: 12px; border-radius: 50%; grid-row: span 2; }
+.cd-dot.inactive { background: var(--bad); } .cd-dot.slipping { background: var(--warn); } .cd-dot.on-track { background: var(--good); }
+.cd-row b { font-size: 1rem; }
+.cd-row .why { grid-column: 2; font-size: .8rem; color: var(--muted); }
+.cd-row .nums { grid-row: span 2; text-align: right; font: 600 .78rem var(--f-data); color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
+.cd-row .nums strong { color: var(--text); font-size: .95rem; }
+.cd-detail { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 12px; }
+.cd-detail h2 { margin: 0; }
+.cd-kv { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; font-size: .88rem; }
+.cd-kv span:nth-child(odd) { color: var(--muted); }
+.cd-kv span:nth-child(even) { font-family: var(--f-data); font-weight: 600; text-align: right; }
+.cd-badge { display: inline-block; font: 700 .7rem var(--f-body); letter-spacing: .08em; text-transform: uppercase; padding: 3px 8px; border-radius: 99px; }
+.cd-badge.inactive { background: rgba(228,110,102,.15); color: var(--bad); } .cd-badge.slipping { background: rgba(229,168,76,.18); color: var(--warn); } .cd-badge.on-track { background: rgba(92,195,148,.16); color: var(--good); }
+.cd-msg { display: flex; flex-direction: column; gap: 8px; }
+.cd-msg textarea { min-height: 70px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); font: inherit; resize: vertical; }
+.cd-tpl { display: flex; flex-wrap: wrap; gap: 6px; }
+.cd-tpl button { font-size: .78rem; padding: 6px 10px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); cursor: pointer; text-align: left; }
+.cd-sent { font-size: .8rem; color: var(--muted); margin: 0; }
