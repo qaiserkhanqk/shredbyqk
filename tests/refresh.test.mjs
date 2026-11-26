@@ -11,6 +11,11 @@ check('bench alternatives are other bench-pattern presses', alts.length >= 4 && 
 check('avoided exercises never offered', !R.alternatives('benchPress', LIB, { avoid: [alts[0]] }).includes(alts[0]));
 const hy = R.alternatives('hyroxSki', LIB);
 check('non-camera exercises get alternatives of the same kind', hy.every(id => (LIB[id].kind || 'gym') === 'hyrox'), hy.join());
+check('HYROX wall balls are never swapped for a gym squat', R.alternatives('hyroxWallBalls', LIB).every(id => LIB[id].kind === 'hyrox'));
+const rr = byId('raceReady'), r2 = R.nextBlock(rr, { block: 1, plan: rr.plan }, { lib: LIB });
+check('HYROX: stations and runs keep their place each month', r2.plan.every((d, i) => d.items.every((it, j) => !['hyrox', 'run'].includes(LIB[rr.plan[i].items[j][0]].kind) || it[0] === rr.plan[i].items[j][0])));
+check('runs stay one session even in a high-volume month', R.nextBlock(rr, { block: 1, plan: rr.plan }, { lib: LIB, compliance: 1, clean: 1 }).plan[0].items[0][1] === 1);
+check('HYROX: the gym lifts still change', r2.changes.some(c => LIB[c.from].kind !== 'hyrox'));
 
 check('reps: volume month', R.repsFor('8-12', 'volume') === '10-15' && R.repsFor('5', 'volume') === '8');
 check('reps: strength month', R.repsFor('8-12', 'strength') === '6-8' && R.repsFor('5', 'strength') === '3');
