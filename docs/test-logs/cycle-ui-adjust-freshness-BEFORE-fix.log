@@ -1,0 +1,9 @@
+FAIL day 0, just synced: the card shows the date of the last usable overnight reading  — Band-adjusted estimate · research No sustained temperature rise seen in this cycle yet, so your estimate comes from your past cycle dates only.Not enough data yet.Research feature. It uses your band's skin temperature together with your own past cycles. It has not been validated on real people or a real band; it has only been tested on synthetic (made-up) data. Your period may come earlier or later. It is not for contraception.
+ok   …and does not say the band data is stale
+FAIL 10 days later with no new band data: "No recent usable band data"  — Band-adjusted estimate · research No sustained temperature rise seen in this cycle yet, so your estimate comes from your past cycle dates only.Not enough data yet.Research feature. It uses your band's skin temperature together with your own past cycles. It has not been validated on real people or a real band; it has only been tested on synthetic (made-up) data. Your period may come earlier or later. It is not for contraception.
+ok   …the last usable reading date is unchanged
+ok   …one logged period only: "Not enough data yet." and no date
+ok   after a sync with new usable nights, the band data is fresh again
+FAIL …and the last usable reading date moved forward  — null
+ok   no JavaScript errors
+3 FAILED of 8
