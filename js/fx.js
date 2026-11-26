@@ -69,7 +69,7 @@ function dashed(ctx, a, b, color, w) {
   ctx.strokeStyle = color; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); ctx.restore();
 }
 // Label pill. Drawn un-mirrored when the canvas is mirrored for the selfie camera.
-function tag(ctx, p, text, color, u, o) {
+export function tag(ctx, p, text, color, u, o) {
   if (!text) return;
   const fs = Math.max(13, u * 0.9);
   ctx.save();

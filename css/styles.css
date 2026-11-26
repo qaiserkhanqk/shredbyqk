@@ -536,3 +536,13 @@ a.ghost { text-decoration: none; text-align: center; display: inline-flex; align
 @media (max-width: 380px) { .detect-chip { max-width: calc(100% - 32px); top: 110px; } }
 .pick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .pick-grid button { padding: 10px; font-size: .9rem; }
+
+/* LIVE tracking chip: a pulsing dot while QK has the body locked. */
+.track-chip { position: absolute; top: 104px; left: 16px; display: inline-flex; align-items: center; gap: 7px; pointer-events: none;
+  font: 600 .72rem var(--f-data); letter-spacing: .06em; text-transform: uppercase; color: rgba(236,241,236,.75);
+  background: rgba(var(--scrim-rgb),.7); border: 1px solid var(--line); padding: 4px 9px; border-radius: 99px; }
+.track-chip i { width: 8px; height: 8px; border-radius: 50%; background: rgba(236,241,236,.45); }
+.track-chip.on { color: #fff; border-color: rgba(92,195,148,.5); }
+.track-chip.on i { background: #E46E66; box-shadow: 0 0 0 0 rgba(228,110,102,.6); animation: livePulse 1.4s ease-out infinite; }
+@keyframes livePulse { 0% { box-shadow: 0 0 0 0 rgba(228,110,102,.6); } 100% { box-shadow: 0 0 0 9px rgba(228,110,102,0); } }
+@media (prefers-reduced-motion: reduce) { .track-chip.on i { animation: none; } }
