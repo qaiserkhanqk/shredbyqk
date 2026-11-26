@@ -369,3 +369,31 @@ screen and not a diagnosis.
   in a prospective 3D study of 205 female athletes, those who later tore the ACL landed with ~8° more knee
   abduction (Hewett et al. 2005, doi:10.1177/0363546504269591). QK's 2D angle is a simpler proxy for this. >10°
   is flagged, and a left–right difference >5° is flagged for extra work on the weaker side.
+
+## Days a week (`js/frequency.js`)
+
+Most adjustable programs start at 5 days a week, and clients can switch to 3 or 4. Beginner programs start
+on their own 3 days. With weekly sets equal, training a muscle 1, 2 or 3+ times a week gives about the same
+growth (Schoenfeld et al. 2019, doi:10.1080/02640414.2018.1555906), and strength frequency effects disappear
+when volume is equated (Grgic et al. 2018, doi:10.1007/s40279-018-0872-x). More weekly sets do give more
+growth (Schoenfeld et al. 2017, doi:10.1080/02640414.2016.1210197). So fewer days keep each muscle's weekly
+sets and pack them into fewer, longer sessions:
+
+- Main lifts keep every set and land on different days; superset pairs move together; no exercise twice in
+  a session.
+- Practical limits (not research findings): 10 sets per muscle per session for accessories, and sessions
+  up to 85 / 75 / 70 minutes at 3 / 4 / 5 days (or the longest original session if longer). Past them, QK
+  trims accessories one set at a time, never below 2, starting with the muscle that has kept the most of
+  its weekly sets. Tested: every muscle stays within 15% of its weekly sets at 3, 4 and 5 days.
+- Circuit, sport, HYROX, plyometric and the 10×10 programs keep their own days, because moving their pieces
+  would break how they work.
+
+**QK judges the days itself**, and only on a clear pattern:
+- It counts complete weeks only, never the current week, and never the first partial week of a program or
+  after a change.
+- Weeks with no sessions (holiday, illness) are skipped, not counted as zero.
+- It needs three counted weeks that are all below the plan (or all above it). Any mixed pattern means no
+  change. Going down, it picks the most the client did in those weeks; going up, the least. The range is 3–5.
+- After a change it needs three new full weeks before judging again. The client is told why ("You trained
+  3, 3, 3 days the last 3 weeks"), and one tap keeps the old days and pauses judging for 4 weeks.
+- Reminder days follow the weekdays the client actually trains on.

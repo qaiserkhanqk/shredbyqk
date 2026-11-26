@@ -35,6 +35,7 @@ import { PROGRAMS, scheme as progScheme, weeklySets, currentDay, byId as builtin
 import * as builder from './builder.js';
 import * as SS from './supersets.js';
 import * as warm from './warmup.js';
+import * as freq from './frequency.js';
 import { ExerciseDetector, PICK_LIST } from './detect.js';
 import { initCalm, renderCalm, startCalmNow } from './calm.js';
 import { WEIGHTED, lastLoad, weekSummary } from './share.js';
@@ -88,6 +89,7 @@ function tab(id) {
   const tabFor = ['body', 'gait', 'scan', 'rehab', 'calm', 'vitals'].includes(id) ? 'today' : id; // tools live under Today
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tabFor));
   if (id === 'today') renderToday();
+  if (id === 'train') renderPrograms();
   if (id === 'progress') { renderProgress(); renderLoad(); renderToday(); $('#youName').textContent = S.profile.name || 'You'; }
   if (id === 'rehab') renderRehab();
   if (id === 'calm') renderCalm();
@@ -108,7 +110,14 @@ document.addEventListener('click', e => {
 /* ---------- Today ---------- */
 const TODAY_DEFAULT = [['hipThrust', '4×10'], ['rdl', '3×10'], ['lunge', '3×12'], ['bandedWalk', '2×20']];
 // Today's workout: the next day of the active program, or the starter glute session.
-const activeProgram = () => { const d = S.program?.id ? programById(S.program.id) : null; return d && S.program.plan ? { ...d, plan: S.program.plan } : d; };
+const baseProgram = () => { const d = S.program?.id ? programById(S.program.id) : null; return d && S.program.plan ? { ...d, plan: S.program.plan } : d; };
+let adaptMemo = {};
+const daysView = (p, n) => {
+  if (!p || !n || !freq.canAdapt(p)) return p;
+  if (adaptMemo.plan === p.plan && adaptMemo.n === n && adaptMemo.id === p.id) return adaptMemo.out;
+  const out = freq.adapt(p, n, LIB); adaptMemo = { plan: p.plan, n, id: p.id, out }; return out;
+};
+const activeProgram = () => { const b = baseProgram(); return b ? daysView(b, S.program.days) : b; };
 const programDay = () => { const p = activeProgram(); return p ? currentDay(p, S.program) : null; };
 const capToday = () => (S.timeCap?.day === new Date().toDateString() ? S.timeCap.mins : null);
 // Rough count of warm-up sets for a day (heavy barbell lifts get about three).
@@ -177,7 +186,7 @@ function renderToday() {
 
   const p = S.plan || {};
   $('#sessionMeta').textContent = [p.time, p.place].filter(Boolean).join(' · ');
-  rollMonth();
+  rollMonth(); autoDays();
   const plan = planToday(), tgt = Object.fromEntries(plan.map(r => [r.id, r]));
   $('#todayList').innerHTML = todayItems().map(([k, sets]) => `<button type="button" class="ex-row" data-train="${k}" style="width:100%;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;cursor:pointer;padding-inline:0"><span class="pic">${icon(iconKey(k))}</span>
     <div><b>${esc(LIB[k].name)}</b>${LIB[k].pattern ? '<span class="tag">QK checks your form</span>' : '<span class="tag" style="color:var(--z3)">QK coaches your tempo</span>'}</div>
@@ -230,7 +239,8 @@ function bindPlan() {
     const d = +b.dataset.day, i = S.plan.days.indexOf(d);
     i >= 0 ? S.plan.days.splice(i, 1) : S.plan.days.push(d);
     if (S.plan.days.length) S.profile.weeklyGoal = S.plan.days.length;
-    persist(); draw(); renderToday();
+    if (S.program && S.plan.days.length >= 3 && S.plan.days.length <= 5) setDays(S.plan.days.length, 'plan');
+    persist(); draw(); renderToday(); renderPrograms();
   };
   $('#planTime').value = S.plan.time; $('#planPlace').value = S.plan.place;
   $('#planTime').onchange = e => { S.plan.time = e.target.value; persist(); draw(); renderToday(); };
@@ -1477,16 +1487,51 @@ const MONTH = 28 * 864e5;
 const inPlan = k => !!activeProgram()?.plan.some(d => d.items.some(it => it[0] === k));
 // Reps done cleanly in the last 4 weeks (form quality for the volume decision).
 const cleanRate = () => { const from = Date.now() - MONTH, xs = S.sessions.filter(x => x.at >= from && !x.demo && !x.guided && x.reps); const r = xs.reduce((a, x) => a + x.reps, 0); return r ? xs.reduce((a, x) => a + Math.min(x.good || 0, x.reps), 0) / r : 1; };
+// Days a week. `how`: 'auto' (QK judged it), 'manual' (the lifter chose), 'undo'.
+function setDays(n, how, extra = {}) {
+  const P = S.program, def = P && programById(P.id); if (!def || !freq.canAdapt(def)) return;
+  const from = P.days || def.days; if (n === from) return;
+  Object.assign(P, { days: n, daysSince: Date.now(), restartAt: (P.log || []).length }, extra);
+  if (S.plan && how !== 'plan') { S.plan.days = freq.usualDays(P.log, n); S.profile.weeklyGoal = n; }
+  persist();
+}
+function autoDays() {
+  const P = S.program, def = P && programById(P.id); if (!def || !freq.canAdapt(def)) return;
+  const cur = P.days || def.days, j = freq.judgeDays(P.log, { current: cur, since: P.daysSince || P.start, hold: P.daysHold || 0 });
+  if (!j) return;
+  setDays(j.days, 'auto', { daysNote: { from: cur, to: j.days, counts: j.counts, dir: j.dir, at: Date.now(), seen: false, planDays: [...(S.plan?.days || [])] } });
+  say(daysLine(S.program.daysNote, true), { id: 'days_' + j.days, priority: 'high' });
+  renderPrograms();
+}
+const daysLine = (n, spoken) => n.dir === 'down'
+  ? `${spoken ? 'I' : 'QK'} moved you to ${n.to} days a week. You trained ${n.counts.join(', ')} days the last ${n.counts.length} weeks. Same weekly sets for every muscle, packed into ${n.to} sessions.`
+  : `${spoken ? 'I' : 'QK'} moved you up to ${n.to} days a week. You trained ${n.counts.join(', ')} days the last ${n.counts.length} weeks. Same weekly sets, shorter sessions.`;
+function renderDaysNews() {
+  const n = S.program?.daysNote, show = n && !n.seen;
+  for (const box of [$('#daysNews'), $('#heroDaysNews')]) {
+    if (!box) continue;
+    box.hidden = !show; if (!show) continue;
+    box.innerHTML = `<b>Now ${n.to} days a week</b><p class="muted small">${esc(daysLine(n))}</p><div class="btn-row"><button class="ghost" type="button" data-daysundo>Keep ${n.from} days</button><button class="cta" type="button" data-daysok>Sounds good</button></div>`;
+  }
+}
+document.addEventListener('click', e => {
+  const ok = e.target.closest('[data-daysok]'), undo = e.target.closest('[data-daysundo]'), n = S.program?.daysNote;
+  if (!n || !(ok || undo)) return;
+  n.seen = true;
+  if (undo) { setDays(n.from, 'undo', { daysHold: Date.now() + 28 * 864e5 }); if (n.planDays?.length) S.plan.days = n.planDays; persist(); toast(`Kept ${n.from} days a week. QK won't change it for 4 weeks.`); }
+  persist(); renderToday(); renderPrograms();
+});
 function rollMonth() {
   const P = S.program, def = P?.id && programById(P.id); if (!def) return;
   P.blockStart ||= P.start; P.block ||= 1;
   if (Date.now() - P.blockStart < MONTH) return;
-  const nb = refresh.nextBlock(def, { block: P.block, plan: P.plan || def.plan }, { lib: LIB, avoid: S.prefs?.avoid || [], compliance: refresh.compliance(P, def.days), clean: cleanRate() });
+  const nb = refresh.nextBlock(def, { block: P.block, plan: P.plan || def.plan }, { lib: LIB, avoid: S.prefs?.avoid || [], compliance: refresh.compliance(P, P.days || def.days), clean: cleanRate() });
   Object.assign(P, { block: nb.block, plan: nb.plan, blockStart: Date.now(), news: { block: nb.block, changes: nb.changes, note: nb.note, seen: false } });
   persist();
   say(`Month ${nb.block} of ${def.name} is ready. ${nb.changes.length} new exercises, same formula. ${nb.note}`, { id: 'month_' + nb.block, priority: 'high' });
 }
 function renderNews() {
+  renderDaysNews();
   const n = S.program?.news, box = $('#planNews');
   if (!n || n.seen) { box.hidden = true; return; }
   box.hidden = false;
@@ -1509,7 +1554,7 @@ $('#swapBtn').onclick = () => {
 };
 $('#rsheetBody').addEventListener('click', e => {
   const b = e.target.closest('[data-swapto]'); if (!b) return;
-  const from = $('#rsheetBody').dataset.swapFrom, to = b.dataset.swapto, plan = activeProgram()?.plan; if (!from || !plan) return;
+  const from = $('#rsheetBody').dataset.swapFrom, to = b.dataset.swapto, plan = baseProgram()?.plan; if (!from || !plan) return;
   S.program.plan = refresh.swapIn(plan, from, to);
   (S.prefs ||= {}).avoid = [...new Set([...(S.prefs.avoid || []), from])];
   persist(); closeSheet(); renderToday(); renderPrograms();
@@ -1811,11 +1856,11 @@ const progMins = p => Math.round(p.plan.reduce((a, dd) => a + warm.dayMinutes(dd
 const progText = p => p.desc || p.tagline;
 const progEquip = p => p.home ? HOME_EQ[p.home] : p.custom || p.athlete ? '' : 'gym';
 function progCard(p, rec) {
-  const c = collectionOf(p.id);
+  const c = collectionOf(p.id), flex = freq.canAdapt(p), v = flex ? daysView(p, freq.defaultDaysFor(p)) : p;
   return `<button type="button" role="listitem" class="prog-card big" data-prog="${p.id}" data-coll="${c?.key || 'yours'}">
     <span class="pgoal">${p.custom ? 'Yours' : esc(c?.name || p.goal)} · ${esc(p.level)}</span><b>${esc(p.name)}</b><p>${esc(progText(p))}</p>
     ${rec ? '<span class="rec-tag">Recommended for your goal</span>' : ''}
-    <span class="meta">${p.days} days/week · ~${progMins(p)} min · ${p.weeks} weeks${progEquip(p) ? ' · ' + progEquip(p) : ''}</span></button>`;
+    <span class="meta">${flex ? '3–5' : p.days} days/week · ~${progMins(v)} min · ${p.weeks} weeks${progEquip(p) ? ' · ' + progEquip(p) : ''}</span></button>`;
 }
 function weekDone() {
   const wk = brief.weekOf(Date.now());
@@ -1833,14 +1878,16 @@ function renderHero() {
   const d = programDay(), done = weekDone(), mw = Math.min(4, Math.floor((Date.now() - (S.program.blockStart || S.program.start)) / (7 * 864e5)) + 1);
   const items = d.day.items, mins = warm.dayMinutes(items, warmCount(items));
   box.innerHTML = `<div class="hero-prog" data-coll="${collectionOf(p.id)?.key || 'yours'}">
-    <span class="eyebrow">Month ${S.program.block || 1} · week ${mw} of 4</span>
+    <span class="eyebrow">Month ${S.program.block || 1} · week ${mw} of 4 · ${p.days} days a week</span>
     <h2 class="display h2" id="heroName">${esc(p.name)}</h2>
+    <div class="news" id="heroDaysNews" hidden></div>
     <p class="hero-sub">${esc(progText(p))}</p>
     <div class="wk-row"><span class="wk-dots" aria-hidden="true">${Array.from({ length: p.days }, (_, i) => `<i class="${i < done.length ? 'on' : ''}"></i>`).join('')}</span><span class="small">${done.length} of ${p.days} sessions this week</span></div>
     <div class="hero-next"><span class="eyebrow">${d.doneToday ? 'Done today ✓ · next time' : 'Today'}</span><b>${esc(d.day.name)}</b><span class="muted small">${esc(d.day.focus)} · ${items.length} exercises · about ${mins} min</span></div>
     <button class="cta" type="button" id="heroStart">${d.doneToday ? 'See today\'s summary' : 'Start workout'}</button>
     <div class="hero-days">${p.plan.map((dd, i) => `<button type="button" class="hero-day ${i === d.index && !d.doneToday ? 'next' : ''}" data-pday="${i}"><span class="n">${i + 1}</span><span><b>${esc(dd.name)}</b><span class="muted small">${esc(dd.focus)}</span></span><span class="tag">${done.includes(i) ? '✓' : i === d.index && !d.doneToday ? 'Next' : `${warm.dayMinutes(dd.items, warmCount(dd.items))} min`}</span></button>`).join('')}</div>
     <button class="ghost" type="button" data-prog="${p.id}">Program details · change or stop</button></div>`;
+  renderDaysNews();
   $('#heroStart').onclick = () => { if (programDay()?.doneToday) { tab('today'); return; } tab('today'); startFlow(); };
 }
 // One program day: what's in it, in order.
@@ -1868,11 +1915,19 @@ function renderPrograms() {
     .map(g => `<div class="coll-head"><b>${esc(g.name)}</b><span class="muted small">${esc(g.sub)}</span></div>${g.list.map(p => progCard(p, p.id === recId)).join('')}`).join('');
 }
 $('#collChips').onclick = e => { const b = e.target.closest('[data-coll]'); if (!b) return; collFilter = b.dataset.coll; renderPrograms(); };
+let pickDays = {};
+// Starting days: the client's pick, else the number of weekdays they already train (3–5), else the program default.
+const startDays = p => { const known = S.plan?.days?.length || 0; return pickDays[p.id] || (known >= 3 && known <= 5 ? known : freq.defaultDaysFor(p)); };
 function showProgram(id) {
-  const on = S.program?.id === id, p = on ? activeProgram() : programById(id); if (!p) return;
+  const on = S.program?.id === id, base = on ? baseProgram() : programById(id); if (!base) return;
+  const flex = freq.canAdapt(base), n = flex ? (on ? S.program.days || base.days : startDays(base)) : base.days, p = daysView(base, n);
+  const cuts = p.adapted?.cut || [];
+  const daysHTML = flex ? `<div class="seg days-seg" role="group" aria-label="Days a week">${freq.DAY_CHOICES.map(d => `<button type="button" data-pdays="${d}" class="${d === n ? 'on' : ''}" aria-pressed="${d === n}">${d} days</button>`).join('')}</div>
+    <p class="muted small" style="margin:0" id="daysWhy">${n === base.days ? `Built for ${base.days} days a week.` : `Re-packed from ${base.days} to ${n} days a week: the same weekly sets for each muscle${cuts.length ? ` (${cuts.length} accessor${cuts.length === 1 ? 'y' : 'ies'} one or two sets lighter to keep sessions a sensible length)` : ''}.`} If your weeks show a different pattern, QK adjusts this by itself and tells you.</p>` : '';
   openSheet(`<div><span class="eyebrow">${esc(p.goal)} · ${esc(p.level)}</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.4rem">${esc(p.name)}</h2></div>
     <p style="margin:0">${esc(progText(p))}</p>
     <p class="muted small" style="margin:0"><b>How it works:</b> ${esc(p.method)} QK picks your weights from how each session went.</p>
+    ${daysHTML}
     <p class="data small" style="margin:0">${p.days} days a week · about ${progMins(p)} min a session · ${p.weeks} weeks · about ${Math.round(weeklySets(p))} working sets a week</p>
     ${p.flag ? `<p class="ath-flag">⚠️ ${esc(p.flag)}</p>` : ''}
     ${p.gaps ? `<p class="ath-gaps">Evidence note: ${esc(p.gaps)}</p>` : ''}
@@ -1883,8 +1938,19 @@ function showProgram(id) {
 }
 $('#progStrip').onclick = e => { const b = e.target.closest('[data-prog]'); if (b) showProgram(b.dataset.prog); };
 $('#rsheetBody').addEventListener('click', e => {
+  const b = e.target.closest('[data-pdays]'); if (!b) return;
+  const id = $('#rsheetBody [data-progstart]')?.dataset.progstart, n = +b.dataset.pdays; if (!id) return;
+  if (S.program?.id === id) { setDays(n, 'manual'); if (S.program.daysNote) S.program.daysNote.seen = true; persist(); renderToday(); renderPrograms(); toast(`${n} days a week. Same weekly sets, new sessions.`); }
+  else pickDays[id] = n;
+  showProgram(id);
+});
+$('#rsheetBody').addEventListener('click', e => {
   const st = e.target.closest('[data-progstart]'), sp = e.target.closest('[data-progstop]');
-  if (st) { S.program = { id: st.dataset.progstart, start: Date.now(), blockStart: Date.now(), block: 1, log: [] }; persist(); closeSheet(); renderPrograms(); renderToday(); const p = activeProgram(); toast(`${p.name} started. Day 1 is on your Today screen.`); say(`${p.name}. Let's go. Day one is ready on your Today screen.`, { priority: 'high' }); }
+  if (st) {
+    const sid = st.dataset.progstart, d0 = programById(sid), nd = freq.canAdapt(d0) ? startDays(d0) : undefined;
+    S.program = { id: sid, start: Date.now(), blockStart: Date.now(), block: 1, log: [], ...(nd ? { days: nd } : {}) };
+    if (nd && S.plan && S.plan.days.length !== nd) { S.plan.days = freq.fitWeekdays(S.plan.days, nd); S.profile.weeklyGoal = nd; }
+    persist(); closeSheet(); renderPrograms(); renderToday(); const p = activeProgram(); toast(`${p.name} started. Day 1 is on your Today screen.`); say(`${p.name}. Let's go. Day one is ready on your Today screen.`, { priority: 'high' }); }
   if (sp) { S.program = null; persist(); closeSheet(); renderPrograms(); renderToday(); toast('Program stopped.'); }
 });
 
@@ -2429,10 +2495,11 @@ $('#obGoals').onclick = e => {
 $('#obExp').onclick = e => { const b = e.target.closest('[data-exp]'); if (!b) return; S.profile.experience = b.dataset.exp; persist(); chooseProgram(pickProgram(obGoalKey, b.dataset.exp === 'new')); };
 function chooseProgram(id) {
   const p = programById(id); if (!p) return;
-  S.program = { id, start: Date.now(), blockStart: Date.now(), block: 1, log: [] };
-  if (!S.plan.days.length) { S.plan.days = defaultDays(p.days); S.profile.weeklyGoal = p.days; }
+  const nd = freq.defaultDaysFor(p);
+  S.program = { id, start: Date.now(), blockStart: Date.now(), block: 1, log: [], ...(freq.canAdapt(p) ? { days: nd } : {}) };
+  if (!S.plan.days.length) { S.plan.days = defaultDays(nd); S.profile.weeklyGoal = nd; }
   persist(); drawObDays();
-  $('#obDaysNote').textContent = `QK picked ${p.name}: ${p.tagline} It's ${p.days} days a week, so QK suggested days. Change them to fit your life.`;
+  $('#obDaysNote').textContent = `QK picked ${p.name}: ${p.tagline} It's ${nd} days a week, so QK suggested days. Change them to fit your life${freq.canAdapt(p) ? ': pick 3, 4 or 5 and QK re-packs the program' : ''}.`;
   obStep(3);
 }
 const OB_ORDER = [1, 2, 3, 4, 5, 6, 0], OB_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -2440,6 +2507,7 @@ function drawObDays() { $('#obDays').innerHTML = OB_ORDER.map(d => `<button type
 $('#obDays').onclick = e => { const b = e.target.closest('[data-day]'); if (!b) return; const d = +b.dataset.day, i = S.plan.days.indexOf(d); i >= 0 ? S.plan.days.splice(i, 1) : S.plan.days.push(d); if (S.plan.days.length) S.profile.weeklyGoal = S.plan.days.length; persist(); drawObDays(); };
 $('#obDone').onclick = $('#obSkip').onclick = () => finishWelcome();
 function finishWelcome() {
+  if (S.program && S.plan?.days.length) setDays(freq.clampDays(S.plan.days.length), 'plan');
   $('#welcome').hidden = true; bindPlan(); renderPrograms(); renderToday(); tab('today');
   if (S.profile.goal === 'athlete' && !S.athlete) setTimeout(() => { tab('train'); openAthlete('sport'); }, 600);
   say(`${greeting(S.profile.name)} ${nudgeLine()}`, { id: 'greet', priority: 'high' });

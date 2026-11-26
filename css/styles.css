@@ -809,3 +809,10 @@ button.row.food-hit { padding: 11px 0; }
 .prog-card[data-coll="home"]::before, .prog-card[data-coll="shape"]::before { background: var(--z1); }
 .prog-card .rec-tag { align-self: flex-start; font: 700 .68rem var(--f-body); letter-spacing: .06em; text-transform: uppercase; color: var(--good); border: 1px solid var(--good); border-radius: 999px; padding: 2px 8px; }
 .more-head { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+
+/* Days a week */
+.days-seg { display: grid; grid-template-columns: repeat(3, 1fr); align-self: stretch; }
+.days-seg button { padding: 9px 6px; }
+#heroDaysNews, #daysNews { display: flex; flex-direction: column; gap: 6px; }
+#heroDaysNews[hidden], #daysNews[hidden] { display: none; }
+#heroDaysNews p, #daysNews p { margin: 0; }

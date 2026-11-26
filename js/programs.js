@@ -227,9 +227,10 @@ export const weeklySets = p => p.plan.reduce((a, day) => a + day.items.reduce((b
 /** The day a lifter is on: rotates through the plan each time a training day is logged. */
 export function currentDay(prog, active) {
   if (!prog || !active) return null;
-  const log = active.log || [], today = new Date().toDateString();
+  // After the days a week change, the rotation restarts at session 1 (log entries before `restartAt` are history).
+  const log = (active.log || []).slice(active.restartAt || 0), today = new Date().toDateString();
   const last = log[log.length - 1];
-  if (last && new Date(last.at).toDateString() === today) return { index: last.day, day: prog.plan[last.day], doneToday: true, n: log.length };
+  if (last && new Date(last.at).toDateString() === today) { const i = last.day % prog.plan.length; return { index: i, day: prog.plan[i], doneToday: true, n: log.length }; }
   const index = log.length ? (last.day + 1) % prog.plan.length : 0;
   return { index, day: prog.plan[index], doneToday: false, n: log.length };
 }
