@@ -65,6 +65,7 @@
       <div class="card-head" style="margin:0"><div><span class="eyebrow" id="planEyebrow">QK's plan for today</span><h2 class="display h2" id="planTitle">Your weights are set</h2></div><button class="linkbtn" type="button" id="planListen" aria-label="Hear the plan"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Hear it</button></div>
       <p class="muted small" style="margin:0" id="planSummary"></p>
       <div class="plan-rows" id="planRows"></div>
+      <button class="cta" type="button" id="planStart"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Start workout</button>
     </div>
 
     <div class="quick" role="group" aria-label="Quick tools">
@@ -364,6 +365,8 @@
           <label class="field">Where<input id="planPlace" placeholder="e.g. PureGym"></label>
         </div>
         <p class="plan-line" id="planLine"></p>
+        <div class="btn-row"><button class="ghost" type="button" id="remindCal">Add reminders to my calendar</button><button class="ghost" type="button" id="remindNotify">Remind me in the app</button></div>
+        <p class="muted small" style="margin:0" id="remindNote">Your calendar reminds you on training days, 30 minutes before. The app also pops up today's plan when it's open.</p>
       </div>
     </details>
     <details class="card" id="profileCard">
@@ -443,7 +446,7 @@
     <ol class="steps" id="setupSteps"></ol>
     <div class="fit-note" id="fitNote" hidden></div>
     <div class="rx" id="rxBox" hidden>
-      <div class="rx-main"><span class="eyebrow" id="rxEyebrow">QK's target today</span><b id="rxLine"></b><p class="muted small" id="rxWhy"></p></div>
+      <div class="rx-main"><span class="eyebrow" id="rxEyebrow">QK's target today</span><b id="rxLine"></b><p class="plates" id="rxPlates" hidden></p><p class="muted small" id="rxWhy"></p></div>
       <button class="ghost" type="button" id="rxEdit">Change</button>
       <div class="rx-edit" id="rxEditWrap" hidden><label class="field"><span id="rxEditLbl">Weight</span><input id="rxKg" type="number" inputmode="decimal" step="0.5" min="0"></label><button class="ghost" type="button" id="rxSave">Save</button></div>
     </div>
@@ -533,6 +536,7 @@
       <p class="muted small" style="margin:0" id="vbtNote"></p>
     </div>
     <div class="card kv" id="sTable"></div>
+    <div class="card flow-next" id="flowNext" hidden><div><span class="eyebrow">Up next · starts when rest ends</span><b id="flowNextLine"></b><span class="muted small" id="flowNextSub"></span></div><button class="ghost" type="button" id="flowGo">Go now</button></div>
     <div class="card rest" id="restCard">
       <svg viewBox="0 0 76 76" aria-hidden="true"><circle cx="38" cy="38" r="32" fill="none" style="stroke:var(--surface-2)" stroke-width="8"/><circle id="restArc" cx="38" cy="38" r="32" fill="none" stroke="url(#zoneStroke)" stroke-width="8" stroke-linecap="round" stroke-dasharray="201" stroke-dashoffset="0" transform="rotate(-90 38 38)"/></svg>
       <div style="flex:1"><span class="eyebrow">Rest</span><div class="num" id="restClock">2:00</div><span class="muted small" id="restWhy"></span></div>

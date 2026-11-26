@@ -311,6 +311,17 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check("QK's plan: today's lifts are listed with what to do", await p.isVisible('#qkPlan') && /Power & Pump · week 1 of 10/.test(await p.textContent('#planEyebrow')) && /Barbell Bench Press/.test(await p.textContent('#planRows')), await p.textContent('#qkPlan'));
   await go('train'); await tap('[data-prog=powerPump]'); await p.click('[data-progstop]'); await p.waitForTimeout(200);
 
+  // One-tap workout: Start workout opens the first exercise's setup with its target filled in.
+  await p.goto('https://shred.local/'); await p.waitForTimeout(400);
+  await p.$eval('#planStart', el => el.scrollIntoView({ block: 'center' })); await p.click('#planStart'); await p.waitForTimeout(300);
+  check('workout mode: Start workout opens exercise 1, ready to go', await p.isVisible('#setup') && /set 1/.test(await p.textContent('#setupEyebrow')) && await p.isVisible('#rxBox'), await p.textContent('#setupEyebrow'));
+  await p.evaluate(() => { document.querySelector('#setup').hidden = true; });
+  // Training-day reminders: a calendar file for the planned days.
+  await go('progress'); await p.click('#planCard summary').catch(() => {});
+  const [dl] = await Promise.all([p.waitForEvent('download', { timeout: 4000 }).catch(() => null), p.click('#remindCal')]);
+  const ics = dl ? fs.readFileSync(await dl.path(), 'utf8') : '';
+  check('reminders: calendar file repeats on the training days', /RRULE:FREQ=WEEKLY;BYDAY=MO,WE/.test(ics), ics.slice(0, 80));
+
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();
   console.log(fails ? `${fails} FAILED` : 'ALL PASS'); process.exit(fails ? 1 : 0);

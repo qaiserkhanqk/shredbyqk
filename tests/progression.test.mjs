@@ -81,5 +81,13 @@ check('year view groups by month', s3.points.length <= 2, s3.points.length);
 const vol = P.weeklyVolume(hist, 4, T0 + 22 * DAY);
 check('weekly volume, oldest first', vol.length === 4 && vol[3] === 70 * 24 && vol[0] === 60 * 24, vol.join());
 
+// Plate maths.
+check('plates: 62.5 kg = bar + 20 + 1.25', P.plates(62.5)?.text === 'Bar + 20 + 1.25 each side', P.plates(62.5)?.text);
+check('plates: 140 kg', P.plates(140).side.join() === '25,25,10');
+check('plates: just the bar', P.plates(20).text === 'Just the bar');
+check('plates: 225 lb = bar + 45 + 45', P.plates(P.fromUnit(225, 'lb'), 'lb').text === 'Bar + 45 + 45 each side');
+check('plates: 135 lb', P.plates(P.fromUnit(135, 'lb'), 'lb').side.join() === '45');
+check('plates: lighter than the bar → none', P.plates(15) === null);
+check('plates: unloadable → none', P.plates(61) === null);
 if (fail) { console.log(`${fail} FAILED`); process.exit(1); }
 console.log('progression: all pass');

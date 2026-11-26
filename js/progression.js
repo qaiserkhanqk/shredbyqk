@@ -184,3 +184,17 @@ export function weeklyVolume(sets, n = 8, now = Date.now()) {
   }
   return out;
 }
+
+/**
+ * Plates for each side of the bar.
+ * @returns { bar, side: [plate, ...], text } in the lifter's unit, or null if it can't be loaded exactly.
+ * Standard bars: 20 kg / 45 lb. Plates: 25 20 15 10 5 2.5 1.25 kg, or 45 35 25 10 5 2.5 lb.
+ */
+export function plates(kg, unit = 'kg', bar = unit === 'lb' ? 45 : 20) {
+  const total = Math.round(toUnit(kg, unit) * 100) / 100, set = unit === 'lb' ? [45, 35, 25, 10, 5, 2.5] : [25, 20, 15, 10, 5, 2.5, 1.25];
+  if (total < bar) return null;
+  let left = Math.round((total - bar) / 2 * 100) / 100; const side = [];
+  for (const p of set) while (left >= p - 1e-9) { side.push(p); left = Math.round((left - p) * 100) / 100; }
+  if (left > 0.01) return null;
+  return { bar, side, text: side.length ? `Bar + ${side.join(' + ')} each side` : 'Just the bar' };
+}
