@@ -85,4 +85,18 @@ The two columns differ because Commons categories are noisy: thali photos sit in
 | 59 | [2013 Sechseläuten - 'Samosa' und 'Pakora' - Limmat](https://commons.wikimedia.org/wiki/File:2013_Sechsel%C3%A4uten_-_%27Samosa%27_und_%27Pakora%27_-_Limmatquai_2013-04-14_17-37-05_(P7700).JPG) | CC BY-SA 3.0 | Pakora | pakora ×1, samosa ×0.5 | 425 | exact |
 | 60 | [*Gulabjamun*.jpg](https://commons.wikimedia.org/wiki/File:*Gulabjamun*.jpg) | CC BY-SA 4.0 | Gulab jamun | gulab_jamun ×6 | 1118 | dish right, but a frying pan, not a plate |
 
-To repeat with the live server: run `tools/food-vision-server.mjs` with a key and send each photo; see `docs/NUTRITION.md`.
+## Repeat it against the live server
+
+```bash
+python3 tools/fetch-test-photos.py test-photos
+```
+
+```bash
+GEMINI_API_KEY=... node tools/food-vision-server.mjs
+```
+
+```bash
+node tools/photo-test.mjs test-photos http://localhost:8787/food-vision
+```
+
+The script scores against the Commons category, so read its "wrong" lines before trusting the number.
