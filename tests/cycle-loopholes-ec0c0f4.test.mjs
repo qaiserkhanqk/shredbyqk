@@ -8,6 +8,7 @@
 //       "Spotting only" left the question on screen for the rest of the day.
 //   L5. Perimenopause mode counted the months of a pregnancy (and after the birth) as "months without a period":
 //       "12 months without a period is how menopause is defined", and any spotting raised "see a doctor".
+//   L6. The summary for her doctor counted a gap that contains a pregnancy as an ordinary cycle in its figures.
 // Run: node tests/cycle-loopholes-ec0c0f4.test.mjs
 import * as M from '../js/cycle/model.js';
 import * as R from '../js/cycle/reminders.js';
@@ -15,6 +16,7 @@ import { addDays } from '../js/cycle/dates.js';
 import { estimateNext } from '../js/cycle/predict.js';
 import { startPregnancy, endPregnancy } from '../js/cycle/pregnancy.js';
 import { midlifeObservations } from '../js/cycle/midlife.js';
+import { clinicianSummary } from '../js/cycle/summary.js';
 import { companionToday } from '../js/cycle/companion.js';
 import * as C from '../js/cycle/checkins.js';
 
@@ -95,5 +97,14 @@ run('L5. Perimenopause mode after a pregnancy', () => {
   check('control: without a pregnancy, 13 months without a period is still described', oc?.sinceLastPeriod?.twelveMonths === true && /how menopause is defined/.test(oc.sinceLastPeriod.text));
   M.logDay(c, t, { bleeding: 'spotting' }, { today: t, at: AT });
   check('control: …and spotting after it still raises the alert', midlifeObservations(c, t)?.alerts.length === 1);
+});
+run('L6. Summary for her doctor', () => {
+  const { s, last } = hist([28, 28, 28], '2026-01-05'); // last start 30 Mar
+  startPregnancy(s, { lmp: last, today: addDays(last, 30), at: AT });
+  endPregnancy(s, { outcome: 'ended', date: addDays(last, 45), today: addDays(last, 45), at: AT });
+  M.logPeriodStart(s, addDays(last, 75), { today: FAR, at: AT }); M.logPeriodStart(s, addDays(last, 103), { today: FAR, at: AT });
+  const x = clinicianSummary(s, { today: addDays(last, 110), months: 12 });
+  const gap = x.cycles.find(c => c.start === last);
+  check('a gap that contains a pregnancy is listed but not used in the cycle figures', gap && gap.usable === false && /pregnan/i.test(gap.reason || '') && x.cycleStats.longest === 28, words({ gap, stats: x.cycleStats }));
 });
 console.log(fails ? `${fails} FAILED of ${count}` : `ALL PASS (${count})`); process.exit(fails ? 1 : 0);
