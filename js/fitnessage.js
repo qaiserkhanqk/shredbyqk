@@ -120,3 +120,22 @@ export function rhrNote(rhr) {
   if (rhr <= 75) return { level: 'ok', text: `${rhr} bpm: normal. Each 10 beats lower was linked to about 9% lower mortality.` };
   return { level: 'low', text: `${rhr} bpm: on the high side. Each 10 beats higher was linked to about 9% higher mortality. Cardio brings it down.` };
 }
+
+/* ---------- When training stops ---------- */
+// The HUNT model's activity term: stop meeting the guideline and the estimate drops by 3.1 (men) / 2.7 (women)
+// mL/kg/min. We switch it off after 14 days with no training, so a busy week doesn't count against anyone.
+export const LAPSE_DAYS = 14;
+export function daysSinceTraining(sessions = [], now = Date.now()) {
+  const real = sessions.filter(s => !s.demo).map(s => s.at);
+  return real.length ? Math.floor((now - Math.max(...real)) / 864e5) : null;
+}
+/** The latest test re-scored for today: if they've stopped training, the activity term goes. */
+export function liveFitAge(tests = [], sessions = [], now = Date.now()) {
+  const t = tests[tests.length - 1]; if (!t) return null;
+  const off = daysSinceTraining(sessions, now), lapsed = t.active && off !== null && off >= LAPSE_DAYS;
+  if (!lapsed) return { ...t, lapsed: false, daysOff: off };
+  const r = fitnessAge({ sex: t.sex, age: t.age, waistCm: t.waist, rhr: t.rhr, active: false });
+  return { ...t, ...r, active: false, was: t.fitnessAge, lapsed: true, daysOff: off };
+}
+/** What it would be if they stopped now (sent to the server so a closed app can still be reminded). */
+export function ifStopped(t) { return t?.active ? fitnessAge({ sex: t.sex, age: t.age, waistCm: t.waist, rhr: t.rhr, active: false })?.fitnessAge ?? null : null; }

@@ -523,3 +523,44 @@ Each group mean sits at its mid-age (25, 35, … 75). We interpolate linearly be
 - Resting HR: each 10 bpm higher goes with about 9% higher all-cause mortality (Zhang et al. 2016, doi:10.1503/cmaj.150535).
 
 **Follow-up.** The first test is offered after two weeks of training (when age is known). After that, a retest reminder comes every 30 days through QK remembers. The trend line appears from the second test. The coach sees the latest Fitness Age as a chip.
+
+## When training stops: Fitness Age goes up (`js/fitnessage.js` liveFitAge, `tools/push-checkins.mjs` lapseMsg)
+The HUNT model has an activity term: meeting the 150/75-minute guideline adds 3.102 mL/kg/min for men and 2.674 for women (see Fitness Age above). After 14 days with no training or classes, the app re-scores the latest test with that term switched off.
+
+Fourteen days means one busy week never counts against anyone. This is the model's own term, not an extra detraining guess. The result moves by the size of that term, usually 2–4 years.
+
+- **On the phone:** a "QK remembers" card says "Your Fitness Age has gone up to X (from Y)", and the Fitness Age screen shows the new number with the reason.
+- **When the app stays closed:** the server gets the "if they stop" age (`care.fitAge.ifStopped`) and the last training day. The daily push job then sends "Your Fitness Age went up to X" at most every 14 days, within the one-notification-a-day budget, and never to people who turned notifications off.
+
+## Mind check (`js/mind.js`)
+- **When QK asks:** on 2 or more of the last 4 days, the morning check showed sleep quality or stress at 5+ on the Hooper 1–7 scale (or the "rough" one-tap answer), or the training check said "slept badly". QK then asks "How are you doing, honestly?" At most every 5 days.
+- **The answer is built from their own numbers:** training days in the last 2–4 weeks, resting heart rate against their own last month, Fitness Age and calm sessions. Only things that are true and going well are mentioned. If nothing is logged, it gives a plain, kind line.
+- **"A bit low":** today's session is made lighter, and QK suggests a 10-minute calm session before bed.
+- **"Struggling":** QK says how they feel matters more than any number. It asks them to talk to a person today (friend, family, doctor) and to call their local emergency number if they ever feel unsafe. It offers a helpline finder (findahelpline.com) and "Let QK know".
+- **"Let QK know"** shares only "Asked for support" with the coach, for a week, never the answers or numbers.
+- QK does not diagnose and never claims to replace a person.
+
+## Leaderboard (`js/leaderboard.js`, server: `leaderboard()` in supabase/schema.sql)
+A weekly health score out of 100, reset every Monday. It is built to be fair at any age: Fitness Age counts against your own age, recovery against your own scale, and most points come from showing up and checking in.
+
+| Part | Points | How |
+|---|---|---|
+| Training | 35 | training days ÷ planned days (capped) |
+| Fitness Age | 20 | 10 years younger than your age = 20, 10 older = 0; a test older than 45 days scores 0 (retest monthly) |
+| Recovery | 15 | morning check fatigue/soreness (Hooper 1–7, 1 best), × days checked in ÷ 5 |
+| Sleep | 15 | morning check sleep quality, same scaling |
+| Stress & mind | 15 | morning check stress, same scaling, +2 per calm session |
+
+The app shows the five parts and the top ways to earn more this week.
+
+- **Ranking:** done on the server, among one coach's clients. It returns the top 50 plus your own row, so someone in 70th place sees "#70".
+- **Board name:** nickname, else first name + last initial, or "Anonymous" if hidden. Scores' health details are never visible to other clients.
+- **Month:** the sum of weekly scores for weeks starting in that month.
+- **Trust:** scores are computed on the phone. The coach sees each client's real training on the dashboard to sanity-check the top 3 before recording prizes.
+
+## Broadcasts (`js/coach-extra.js`, `js/dash.js` audienceOf, `tools/push-checkins.mjs` broadcastJobs)
+- **Delivery:** the coach writes one message, which is stored as one `messages` row per client (kind `broadcast`, with a title). The app says it and shows it at the next sync. The push job, now hourly for broadcasts only, sends it as a phone notification and stamps `pushed_at`.
+- **{name}** is filled with each client's first name.
+- **Audiences:** everyone, not trained in 7+ days, trained this week, or this week's top 10.
+- **Notifications off:** clients who turned notifications off still see it in the app.
+- **Templates:** ready-made ones in QK's voice (Roman Urdu and English), e.g. "Dr. Doom aa gaya lekin tum gym nahi aaye, {name}?".

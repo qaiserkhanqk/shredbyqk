@@ -903,3 +903,17 @@ details.adj[hidden] { display: none; }
 .fa-note { padding-left: 10px; border-left: 3px solid var(--muted); }
 .fa-note.great { border-color: var(--good); }
 .fa-note.low { border-color: var(--warn); }
+
+/* Leaderboard */
+.b-card { display: flex; justify-content: space-between; align-items: center; width: 100%; text-align: left; cursor: pointer; border: 1px solid var(--line); }
+.b-chev { font-size: 1.6rem; color: var(--muted); }
+.b-row { display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-top: 1px solid var(--line); }
+.b-row:first-child { border-top: 0; }
+.b-row.me { background: rgba(var(--z2-rgb), .10); border-radius: 10px; }
+.b-rank { width: 2.6em; font-weight: 700; }
+.b-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-gap { text-align: center; color: var(--muted); }
+.b-parts { display: grid; gap: 6px; }
+.b-parts > div { display: grid; grid-template-columns: 7.5em 1fr 3.2em; align-items: center; gap: 8px; font-size: .85rem; }
+.b-parts .bar { height: 6px; }
+.b-parts b { text-align: right; }

@@ -54,3 +54,9 @@ body.coach-page { background: var(--ink); color: var(--text); min-height: 100vh;
 .cd-plan .cdp-x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 1rem; }
 .cd-plan .cdp-add select { width: 100%; padding: 4px; border-radius: 8px; border: 1px dashed var(--line); background: transparent; color: var(--muted); font: inherit; }
 .cd-plan textarea { width: 100%; min-height: 54px; border-radius: 10px; border: 1px solid var(--line); padding: 8px; background: transparent; color: inherit; font: inherit; }
+
+/* Broadcast + leaderboard */
+.cd-extra { margin-top: 18px; align-items: start; }
+.cd-extra textarea { width: 100%; font: inherit; padding: 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--text); resize: vertical; }
+.bc-notif { display: grid; gap: 2px; padding: 12px 14px; border-radius: 16px; background: var(--surface-2); font-size: .9rem; }
+.cb-won { font-size: .8rem; color: var(--good); font-weight: 700; }

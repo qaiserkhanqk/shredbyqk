@@ -63,7 +63,9 @@ export function renderFitAge() {
   $('#faNeed').hidden = !!(p.age && p.sex);
   $('#faPushWrap').hidden = p.sex === 'female';
   drawActivity();
-  if (last) show(last); else $('#faResult').hidden = true;
+  const live = FA.liveFitAge(S.fitage, S.sessions || []);
+  if (live?.lapsed) show(live, null, `Up from ${live.was}: ${live.daysOff} days without training. One session a week or more and it comes back down.`);
+  else if (last) show(last); else $('#faResult').hidden = true;
   renderHistory();
 }
 
@@ -82,12 +84,12 @@ function calculate() {
   ctx.say(d < 0 ? `Your fitness age is ${r.fitnessAge}. That's ${-d} years younger than you are.` : d > 0 ? `Your fitness age is ${r.fitnessAge}. We can bring that down. Here's how.` : `Your fitness age is ${r.fitnessAge}, right on your age. Let's get it lower.`, { priority: 'high' });
 }
 
-function show(t, prev) {
+function show(t, prev, note = '') {
   const d = t.fitnessAge - t.age, box = $('#faResult'); box.hidden = false;
   const line = d < 0 ? `${-d} year${d === -1 ? '' : 's'} younger than your age` : d > 0 ? `${d} year${d === 1 ? '' : 's'} older than your age` : 'Right on your age';
   const change = prev ? (prev.fitnessAge - t.fitnessAge) : 0;
   const L = FA.levers({ sex: t.sex, age: t.age, waistCm: t.waist, rhr: t.rhr, active: t.active });
-  box.innerHTML = `<div class="fa-big"><span class="num">${t.fitnessAge}</span><span><b>${line}</b><br><span class="muted small">Fitness ${t.vo2} mL/kg/min · ${t.pct}% of the average for ${t.age}${change ? ` · ${change > 0 ? '−' : '+'}${Math.abs(change)} since last test` : ''}</span></span></div>
+  box.innerHTML = `${note ? `<p class="fa-note low" style="margin:0">${esc(note)}</p>` : ''}<div class="fa-big"><span class="num">${t.fitnessAge}</span><span><b>${line}</b><br><span class="muted small">Fitness ${t.vo2} mL/kg/min · ${t.pct}% of the average for ${t.age}${change ? ` · ${change > 0 ? '−' : '+'}${Math.abs(change)} since last test` : ''}</span></span></div>
     ${L.length ? `<div class="stack" style="gap:6px"><span class="eyebrow">What would make you younger</span>${L.map(l => `<div class="fa-lever"><span>${esc(l.text)}</span><b>−${l.years} yr${l.years > 1 ? 's' : ''}</b></div>`).join('')}</div>` : '<p class="muted small" style="margin:0">You\'re doing all the big things. Keep training and retest next month.</p>'}
     <p class="muted small" style="margin:0">Retest in a month: same time of day, resting heart rate measured sitting.</p>`;
 }
