@@ -828,3 +828,9 @@ button.row.food-hit { padding: 11px 0; }
 .ready-note.easy { border-left-color: var(--warn); }
 .ready-note.rest { border-left-color: var(--bad); }
 #rescueNews p { margin: 4px 0 0; }
+
+/* QK remembers */
+.mem-card { display: flex; flex-direction: column; gap: 6px; border: 1px solid rgba(var(--z2-rgb), .45); background: linear-gradient(160deg, rgba(var(--z2-rgb), .14), var(--surface) 70%); }
+.mem-card[hidden] { display: none; }
+.mem-card b { font: 800 1.15rem var(--f-display, inherit); }
+#lightNews p { margin: 4px 0 0; }

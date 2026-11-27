@@ -51,6 +51,8 @@
 
     <button type="button" class="card recover-card" id="recoverCard" hidden><span class="eyebrow" id="recoverEyebrow">Recovery</span><b id="recoverTitle"></b><span class="muted small" id="recoverSub"></span></button>
 
+    <div class="card mem-card" id="memCard" hidden></div>
+
     <div class="card next" id="nextCard">
       <span class="eyebrow" id="nextEyebrow"></span>
       <h2 class="display h2" id="nextTitle"></h2>
@@ -67,6 +69,7 @@
       <div class="card-head" style="margin:0"><div><span class="eyebrow" id="planEyebrow">QK's plan for today</span><h2 class="display h2" id="planTitle">Your weights are set</h2></div><button class="linkbtn" type="button" id="planListen" aria-label="Hear the plan"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Hear it</button></div>
       <div class="news" id="daysNews" hidden></div>
       <div class="news" id="rescueNews" hidden></div>
+      <div class="news" id="lightNews" hidden></div>
       <p class="ready-note" id="readyNote" hidden></p>
       <p class="muted small" style="margin:0" id="swapNote" hidden></p>
       <div class="news" id="planNews" hidden><b id="newsTitle"></b><p class="muted small" id="newsNote"></p><ul id="newsList"></ul><button class="ghost" type="button" id="newsOk">Got it</button></div>
@@ -476,6 +479,17 @@
           <label class="field">Lifting experience<select id="pExp"><option value="">Not set</option><option value="new">New to lifting</option><option value="trained">Some experience or more</option></select></label>
         </div>
         <div><span class="eyebrow">My gym has</span><p class="muted small" style="margin:2px 0 6px">Nothing ticked means a full gym. QK swaps anything you can't do.</p><div class="chip-wrap" id="eqChips"></div></div>
+        <div class="grid2">
+          <label class="field">Heaviest dumbbell (kg)<input id="pMaxDb" type="number" inputmode="decimal" min="1" placeholder="No limit"></label>
+          <label class="field">Heaviest kettlebell (kg)<input id="pMaxKb" type="number" inputmode="decimal" min="1" placeholder="No limit"></label>
+        </div>
+        <label class="check"><input type="checkbox" id="pMicro"> I have micro plates (0.5 kg): smaller jumps on barbell lifts</label>
+        <div><span class="eyebrow">Travelling?</span>
+          <div class="grid2" style="margin-top:6px"><label class="field">Where<select id="pTravel"><option value="">Not travelling</option><option value="hotel">Hotel gym</option><option value="none">No equipment</option></select></label>
+          <label class="field">For<select id="pTravelDays"><option value="3">3 days</option><option value="7" selected>1 week</option><option value="14">2 weeks</option></select></label></div>
+          <p class="muted small" style="margin:4px 0 0" id="travelNote">QK switches your workouts to what you'll have, then back to your own gym by itself.</p></div>
+        <label class="check"><input type="checkbox" id="pRamadan"> Ramadan mode (30 days): shorter sessions, a bit less volume</label>
+        <p class="muted small" style="margin:0" id="ramadanNote">Train after iftar if you can: in a 2023 study, strength gains were better fed than fasted.</p>
         <div><span class="eyebrow">Anything hurting?</span><p class="muted small" style="margin:2px 0 6px">QK keeps loaded moves away from it and adds two gentle rehab exercises. Not a diagnosis: sharp pain, swelling, numbness or pain lasting more than two weeks, see a physio or doctor.</p><div class="chip-wrap" id="painChips"></div></div>
         <div><span class="eyebrow">Time per training day</span><div class="stack" id="dayMins" style="margin-top:6px"></div></div>
         <label class="check"><input type="checkbox" id="pCheckin"> Ask how I feel before each workout (3 taps)</label>

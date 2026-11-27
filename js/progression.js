@@ -46,9 +46,11 @@ const STEP = {
 };
 // Rounding grain: barbells load in 2.5 kg / 5 lb (two smallest plates); others in 0.5 kg / 2.5 lb.
 const GRAIN = { kg: { bar: 2.5, other: 0.5 }, lb: { bar: 5, other: 2.5 } };
-export const stepKg = (cls, unit = 'kg') => fromUnit(STEP[unit][cls] || STEP[unit].mid, unit);
-export function roundLoad(kg, cls, unit = 'kg') {
-  const g = GRAIN[unit][cls?.startsWith('big') ? 'bar' : 'other'];
+// Micro plates (0.5 kg / 1.25 lb each side): smaller barbell jumps for lighter lifters. Dumbbells keep their steps.
+const MICRO = { kg: { 'big-lower': 2.5, 'big-upper': 1, grain: 1 }, lb: { 'big-lower': 5, 'big-upper': 2.5, grain: 2.5 } };
+export const stepKg = (cls, unit = 'kg', micro = false) => fromUnit((micro && MICRO[unit][cls]) || STEP[unit][cls] || STEP[unit].mid, unit);
+export function roundLoad(kg, cls, unit = 'kg', micro = false) {
+  const g = micro && cls?.startsWith('big') ? MICRO[unit].grain : GRAIN[unit][cls?.startsWith('big') ? 'bar' : 'other'];
   return fromUnit(Math.max(g, Math.round(toUnit(kg, unit) / g) * g), unit);
 }
 
@@ -94,7 +96,7 @@ export function nextFor(item, sets, o = {}) {
   if (!cls) return null;
   const days = sessionsOf(sets, item.id);
   if (!days.length) return null;
-  const step = stepKg(cls, unit), round = kg => roundLoad(kg, cls, unit);
+  const step = stepKg(cls, unit, o.micro), round = kg => roundLoad(kg, cls, unit, o.micro);
   const last = days[days.length - 1], j = judge(last, { reps: last[0].target });
   const lastDay = last[0].wave;
 
@@ -191,7 +193,7 @@ export function weeklyVolume(sets, n = 8, now = Date.now()) {
  * Standard bars: 20 kg / 45 lb. Plates: 25 20 15 10 5 2.5 1.25 kg, or 45 35 25 10 5 2.5 lb.
  */
 export function plates(kg, unit = 'kg', bar = unit === 'lb' ? 45 : 20) {
-  const total = Math.round(toUnit(kg, unit) * 100) / 100, set = unit === 'lb' ? [45, 35, 25, 10, 5, 2.5] : [25, 20, 15, 10, 5, 2.5, 1.25];
+  const total = Math.round(toUnit(kg, unit) * 100) / 100, set = unit === 'lb' ? [45, 35, 25, 10, 5, 2.5, 1.25] : [25, 20, 15, 10, 5, 2.5, 1.25, 0.5];
   if (total < bar) return null;
   let left = Math.round((total - bar) / 2 * 100) / 100; const side = [];
   for (const p of set) while (left >= p - 1e-9) { side.push(p); left = Math.round((left - p) * 100) / 100; }

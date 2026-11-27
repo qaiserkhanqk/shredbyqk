@@ -1,6 +1,7 @@
 import * as store from './store.js';
 import { say, registerAvatar, setMuted, greeting, CONFIG, setLang as setCoachLang, urduVoice } from './coach.js';
 import * as personal from './personal.js';
+import * as memory from './memory.js';
 import { parse as parseVoice } from './voicecmd.js';
 import { EXERCISES, RepEngine, allRules, estimateRIR, TIPS, BREATHING } from './exercises.js';
 import { FeedbackCoach, restSeconds } from './feedback.js';
@@ -122,7 +123,7 @@ const daysView = (p, n) => {
 const activeProgram = () => { const b = baseProgram(); return b ? daysView(b, S.program.days) : b; };
 const programDay = () => { const p = activeProgram(); return p ? currentDay(p, S.program) : null; };
 // Minutes allowed today: a one-off "short on time" cap, else the client's budget for this weekday.
-const capToday = () => personal.minutesFor(S.plan?.minutes, S.timeCap?.day === new Date().toDateString() ? S.timeCap.mins : null);
+const capToday = () => { const c = personal.minutesFor(S.plan?.minutes, S.timeCap?.day === new Date().toDateString() ? S.timeCap.mins : null); return personal.ramadanOn(S.profile) ? Math.min(c || personal.RAMADAN.maxMinutes, personal.RAMADAN.maxMinutes) : c; };
 // Rough count of warm-up sets for a day (heavy barbell lifts get about three).
 const warmCount = items => items.reduce((a, it) => a + ((prog.liftClass(LIB[it[0]]) || '').startsWith('big') ? 3 : prog.liftClass(LIB[it[0]]) === 'mid' ? 1 : 0), 0);
 // Today's session, made personal: starting volume (age, experience), the client's equipment, pain areas and
@@ -132,10 +133,10 @@ const todayKey = () => new Date().toDateString();
 const avoidList = () => [...new Set([...(S.prefs?.avoid || []), ...personal.skipDrops(S.prefs?.skips)])];
 function dayItemsRaw() {
   const d = programDay(); if (!d?.day) return null;
-  const p = activeProgram(), key = JSON.stringify([p.id, p.days, d.index, d.doneToday, S.program.block, (S.program.log || []).length, S.program.restartAt, S.profile.equip, S.profile.pain, S.profile.age, S.profile.experience, avoidList(), S.todaySwap, S.rescueOff, S.plan?.days, todayKey(), S.program.plan ? 1 : 0, S.timeCap, S.program.daysSince]);
+  const p = activeProgram(), key = JSON.stringify([p.id, p.days, d.index, d.doneToday, S.program.block, (S.program.log || []).length, S.program.restartAt, personal.equipNow(S.profile), S.profile.pain, S.profile.age, S.profile.experience, avoidList(), S.todaySwap, S.rescueOff, S.plan?.days, todayKey(), S.program.plan ? 1 : 0, S.timeCap, S.program.daysSince]);
   if (rawMemo.key === key) { personalNote = rawMemo.note; return rawMemo.items; }
   let items = personal.startItems(d.day.items, LIB, S.profile, S.program.block || 1);
-  const pd = personal.personalDay(items, LIB, { have: S.profile.equip, pain: S.profile.pain || [], avoid: avoidList() });
+  const pd = personal.personalDay(items, LIB, { have: personal.equipNow(S.profile), pain: S.profile.pain || [], avoid: avoidList() });
   items = pd.items;
   const sw = S.todaySwap?.day === todayKey() ? S.todaySwap.map : {};
   items = items.map(it => (sw[it[0]] ? [sw[it[0]], ...it.slice(1)] : it));
@@ -143,7 +144,7 @@ function dayItemsRaw() {
   if (!d.doneToday && S.rescueOff !== todayKey() && p.plan.length > 1) {
     const b = personal.behind((S.program.log || []).slice(S.program.restartAt || 0), { perWeek: p.days, weekdays: S.plan?.days || [], since: S.program.daysSince || S.program.start });
     if (b) {
-      const ni = (d.index + 1) % p.plan.length, nextItems = personal.personalDay(p.plan[ni].items, LIB, { have: S.profile.equip, pain: S.profile.pain || [], avoid: avoidList() }).items;
+      const ni = (d.index + 1) % p.plan.length, nextItems = personal.personalDay(p.plan[ni].items, LIB, { have: personal.equipNow(S.profile), pain: S.profile.pain || [], avoid: avoidList() }).items;
       const r = personal.rescue(items, nextItems, LIB, { maxMinutes: Math.max(80, capToday() || 0) });
       if (r.added.length) { items = r.items; rescue = { ...b, next: ni, nextName: p.plan[ni].name, added: r.added }; }
     }
@@ -160,7 +161,24 @@ function readyToday() {
   const lvl = recommendToday({ check: c, history: S.readiness.filter(x => x !== c), sessions: S.loads || [] }).level, a = MORNING[lvl];
   return a ? { ...personal.readiness(a), note: lvl === 'recover' ? 'Your morning check says recover. QK made today lighter: 10% less weight and one set fewer on the extras. A recovery session is also an option.' : 'Your morning check says go lighter: 5% off and one set fewer on the extras. Main lifts stay.' } : null;
 }
-const dayItems = () => { let raw = dayItemsRaw(); if (!raw) return null; raw = personal.readyItems(raw, readyToday(), LIB); const cap = capToday(); return cap ? warm.fitTo(raw, cap, warmCount(raw)).items : raw; };
+// Everything that changes today's load: how they feel, coming back from a break, Ramadan, how the last workouts felt.
+function todayAdjust() {
+  const r = readyToday();
+  return personal.combine(r && r.load < 1 ? r : null, personal.welcomeBack(S.sessions), personal.ramadanOn(S.profile) ? personal.RAMADAN : null, memory.sessionFeel(S.feels || []));
+}
+// One exercise's weight today: the day's adjustment, 80% for two weeks after a sore spot clears, the home-weights ceiling.
+function adjustKg(id, kg, cls) {
+  const r = todayAdjust(), notes = [];
+  let k = kg * (r?.load || 1);
+  if (r && r.load < 1) notes.push(r.note);
+  const back = memory.returningAreas(S.profile);
+  if (back.length && personal.hurts(LIB, id, back)) { k *= 0.8; notes.push('Back after your sore spot: 80% for two weeks, then QK builds up again.'); }
+  k = prog.roundLoad(k, cls, unit(), !!S.profile.micro);
+  const cap = personal.capLoad(LIB, id, k, S.profile.maxKg);
+  if (cap) { k = cap.kg; notes.push(cap.note); }
+  return { kg: k, changed: Math.abs(k - kg) > 0.01, note: notes.join(' ') };
+}
+const dayItems = () => { let raw = dayItemsRaw(); if (!raw) return null; raw = personal.readyItems(raw, todayAdjust(), LIB); const cap = capToday(); return cap ? warm.fitTo(raw, cap, warmCount(raw)).items : raw; };
 const todayItems = () => { const items = dayItems(); return items ? items.map(it => [it[0], `${it[1]}×${it[2]}`]) : TODAY_DEFAULT; };
 const todayName = () => { const p = activeProgram(), d = programDay(); return p && d ? `${p.name}: ${d.day.name}` : 'Glute Builder'; };
 const ICONS = {
@@ -201,6 +219,7 @@ function setRing(id, frac) {
 }
 
 function renderToday() {
+  renderMemory();
   if (typeof renderRehabToday === 'function' && S.rehab) renderRehabToday();
   if (S.readiness) renderReady(); else renderNext(null);
   const now = new Date();
@@ -1296,15 +1315,14 @@ function lightWeek() {
 // The prescription for an exercise, with a coach/lifter override if one was set since the last session.
 function rxFor(k) {
   const item = LIB[k]; if (!item) return null;
-  const r = prog.nextFor(item, S.sessions, { unit: unit(), light: lightWeek(), scheme: programScheme(k) });
+  const r = prog.nextFor(item, S.sessions, { unit: unit(), light: lightWeek(), scheme: programScheme(k), micro: !!S.profile.micro });
   const o = S.prog?.override?.[k], lastAt = Math.max(0, ...S.sessions.filter(s => s.ex === k).map(s => s.at));
   if (o && o.at > lastAt) {
     const base = r || { reps: prog.liftClass(item) === 'small' || prog.liftClass(item) === 'mid' ? prog.RANGE.lo : 8, sets: 3, mode: 'linear', cls: prog.liftClass(item) };
     return { ...base, kg: o.kg, action: 'set', why: 'Weight set by you.' };
   }
   if (r?.action === 'reset') { const P = (S.prog ||= {}); P.resets ||= []; if (!P.resets.some(x => x.ex === k && Date.now() - x.at < 3 * 864e5)) { P.resets.push({ ex: k, at: Date.now() }); persist(); } }
-  const rd = readyToday();
-  if (r && rd && rd.load < 1 && r.action !== 'set') return { ...r, kg: prog.roundLoad(r.kg * rd.load, r.cls, unit()), why: rd.note };
+  if (r && r.action !== 'set') { const a = adjustKg(k, r.kg, r.cls); if (a.changed) return { ...r, kg: a.kg, why: a.note }; }
   return r;
 }
 const rxLine = r => `${r.sets} × ${r.reps} at ${prog.fmtW(r.kg, unit())}${r.day ? ` · ${r.day} day` : ''}`;
@@ -1338,7 +1356,7 @@ $('#rxSave').onclick = () => {
 function showNext() {
   const item = LIB[exKey], box = $('#sNext');
   if (!lastSet?.kg || !prog.liftClass(item)) { box.hidden = true; return; }
-  const r = prog.nextFor(item, S.sessions, { unit: unit(), scheme: programScheme(exKey) });
+  const r = prog.nextFor(item, S.sessions, { unit: unit(), scheme: programScheme(exKey), micro: !!S.profile.micro });
   if (!r) { box.hidden = true; return; }
   box.hidden = false; $('#sNextLine').textContent = rxLine(r); $('#sNextWhy').textContent = r.why;
 }
@@ -1375,9 +1393,8 @@ $('#stRange').onclick = e => { const b = e.target.closest('[data-r]'); if (!b) r
 
 /* ---------- QK's plan: every weight decided before the lifter asks ---------- */
 const planToday = () => {
-  const rows = brief.planRows(todayItems().map(x => x[0]), { lib: LIB, sets: S.sessions, unit: unit(), light: lightWeek(), schemeFor: programScheme }), r = readyToday();
-  if (!r || r.load >= 1) return rows;
-  return rows.map(x => { if (!x.rx) return x; const kg = prog.roundLoad(x.rx.kg * r.load, x.rx.cls, unit()); return { ...x, rx: { ...x.rx, kg }, change: x.change === 'up' ? 'same' : x.change, tag: 'easier today', line: `${x.rx.sets} × ${x.rx.reps} · ${prog.fmtW(kg, unit())}`, why: r.note }; });
+  const rows = brief.planRows(todayItems().map(x => x[0]), { lib: LIB, sets: S.sessions, unit: unit(), light: lightWeek(), schemeFor: programScheme, micro: !!S.profile.micro });
+  return rows.map(x => { if (!x.rx) return x; const a = adjustKg(x.id, x.rx.kg, x.rx.cls); if (!a.changed) return x; return { ...x, rx: { ...x.rx, kg: a.kg }, change: x.change === 'up' ? 'same' : x.change, tag: 'adjusted today', line: `${x.rx.sets} × ${x.rx.reps} · ${prog.fmtW(a.kg, unit())}`, why: a.note }; });
 };
 function renderPlan(rows) {
   // With a program, every item of the day is listed (runs and stations too); without one, only weighted lifts.
@@ -1493,6 +1510,7 @@ function nextInFlow(first) {
     toast('Workout done ✓ Next session is planned.');
     const st = routines.stretchFor(trained, LIB);
     openSheet(`<div><span class="eyebrow">Workout done ✓</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Cool-down stretch · ${classes.minutes(st)} min</h2></div>
+      <div class="rq"><span class="small">How was today's workout?</span><div class="seg" id="feelSeg">${[['easy', 'Too easy'], ['right', 'Just right'], ['hard', 'Too hard']].map(([v, l]) => `<button type="button" data-feelr="${v}">${l}</button>`).join('')}</div></div>
       <p class="muted small" style="margin:0">${esc(st.tagline)} Helps you feel looser tomorrow.</p>
       <div class="btn-row"><button class="ghost" type="button" id="cdSkip">Not now</button><button class="cta" type="button" id="cdGo">Stretch with QK</button></div>`);
     $('#cdGo').onclick = () => { closeSheet(); startClass(st); };
@@ -1597,7 +1615,7 @@ function rollMonth() {
   P.blockStart ||= P.start; P.block ||= 1;
   if (Date.now() - P.blockStart < MONTH) return;
   const nb = refresh.nextBlock(def, { block: P.block, plan: P.plan || def.plan }, { lib: LIB, avoid: avoidList(), compliance: refresh.compliance(P, P.days || def.days), clean: cleanRate(), keep: personal.favourites(S.sessions) });
-  const weak = personal.weakPoints(S.sessions, LIB, { plan: nb.plan, have: S.profile.equip, pain: S.profile.pain || [], avoid: avoidList() });
+  const weak = personal.weakPoints(S.sessions, LIB, { plan: nb.plan, have: personal.equipNow(S.profile), pain: S.profile.pain || [], avoid: avoidList() });
   if (weak.length) nb.plan = personal.addWeak(nb.plan, weak);
   Object.assign(P, { block: nb.block, plan: nb.plan, blockStart: Date.now(), news: { block: nb.block, changes: nb.changes, note: nb.note, weak, seen: false } });
   persist();
@@ -1705,7 +1723,7 @@ $('#recoverCard').onclick = () => { const id = $('#recoverCard').dataset.routine
 /* ---------- QK classes: on-demand classes run by voice ---------- */
 function renderClasses() {
   S.classes ||= [];
-  $('#classStrip').innerHTML = classes.CLASSES.map(c => { const best = classes.bestScore(S.classes, c.id), done = S.classes.filter(r => r.class === c.id).length;
+  $('#classStrip').innerHTML = classes.CLASSES.filter(classOk).map(c => { const best = classes.bestScore(S.classes, c.id), done = S.classes.filter(r => r.class === c.id).length;
     return `<button type="button" role="listitem" class="prog-card class-card" data-class="${c.id}"><span class="pgoal">${classes.minutes(c)} min · ${esc(c.level)}</span><b>${esc(c.name)}</b><p>${esc(c.tagline)}</p>
       <span class="meta">${esc(classes.format(c))}${c.equipment === 'dumbbells' ? ' · dumbbells' : ' · no equipment'}${done ? ` · done ${done}×${best ? `, best ${best} rounds` : ''}` : ''}</span></button>`; }).join('');
 }
@@ -1717,7 +1735,7 @@ function showClass(id) {
   openSheet(`<div><span class="eyebrow">QK class · ${classes.minutes(c)} min · ${esc(c.level)}</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.4rem">${esc(c.name)}</h2></div>
     <p style="margin:0">${esc(c.tagline)}</p>
     <p class="muted small" style="margin:0">QK calls every move and counts you down. Warm-up and cool-down included. Prop your phone up where you can see it.${best ? ` Your best finisher: ${best} rounds.` : ''}</p>
-    ${c.quiet ? '' : '<label class="check"><input type="checkbox" id="classQuiet"> Quiet mode: no jumping (apartments, sore knees)</label>'}
+    ${c.quiet ? '' : `<label class="check"><input type="checkbox" id="classQuiet" ${sorePounding() ? 'checked' : ''}> Quiet mode: no jumping (apartments, sore knees)${sorePounding() ? ' · on for your ' + esc(sorePounding()) : ''}</label>`}
     ${blocks}
     <button class="cta" type="button" data-classstart="${c.id}">Start class · ${Math.round(t.total / 60)} min</button>`);
 }
@@ -1727,7 +1745,7 @@ const HOME_EQ = { none: 'no equipment', dumbbells: 'dumbbells', bands: 'bands' }
 function renderHome() {
   const act = activeProgram();
   const progs = PROGRAMS.filter(p => p.home).map(p => `<button type="button" role="listitem" class="prog-card ${p.id === act?.id ? 'on' : ''}" data-prog="${p.id}"><span class="pgoal">Program · ${HOME_EQ[p.home]}</span><b>${esc(p.name)}</b><p>${esc(p.tagline)}</p><span class="meta">${p.days} days/week · ${p.weeks} weeks · ${esc(p.level)}</span></button>`);
-  const sess = classes.CLASSES.filter(c => c.home).map(c => `<button type="button" role="listitem" class="prog-card class-card" data-class="${c.id}"><span class="pgoal">${classes.minutes(c)} min · ${c.equipment === 'dumbbells' ? 'dumbbells' : 'no equipment'}</span><b>${esc(c.name)}</b><p>${esc(c.tagline)}</p><span class="meta">${esc(classes.format(c))}${c.quiet ? ' · no jumping' : ''}</span></button>`);
+  const sess = classes.CLASSES.filter(c => c.home && classOk(c)).map(c => `<button type="button" role="listitem" class="prog-card class-card" data-class="${c.id}"><span class="pgoal">${classes.minutes(c)} min · ${c.equipment === 'dumbbells' ? 'dumbbells' : 'no equipment'}</span><b>${esc(c.name)}</b><p>${esc(c.tagline)}</p><span class="meta">${esc(classes.format(c))}${c.quiet ? ' · no jumping' : ''}</span></button>`);
   $('#homeStrip').innerHTML = [...sess, ...progs].join('');
 }
 $('#homeStrip').onclick = e => { const c = e.target.closest('[data-class]'), p = e.target.closest('[data-prog]'); if (c) showClass(c.dataset.class); else if (p) showProgram(p.dataset.prog); };
@@ -2609,9 +2627,31 @@ function bindPersonal() {
   };
   chips();
   $('#eqChips').onclick = e => { const b = e.target.closest('[data-eq]'); if (!b) return; const s = new Set(p.equip || []); s.has(b.dataset.eq) ? s.delete(b.dataset.eq) : s.add(b.dataset.eq); p.equip = [...s]; persist(); chips(); renderToday(); };
-  $('#painChips').onclick = e => { const b = e.target.closest('[data-painarea]'); if (!b) return; const s = new Set(p.pain || []); s.has(b.dataset.painarea) ? s.delete(b.dataset.painarea) : s.add(b.dataset.painarea); p.pain = [...s]; persist(); chips(); renderToday(); };
+  $('#painChips').onclick = e => {
+    const b = e.target.closest('[data-painarea]'); if (!b) return; const a = b.dataset.painarea, s = new Set(p.pain || []);
+    if (s.has(a)) { s.delete(a); p.painCleared = { ...(p.painCleared || {}), [a]: Date.now() }; delete p.painSince?.[a]; }
+    else { s.add(a); p.painSince = { ...(p.painSince || {}), [a]: Date.now() }; }
+    p.pain = [...s]; persist(); chips(); renderToday(); renderClasses(); renderHome();
+  };
   $('#dayMins').onchange = e => { const sel = e.target.closest('[data-dmin]'); if (!sel) return; S.plan.minutes ||= {}; if (sel.value) S.plan.minutes[sel.dataset.dmin] = +sel.value; else delete S.plan.minutes[sel.dataset.dmin]; persist(); renderToday(); };
   $('#meCard').ontoggle = () => { if ($('#meCard').open) bindPersonal(); };
+  // Home weights ceiling, micro plates, travel, Ramadan.
+  const max = p.maxKg || {};
+  $('#pMaxDb').value = max.dumbbells || ''; $('#pMaxKb').value = max.kettlebell || '';
+  const setMax = (k, v) => { p.maxKg = { ...(p.maxKg || {}) }; if (v > 0) p.maxKg[k] = v; else delete p.maxKg[k]; persist(); renderToday(); };
+  $('#pMaxDb').onchange = e => setMax('dumbbells', +e.target.value); $('#pMaxKb').onchange = e => setMax('kettlebell', +e.target.value);
+  $('#pMicro').checked = !!p.micro; $('#pMicro').onchange = e => { p.micro = e.target.checked; persist(); renderToday(); };
+  const trav = () => {
+    const t = p.travel, on = t && Date.now() < t.until;
+    $('#pTravel').value = on ? t.kind : '';
+    $('#travelNote').textContent = on ? `Travelling (${personal.TRAVEL[t.kind].label.toLowerCase()}) until ${new Date(t.until).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}. QK switches back to your own gym by itself.` : 'QK switches your workouts to what you\'ll have, then back to your own gym by itself.';
+  };
+  const setTravel = () => { const k = $('#pTravel').value; if (k) p.travel = { kind: k, until: Date.now() + +$('#pTravelDays').value * 864e5 }; else delete p.travel; persist(); trav(); renderToday(); renderClasses(); renderHome(); };
+  $('#pTravel').onchange = setTravel; $('#pTravelDays').onchange = () => { if ($('#pTravel').value) setTravel(); };
+  trav();
+  const ram = () => { const on = personal.ramadanOn(p); $('#pRamadan').checked = on; $('#ramadanNote').textContent = on ? `Ramadan mode until ${new Date(p.ramadan.until).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}: sessions up to 45 minutes, one set fewer on the extras. Train after iftar if you can.` : 'Train after iftar if you can: in a 2023 study, strength gains were better fed than fasted.'; };
+  $('#pRamadan').onchange = e => { if (e.target.checked) p.ramadan = { until: Date.now() + 30 * 864e5 }; else if (p.ramadan) p.ramadan.until = Date.now() - 1; persist(); ram(); renderToday(); };
+  ram();
   $('#pCheckin').checked = P.checkin !== false; $('#pCheckin').onchange = e => { P.checkin = e.target.checked; persist(); };
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   $('#pVoiceCmd').checked = !!P.voiceCmd; $('#pVoiceCmd').disabled = !SR;
@@ -2632,19 +2672,25 @@ function renderPersonalNotes() {
   const r = personalNote.rescue, box = $('#rescueNews');
   box.hidden = !r;
   if (r) box.innerHTML = `<b>Missed ${r.missedDays.map(d => WDAY_(d)).join(' and ')}? Nothing is lost.</b><p class="muted small">Today also has the main lifts from ${esc(r.nextName)}: ${r.added.map(id => esc(LIB[id]?.name || id)).join(', ')}. One set lighter each, so it still fits.</p><div class="btn-row"><button class="ghost" type="button" id="rescueOff">Just today's session</button></div>`;
-  const sw = personalNote.swaps, why = { equipment: 'your equipment', pain: 'easy on the sore spot', skipped: 'you skipped it twice', busy: 'machine taken' };
+  const travelling = S.profile.travel && Date.now() < S.profile.travel.until;
+  const sw = personalNote.swaps, why = { equipment: travelling ? 'your travel kit' : 'your equipment', pain: 'easy on the sore spot', skipped: 'you skipped it twice', busy: 'machine taken' };
   $('#swapNote').hidden = !sw.length;
-  $('#swapNote').textContent = sw.length ? 'Fitted to you: ' + sw.map(x => `${LIB[x.from]?.name} → ${LIB[x.to]?.name} (${why[x.why]})`).join('; ') + '.' : '';
-  const rd = readyToday();
-  $('#readyNote').hidden = !rd || rd.level === 'normal';
-  if (rd) { $('#readyNote').textContent = rd.note; $('#readyNote').className = 'ready-note ' + rd.level; }
+  $('#swapNote').textContent = sw.length ? 'Fitted to you: ' + sw.map(x => (x.to ? `${LIB[x.from]?.name} → ${LIB[x.to]?.name} (${why[x.why]})` : `${LIB[x.from]?.name} left out (nothing similar for ${why[x.why]})`)).join('; ') + '.' : '';
+  const adj = todayAdjust();
+  $('#readyNote').hidden = !adj?.note;
+  if (adj?.note) { $('#readyNote').textContent = adj.note; $('#readyNote').className = 'ready-note ' + (adj.load < 0.9 ? 'rest' : adj.load < 1 || adj.setDelta < 0 ? 'easy' : 'normal'); }
+  // An early light week: three rough days this week, or every lift stalled.
+  const P = (S.prog ||= {}), lw = !lightWeek() && Date.now() - (P.lightOfferAt || 0) > 7 * 864e5
+    ? personal.lightWeekOffer(S.sessions, [...(S.checkinLog || []), ...(S.readiness || []).filter(c => /rough/.test(c.feel || '')).map(c => ({ at: c.at, level: 'rest' }))]) : null;
+  $('#lightNews').hidden = !lw;
+  if (lw) $('#lightNews').innerHTML = `<b>${lw.why === 'fatigue' ? 'A light week might help' : 'Time for a reset'}</b><p class="muted small">${esc(lw.note)}</p><div class="btn-row"><button class="ghost" type="button" data-lw="no">Not now</button><button class="cta" type="button" data-lw="yes">Take a light week</button></div>`;
 }
 document.addEventListener('click', e => { if (e.target.id === 'rescueOff') { S.rescueOff = todayKey(); persist(); renderToday(); toast('Just today\'s session. The rest of your week stays as planned.'); } });
 
 // Machine taken: an equivalent exercise for today only.
 $('#busyBtn').onclick = () => {
   const k = exKey, ids = (dayItems() || []).map(x => x[0]);
-  const opts = refresh.alternatives(k, LIB, { avoid: avoidList(), exclude: ids, n: 16 }).filter(id => personal.canDo(LIB, id, S.profile.equip) && !personal.hurts(LIB, id, S.profile.pain || [])).slice(0, 4);
+  const opts = refresh.alternatives(k, LIB, { avoid: avoidList(), exclude: ids, n: 16 }).filter(id => personal.canDo(LIB, id, personal.equipNow(S.profile)) && !personal.hurts(LIB, id, S.profile.pain || [])).slice(0, 4);
   if (!opts.length) return toast('No close alternative here. Do the next exercise first and come back.');
   $('#setup').hidden = true;
   openSheet(`<div><span class="eyebrow">Machine taken</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Do one of these today</h2></div>
@@ -2679,15 +2725,15 @@ $('#painBtn').onclick = () => {
 };
 $('#rsheetBody').addEventListener('click', e => {
   const b = e.target.closest('[data-painto]'); if (!b) return;
-  const p = S.profile; p.pain = [...new Set([...(p.pain || []), b.dataset.painto])]; persist(); closeSheet();
+  const p = S.profile; p.pain = [...new Set([...(p.pain || []), b.dataset.painto])]; p.painSince = { ...(p.painSince || {}), [b.dataset.painto]: p.painSince?.[b.dataset.painto] || Date.now() }; persist(); closeSheet();
   if (flow) { flow.items = (dayItems() || []).map(x => x[0]); nextInFlow(); }
   renderToday(); bindPersonal();
-  toast(`${personal.PAIN[b.dataset.painto].label}: QK works around it from now on.`);
+  toast(`${personal.PAIN[b.dataset.painto].label}: QK works around it and checks in with you in a few days.`);
 });
 
 // Weak points on the Progress tab: what QK will add next month, and why.
 function renderWeak() {
-  const w = personal.weakPoints(S.sessions, LIB, { plan: activeProgram()?.plan || [], have: S.profile.equip, pain: S.profile.pain || [], avoid: avoidList() });
+  const w = personal.weakPoints(S.sessions, LIB, { plan: activeProgram()?.plan || [], have: personal.equipNow(S.profile), pain: S.profile.pain || [], avoid: avoidList() });
   $('#weakTitle').textContent = w.length ? `${w.length} to work on` : 'None found';
   $('#weakList').innerHTML = w.length ? w.map(x => `<p style="margin:0"><b>+ ${esc(LIB[x.id].name)}</b><br><span class="muted small">${esc(x.why)}</span></p>`).join('') + '<p class="muted small" style="margin:0">QK adds these to your program next month.</p>'
     : '<p class="muted small" style="margin:0">Your lifts are moving together and your form is steady. QK checks your numbers and form every time you train.</p>';
@@ -2724,3 +2770,60 @@ function handleVoice(text) {
   return c;
 }
 window.__qkVoice = handleVoice;
+
+
+/* ---------- QK remembers: one follow-up at a time, said once ---------- */
+function renderMemory() {
+  const box = $('#memCard'); if (!box) return;
+  const f = memory.followUps(S, { lib: LIB })[0];
+  box.hidden = !f; if (!f) return;
+  box.dataset.id = f.id;
+  box.innerHTML = `<span class="eyebrow">QK remembers</span><b>${esc(f.title)}</b><p class="muted small" style="margin:0">${esc(f.text)}</p><div class="btn-row">${f.actions.map(a => `<button type="button" class="${a === f.actions[0] ? 'cta' : 'ghost'}" data-mem="${esc(a.act)}">${esc(a.label)}</button>`).join('')}</div>`;
+  const M = (S.memory ||= { done: {} }); M.said ||= {};
+  if (!M.said[f.id] && S.profile.name) { M.said[f.id] = Date.now(); persist(); setTimeout(() => say(f.say, { id: 'mem_' + f.id, priority: 'high' }), 1200); }
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-mem]'); if (!b) return;
+  const id = $('#memCard').dataset.id, [kind, a, v] = b.dataset.mem.split(':'), p = S.profile, now = Date.now(), M = (S.memory ||= { done: {} });
+  M.done ||= {}; M.done[id] = now;
+  if (kind === 'pain') {
+    p.painAsked = { ...(p.painAsked || {}), [a]: now }; p.painAskCount = { ...(p.painAskCount || {}), [a]: (p.painAskCount?.[a] || 0) + 1 };
+    const label = personal.PAIN[a]?.label.toLowerCase() || a;
+    if (v === 'better') {
+      p.pain = (p.pain || []).filter(x => x !== a); p.painCleared = { ...(p.painCleared || {}), [a]: now };
+      delete p.painSince?.[a]; delete p.painSame?.[a];
+      say(`Great news about your ${label}. Those exercises come back at 80 percent for two weeks.`, { priority: 'high' });
+      toast(`Great news. ${personal.PAIN[a]?.label} moves come back at 80% for two weeks.`);
+    } else {
+      p.painSame = { ...(p.painSame || {}), [a]: (p.painSame?.[a] || 0) + 1 };
+      const physio = v === 'worse' || p.painSame[a] >= 2;
+      toast(physio ? `Please see a physio or doctor about your ${label}. QK keeps working around it.` : `OK. QK keeps working around your ${label} and asks again next week.`);
+      if (physio) say(`I'm sorry it's not improving. Please get your ${label} checked by a physio or doctor. I'll keep working around it.`, { priority: 'high' });
+    }
+  } else if (kind === 'rough') {
+    if (a === 'tired') { S.checkin = { day: todayKey(), a: { sleep: 'bad', sore: 'some', energy: 'ok' }, r: personal.readiness({ sleep: 'bad', sore: 'some', energy: 'ok' }) }; toast('OK. Today is a little lighter.'); }
+    else say('Good to hear. Let\'s get after it.', { priority: 'high' });
+  } else if (kind === 'skip' && v === 'swap') {
+    const P = (S.prefs ||= {}); P.avoid = [...new Set([...(P.avoid || []), a])]; toast(`Swapped for good: no more ${LIB[a]?.name}.`);
+  }
+  persist(); renderToday(); renderPrograms();
+});
+// Light-week offer.
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-lw]'); if (!b) return;
+  const P = (S.prog ||= {});
+  if (b.dataset.lw === 'yes') { P.lightAt = Date.now(); toast('Light week: same weights, fewer sets. Recover and come back stronger.'); say('Light week it is. Same weights, fewer sets. Recover and come back stronger.', { priority: 'high' }); }
+  else P.lightOfferAt = Date.now();
+  persist(); renderToday();
+});
+// "How was it?" after a workout.
+$('#rsheetBody').addEventListener('click', e => {
+  const b = e.target.closest('[data-feelr]'); if (!b) return;
+  (S.feels ||= []).push({ at: Date.now(), rating: b.dataset.feelr }); persist();
+  $$('#feelSeg button').forEach(x => x.classList.toggle('on', x === b));
+  const f = memory.sessionFeel(S.feels);
+  toast(f ? f.note : 'Got it. QK remembers how each workout felt.');
+});
+// Classes follow the client: no jumping with a sore knee or hip; no dumbbell classes without dumbbells.
+function sorePounding() { const a = (S.profile.pain || []).find(x => x === 'knee' || x === 'hip'); return a ? personal.PAIN[a].label.toLowerCase() : ''; }
+function classOk(c) { const eq = personal.equipNow(S.profile); return !(c.equipment === 'dumbbells' && eq && eq.length && !eq.includes('dumbbells')); }

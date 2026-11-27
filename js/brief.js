@@ -21,12 +21,12 @@ export function lastKg(sets, id) {
  * @returns [{ id, name, rx, prevKg, delta, change: 'up'|'down'|'same'|'reps'|'new'|'light'|'none', line, why }]
  */
 export function planRows(ids, o) {
-  const { lib, sets, unit = 'kg', light = false, schemeFor = () => undefined } = o;
+  const { lib, sets, unit = 'kg', light = false, schemeFor = () => undefined, micro = false } = o;
   return ids.map(id => {
     const item = lib[id]; if (!item) return null;
     const cls = liftClass(item), sc = schemeFor(id);
     if (!cls) return { id, name: item.name, change: 'none' };
-    const rx = nextFor(item, sets, { unit, light, scheme: sc }), prevKg = lastKg(sets, id);
+    const rx = nextFor(item, sets, { unit, light, scheme: sc, micro }), prevKg = lastKg(sets, id);
     if (!rx) {
       const target = sc ? `${sc.sets} × ${sc.lo === sc.hi ? sc.lo : sc.lo + '–' + sc.hi}` : '3 × 8';
       return { id, name: item.name, change: 'new', line: `${target} · pick weight`, why: 'First time: choose a weight you can do with good form. QK takes it from there.' };

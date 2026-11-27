@@ -428,7 +428,41 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.goto('https://shred.local/?start=today'); await p.waitForTimeout(1000);
   check('reminder link: opens straight into today\'s workout', await p.isVisible('#rsheet') || await p.isVisible('#setup') || await p.isVisible('#live'));
   check('app-icon shortcut: "Start today\'s workout"', JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.webmanifest'), 'utf8')).shortcuts.some(x => x.url === './?start=today'));
-  await p.evaluate(() => { const S = JSON.parse(localStorage.getItem('shred_qk_v1')); S.profile.equip = []; S.profile.pain = []; delete S.plan.minutes; S.program = null; localStorage.setItem('shred_qk_v1', JSON.stringify(S)); });
+
+  // QK remembers: a sore shoulder 4 days ago → "How's your shoulder?"; Better brings the moves back at 80%.
+  const setS = f => p.evaluate(src => { const S = JSON.parse(localStorage.getItem('shred_qk_v1')); new Function('S', src)(S); localStorage.setItem('shred_qk_v1', JSON.stringify(S)); }, f);
+  await setS(`S.profile.equip = []; S.profile.pain = ['shoulder']; S.profile.painSince = { shoulder: Date.now() - 4 * 864e5 }; delete S.plan.minutes; S.memory = { done: {} };`);
+  await p.goto('https://shred.local/'); await p.waitForTimeout(600); await go('today');
+  check('remembers: "How\'s your shoulder?" 4 days after it was marked sore', await p.isVisible('#memCard') && /How's your shoulder/.test(await p.textContent('#memCard')) && /You told me it hurt on/.test(await p.textContent('#memCard')), await p.textContent('#memCard'));
+  await tap('#memCard [data-mem="pain:shoulder:better"]'); await p.waitForTimeout(250);
+  const cleared = await p.evaluate(() => JSON.parse(localStorage.getItem('shred_qk_v1')).profile);
+  check('remembers: "Better" clears it and starts the 2-week 80% return', !cleared.pain.includes('shoulder') && cleared.painCleared.shoulder > 0 && !(await p.isVisible('#memCard')));
+  // A rough day yesterday → asked the next day.
+  await setS(`S.checkinLog = [{ at: Date.now() - 864e5, level: 'rest' }];`);
+  await p.goto('https://shred.local/'); await p.waitForTimeout(500); await go('today');
+  check('remembers: rough day yesterday → "Feeling better today?"', /Feeling better today/.test(await p.textContent('#memCard')));
+  await tap('#memCard [data-mem="rough:tired"]'); await p.waitForTimeout(200);
+  check('remembers: "Still tired" → today is lighter', await p.isVisible('#readyNote') && /lighter|5% off/.test(await p.textContent('#readyNote')), await p.textContent('#readyNote'));
+  // Three rough days this week → an early light week offer.
+  await setS(`S.checkinLog = [0, 1, 2].map(d => ({ at: Date.now() - d * 864e5 - 3600e3, level: 'easy' })); S.memory.done = Object.fromEntries([0,1,2,3].map(d => { const x = new Date(Date.now() - d * 864e5); x.setHours(0,0,0,0); return ['rough:' + x.getTime(), 1]; })); (S.prog ||= {}).lightAt = 0; S.prog.lightOfferAt = 0;`);
+  await p.goto('https://shred.local/'); await p.waitForTimeout(500); await go('today');
+  check('fatigue: 3 rough days this week → "Take a light week" offered', await p.isVisible('#lightNews') && /rough days this week/.test(await p.textContent('#lightNews')));
+  await tap('#lightNews [data-lw=yes]'); await p.waitForTimeout(200);
+  check('fatigue: one tap starts the light week', await p.evaluate(() => JSON.parse(localStorage.getItem('shred_qk_v1')).prog.lightAt > 0) && !(await p.isVisible('#lightNews')));
+  // Make it yours extras: dumbbell ceiling, travel, Ramadan.
+  await go('progress'); await tap('#meCard summary'); await p.waitForTimeout(150);
+  await p.fill('#pMaxDb', '20'); await p.press('#pMaxDb', 'Tab');
+  await p.selectOption('#pTravel', 'none'); await p.waitForTimeout(150);
+  check('travel: "No equipment" for a week, ends by itself', /until/.test(await p.textContent('#travelNote')) && await p.evaluate(() => JSON.parse(localStorage.getItem('shred_qk_v1')).profile.travel.until > Date.now() + 6 * 864e5));
+  await p.selectOption('#pTravel', ''); await p.click('#pRamadan'); await p.waitForTimeout(150);
+  check('Ramadan mode: on for 30 days, with the iftar tip', /45 minutes/.test(await p.textContent('#ramadanNote')) && await p.evaluate(() => JSON.parse(localStorage.getItem('shred_qk_v1')).profile.ramadan.until > Date.now() + 29 * 864e5));
+  await p.click('#pRamadan');
+  // Knee pain → classes default to no jumping.
+  await setS(`S.profile.pain = ['knee']; S.profile.painSince = { knee: Date.now() };`);
+  await p.goto('https://shred.local/'); await p.waitForTimeout(500); await go('train'); await tap('#classStrip [data-class=ignite20]'); await p.waitForTimeout(150);
+  check('classes: knee marked sore → quiet mode (no jumping) is on', await p.isChecked('#classQuiet') && /on for your knee/.test(await p.textContent('#rsheetBody')));
+  await p.evaluate(() => { document.querySelector('#rsheet').hidden = true; });
+  await p.evaluate(() => { const S = JSON.parse(localStorage.getItem('shred_qk_v1')); S.profile.equip = []; S.profile.pain = []; S.profile.travel = null; delete S.profile.maxKg; delete S.plan.minutes; S.program = null; localStorage.setItem('shred_qk_v1', JSON.stringify(S)); });
 
   // Workout builder: build a two-exercise program, save it, start it; day 1 becomes today's workout.
   await p.goto('https://shred.local/'); await go('train'); await tap('#buildNew');

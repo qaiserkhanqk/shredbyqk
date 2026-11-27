@@ -37,7 +37,8 @@ export function readiness(a = {}, { restHr, baseHr } = {}) {
 /** Today's items with the readiness adjustment: accessories lose sets (never below 2), main lifts keep theirs. */
 export function readyItems(items, r, lib) {
   if (!r?.setDelta) return items;
-  return items.map((it, i) => (isMain(lib, items, i) || it[1] <= 2 ? it : [it[0], Math.max(2, it[1] + r.setDelta), ...it.slice(2)]));
+  // Fewer sets: extras only, never below 2. More sets: extras only, at most one more.
+  return items.map((it, i) => (isMain(lib, items, i) || isRehab(it) || (r.setDelta < 0 && it[1] <= 2) ? it : [it[0], Math.max(2, it[1] + Math.max(-1, Math.min(1, r.setDelta))), ...it.slice(2)]));
 }
 
 // ---------- 2. My gym: only exercises the client can actually do ----------
@@ -52,10 +53,12 @@ export const EQUIP = [
   { key: 'bench', label: 'Bench and box', match: ['Bench', 'Box', 'Step', 'Hyperextension bench'] },
   { key: 'cardio', label: 'Cardio machines and sled', match: ['Treadmill', 'SkiErg', 'Rower', 'Sled'] },
 ];
-const ALWAYS = ['Bodyweight', 'No equipment', 'None', 'Wall', 'Mat', 'Chair', 'Towel', 'Table', 'Other', 'Ab wheel', 'Dowel', 'Foam roller', 'Ball', 'Exercise ball', 'Medicine ball', 'Sandbag', 'Slant board'];
+const ALWAYS = ['Bodyweight', 'No equipment', 'None', 'Wall', 'Mat', 'Chair', 'Towel', 'Table', 'Ab wheel', 'Dowel', 'Foam roller', 'Ball', 'Exercise ball', 'Medicine ball', 'Sandbag', 'Slant board'];
 /** Can this exercise be done with this equipment? `have` = EQUIP keys; empty/undefined = a full gym. */
 export function canDo(lib, id, have) {
-  if (!have || !have.length) return true;
+  if (!have || !have.length) return true; // nothing ticked = a full gym ('none' = bodyweight only)
+  // Rings and suspension straps are listed as bodyweight but need something to hang from.
+  if (/suspension|\bring\b/i.test(lib[id]?.name || '')) return have.includes('pullup');
   const eq = lib[id]?.equipment; if (!eq || ALWAYS.includes(eq)) return true;
   return EQUIP.some(e => have.includes(e.key) && e.match.includes(eq));
 }
@@ -94,12 +97,14 @@ export function personalDay(items, lib, { have, pain = [], avoid = [] } = {}) {
       const me = lib[it[0]];
       to = Object.values(lib).find(x => !x.rehab && x.id !== it[0] && !used.has(x.id) && (x.kind || 'gym') === (me.kind || 'gym') && x.muscles?.[0] === me.muscles?.[0] && ok(x.id))?.id;
     }
-    if (!to) return it; // nothing suitable: keep it, the client can still swap by hand
+    // Nothing suitable: an exercise they can't do or that loads a sore spot is left out (and listed);
+    // one they merely skipped stays, and they can still swap it by hand.
+    if (!to) { if (why === 'skipped') return it; swaps.push({ from: it[0], to: null, why }); return null; }
     swaps.push({ from: it[0], to, why }); used.add(to);
     return [to, ...it.slice(1)];
   });
   const rehab = [...new Set(pain.flatMap(a => PAIN[a]?.rehab || []))].filter(id => lib[id] && !used.has(id)).map(id => [id, 2, lib[id].hold || /iso|Iso/.test(id) ? '30s' : '12', 45, 'Rehab: easy, pain-free range']);
-  return { items: [...rehab, ...out], swaps };
+  return { items: [...rehab, ...out.filter(Boolean)], swaps };
 }
 
 // ---------- 4. Likes and skips ----------
@@ -228,3 +233,90 @@ export function rescue(today, next, lib, { maxMinutes = 80 } = {}) {
 // ---------- 8. Time per day ----------
 /** Minutes allowed today: a one-off cap first, else the client's budget for this weekday. */
 export const minutesFor = (budget = {}, cap = null, now = Date.now()) => cap || budget[new Date(now).getDay()] || null;
+
+// ---------- 9. Coming back after a break ----------
+// Maximal strength holds up fairly well over a few weeks off (lockdown studies: Washif et al. 2026,
+// doi:10.5114/biolsport.2026.153307), but jumping straight back to old weights invites soreness and strain.
+// QK starts lighter and ramps back over a few sessions (practical rule, not a research finding).
+const dayStart = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
+/** @returns null or { gapDays, session, of, load, setDelta, note } */
+export function welcomeBack(sessions = [], { now = Date.now() } = {}) {
+  const days = [...new Set(sessions.filter(s => !s.demo && s.at <= now).map(s => dayStart(s.at)))].sort((a, b) => a - b);
+  if (!days.length) return null;
+  const today = dayStart(now), last = days[days.length - 1];
+  let gap, after;
+  if (today - last >= 14 * DAY) { gap = Math.round((today - last) / DAY); after = 0; }
+  else {
+    let i = days.length - 1; while (i > 0 && days[i] - days[i - 1] < 14 * DAY) i--;
+    if (i === 0) return null;
+    gap = Math.round((days[i] - days[i - 1]) / DAY); after = days.filter(d => d >= days[i] && d < today).length;
+  }
+  const of = gap >= 56 ? 4 : gap >= 28 ? 3 : 2, start = gap >= 56 ? 0.75 : gap >= 28 ? 0.85 : 0.9;
+  if (after >= of) return null;
+  const load = Math.round((start + (1 - start) * after / of) * 100) / 100, weeks = Math.round(gap / 7);
+  return { gapDays: gap, session: after + 1, of, load, setDelta: gap >= 28 ? -1 : 0,
+    note: `Welcome back! About ${weeks} week${weeks === 1 ? '' : 's'} off, so session ${after + 1} of ${of} back is at ${Math.round(load * 100)}% of your old weights${gap >= 28 ? ' with one set fewer on the extras' : ''}. QK ramps you back up from here.` };
+}
+/** Combine today's adjustments (readiness, welcome back, Ramadan): the lightest load and fewest sets win. */
+export function combine(...adj) {
+  const a = adj.filter(Boolean); if (!a.length) return null;
+  // Any reason to go lighter wins over a reason to add a set.
+  const ds = a.map(x => x.setDelta ?? 0), setDelta = ds.some(d => d < 0) ? Math.min(...ds) : Math.max(...ds);
+  return { level: a.find(x => x.level)?.level || 'normal', load: Math.min(...a.map(x => x.load ?? 1)), setDelta, note: a.map(x => x.note).filter(Boolean).join(' ') };
+}
+
+// ---------- 10. Home weights have a ceiling ----------
+const KIT = { Dumbbells: 'dumbbells', Dumbbell: 'dumbbells', Kettlebell: 'kettlebell', Kettlebells: 'kettlebell' };
+/**
+ * If QK asks for more than the heaviest dumbbell/kettlebell the client owns: use the heaviest and progress
+ * with reps and a slower lowering instead. `maxKg` = { dumbbells, kettlebell } (per hand).
+ * @returns null or { kg, note }
+ */
+export function capLoad(lib, id, kg, maxKg = {}) {
+  const k = KIT[lib[id]?.equipment], m = k && maxKg[k];
+  if (!m || !(kg > m)) return null;
+  return { kg: m, note: `That's past your heaviest ${k === 'kettlebell' ? 'kettlebell' : 'dumbbells'} (${m} kg). Use them and make it harder instead: 2 more reps a set and 3 seconds on the way down.` };
+}
+
+// ---------- 11. Pain gets re-checked ----------
+/** Areas marked sore 14+ days ago (and not asked in the last 14 days): time to ask "Is it better?" */
+export function painDue(profile = {}, { now = Date.now() } = {}) {
+  const since = profile.painSince || {}, asked = profile.painAsked || {};
+  return (profile.pain || []).filter(a => now - (since[a] || now) >= 14 * DAY && now - (asked[a] || 0) >= 14 * DAY);
+}
+
+// ---------- 12. Fatigue and plateaus: an early light week ----------
+/**
+ * Offer a light week now when (a) 3+ of the last 7 days had a lighter or recovery check-in, or (b) 3+ lifts
+ * have all stalled for 6 weeks (none up more than 1%): a pattern of fatigue, sleep or food, not one weak lift.
+ * @param checks [{ at, level: 'rest'|'easy'|'normal'|'ready' }]
+ * @returns null or { why: 'fatigue'|'plateau', note }
+ */
+export function lightWeekOffer(sessions = [], checks = [], { now = Date.now() } = {}) {
+  const rough = new Set(checks.filter(c => now - c.at < 7 * DAY && ['rest', 'easy'].includes(c.level)).map(c => dayStart(c.at)));
+  if (rough.size >= 3) return { why: 'fatigue', note: `${rough.size} rough days this week. That's a pattern, not a bad day: a light week now lets you recover and come back stronger.` };
+  const g = {};
+  for (const s of sessions) {
+    if (s.demo || !s.kg || now - s.at > 6 * WEEK) continue;
+    const v = e1rm(s.kg, s.reps); if (!v) continue;
+    const x = (g[s.ex] ||= { early: 0, late: 0 }); if (now - s.at < 3 * WEEK) x.late = Math.max(x.late, v); else x.early = Math.max(x.early, v);
+  }
+  const ch = Object.values(g).filter(x => x.early && x.late).map(x => (x.late - x.early) / x.early * 100);
+  if (ch.length >= 3 && ch.every(p => p <= 1)) return { why: 'plateau', note: `Your lifts have all stalled for 6 weeks. That usually means tiredness, sleep or food, not one weak lift. A light week now, then QK freshens the program. Check your sleep and protein too.` };
+  return null;
+}
+
+// ---------- 13. Travel ----------
+export const TRAVEL = { none: { label: 'No equipment', equip: [] }, hotel: { label: 'Hotel gym', equip: ['dumbbells', 'machines', 'cable', 'bench', 'cardio'] } };
+/** Equipment in use now: travel kit while travelling (ends by itself), else the client's gym. `null` = full gym. */
+export function equipNow(profile = {}, { now = Date.now() } = {}) {
+  const t = profile.travel;
+  if (t && now < t.until) return t.kind === 'none' ? ['none'] : TRAVEL[t.kind]?.equip || profile.equip;
+  return profile.equip;
+}
+
+// ---------- 14. Ramadan ----------
+// Strength gains were better training after iftar (fed) than fasted (Triki et al. 2023, doi:10.1123/ijspp.2022-0268),
+// and trimming volume ~22% during Ramadan improved strength and power (Rebaï et al. 2014, doi:10.1055/s-0033-1353216).
+export const ramadanOn = (profile = {}, now = Date.now()) => !!profile.ramadan && now < profile.ramadan.until;
+export const RAMADAN = { load: 1, setDelta: -1, maxMinutes: 45, note: 'Ramadan mode: sessions up to 45 minutes and one set fewer on the extras. Train after iftar if you can: strength gains were better fed than fasted.' };

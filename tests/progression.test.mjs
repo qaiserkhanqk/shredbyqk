@@ -88,6 +88,8 @@ check('plates: just the bar', P.plates(20).text === 'Just the bar');
 check('plates: 225 lb = bar + 45 + 45', P.plates(P.fromUnit(225, 'lb'), 'lb').text === 'Bar + 45 + 45 each side');
 check('plates: 135 lb', P.plates(P.fromUnit(135, 'lb'), 'lb').side.join() === '45');
 check('plates: lighter than the bar → none', P.plates(15) === null);
-check('plates: unloadable → none', P.plates(61) === null);
+check('plates: unloadable → none', P.plates(60.3) === null);
+check('plates: micro plates load 61 kg as 20 + 0.5 a side', P.plates(61)?.text === 'Bar + 20 + 0.5 each side');
+check('micro plates: bench goes up 1 kg, squat 2.5 kg', P.stepKg('big-upper', 'kg', true) === 1 && P.stepKg('big-lower', 'kg', true) === 2.5 && P.roundLoad(61.2, 'big-upper', 'kg', true) === 61 && P.stepKg('mid', 'kg', true) === 2.5);
 if (fail) { console.log(`${fail} FAILED`); process.exit(1); }
 console.log('progression: all pass');

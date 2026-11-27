@@ -89,6 +89,40 @@ check('voice: next / skip / done / heavier / lighter', ['next exercise', 'skip t
 check('voice: Urdu words (agla, chhor do, bas, bhari, halka)', ['agla', 'chhor do', 'bas', 'bhari karo', 'halka'].map(t => parse(t)?.cmd).join() === 'next,skip,done,heavier,lighter');
 check('voice: random talk is ignored', parse('what a nice day') === null && parse('') === null);
 
+// 11. Coming back after a break
+const trainedOn = (...daysAgo) => daysAgo.map(d => ({ ex: 'squat', at: NOW - d * DAY, kg: 100, reps: 5 }));
+check('break: trained 3 days ago → nothing changes', P.welcomeBack(trainedOn(3, 5, 7), { now: NOW }) === null);
+const wb3 = P.welcomeBack(trainedOn(20, 22), { now: NOW });
+check('break: 3 weeks off → first session back at 90%, 2 sessions to ramp', wb3?.load === 0.9 && wb3.of === 2 && wb3.session === 1 && /Welcome back/.test(wb3.note), JSON.stringify(wb3));
+const wb6 = P.welcomeBack(trainedOn(45, 47), { now: NOW });
+check('break: 6 weeks off → 85% and one set fewer on extras', wb6?.load === 0.85 && wb6.setDelta === -1 && wb6.of === 3);
+check('break: 10 weeks off → 75%, 4 sessions to ramp', P.welcomeBack(trainedOn(70), { now: NOW })?.load === 0.75);
+const ramp = P.welcomeBack(trainedOn(2, 30, 32), { now: NOW });
+check('break: ramps up each session back (2nd of 3 after 4 weeks off: 90%)', ramp?.session === 2 && ramp.load === 0.9, JSON.stringify(ramp));
+check('break: done ramping → normal', P.welcomeBack(trainedOn(1, 3, 5, 40), { now: NOW }) === null);
+check('break: no history → nothing', P.welcomeBack([], { now: NOW }) === null);
+check('combine: lightest load and fewest sets win, notes kept', JSON.stringify(P.combine({ load: 0.95, setDelta: -1, note: 'a' }, null, { load: 0.9, setDelta: 0, note: 'b' })) === JSON.stringify({ level: 'normal', load: 0.9, setDelta: -1, note: 'a b' }));
+
+// 12. Home weights ceiling
+check('ceiling: 25 kg asked, dumbbells only go to 20 → 20 kg, harder with reps and tempo', P.capLoad(LIB, 'dbBench', 25, { dumbbells: 20 })?.kg === 20 && /3 seconds/.test(P.capLoad(LIB, 'dbBench', 25, { dumbbells: 20 }).note));
+check('ceiling: under the limit, or a barbell lift → nothing', P.capLoad(LIB, 'dbBench', 18, { dumbbells: 20 }) === null && P.capLoad(LIB, 'benchPress', 100, { dumbbells: 20 }) === null);
+
+// 13. Pain re-check
+check('pain re-check: after 14 days, ask once; not again for 14 days', P.painDue({ pain: ['knee', 'back'], painSince: { knee: NOW - 15 * DAY, back: NOW - 3 * DAY } }, { now: NOW }).join() === 'knee' && P.painDue({ pain: ['knee'], painSince: { knee: NOW - 30 * DAY }, painAsked: { knee: NOW - 2 * DAY } }, { now: NOW }).length === 0);
+
+// 14. Early light week
+check('light week: 3 rough check-ins this week → offer, with why', P.lightWeekOffer([], [0, 1, 3].map(d => ({ at: NOW - d * DAY, level: 'easy' })), { now: NOW })?.why === 'fatigue');
+check('light week: 2 rough days, or rough days long ago → no', P.lightWeekOffer([], [{ at: NOW, level: 'rest' }, { at: NOW - DAY, level: 'easy' }, { at: NOW - 20 * DAY, level: 'rest' }], { now: NOW }) === null);
+const flat = [...lift('benchPress', 80, 80), ...lift('squat', 100, 100), ...lift('deadlift', 120, 121)];
+check('light week: every lift stalled 6 weeks → plateau offer', P.lightWeekOffer(flat, [], { now: NOW })?.why === 'plateau');
+check('light week: one lift stalled, others rising → no plateau (that is a weak point)', P.lightWeekOffer(stall, [], { now: NOW }) === null);
+
+// 15. Travel and Ramadan
+check('travel: hotel gym for a week, then back to your own gym by itself', P.equipNow({ equip: ['barbell'], travel: { kind: 'hotel', until: NOW + DAY } }, { now: NOW }).includes('machines') && P.equipNow({ equip: ['barbell'], travel: { kind: 'hotel', until: NOW - DAY } }, { now: NOW }).join() === 'barbell');
+const tv = P.personalDay(byId('massMonster').plan[0].items, LIB, { have: P.equipNow({ travel: { kind: 'none', until: NOW + DAY } }, { now: NOW }) });
+check('travel: no equipment → bodyweight-only session', tv.items.every(it => P.canDo(LIB, it[0], ['none'])), tv.items.map(it => it[0]).join(' '));
+check('Ramadan: on until its end date; one set fewer, 45-minute sessions', P.ramadanOn({ ramadan: { until: NOW + DAY } }, NOW) && !P.ramadanOn({ ramadan: { until: NOW - DAY } }, NOW) && P.RAMADAN.setDelta === -1 && P.RAMADAN.maxMinutes === 45);
+
 // 10. Urdu cues: short lines only; a form tip is never dropped
 const { toUrdu } = await import('../js/coach-ur.js');
 check('urdu: counts, sets, rest, switch sides', toUrdu('seven') === 'سات' && toUrdu('Set 2 of 4.') === 'سیٹ دو، کل چار میں سے۔' && toUrdu('Rest. Next up: Squat.') === 'آرام کریں۔' && toUrdu('Switch sides.') === 'سائیڈ بدلیں۔');
