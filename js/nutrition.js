@@ -100,6 +100,7 @@ export const ING = {
   milkLow: ['Milk, low fat (1%)', 42, 3.4, 5, 1, 0],
   greekYogurt: ['Greek yogurt, low fat', 73, 10, 3.9, 1.9, 0],
   peanutButter: ['Peanut butter', 588, 25, 20, 50, 6],
+  caneJuice: ['Sugarcane juice (ganne ka ras)', 70, 0.2, 17.5, 0, 0.1], // USDA branded cane drink 184 kcal / 248 g; stall juice ~64-75
 };
 const FATS = { oil: 'Oil', ghee: 'Ghee', butter: 'Butter' };
 
@@ -122,18 +123,20 @@ const NOFAT = F('oil', 0, 0, 0);
 const FAM = (fam, list) => list.forEach(d => { d.fam = fam; });
 
 export const DISHES = [
-  // Curries and salans — serving is one katori (~200 g) unless noted.
-  D('chicken_karahi', 'Chicken karahi', 'kadai chicken karahi gosht کڑاہی', 'curry', 'katori', 200, ['chicken', 110], [['tomato', 80], ['spices', 8]], F('oil', 14, 28, 36)),
-  D('chicken_handi', 'Chicken handi', 'handi chicken makhni handi', 'curry', 'katori', 200, ['chicken', 100], [['dahi', 40], ['cream', 15], ['onion', 30], ['tomato', 40], ['spices', 6]], F('oil', 12, 24, 30)),
-  D('chicken_qorma', 'Chicken qorma', 'korma chicken qorma قورمہ', 'curry', 'katori', 200, ['chicken', 100], [['dahi', 45], ['onion', 40], ['spices', 6]], F('oil', 14, 28, 36)),
-  D('chicken_jalfrezi', 'Chicken jalfrezi', 'jalfrezi', 'curry', 'katori', 220, ['chicken', 100], [['capsicum', 40], ['onion', 40], ['tomato', 50], ['spices', 6]], F('oil', 12, 22, 28)),
-  D('chicken_salan', 'Chicken salan (shorba)', 'chicken curry shorba wala salan murgh', 'curry', 'katori', 220, ['chicken', 90], [['onion', 30], ['tomato', 40], ['spices', 6]], F('oil', 12, 22, 28)),
-  D('butter_chicken', 'Butter chicken', 'murgh makhani chicken tikka masala makhni', 'curry', 'katori', 210, ['chicken', 100], [['tomato', 80], ['cream', 20], ['spices', 6]], F('butter', 10, 20, 26)),
-  D('mutton_karahi', 'Mutton karahi', 'gosht karahi goat karahi', 'curry', 'katori', 200, ['mutton', 110], [['tomato', 80], ['spices', 8]], F('oil', 16, 30, 38)),
-  D('mutton_qorma', 'Mutton qorma', 'korma gosht qorma mutton korma', 'curry', 'katori', 200, ['mutton', 100], [['dahi', 45], ['onion', 40], ['spices', 6]], F('ghee', 14, 28, 36)),
-  D('aloo_gosht', 'Aloo gosht', 'aloo gosht potato meat curry', 'curry', 'katori', 240, ['mutton', 80], [['potato', 70], ['onion', 30], ['tomato', 40], ['spices', 6]], F('oil', 12, 22, 28)),
-  D('nihari', 'Beef nihari', 'nihari nalli nehari نہاری', 'curry', 'bowl', 250, ['beef', 110], [['atta', 8], ['onion', 15], ['spices', 8]], F('ghee', 18, 35, 45)),
-  D('haleem', 'Haleem', 'daleem haleem beef حلیم', 'curry', 'bowl', 250, ['beef', 60], [['dalia', 25], ['chanaDal', 10], ['masoor', 6], ['moong', 4], ['mash', 4], ['onion', 15], ['spices', 6]], F('ghee', 14, 26, 34)),
+  // Curries and salans — one katori. Meat curries 240 g (LFAC 2024 cup of karahi = 240 g;
+  // FNDDS curry cup 240 g), daals 200 g (LFAC 185 g); nihari and haleem a 250 g bowl. Home fat sits between the Pakistani lab values (KHAN 2019,
+  // 12-20% fat) and the leaner UK/US recipes (CoFID, FNDDS).
+  D('chicken_karahi', 'Chicken karahi', 'kadai chicken karahi gosht کڑاہی', 'curry', 'katori', 240, ['chicken', 125], [['tomato', 95], ['spices', 10]], F('oil', 30, 45, 54)), // KHAN 2019 lab 240 vs CoFID/FNDDS 106-145 kcal/100 g: home at the midpoint
+  D('chicken_handi', 'Chicken handi', 'handi chicken makhni handi', 'curry', 'katori', 240, ['chicken', 120], [['dahi', 48], ['cream', 18], ['onion', 36], ['tomato', 48], ['spices', 7]], F('oil', 18, 30, 38)),
+  D('chicken_qorma', 'Chicken qorma', 'korma chicken qorma قورمہ', 'curry', 'katori', 240, ['chicken', 120], [['dahi', 55], ['onion', 50], ['spices', 7]], F('oil', 21, 35, 44)), // KHAN 194 vs CoFID 127 kcal/100 g: home ~165
+  D('chicken_jalfrezi', 'Chicken jalfrezi', 'jalfrezi', 'curry', 'katori', 240, ['chicken', 110], [['capsicum', 44], ['onion', 44], ['tomato', 55], ['spices', 7]], F('oil', 20, 30, 36)),
+  D('chicken_salan', 'Chicken salan (shorba)', 'chicken curry shorba wala salan murgh', 'curry', 'katori', 240, ['chicken', 100], [['onion', 33], ['tomato', 44], ['spices', 7]], F('oil', 18, 28, 34)),
+  D('butter_chicken', 'Butter chicken', 'murgh makhani chicken tikka masala makhni', 'curry', 'katori', 240, ['chicken', 115], [['tomato', 90], ['cream', 23], ['spices', 7]], F('butter', 16, 26, 32)),
+  D('mutton_karahi', 'Mutton karahi', 'gosht karahi goat karahi', 'curry', 'katori', 240, ['mutton', 130], [['tomato', 95], ['spices', 10]], F('oil', 32, 47, 56)), // KHAN 2019: 242 kcal/100 g; home at the midpoint
+  D('mutton_qorma', 'Mutton qorma', 'korma gosht qorma mutton korma', 'curry', 'katori', 240, ['mutton', 120], [['dahi', 55], ['onion', 50], ['spices', 7]], F('ghee', 24, 37, 46)), // KHAN 2019 korma 194 kcal/100 g
+  D('aloo_gosht', 'Aloo gosht', 'aloo gosht potato meat curry', 'curry', 'katori', 240, ['mutton', 95], [['potato', 70], ['onion', 30], ['tomato', 40], ['spices', 6]], F('oil', 25, 35, 42)), // KHAN 2019 potato-meat 199 kcal/100 g
+  D('nihari', 'Beef nihari', 'nihari nalli nehari نہاری', 'curry', 'bowl', 250, ['beef', 110], [['atta', 8], ['onion', 15], ['spices', 8]], F('ghee', 18, 35, 45)), // LFAC 2024: 1 cup = 240 g; KHAN 172 kcal/100 g
+  D('haleem', 'Haleem', 'daleem haleem beef حلیم', 'curry', 'bowl', 250, ['beef', 60], [['dalia', 20], ['chanaDal', 8], ['masoor', 5], ['moong', 3], ['mash', 3], ['onion', 15], ['spices', 5]], F('ghee', 10, 29, 36)), // KHAN 2019: 128 kcal/100 g at home; restaurant tarka on top
   D('qeema', 'Qeema (beef mince)', 'keema kima mince beef qeema aloo qeema', 'curry', 'katori', 170, ['beefMince', 100], [['onion', 30], ['tomato', 40], ['spices', 6]], F('oil', 10, 20, 26)),
   D('qeema_matar', 'Qeema matar', 'keema matar mince peas', 'curry', 'katori', 200, ['beefMince', 80], [['peas', 50], ['onion', 25], ['tomato', 40], ['spices', 6]], F('oil', 10, 20, 26)),
   D('palak_paneer', 'Palak paneer', 'saag paneer spinach paneer', 'curry', 'katori', 200, ['paneer', 50], [['spinach', 150], ['onion', 20], ['tomato', 20], ['cream', 5], ['spices', 5]], F('ghee', 10, 20, 26)),
@@ -148,25 +151,26 @@ export const DISHES = [
   D('palak_gosht', 'Palak gosht', 'spinach meat', 'curry', 'katori', 220, ['mutton', 80], [['spinach', 130], ['onion', 25], ['tomato', 25], ['spices', 6]], F('oil', 12, 22, 28)),
   D('sarson_saag', 'Sarson ka saag', 'saag sarson mustard greens', 'curry', 'katori', 200, null, [['sarson', 170], ['spinach', 30], ['makki', 8], ['spices', 5]], F('butter', 12, 22, 30)),
   D('cholay', 'Cholay (chana masala)', 'chole chana masala chickpea curry channay', 'curry', 'katori', 200, null, [['kabuli', 50], ['onion', 30], ['tomato', 40], ['spices', 6]], F('oil', 10, 18, 24)),
-  D('daal_chana', 'Daal chana', 'chana dal chane ki daal', 'curry', 'katori', 200, null, [['chanaDal', 40], ['onion', 15], ['tomato', 15], ['spices', 3]], F('ghee', 8, 16, 22)),
-  D('daal_masoor', 'Daal masoor', 'masoor dal red lentil daal', 'curry', 'katori', 200, null, [['masoor', 40], ['onion', 15], ['tomato', 15], ['spices', 3]], F('ghee', 8, 16, 22)),
-  D('daal_moong', 'Daal moong', 'moong dal yellow daal', 'curry', 'katori', 200, null, [['moong', 40], ['onion', 15], ['tomato', 15], ['spices', 3]], F('ghee', 8, 16, 22)),
-  D('daal_mash', 'Daal mash', 'mash ki daal urad dal white', 'curry', 'katori', 180, null, [['mash', 40], ['onion', 15], ['spices', 4]], F('ghee', 10, 18, 24)),
+  D('daal_chana', 'Daal chana', 'chana dal chane ki daal', 'curry', 'katori', 200, null, [['chanaDal', 45], ['onion', 15], ['tomato', 15], ['spices', 3]], F('ghee', 19, 26, 32)), // KHAN 229 vs CoFID 152 kcal/100 g: home ~170
+  D('daal_masoor', 'Daal masoor', 'masoor dal red lentil daal', 'curry', 'katori', 200, null, [['masoor', 42], ['onion', 15], ['tomato', 15], ['spices', 3]], F('ghee', 13, 22, 28)), // KHAN 183 vs CoFID/FNDDS 93-173 kcal/100 g: home ~140
+  D('daal_moong', 'Daal moong', 'moong dal yellow daal', 'curry', 'katori', 200, null, [['moong', 42], ['onion', 15], ['tomato', 15], ['spices', 3]], F('ghee', 13, 22, 28)), // KHAN 183 vs CoFID 74-102 kcal/100 g: home ~135
+  D('daal_mash', 'Daal mash', 'mash ki daal urad dal white', 'curry', 'katori', 180, null, [['mash', 45], ['onion', 15], ['spices', 4]], F('ghee', 22, 32, 38)), // KHAN 272 vs CoFID 154 kcal/100 g: home ~200
   D('daal_makhani', 'Daal makhani', 'dal makhani black dal', 'curry', 'katori', 200, null, [['mash', 30], ['rajma', 8], ['tomato', 30], ['cream', 15], ['spices', 4]], F('butter', 10, 20, 26)),
   D('rajma', 'Rajma', 'kidney bean curry lobia', 'curry', 'katori', 200, null, [['rajma', 45], ['onion', 25], ['tomato', 30], ['spices', 3]], F('oil', 9, 16, 22)),
+  D('aloo_sabzi', 'Aloo ki sabzi (aloo bhujia)', 'aloo ki sabzi aloo bhujia aloo bhaji potato sabzi aloo fry', 'curry', 'katori', 150, null, [['potato', 130], ['onion', 15], ['tomato', 15], ['spices', 3]], F('oil', 10, 16, 20)),
   D('aloo_gobi', 'Aloo gobi', 'aloo gobhi potato cauliflower', 'curry', 'katori', 150, null, [['potato', 70], ['cauliflower', 70], ['onion', 15], ['tomato', 15], ['spices', 3]], F('oil', 10, 18, 24)),
   D('aloo_matar', 'Aloo matar', 'aloo mattar potato peas', 'curry', 'katori', 190, null, [['potato', 80], ['peas', 50], ['onion', 15], ['tomato', 30], ['spices', 3]], F('oil', 9, 16, 22)),
   D('bhindi', 'Bhindi', 'bhindi masala okra', 'curry', 'katori', 150, null, [['okra', 150], ['onion', 30], ['tomato', 20], ['spices', 3]], F('oil', 12, 20, 26)),
-  D('mix_sabzi', 'Mix sabzi', 'mixed vegetable sabzi tarkari', 'curry', 'katori', 160, null, [['mixedVeg', 120], ['potato', 30], ['onion', 15], ['tomato', 20], ['spices', 3]], F('oil', 9, 16, 22)),
+  D('mix_sabzi', 'Mix sabzi', 'mixed vegetable sabzi tarkari', 'curry', 'katori', 160, null, [['mixedVeg', 120], ['potato', 30], ['onion', 15], ['tomato', 20], ['spices', 3]], F('oil', 14, 18, 24)), // KHAN 142 vs CoFID 108-120 kcal/100 g
   D('anda_curry', 'Anda curry (2 eggs)', 'egg curry anday ka salan', 'curry', 'katori', 200, ['egg', 100], [['onion', 30], ['tomato', 50], ['spices', 5]], F('oil', 10, 18, 24)),
-  D('fish_curry', 'Fish curry', 'machli salan fish salan', 'curry', 'katori', 200, ['fish', 120], [['tomato', 50], ['onion', 25], ['spices', 6]], F('oil', 12, 22, 28)),
+  D('fish_curry', 'Fish curry', 'machli salan fish salan', 'curry', 'katori', 200, ['fish', 120], [['tomato', 50], ['onion', 25], ['spices', 6]], F('oil', 17, 26, 32)), // KHAN 173 vs CoFID 139 kcal/100 g
 
-  // Rice — serving is one plate (~300 g) unless noted.
-  D('chicken_biryani', 'Chicken biryani', 'biryani biriyani chicken بریانی', 'rice', 'plate', 300, ['chicken', 90], [['rice', 75], ['dahi', 30], ['onion', 30], ['tomato', 20], ['spices', 5]], F('oil', 12, 20, 28)),
-  D('mutton_biryani', 'Mutton biryani', 'biryani gosht mutton', 'rice', 'plate', 300, ['mutton', 85], [['rice', 75], ['dahi', 30], ['onion', 30], ['tomato', 20], ['spices', 5]], F('ghee', 12, 20, 28)),
-  D('beef_pulao', 'Beef yakhni pulao', 'pulao yakhni beef pulao', 'rice', 'plate', 300, ['beef', 70], [['rice', 80], ['onion', 25], ['dahi', 15], ['spices', 4]], F('oil', 12, 20, 28)),
-  D('chicken_pulao', 'Chicken pulao', 'yakhni pulao chicken', 'rice', 'plate', 300, ['chicken', 80], [['rice', 80], ['onion', 25], ['dahi', 15], ['spices', 4]], F('oil', 12, 20, 28)),
-  D('kabuli_pulao', 'Kabuli pulao', 'kabuli pulao afghani pulao', 'rice', 'plate', 320, ['mutton', 80], [['rice', 80], ['carrot', 30], ['dates', 10], ['onion', 15]], F('oil', 12, 18, 24)),
+  // Rice — one plate. Biryani and pulao 350 g: home plates ~300 g, restaurant 350-500 g, and the plate is the same serving for both.
+  D('chicken_biryani', 'Chicken biryani', 'biryani biriyani chicken بریانی', 'rice', 'plate', 350, ['chicken', 105], [['rice', 88], ['dahi', 35], ['onion', 35], ['tomato', 23], ['spices', 6]], F('oil', 12, 18, 25)), // KHAN 160, CoFID 163 kcal/100 g
+  D('mutton_biryani', 'Mutton biryani', 'biryani gosht mutton', 'rice', 'plate', 350, ['mutton', 99], [['rice', 88], ['dahi', 35], ['onion', 35], ['tomato', 23], ['spices', 6]], F('ghee', 12, 20, 28)), // CoFID 195 kcal/100 g
+  D('beef_pulao', 'Beef yakhni pulao', 'pulao yakhni beef pulao', 'rice', 'plate', 350, ['beef', 82], [['rice', 93], ['onion', 29], ['dahi', 18], ['spices', 5]], F('oil', 13, 21, 28)), // KHAN 181 kcal/100 g
+  D('chicken_pulao', 'Chicken pulao', 'yakhni pulao chicken', 'rice', 'plate', 350, ['chicken', 93], [['rice', 93], ['onion', 29], ['dahi', 18], ['spices', 5]], F('oil', 13, 21, 28)),
+  D('kabuli_pulao', 'Kabuli pulao', 'kabuli pulao afghani pulao', 'rice', 'plate', 350, ['mutton', 88], [['rice', 88], ['carrot', 33], ['dates', 11], ['onion', 16]], F('oil', 13, 20, 26)),
   D('matar_pulao', 'Matar pulao', 'peas pulao', 'rice', 'plate', 250, null, [['rice', 70], ['peas', 40], ['onion', 15], ['spices', 2]], F('oil', 8, 14, 18)),
   D('zeera_rice', 'Zeera rice', 'jeera rice cumin rice', 'rice', 'cup', 180, null, [['rice', 60], ['spices', 1]], F('ghee', 5, 10, 12)),
   D('plain_rice', 'Plain boiled rice', 'chawal white rice basmati', 'rice', 'cup', 160, null, [['rice', 55]], NOFAT),
@@ -176,26 +180,26 @@ export const DISHES = [
   // A Pakistani home roti is about 80 g cooked and ~200 kcal (QK's standard); a thin phulka is its own dish below.
   D('roti', 'Roti / chapati', 'chapati roti chapatti روٹی', 'bread', 'roti', 80, null, [['atta', 59]], NOFAT, { topping: ['ghee', 5, 'Ghee or butter on top'], sizes: true }),
   D('tandoori_roti', 'Tandoori roti', 'tandoor roti naan roti', 'bread', 'roti', 80, null, [['atta', 55]], NOFAT, { topping: ['butter', 6, 'Butter on top'] }),
-  D('naan', 'Naan', 'plain naan butter naan khamiri', 'bread', 'naan', 100, null, [['maida', 80], ['dahi', 8], ['milk', 10], ['sugar', 2]], F('oil', 4, 5, 6), { topping: ['butter', 8, 'Butter naan'] }),
+  D('naan', 'Naan', 'plain naan butter naan khamiri', 'bread', 'naan', 140, null, [['maida', 96], ['dahi', 10], ['milk', 14], ['sugar', 3]], F('oil', 4, 5, 6), { topping: ['butter', 8, 'Butter naan'] }), // LFAC 133 g, CUH 150 g; CoFID 285, FNDDS 311 kcal/100 g
   D('paratha', 'Plain paratha', 'paratha parantha پراٹھا', 'bread', 'paratha', 100, null, [['atta', 60]], F('ghee', 10, 15, 20), { sizes: true }),
-  D('aloo_paratha', 'Aloo paratha', 'aloo parantha potato paratha', 'bread', 'paratha', 150, null, [['atta', 60], ['potato', 70], ['onion', 5], ['spices', 2]], F('ghee', 12, 18, 24)),
+  D('aloo_paratha', 'Aloo paratha', 'aloo parantha potato paratha', 'bread', 'paratha', 150, null, [['atta', 60], ['potato', 70], ['onion', 5], ['spices', 2]], F('ghee', 12, 18, 24), { sizes: true }), // LFAC medium 103 g: Small size
   D('anda_paratha', 'Anda paratha', 'egg paratha', 'bread', 'paratha', 140, ['egg', 50], [['atta', 60]], F('ghee', 12, 20, 24)),
-  D('puri', 'Puri', 'poori', 'fried', 'puri', 28, null, [['atta', 20]], F('oil', 5, 7, 8)),
+  D('puri', 'Puri', 'poori', 'fried', 'puri', 65, null, [['atta', 45]], F('oil', 10, 12, 13)), // LFAC 2024: halwa-puri puri 68 g; CoFID 366, FNDDS 409 kcal/100 g
   D('makki_roti', 'Makki ki roti', 'makai roti corn roti', 'bread', 'roti', 65, null, [['makki', 45]], NOFAT, { topping: ['butter', 8, 'Makhan on top'] }),
   D('roghni_naan', 'Roghni naan', 'roghni naan roghani sesame naan', 'bread', 'naan', 125, null, [['maida', 90], ['milk', 15], ['dahi', 10], ['egg', 5], ['sugar', 3], ['sesame', 3]], F('ghee', 8, 10, 12)),
-  D('garlic_naan', 'Garlic naan', 'garlic naan', 'bread', 'naan', 105, null, [['maida', 80], ['dahi', 8], ['milk', 10], ['spices', 3]], F('butter', 8, 10, 12)),
+  D('garlic_naan', 'Garlic naan', 'garlic naan', 'bread', 'naan', 145, null, [['maida', 96], ['dahi', 10], ['milk', 14], ['spices', 3]], F('butter', 8, 10, 12)), // same dough as naan
   D('kulcha', 'Kulcha', 'kulcha amritsari', 'bread', 'kulcha', 95, null, [['maida', 75], ['dahi', 8], ['milk', 8]], F('butter', 5, 8, 10)),
   D('taftan', 'Taftan', 'taftaan', 'bread', 'taftan', 120, null, [['maida', 85], ['milk', 30], ['egg', 5], ['sugar', 6], ['nuts', 2]], F('ghee', 6, 8, 10)),
   D('sheermal', 'Sheermal', 'shirmal sheer mal', 'bread', 'sheermal', 115, null, [['maida', 80], ['milk', 30], ['sugar', 10]], F('ghee', 10, 12, 14)),
-  D('bakarkhani', 'Bakarkhani', 'baqarkhani', 'bread', 'piece', 70, null, [['maida', 50], ['sugar', 3]], F('ghee', 15, 16, 18)),
+  D('bakarkhani', 'Bakarkhani', 'baqarkhani', 'bread', 'piece', 50, null, [['maida', 36], ['sugar', 2]], F('ghee', 11, 11.5, 13)), // LFAC 2024: 47 g
   D('chapati_thin', 'Phulka (thin chapati)', 'phulka chapati patli roti', 'bread', 'phulka', 30, null, [['atta', 20]], NOFAT, { topping: ['ghee', 3, 'Ghee on top'] }),
   D('lachha_paratha', 'Lachha paratha', 'laccha paratha layered', 'bread', 'paratha', 90, null, [['atta', 25], ['maida', 25]], F('ghee', 12, 18, 24)),
   D('bread_slice', 'Bread (slice)', 'double roti toast slice', 'bread', 'slice', 28, null, [['bread', 28]], NOFAT, { topping: ['butter', 5, 'Butter or margarine'] }),
 
   // BBQ and kebabs.
   // A BBQ tikka is a quarter chicken: leg piece (thigh + drumstick) or chest piece (breast, the bigger one).
-  D('chicken_tikka', 'Chicken tikka (leg piece)', 'tikka tandoori chicken leg piece ran bbq', 'bbq', 'piece', 130, ['chicken', 180], [['dahi', 20], ['spices', 5]], F('oil', 5, 10, 14)),
-  D('chicken_tikka_chest', 'Chicken tikka (chest piece)', 'chest piece breast tikka seena tikka', 'bbq', 'piece', 155, ['chickenBreast', 220], [['dahi', 20], ['spices', 5]], F('oil', 5, 10, 14)),
+  D('chicken_tikka', 'Chicken tikka (leg piece)', 'tikka tandoori chicken leg piece ran bbq', 'bbq', 'piece', 160, ['chicken', 225], [['dahi', 20], ['spices', 5]], F('oil', 7, 12, 16)), // 160 g edible: FNDDS leg quarter 140 g (US bird), Pakistani pieces bigger; CoFID tandoori 214 kcal/100 g
+  D('chicken_tikka_chest', 'Chicken tikka (chest piece)', 'chest piece breast tikka seena tikka', 'bbq', 'piece', 190, ['chickenBreast', 270], [['dahi', 20], ['spices', 5]], F('oil', 7, 12, 16)), // chest piece ~1.2× the leg piece
   D('chicken_boti', 'Chicken boti (one seekh)', 'boti malai boti', 'bbq', 'seekh', 100, ['chicken', 130], [['dahi', 10], ['spices', 3]], F('oil', 4, 7, 9)),
   D('sajji', 'Sajji (chicken, quarter)', 'sajji chicken sajji roast', 'bbq', 'quarter', 200, ['chickenSkin', 220], [['spices', 3]], F('oil', 3, 4, 5)),
   D('lamb_sajji', 'Lamb sajji / namkeen tikka', 'lamb sajji namkeen tikka charsi tikka dumba', 'bbq', 'portion', 175, ['mutton', 250], [['spices', 2]], F('ghee', 10, 15, 20)),
@@ -205,19 +209,20 @@ export const DISHES = [
   D('manchurian', 'Chicken manchurian', 'manchurian', 'fastfood', 'plate', 250, ['chicken', 120], [['maida', 15], ['ketchup', 30], ['capsicum', 30]], F('oil', 10, 15, 18)),
   D('afghani_burger', 'Afghani burger', 'afghani burger naan roll fries', 'street', 'burger', 250, ['chicken', 40], [['maida', 70], ['potato', 80], ['mayo', 15], ['cabbage', 20]], F('oil', 8, 10, 12)),
   D('patties', 'Chicken patties', 'patties patty puff pastry bakery', 'snack', 'piece', 70, ['chicken', 20], [['maida', 30], ['cream', 5]], F('butter', 12, 12, 12)),
-  D('seekh_kebab', 'Seekh kebab', 'seekh kabab beef kebab', 'bbq', 'kebab', 45, ['beefMince', 60], [['onion', 5], ['spices', 2]], F('oil', 1, 3, 4)),
+  D('seekh_kebab', 'Seekh kebab', 'seekh kabab beef kebab', 'bbq', 'kebab', 70, ['beefMince', 90], [['onion', 8], ['spices', 3]], F('oil', 1.5, 3.5, 4.5)), // supplier 65-70 g/piece; CoFID kofta 290 kcal/100 g
   D('chapli_kebab', 'Chapli kebab', 'chapli kabab peshawari', 'fried', 'kebab', 120, ['beefMince', 110], [['tomato', 15], ['onion', 15], ['egg', 10], ['makki', 5], ['spices', 4]], F('ghee', 8, 15, 18)),
-  D('shami_kebab', 'Shami kebab', 'shami kabab', 'fried', 'kebab', 45, ['beef', 25], [['chanaDal', 12], ['egg', 5], ['spices', 2]], F('oil', 4, 6, 7)),
+  D('shami_kebab', 'Shami kebab', 'shami kabab', 'fried', 'kebab', 75, ['beef', 42], [['chanaDal', 20], ['egg', 8], ['spices', 3]], F('oil', 7, 10, 12)), // LFAC 2024: 1 shami = 76 g
   D('fried_fish', 'Fried fish (Lahori)', 'lahori fish fry machli', 'fried', 'portion', 130, ['fish', 120], [['besan', 15], ['spices', 3]], F('oil', 10, 16, 18)),
 
   // Snacks.
-  D('samosa', 'Samosa (aloo)', 'aloo samosa potato samosa سموسہ', 'fried', 'samosa', 75, null, [['maida', 25], ['potato', 40], ['peas', 5], ['spices', 2]], F('oil', 9, 12, 13)),
-  D('keema_samosa', 'Samosa (qeema)', 'keema samosa meat samosa', 'fried', 'samosa', 70, ['beefMince', 30], [['maida', 25], ['onion', 8], ['spices', 2]], F('oil', 9, 12, 13)),
+  D('samosa', 'Samosa (aloo)', 'aloo samosa potato samosa سموسہ', 'fried', 'samosa', 100, null, [['maida', 33], ['potato', 55], ['peas', 7], ['spices', 3]], F('oil', 13, 15, 16)), // LFAC aloo samosa 100 g, FNDDS 100 g
+  D('keema_samosa', 'Samosa (qeema)', 'keema samosa meat samosa', 'fried', 'samosa', 50, ['beefMince', 21], [['maida', 18], ['onion', 6], ['spices', 1.5]], F('oil', 6.5, 8.5, 9)), // LFAC qeema samosa 45 g
   D('pakora', 'Pakoray', 'pakora pakoda bhajia fritters', 'fried', 'plate', 100, null, [['besan', 30], ['onion', 30], ['potato', 20], ['spinach', 10], ['spices', 2]], F('oil', 14, 18, 20)),
   D('dahi_bhalla', 'Dahi bhalla', 'dahi baray dahi vada', 'fried', 'plate', 220, null, [['mash', 30], ['dahi', 120], ['sugar', 6], ['spices', 2]], F('oil', 8, 10, 12)),
   D('chana_chaat', 'Chana chaat', 'chaat chickpea chaat', 'snack', 'plate', 180, null, [['kabuli', 40], ['potato', 30], ['onion', 15], ['tomato', 20], ['sugar', 3], ['spices', 3]], NOFAT),
-  D('halwa_puri', 'Halwa puri plate (2 puri, halwa, cholay)', 'halwa puri plate nashta thaal', 'fried', 'plate', 366, null, [['atta', 40], ['suji', 35], ['sugar', 30], ['kabuli', 50], ['onion', 30], ['tomato', 40], ['spices', 6]], F('ghee', 32, 42, 52)),
-  D('suji_halwa', 'Suji halwa', 'halwa sooji halwa', 'sweet', 'katori', 110, null, [['suji', 35], ['sugar', 30]], F('ghee', 20, 25, 30)),
+  // 2 puris (LFAC 68 g each) + ~110 g halwa + ~160 g cholay; fat = puri oil 20 + halwa ghee 16 + cholay oil 10 at home.
+  D('halwa_puri', 'Halwa puri plate (2 puri, halwa, cholay)', 'halwa puri plate nashta thaal', 'fried', 'plate', 400, null, [['atta', 90], ['suji', 35], ['sugar', 30], ['kabuli', 45], ['onion', 25], ['tomato', 35], ['spices', 5]], F('ghee', 46, 58, 66)),
+  D('suji_halwa', 'Suji halwa', 'halwa sooji halwa', 'sweet', 'katori', 110, null, [['suji', 35], ['sugar', 30]], F('ghee', 16, 20, 24)), // CoFID 17-799: 342 kcal/100 g
 
   // Fast food (chains). Built as recipes; official chain values can override them in js/menus.js.
   D('zinger_burger', 'Zinger / crispy chicken burger', 'zinger krunch crispy chicken burger', 'fastfood', 'burger', 200, ['chickenBreast', 110], [['bun', 60], ['maida', 15], ['mayo', 12], ['cabbage', 10]], F('oil', 8, 10, 12)),
@@ -226,8 +231,8 @@ export const DISHES = [
   D('chicken_burger', 'Chicken patty burger', 'mcchicken chicken burger patty', 'fastfood', 'burger', 150, ['chickenMince', 65], [['bun', 55], ['maida', 12], ['mayo', 6], ['cabbage', 10]], F('oil', 6, 6, 8)),
   D('fried_chicken', 'Fried chicken piece', 'hot and crispy piece broast fried chicken', 'fastfood', 'piece', 110, ['chickenSkin', 100], [['maida', 12], ['spices', 2]], F('oil', 8, 10, 12)),
   D('broast', 'Broast (quarter)', 'broast chicken quarter', 'fastfood', 'quarter', 260, ['chickenSkin', 200], [['maida', 25], ['spices', 3]], F('oil', 18, 22, 25)),
-  D('nuggets', 'Chicken nuggets (6 pieces)', 'nuggets mcnuggets', 'fastfood', 'box', 100, ['chickenMince', 70], [['maida', 15]], F('oil', 10, 12, 12)),
-  D('fries', 'French fries (regular)', 'fries chips french fries', 'fastfood', 'regular', 110, null, [['potato', 230]], F('oil', 14, 16, 18)),
+  D('nuggets', 'Chicken nuggets (6 pieces)', 'nuggets mcnuggets', 'fastfood', 'box', 100, ['chickenMince', 72], [['maida', 20]], F('oil', 13, 14, 15)), // FNDDS 307 kcal/100 g
+  D('fries', 'French fries (regular)', 'fries chips french fries', 'fastfood', 'regular', 110, null, [['potato', 230]], F('oil', 16, 16, 18)), // FNDDS 289 (restaurant) to 312 kcal/100 g
   D('pizza_slice', 'Pizza slice (medium, chicken)', 'pizza slice chicken tikka fajita', 'fastfood', 'slice', 110, ['chicken', 15], [['maida', 40], ['mozzarella', 25], ['tomato', 15]], F('oil', 4, 5, 6)),
   D('club_sandwich', 'Club sandwich', 'club sandwich', 'fastfood', 'sandwich', 230, ['chicken', 60], [['bread', 90], ['egg', 25], ['mayo', 15], ['cheese', 14], ['cabbage', 15], ['tomato', 15]], NOFAT),
   D('sub_6', 'Sub sandwich (6 inch, chicken)', 'sub chicken tikka teriyaki', 'fastfood', 'sub', 200, ['chickenBreast', 70], [['bread', 75], ['cabbage', 25], ['tomato', 20], ['mayo', 6]], NOFAT, { topping: ['cheese', 14, 'Cheese'] }),
@@ -244,12 +249,14 @@ export const DISHES = [
   D('milkshake', 'Milkshake', 'shake mango shake', 'drink', 'glass', 300, null, [['milk', 250], ['sugar', 25], ['cream', 20]], NOFAT),
 
   // Street carts and stalls.
-  D('bun_kebab', 'Bun kebab', 'bun kabab anda bun', 'street', 'bun kebab', 150, ['beefMince', 20], [['bun', 60], ['chanaDal', 15], ['egg', 25], ['onion', 15], ['ketchup', 10]], F('oil', 6, 8, 10)),
-  D('anda_shami_burger', 'Anda shami burger', 'anda shami burger egg shami', 'street', 'burger', 190, ['beef', 25], [['bun', 60], ['chanaDal', 12], ['egg', 55], ['cabbage', 15], ['ketchup', 10]], F('oil', 8, 10, 12)),
-  D('paratha_roll', 'Chicken paratha roll', 'roll paratha roll chicken roll kathi', 'street', 'roll', 190, ['chicken', 70], [['atta', 45], ['mayo', 10], ['ketchup', 8], ['onion', 20], ['spices', 3]], F('ghee', 10, 14, 16)),
+  D('bun_kebab', 'Bun kebab', 'bun kabab anda bun', 'street', 'bun kebab', 160, ['beefMince', 25], [['bun', 60], ['chanaDal', 20], ['egg', 25], ['onion', 15], ['ketchup', 10]], F('oil', 8, 10, 12)), // bun + lentil-heavy shami patty dipped in egg
+  D('anda_shami_burger', 'Anda shami burger', 'anda shami burger egg shami', 'street', 'burger', 205, ['beef', 42], [['bun', 60], ['chanaDal', 20], ['egg', 58], ['cabbage', 15], ['ketchup', 10]], F('oil', 11, 13, 15)), // bun + 75 g shami (LFAC) + fried egg
+  D('paratha_roll', 'Chicken paratha roll', 'roll paratha roll chicken roll kathi', 'street', 'roll', 190, ['chicken', 65], [['atta', 85], ['mayo', 8], ['ketchup', 8], ['onion', 20], ['spices', 3]], F('ghee', 10, 14, 16)), // LFAC kabab roll 183 g with 71 g carbs
   D('gol_gappay', 'Gol gappay (plate of 6)', 'gol gappay pani puri gol gappe', 'street', 'plate', 150, null, [['suji', 24], ['kabuli', 10], ['potato', 30], ['sugar', 8], ['spices', 3]], F('oil', 6, 7, 8)),
   D('fruit_chaat', 'Fruit chaat', 'fruit chaat', 'street', 'plate', 200, null, [['banana', 60], ['apple', 60], ['mango', 40], ['sugar', 6], ['spices', 1]], NOFAT),
   D('samosa_chaat', 'Samosa chaat', 'samosa chaat chana samosa', 'street', 'plate', 250, null, [['maida', 25], ['potato', 40], ['kabuli', 30], ['dahi', 50], ['onion', 15], ['sugar', 6], ['spices', 3]], F('oil', 10, 12, 13)),
+  D('pav_bhaji', 'Pav bhaji (2 pav)', 'pav bhaji pao bhaji paav bhaji', 'street', 'plate', 300, null, [['bun', 80], ['potato', 80], ['mixedVeg', 60], ['peas', 20], ['tomato', 60], ['onion', 30], ['capsicum', 20], ['spices', 5]], F('butter', 18, 25, 30)), // bhaji ~220 g + 2 pav (40 g each), butter in the bhaji and on the pav
+  D('roasted_chana', 'Roasted chana (bhunay chanay)', 'bhunay chanay bhune chane bhuna chana roasted chickpeas', 'snack', 'handful', 30, null, [['kabuli', 31]], NOFAT),
   D('bhutta', 'Bhutta (roasted corn)', 'bhutta corn cob makai', 'street', 'cob', 100, null, [['makki', 35]], NOFAT),
 
   // Sweets.
@@ -260,8 +267,9 @@ export const DISHES = [
   D('ice_cream', 'Ice cream (2 scoops)', 'ice cream scoop kulfi', 'sweet', 'cup', 140, null, [['iceCream', 140]], NOFAT),
   D('rabri', 'Rabri', 'rabri rabdi', 'sweet', 'katori', 120, null, [['milk', 300], ['sugar', 20], ['nuts', 3]], NOFAT),
   D('ras_malai', 'Ras malai', 'ras malai rasmalai', 'sweet', 'piece', 60, null, [['paneer', 20], ['milk', 60], ['sugar', 10], ['nuts', 2]], NOFAT),
-  D('mithai', 'Mithai (barfi, laddu, chamcham)', 'mithai barfi laddu ladoo chamcham milk cake sweets', 'sweet', 'piece', 30, null, [['khoya', 15], ['sugar', 12]], F('ghee', 3, 3, 3)),
-  D('sohan_halwa', 'Sohan halwa', 'sohan halwa multani', 'sweet', 'piece', 30, null, [['sugar', 10], ['milk', 20], ['maida', 5], ['nuts', 4]], F('ghee', 5, 5, 5)),
+  D('mithai', 'Mithai (barfi, chamcham)', 'mithai barfi chamcham milk cake sweets', 'sweet', 'piece', 45, null, [['khoya', 20], ['sugar', 12]], F('ghee', 1, 1, 1)), // LFAC barfi 40 g, FNDDS 45 g at 283 kcal/100 g
+  D('laddu', 'Laddu (besan / motichoor)', 'laddu ladoo laddoo motichoor besan laddu', 'sweet', 'piece', 60, null, [['besan', 25], ['sugar', 20]], F('ghee', 8, 8, 8)), // FNDDS ladoo 60 g at 411 kcal/100 g
+  D('sohan_halwa', 'Sohan halwa', 'sohan halwa multani', 'sweet', 'piece', 50, null, [['sugar', 18], ['milk', 30], ['maida', 8], ['nuts', 7]], F('ghee', 8, 8, 8)), // LFAC 2024: 1 piece 50 g
   D('kulfi', 'Kulfi', 'kulfi', 'sweet', 'kulfi', 70, null, [['milk', 150], ['sugar', 12], ['nuts', 3]], NOFAT),
   D('falooda', 'Falooda', 'falooda faluda kulfi falooda', 'sweet', 'glass', 300, null, [['milk', 200], ['sugar', 25], ['iceCream', 60], ['vermicelli', 10], ['nuts', 5]], NOFAT),
   D('nankhatai', 'Nankhatai', 'nankhatai nan khatai', 'sweet', 'piece', 25, null, [['maida', 12], ['sugar', 6]], F('ghee', 6, 6, 6)),
@@ -270,14 +278,16 @@ export const DISHES = [
   D('cake_rusk', 'Cake rusk (2)', 'rusk cake rusk', 'sweet', 'pack', 30, null, [['maida', 15], ['sugar', 6], ['egg', 5]], F('oil', 4, 4, 4)),
   D('nimko', 'Nimko (handful)', 'nimko daal moth namkeen', 'snack', 'handful', 30, null, [['besan', 15], ['spices', 1]], F('oil', 8, 8, 8)),
   D('paan', 'Paan (sweet)', 'paan pan meetha paan', 'snack', 'paan', 15, null, [['sugar', 10], ['nuts', 3]], NOFAT),
-  D('kheer', 'Kheer', 'rice kheer chawal ki kheer', 'sweet', 'katori', 150, null, [['milk', 150], ['rice', 12], ['sugar', 15], ['nuts', 3]], NOFAT),
-  D('gulab_jamun', 'Gulab jamun', 'gulab jaman', 'fried', 'piece', 40, null, [['khoya', 12], ['maida', 4], ['sugar', 20]], F('ghee', 4, 5, 5)),
-  D('gajar_halwa', 'Gajar ka halwa', 'gajrela carrot halwa', 'sweet', 'katori', 150, null, [['carrot', 140], ['milk', 100], ['sugar', 20], ['khoya', 10], ['nuts', 3]], F('ghee', 10, 15, 20)),
+  D('kheer', 'Kheer', 'rice kheer chawal ki kheer', 'sweet', 'katori', 150, null, [['milk', 150], ['rice', 14], ['sugar', 18], ['nuts', 3]], NOFAT), // LFAC/CUH carbs imply ~160 kcal/100 g
+  D('gulab_jamun', 'Gulab jamun', 'gulab jaman', 'fried', 'piece', 40, null, [['khoya', 10], ['maida', 4], ['sugar', 12]], F('ghee', 2, 2.5, 3)), // CoFID 273-306 kcal/100 g; LFAC 36 g
+  D('gajar_halwa', 'Gajar ka halwa', 'gajrela carrot halwa', 'sweet', 'katori', 150, null, [['carrot', 140], ['milk', 100], ['sugar', 28], ['khoya', 15], ['nuts', 4]], F('ghee', 14, 18, 22)), // CoFID 354 kcal/100 g (CUH lower): ~290
   D('jalebi', 'Jalebi', 'jalaibi', 'fried', 'plate', 100, null, [['maida', 30], ['sugar', 45]], F('ghee', 12, 14, 15)),
-  D('sheer_khurma', 'Sheer khurma', 'sheer korma seviyan', 'sweet', 'katori', 200, null, [['milk', 180], ['vermicelli', 12], ['sugar', 15], ['nuts', 8], ['dates', 6]], F('ghee', 4, 6, 8)),
+  D('sheer_khurma', 'Sheer khurma', 'sheer korma seviyan', 'sweet', 'katori', 200, null, [['milk', 200], ['vermicelli', 20], ['sugar', 30], ['nuts', 10], ['dates', 10]], F('ghee', 6, 8, 10)), // LFAC 2024: 37 g carbs/100 g
 
   // Drinks.
   D('chai', 'Chai (doodh patti)', 'tea doodh patti chai milk tea چائے', 'drink', 'cup', 150, null, [['milk', 100], ['sugar', 10]], NOFAT),
+  D('chai_no_sugar', 'Chai (no sugar)', 'chai bina cheeni sugar free chai pheeki chai tea without sugar', 'drink', 'cup', 150, null, [['milk', 100]], NOFAT),
+  D('sugarcane_juice', 'Sugarcane juice (ganne ka ras)', 'ganne ka ras ganay ka ras ganna juice sugarcane juice گنے کا رس', 'drink', 'glass', 300, null, [['caneJuice', 300]], NOFAT),
   D('kehwa', 'Kehwa (green tea)', 'kehwa qehwa green tea', 'drink', 'cup', 150, null, [['sugar', 5]], NOFAT),
   D('sweet_lassi', 'Lassi (sweet)', 'meethi lassi', 'drink', 'glass', 300, null, [['dahi', 200], ['milk', 50], ['sugar', 25]], NOFAT),
   D('salted_lassi', 'Lassi (salted)', 'namkeen lassi chaas', 'drink', 'glass', 300, null, [['dahi', 200]], NOFAT),
@@ -293,7 +303,7 @@ export const DISHES = [
 
   // Eggs and sides.
   D('anda_fry', 'Fried egg (anda fry)', 'fried egg anda', 'egg', 'egg', 46, ['egg', 50], [], F('oil', 4, 6, 8)),
-  D('omelette', 'Omelette (2 eggs)', 'omelet anday ka khagina', 'egg', 'omelette', 125, ['egg', 100], [['onion', 15], ['tomato', 15], ['spices', 2]], F('oil', 6, 10, 12)),
+  D('omelette', 'Omelette (2 eggs)', 'omelet anday ka khagina', 'egg', 'omelette', 125, ['egg', 100], [['onion', 15], ['tomato', 15], ['spices', 2]], F('oil', 9, 12, 14)), // FNDDS/CoFID 191 kcal/100 g
   D('boiled_egg', 'Boiled egg', 'ublay anday egg', 'egg', 'egg', 50, ['egg', 50], [], NOFAT),
   D('raita', 'Raita', 'raita yogurt', 'side', 'katori', 100, null, [['dahi', 90], ['cucumber', 15]], NOFAT),
   D('dahi', 'Dahi (plain yogurt)', 'yogurt curd', 'side', 'katori', 150, null, [['dahi', 150]], NOFAT),
@@ -367,13 +377,14 @@ fam('Chicken tikka', ['chicken_tikka', 'chicken_tikka_chest', 'chicken_boti']);
 fam('Pizza and pasta', ['pizza_slice', 'cheesy_pizza_slice', 'creamy_pasta', 'lasagna', 'chow_mein']);
 fam('Burger', ['zinger_burger', 'mighty_zinger', 'beef_burger', 'chicken_burger', 'anda_shami_burger', 'bun_kebab']);
 fam('Fried chicken', ['fried_chicken', 'broast', 'nuggets', 'wings']);
+fam('Mithai', ['mithai', 'laddu', 'gulab_jamun', 'sohan_halwa']);
 fam('Eggs', ['boiled_egg', 'anda_fry', 'omelette', 'anda_curry']);
 fam('Gulf rice', ['chicken_mandi', 'lamb_mandi', 'chicken_machboos', 'lamb_machboos', 'fish_machboos', 'chicken_kabsa', 'chelo_rice']);
 fam('Arabic grill', ['shish_tawook', 'mixed_grill', 'koobideh_kebab', 'joojeh_kebab']);
 fam('Manakish', ['manakish_zaatar', 'manakish_cheese', 'manakish_meat']);
 fam('Mezze', ['hummus', 'mutabbal', 'labneh', 'foul_medames', 'fattoush', 'tabbouleh', 'falafel']);
 fam('Coffee', ['latte', 'cappuccino', 'flat_white', 'spanish_latte', 'iced_latte', 'caramel_macchiato', 'frappuccino', 'iced_capp', 'coffee_cream_sugar']);
-fam('Lassi and drinks', ['chai', 'karak_chai', 'sweet_lassi', 'salted_lassi', 'milkshake', 'cola']);
+fam('Lassi and drinks', ['chai', 'chai_no_sugar', 'karak_chai', 'sugarcane_juice', 'sweet_lassi', 'salted_lassi', 'milkshake', 'cola']);
 export const family = d => (d?.fam ? DISHES.filter(x => x.fam === d.fam) : []);
 
 // "1½ katori (≈300 g)", "2 rotis". Containers show grams so people can check against a scale.

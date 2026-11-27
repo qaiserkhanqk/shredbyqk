@@ -31,13 +31,19 @@ check('ids are unique', new Set(N.DISHES.map(d => d.id)).size === N.DISHES.lengt
 // Fried foods are excluded on purpose: INDB counts the whole frying oil as eaten.
 const indb = code => INDB.find(r => r[0] === code);
 const pairs = [
-  ['chicken_qorma', 'BFP222'], ['mutton_qorma', 'BFP194'], ['mutton_biryani', 'ASC122'], ['roti', 'ASC096'], ['paratha', 'ASC097'],
-  ['aloo_gobi', 'ASC171'], ['rajma', 'ASC165'], ['daal_chana', 'OSR142'], ['zeera_rice', 'ASC114'],
+  ['chicken_qorma', 'BFP222'], ['mutton_biryani', 'ASC122'], ['roti', 'ASC096'], ['paratha', 'ASC097'],
+  ['aloo_gobi', 'ASC171'], ['rajma', 'ASC165'], ['zeera_rice', 'ASC114'],
 ];
 for (const [id, code] of pairs) {
   const d = N.DISH[id], e = N.estimateDish(d, { style: 'home' }), ours = e.kcal / e.grams * 100, ref = indb(code)[2];
   const diff = (ours - ref) / ref;
   check(`${d.name} (home) vs INDB ${indb(code)[1]}`, Math.abs(diff) <= 0.25, `${Math.round(ours)} vs ${Math.round(ref)} kcal/100 g (${diff > 0 ? '+' : ''}${Math.round(diff * 100)}%)`);
+}
+// Mutton qorma and chana daal follow the Pakistani lab instead (Khan et al., Progress in Nutrition 2019: korma 194,
+// split-chickpea daal 229 kcal/100 g, home recipes with 12-20% fat). Home sits between the leaner INDB recipe and the lab.
+for (const [id, code, khan] of [['mutton_qorma', 'BFP194', 194], ['daal_chana', 'OSR142', 229]]) {
+  const d = N.DISH[id], e = N.estimateDish(d, { style: 'home' }), ours = e.kcal / e.grams * 100, ref = indb(code)[2];
+  check(`${d.name} (home) between INDB ${indb(code)[1]} and Khan 2019 lab`, ours > ref && ours < khan, `${Math.round(ours)} (INDB ${Math.round(ref)}, lab ${khan}) kcal/100 g`);
 }
 const samosa = indb('ASC361');
 check('INDB samosa is flagged as fried (counts all frying oil)', samosa[9] === 1 && samosa[2] > 500, `${samosa[2]} kcal/100 g`);
