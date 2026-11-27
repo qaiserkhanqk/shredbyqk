@@ -320,3 +320,66 @@ create policy "client reads own rewards" on public.rewards for select using (cli
 -- Weekly report: the client's latest week-in-review snapshot and lifetime weight lifted (for the coach).
 alter table public.profiles add column if not exists week_report jsonb;
 alter table public.profiles add column if not exists lifetime_kg bigint;
+
+-- ============ Chat: clients message QK; Muhammad (QK's AI assistant) answers straight away ============
+-- One row per message. sender: 'client' (the client wrote it), 'assistant' (Muhammad, written only by the server
+-- with the service key, never by an app), 'coach' (QK typed it on the dashboard). A client message Muhammad hands
+-- to QK (injury, pain, medicine, money…) gets `flagged` = the reason, and stays in QK's "Needs you" list until QK
+-- marks it handled.
+create table if not exists public.chats (
+  id bigint generated always as identity primary key,
+  client_id uuid not null references public.profiles (id) on delete cascade,
+  coach_id uuid references public.profiles (id) on delete set null,
+  sender text not null check (sender in ('client', 'assistant', 'coach')),
+  body text not null check (char_length(body) between 1 and 2000),
+  flagged text,                 -- why it needs QK (set by the server on a client message)
+  handled_at timestamptz,       -- QK dealt with it
+  seen_by_coach_at timestamptz, -- QK opened the conversation after this message
+  read_at timestamptz,          -- the client read it (assistant/coach messages)
+  pushed_at timestamptz,        -- a phone notification went out for it (coach replies)
+  created_at timestamptz not null default now()
+);
+create index if not exists chats_client on public.chats (client_id, created_at desc);
+create index if not exists chats_flagged on public.chats (coach_id, created_at desc) where flagged is not null and handled_at is null;
+alter table public.chats enable row level security;
+drop policy if exists "client reads own chat" on public.chats;
+create policy "client reads own chat" on public.chats for select using (client_id = auth.uid());
+drop policy if exists "client writes to their coach" on public.chats;
+create policy "client writes to their coach" on public.chats for insert with check (
+  client_id = auth.uid() and sender = 'client' and flagged is null and handled_at is null and seen_by_coach_at is null and read_at is null and pushed_at is null
+  and coach_id is not distinct from (select coach_id from public.profiles where id = auth.uid()));
+drop policy if exists "coach reads client chats" on public.chats;
+create policy "coach reads client chats" on public.chats for select using (public.is_my_client(client_id));
+drop policy if exists "coach replies" on public.chats;
+create policy "coach replies" on public.chats for insert with check (
+  coach_id = auth.uid() and sender = 'coach' and public.is_my_client(client_id) and flagged is null and handled_at is null and read_at is null and pushed_at is null);
+drop policy if exists "chat updates" on public.chats;
+create policy "chat updates" on public.chats for update using (client_id = auth.uid() or public.is_my_client(client_id));
+revoke update on public.chats from authenticated;
+grant update (read_at, handled_at, seen_by_coach_at) on public.chats to authenticated;
+-- Who may change which column: the client only marks replies read; only the coach marks things handled or seen.
+create or replace function public.chats_guard() returns trigger language plpgsql as $$
+begin
+  if auth.uid() is null then return new; end if; -- the server (service key)
+  if (new.handled_at is distinct from old.handled_at or new.seen_by_coach_at is distinct from old.seen_by_coach_at) and not public.is_my_client(old.client_id) then
+    raise exception 'Only the coach can mark messages handled';
+  end if;
+  if new.read_at is distinct from old.read_at and old.client_id <> auth.uid() then
+    raise exception 'Only the client marks replies read';
+  end if;
+  return new;
+end $$;
+drop trigger if exists chats_guard on public.chats;
+create trigger chats_guard before update on public.chats for each row execute function public.chats_guard();
+
+-- Muhammad's settings live on the coach's own profile: { "name": "Muhammad", "on": true, "style": "…how QK talks…" }.
+alter table public.profiles add column if not exists assistant jsonb;
+-- Clients QK wants to answer himself: Muhammad stays quiet for them.
+create table if not exists public.assistant_off (
+  client_id uuid primary key references public.profiles (id) on delete cascade,
+  coach_id uuid not null references public.profiles (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+alter table public.assistant_off enable row level security;
+drop policy if exists "coach pauses assistant" on public.assistant_off;
+create policy "coach pauses assistant" on public.assistant_off for all using (coach_id = auth.uid() and public.is_my_client(client_id)) with check (coach_id = auth.uid() and public.is_my_client(client_id));

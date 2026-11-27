@@ -56,6 +56,7 @@ import { nextStep } from './today.js';
 import { initFood, renderFood } from './food.js';
 import { enablePush } from './push.js';
 import { renderScores } from './scoreview.js';
+import { initChat, checkReplies, renderCard as renderChatCard } from './chatui.js';
 import { sanitizePlan } from './dietplan.js';
 import { PHOTO_CONFIG } from './foodphoto.js';
 import { landmarksFrom, analyse, render, navyBodyFat, bfCategory, stanceProblem } from './bodyscan.js';
@@ -1718,6 +1719,7 @@ $('#rsheetBody').addEventListener('click', e => {
 const cloud = cloudOn() ? new Cloud({ url: CLOUD.url, anonKey: CLOUD.anonKey, session: S.cloud?.session || null, onSession: s => { (S.cloud ||= {}).session = s; persist(); } }) : null;
 let syncing = false;
 PHOTO_CONFIG.getToken = () => cloud?.session?.access_token || null; // lets the photo server check it's a real client
+initChat({ cloud, S, persist, toast }); // Message QK (Muhammad, QK's AI assistant, replies straight away)
 async function syncNow() {
   if (!cloud?.signedIn || !S.cloud?.coach || syncing || !navigator.onLine) return;
   syncing = true;
@@ -1734,10 +1736,12 @@ async function syncNow() {
       msgs.forEach((m, i) => setTimeout(() => { const t = m.title ? `${m.title}. ${m.body}` : m.body; say(m.kind === 'broadcast' ? t : `Message from ${from}. ${t}`, { id: 'coachmsg_' + m.id, priority: 'high' }); toast(`${m.kind === 'broadcast' ? m.title || from : from}: ${m.body}`); }, 1500 + i * 6000));
       await cloud.markRead(msgs.map(m => m.id));
     }
+    await checkReplies();
   } catch (e) { if (e.status === 401) { S.cloud.session = null; persist(); renderCoachLink(); } }
   finally { syncing = false; }
 }
 function renderCoachLink() {
+  renderChatCard();
   const card = $('#coachLink'); card.hidden = !cloud; if (!cloud) return;
   const signed = cloud.signedIn, coach = S.cloud?.coach;
   $('#clStep1').hidden = signed; $('#clStep2').hidden = true; $('#clStep3').hidden = !signed || !!coach; $('#clOut').hidden = !signed;
