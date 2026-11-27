@@ -2,7 +2,7 @@
 // With no server configured (js/cloud-config.js) it shows sample clients so the coach can try it.
 import { CLOUD, cloudOn } from './cloud-config.js';
 import { Cloud } from './sync.js';
-import { clientCard, sortCards, overview, TEMPLATES, fill, demoData, localClient, LOCAL_ID, DEMO_INBOX } from './dash.js';
+import { clientCard, sortCards, overview, TEMPLATES, fill, demoData, localClient, LOCAL_ID, DEMO_INBOX, careChips } from './dash.js';
 import { LIB } from './library.js';
 import { byId as programById } from './programs.js';
 import { EXERCISES, allRules } from './exercises.js';
@@ -57,7 +57,7 @@ function render() {
   $('#cdList').innerHTML = list.map(c => `<button type="button" role="listitem" class="cd-row ${c.id === state.sel ? 'sel' : ''}" data-client="${esc(c.id)}">
       <span class="cd-dot ${statusCls(c.status)}" aria-label="${c.status}"></span><b>${esc(c.name)}</b>
       <span class="nums"><strong>${c.daysTrained}/${c.weeklyGoal}</strong> days<span>${c.form == null ? '–' : c.form + '%'} form</span></span>
-      <span class="why">${esc(c.reason)} · seen ${ago(c.lastSeen)}</span></button>`).join('') || '<p class="empty">No clients match.</p>';
+      <span class="why">${esc(c.reason)} · seen ${ago(c.lastSeen)}</span>${careChips(c.care).length ? `<span class="cd-care">${careChips(c.care).map(x => `<i>${esc(x)}</i>`).join('')}</span>` : ''}</button>`).join('') || '<p class="empty">No clients match.</p>';
   renderDetail();
 }
 

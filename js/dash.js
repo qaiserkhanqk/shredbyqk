@@ -11,7 +11,7 @@ const D = 864e5;
 export const weekStart = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime(); }; // Monday
 const ms = x => (typeof x === 'number' ? x : Date.parse(x));
 const dayKey = t => new Date(t).toDateString();
-const score = sets => { const xs = sets.filter(s => !s.guided && s.reps); const r = xs.reduce((a, s) => a + s.reps, 0); return r ? Math.round(xs.reduce((a, s) => a + Math.min(s.good || 0, s.reps), 0) / r * 100) : null; };
+const score = sets => { const xs = sets.filter(s => !s.guided && !s.manual && s.reps); const r = xs.reduce((a, s) => a + s.reps, 0); return r ? Math.round(xs.reduce((a, s) => a + Math.min(s.good || 0, s.reps), 0) / r * 100) : null; };
 
 /**
  * @param p profile row, @param sets session rows, @param opens event rows, @param checks checkin rows
@@ -52,6 +52,7 @@ export function clientCard(p, sets = [], opens = [], checks = [], { now = Date.n
     cleanReps: clean, medal: rewardProgress(clean).earned.at(-1) || null,
     checkin: checks.length ? checks.map(c => ({ ...c, at: ms(c.at) })).sort((a, b) => b.at - a.at)[0] : null,
     food: foodCard(p.food_week, food, now),
+    care: p.care || null,
   };
 }
 
@@ -63,6 +64,26 @@ export function overview(cards) {
   const n = s => cards.filter(c => c.status === s).length;
   return { total: cards.length, onTrack: n('on track'), slipping: n('slipping'), inactive: n('inactive'), openedToday: cards.filter(c => c.openedToday).length, prs: cards.reduce((a, c) => a + c.prs.length, 0) };
 }
+
+/**
+ * What the coach should know to look after the client: sore areas, rough days this week, travel, Ramadan.
+ * Labels and counts only (the same privacy rule as everything else: no videos, no free text).
+ */
+const PAIN_LABEL = { shoulder: 'shoulder', knee: 'knee', back: 'lower back', elbow: 'elbow', wrist: 'wrist', hip: 'hip' };
+export function careSummary(S, now = Date.now()) {
+  const p = S?.profile || {}, wk = 7 * D;
+  const rough = new Set([...(S?.checkinLog || []).filter(c => ['rest', 'easy'].includes(c.level)), ...(S?.readiness || []).filter(c => /rough/.test(c.feel || ''))]
+    .filter(c => now - c.at < wk).map(c => dayKey(c.at))).size;
+  const care = {
+    pain: (p.pain || []).map(a => PAIN_LABEL[a] || a),
+    rough7: rough,
+    travel: p.travel && now < p.travel.until ? p.travel.kind : null,
+    ramadan: !!(p.ramadan && now < p.ramadan.until),
+  };
+  return care.pain.length || care.rough7 || care.travel || care.ramadan ? care : null;
+}
+/** Short chips for the coach: "Sore: knee", "2 rough days", "Travelling", "Ramadan". */
+export const careChips = c => (c ? [...(c.pain?.length ? [`Sore: ${c.pain.join(', ')}`] : []), ...(c.rough7 ? [`${c.rough7} rough day${c.rough7 > 1 ? 's' : ''}`] : []), ...(c.travel ? ['Travelling'] : []), ...(c.ramadan ? ['Ramadan'] : [])] : []);
 
 /** Ready-made messages. {name} is the client's first name. */
 export const TEMPLATES = {
@@ -94,6 +115,7 @@ export function demoData(now = Date.now()) {
   for (let d = 0; d < 6; d++) food.push({ client_id: 'd1', at: dk(d), kcal: 2350 + d * 40, protein: 138, carbs: 260, fat: 75, water: 9, steps: 8200, items: [{ meal: 'Lunch', name: 'Chicken tikka / tandoori (leg piece)', kcal: 260 }, { meal: 'Dinner', name: 'Daal masoor', kcal: 230 }] });
   for (const d of [1, 4]) food.push({ client_id: 'd3', at: dk(d), kcal: 2650, protein: 70, carbs: 300, fat: 120, water: 4, steps: 3900, items: [{ meal: 'Dinner', name: 'KFC · Zinger Burger', kcal: 420 }, { meal: 'Dinner', name: 'Butt Karahi · Chicken karahi (per person)', kcal: 713 }] });
   profiles[0].food_week = { logged: 6, kcal: 2450, protein: 138, target: { kcal: 2600, protein: 130 }, focus: ['Add colour: salad or fruit with two meals'], wins: ['Protein averaged 138 g a day'], weightPerWeek: 0.2 };
+  profiles[3].care = { pain: ['knee'], rough7: 2, travel: null, ramadan: false }; // Bilal: sore knee, two rough days → his form drop makes sense
   profiles[2].food_week = { logged: 2, kcal: 2650, protein: 70, target: { kcal: 1850, protein: 130 }, focus: ['Add a protein to each meal', 'One easy swap a day'], wins: [], weightPerWeek: null };
   return { profiles, sets, opens, checks: [], food };
 }
@@ -110,6 +132,7 @@ export function localClient(S, now = Date.now()) {
   const profile = { id: LOCAL_ID, name: `${S.profile?.name || 'You'} (this phone)`, goal: S.profile?.goal, weekly_goal: S.profile?.weeklyGoal || S.plan?.days?.length || 3, plan: S.plan,
     program: S.program ? { id: S.program.id, block: S.program.block || 1, name: (S.customPrograms || []).find(p => p.id === S.program.id)?.name } : null };
   profile.food_week = foodWeekSummary(S, now);
+  profile.care = careSummary(S, now);
   profile.diet_plan = S.food?.plan || null;
   return { profile, sets, opens, checks: (S.checkins || []).map(c => ({ ...c, client_id: LOCAL_ID })), food: foodDayRows(LOCAL_ID, S, now) };
 }

@@ -143,14 +143,27 @@ export const CLASSES = [
 ];
 
 export const byId = id => CLASSES.find(c => c.id === id);
-const mv = (id, quiet) => (quiet && MOVES[id]?.jump && MOVES[id].quiet ? MOVES[id].quiet : id);
+// Moves that load a sore spot, and what replaces them. Hands on the floor: wrist, elbow, shoulder.
+// Lunging and jumping: knee, hip. (The swap keeps the effort: cardio for cardio, legs for push-ups.)
+const HANDS = { pushUps: 'pulseSquats', pikePushUps: 'pulseSquats', chairDips: 'wallSit', burpees: 'marchKnees', squatThrusts: 'marchKnees', climbers: 'marchKnees', plankJacks: 'marchKnees', plankTaps: 'flutterKicks', plank: 'flutterKicks', bearCrawl: 'marchKnees', inchworm: 'hipCircles', dbRenegade: 'dbRdl', walkouts: 'torsoTwist', pushUpPlus: 'shoulderRolls' };
+const LEGS = { lunges: 'bridges', jumpLunges: 'bridges', curtsyLunge: 'bridges', sideLunge: 'bridges', skaters: 'bridges', lungeTwist: 'torsoTwist', dbLunge: 'dbRdl', skips: 'legSwings', jumpSquats: 'pulseSquats', tuckJumps: 'pulseSquats' };
+/** The move to do, given quiet mode and sore areas. */
+export function moveFor(id, { quiet = false, pain = [] } = {}) {
+  let m = quiet && MOVES[id]?.jump && MOVES[id].quiet ? MOVES[id].quiet : id;
+  if (pain.some(a => ['wrist', 'elbow', 'shoulder'].includes(a)) && HANDS[m]) m = HANDS[m];
+  if (pain.some(a => ['knee', 'hip'].includes(a)) && (LEGS[m] || MOVES[m]?.jump)) m = LEGS[m] || MOVES[m]?.quiet || m;
+  return m;
+}
+let PAIN = [];
+const mv = (id, quiet) => moveFor(id, { quiet, pain: PAIN });
 
 /**
  * The class as a list of timed segments.
  * @param o { quiet } swap jumping moves for quiet versions
  * @returns { segs: [{ kind: 'warmup'|'work'|'rest'|'emom'|'amrap'|'cooldown', move?, secs, reps?, label, block, round? }], total }
  */
-export function timeline(cls, { quiet = !!cls.quiet } = {}) {
+export function timeline(cls, { quiet = !!cls.quiet, pain = [] } = {}) {
+  PAIN = pain;
   const segs = [], add = s => segs.push(s);
   for (const [m, s] of cls.warmup || WARM) add({ kind: 'warmup', move: mv(m, quiet), secs: s, label: 'Warm-up', block: 'Warm-up' });
   cls.blocks.forEach((b, bi) => {

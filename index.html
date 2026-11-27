@@ -37,7 +37,6 @@
       <div><span class="eyebrow" id="dateLine"></span><h1 class="display h1" id="hello">Welcome.</h1></div>
     </div>
 
-    <button type="button" class="cam-start" id="camCoach"><span class="cam-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5zM1 5h15v14H1z"/></svg></span><span><b>Camera coach</b><span>Open the camera and start moving. QK recognises the exercise and corrects you live.</span></span></button>
     <div class="card stack" id="readyCard">
       <div class="ready-q"><span class="eyebrow">How do you feel today?</span><button type="button" class="linkbtn" id="readyChange" hidden>Change</button></div>
       <div class="feel" role="group" aria-label="How do you feel today?">
@@ -51,6 +50,8 @@
 
     <button type="button" class="card recover-card" id="recoverCard" hidden><span class="eyebrow" id="recoverEyebrow">Recovery</span><b id="recoverTitle"></b><span class="muted small" id="recoverSub"></span></button>
 
+    <div class="card mem-card" id="memCard" hidden></div>
+
     <div class="card next" id="nextCard">
       <span class="eyebrow" id="nextEyebrow"></span>
       <h2 class="display h2" id="nextTitle"></h2>
@@ -60,6 +61,7 @@
       <details id="todayDetails"><summary>Today's exercises<span class="muted small" id="sessionMeta"></span></summary>
         <div id="todayList"></div>
       </details>
+      <button type="button" class="cam-line" id="camCoach"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 7l-7 5 7 5zM1 5h15v14H1z"/></svg>Or just start moving: the camera recognises your exercise</button>
       <div class="qk-says"><span class="eyebrow">QK</span><span id="nudge"></span><button class="linkbtn" id="listenBtn" type="button" aria-label="Listen to QK"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Listen</button></div>
     </div>
 
@@ -67,8 +69,9 @@
       <div class="card-head" style="margin:0"><div><span class="eyebrow" id="planEyebrow">QK's plan for today</span><h2 class="display h2" id="planTitle">Your weights are set</h2></div><button class="linkbtn" type="button" id="planListen" aria-label="Hear the plan"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Hear it</button></div>
       <div class="news" id="daysNews" hidden></div>
       <div class="news" id="rescueNews" hidden></div>
+      <div class="news" id="lightNews" hidden></div>
       <p class="ready-note" id="readyNote" hidden></p>
-      <p class="muted small" style="margin:0" id="swapNote" hidden></p>
+      <details class="adj" id="swapBox" hidden><summary id="swapSum"></summary><p class="muted small" style="margin:6px 0 0" id="swapNote"></p></details>
       <div class="news" id="planNews" hidden><b id="newsTitle"></b><p class="muted small" id="newsNote"></p><ul id="newsList"></ul><button class="ghost" type="button" id="newsOk">Got it</button></div>
       <p class="muted small" style="margin:0" id="planSummary"></p>
       <div class="time-cap" id="planTime"><span id="planMins"></span><span class="tc-btns">Short on time? <button type="button" data-cap="30">30</button><button type="button" data-cap="45">45</button><button type="button" data-cap="60">60</button> min</span></div>
@@ -481,12 +484,26 @@
         </div>
         <div><span class="eyebrow">My gym has</span><p class="muted small" style="margin:2px 0 6px">Nothing ticked means a full gym. QK swaps anything you can't do.</p><div class="chip-wrap" id="eqChips"></div></div>
         <div><span class="eyebrow">Anything hurting?</span><p class="muted small" style="margin:2px 0 6px">QK keeps loaded moves away from it and adds two gentle rehab exercises. Not a diagnosis: sharp pain, swelling, numbness or pain lasting more than two weeks, see a physio or doctor.</p><div class="chip-wrap" id="painChips"></div></div>
+        <label class="field">How I log sets<select id="pLogMode"><option value="quick">Quick tap: weight, reps, how it felt (default)</option><option value="camera">Camera form check</option></select></label>
+        <details class="more-opts" id="moreOpts"><summary>More options</summary><div class="stack" style="margin-top:12px">
         <div><span class="eyebrow">Time per training day</span><div class="stack" id="dayMins" style="margin-top:6px"></div></div>
+        <div class="grid2">
+          <label class="field">Heaviest dumbbell (kg)<input id="pMaxDb" type="number" inputmode="decimal" min="1" placeholder="No limit"></label>
+          <label class="field">Heaviest kettlebell (kg)<input id="pMaxKb" type="number" inputmode="decimal" min="1" placeholder="No limit"></label>
+        </div>
+        <label class="check"><input type="checkbox" id="pMicro"> I have micro plates (0.5 kg): smaller jumps on barbell lifts</label>
+        <div><span class="eyebrow">Travelling?</span>
+          <div class="grid2" style="margin-top:6px"><label class="field">Where<select id="pTravel"><option value="">Not travelling</option><option value="hotel">Hotel gym</option><option value="none">No equipment</option></select></label>
+          <label class="field">For<select id="pTravelDays"><option value="3">3 days</option><option value="7" selected>1 week</option><option value="14">2 weeks</option></select></label></div>
+          <p class="muted small" style="margin:4px 0 0" id="travelNote">QK switches your workouts to what you'll have, then back to your own gym by itself.</p></div>
+        <label class="check"><input type="checkbox" id="pRamadan"> Ramadan mode (30 days): shorter sessions, a bit less volume</label>
+        <p class="muted small" style="margin:0" id="ramadanNote">Train after iftar if you can: in a 2023 study, strength gains were better fed than fasted.</p>
         <label class="check"><input type="checkbox" id="pCheckin"> Ask how I feel before each workout (3 taps)</label>
         <label class="check"><input type="checkbox" id="pVoiceCmd"> Hands-free voice commands during workouts</label>
         <p class="muted small" style="margin:0" id="voiceCmdNote">Say "next", "skip", "done", "heavier", "lighter" or "80 kilos" (Urdu too: agla, bas, bhari, halka). Uses your phone's speech recognition: on most Android phones Google turns the audio into text. Off unless you turn it on.</p>
         <label class="field">Coaching voice language<select id="pLang"><option value="en">English</option><option value="ur">اردو Urdu (short cues)</option></select></label>
         <p class="muted small" style="margin:0" id="langNote" hidden></p>
+        </div></details>
       </div>
     </details>
 
@@ -571,13 +588,23 @@
       <div class="rx-edit" id="rxEditWrap" hidden><label class="field"><span id="rxEditLbl">Weight</span><input id="rxKg" type="number" inputmode="decimal" step="0.5" min="0"></label><button class="ghost" type="button" id="rxSave">Save</button></div>
     </div>
     <p class="muted small" id="setupLast" style="margin:0"></p>
+    <div class="qlog" id="qlog" hidden>
+      <div class="ql-head"><span class="eyebrow" id="qlSet">Set 1</span><span class="muted small" id="qlHint"></span></div>
+      <div class="ql-row" id="qlKgRow"><button type="button" class="ql-step" data-ql="kg-" aria-label="Less weight">−</button><label class="ql-val"><input id="qlKg" type="number" inputmode="decimal" step="0.5" min="0" aria-label="Weight"><span id="qlUnit">kg</span></label><button type="button" class="ql-step" data-ql="kg+" aria-label="More weight">+</button></div>
+      <div class="ql-row"><button type="button" class="ql-step" data-ql="r-" aria-label="Fewer reps">−</button><label class="ql-val"><input id="qlReps" type="number" inputmode="numeric" min="1" aria-label="Reps"><span>reps</span></label><button type="button" class="ql-step" data-ql="r+" aria-label="More reps">+</button></div>
+      <p class="plates" id="qlPlates" hidden style="margin:0"></p><p class="warm" id="qlWarm" hidden style="margin:0"></p>
+      <p class="small" style="margin:0"><b>How did it feel?</b> Tap to log the set.</p>
+      <div class="ql-feel" id="qlFeel"><button type="button" data-qlog="4"><b>Easy</b><span>4+ left</span></button><button type="button" data-qlog="2.5"><b>Good</b><span>2–3 left</span></button><button type="button" data-qlog="1"><b>Hard</b><span>1 left</span></button><button type="button" data-qlog="0"><b>Max</b><span>nothing left</span></button></div>
+      <div class="ql-rest" id="qlRest" hidden><span>Rest</span><b id="qlRestT">1:30</b><button type="button" class="linkbtn" id="qlRestSkip">Skip</button></div>
+      <p class="muted small" id="qlNote" style="margin:0"></p>
+    </div>
     <div class="grid2" id="loadWrap" hidden>
       <label class="field"><span><span id="loadKgLbl">Weight (kg)</span> for bar speed</span><input id="loadKg" type="number" inputmode="decimal" placeholder="e.g. 80"></label>
       <p class="muted small" style="margin:0;align-self:end">Tap <b>Calibrate</b> during the set and mark a 45 cm plate for exact speed.</p>
     </div>
     <label class="check"><input type="checkbox" id="recordChk" checked> Record my set so I can watch it back</label>
     <p class="privacy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span><b>Your video never leaves your phone.</b> QK watches on this device. Nothing is uploaded or saved unless you save it yourself.</span></p>
-    <div class="btn-row setup-extra"><button class="ghost" type="button" id="busyBtn" hidden>Machine taken</button><button class="ghost" type="button" id="painBtn" hidden>This hurts</button><button class="ghost" type="button" id="skipEx" hidden>Skip exercise</button></div>
+    <div class="btn-row setup-extra"><button class="ghost" type="button" id="busyBtn" hidden>Machine taken</button><button class="ghost" type="button" id="painBtn" hidden>This hurts</button><button class="ghost" type="button" id="skipEx" hidden>Skip exercise</button><button class="ghost" type="button" id="qlSwap" hidden>Swap</button></div>
     <button class="ghost" type="button" id="formTestBtn" hidden>Check my running form (camera)</button>
     <button class="cta" type="button" id="startGuided" hidden><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Start with QK</button>
     <button class="cta" type="button" id="startCam"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M23 7l-7 5 7 5zM1 5h15v14H1z"/></svg>Start camera</button>
@@ -647,6 +674,7 @@
     </div>
     <div class="card reward" id="sReward" hidden><div class="medal" id="sMedal">★</div><div><b id="sRewardTitle"></b><p class="muted small" id="sRewardSub"></p><div class="bar"><i id="sRewardBar"></i></div></div></div>
     <div class="card grid2" id="kgWrap" hidden><label class="field"><span id="setKgLbl">Weight used (kg)</span><input id="setKg" type="number" inputmode="decimal" step="0.5" min="0" placeholder="e.g. 40"></label><p class="muted small" style="margin:0;align-self:end" id="sLast"></p></div>
+    <div class="card stack" id="rirBox" hidden><span class="eyebrow">First time on this one</span><b>How many more reps could you have done?</b><div class="seg" id="rirSeg"><button type="button" data-rir="0">0</button><button type="button" data-rir="1.5">1–2</button><button type="button" data-rir="3.5">3–4</button><button type="button" data-rir="6">5+</button></div><p class="muted small" style="margin:0" id="rirNote">QK sets your next set from your answer.</p></div>
     <div class="card rx-next" id="sNext" hidden><span class="eyebrow">Next time</span><b id="sNextLine"></b><p class="muted small" id="sNextWhy"></p></div>
     <div class="one-thing" id="sFocusBox"><span class="eyebrow" style="color:var(--warn)">One thing for next set</span><p id="sFocus"></p><p class="why" id="sWhy"></p></div>
     <div class="card"><span class="eyebrow">Range of motion per rep</span><div class="rom-bars" id="romBars" style="margin-top:12px"></div><p class="muted small" style="margin:10px 0 0" id="romNote"></p></div>
@@ -772,6 +800,9 @@
     <h2 class="display h2">Which days will you train?</h2>
     <p class="note" style="margin:0" id="obDaysNote">Pick the days you can really make. People who plan their days are far more likely to keep going.</p>
     <div class="days" id="obDays"></div>
+    <details class="ob-know" id="obKnowWrap" hidden><summary>I know my numbers <span class="muted small">(optional)</span></summary>
+      <p class="muted small" style="margin:6px 0">Your usual weight and reps on the big lifts. QK fills in day 1 from these. Leave it and QK finds your weights with a light first set.</p>
+      <div class="stack" id="obKnow"></div></details>
     <button class="cta" type="button" id="obDone">Done</button>
     <button class="linkbtn" type="button" id="obSkip">Skip for now</button>
   </div>
