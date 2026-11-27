@@ -576,7 +576,11 @@ export function targets(p) {
   // Safety floor: 90% of resting burn, and never under 1,500 (men) / 1,200 (women) kcal.
   const floor = kcalFloor(p.sex, bmr);
   const kcal = Math.max(Math.round(floor / 10) * 10, Math.round((tdee * (1 + goal) + (+p.kcalAdjust || 0)) / 10) * 10);
-  const protein = Math.round(w * (dg === 'lose' ? 2.0 : 1.8));
+  // Protein per kg uses a reference weight when BMI is over 30: at 130 kg, 2 g/kg of total weight would be 260 g,
+  // far more than the lean mass needs. Reference = weight at BMI 25 plus 40% of the excess. Also never over 35% of kcal.
+  const hM = +p.heightCm / 100, bmi = hM ? w / (hM * hM) : 0;
+  const refW = bmi > 30 ? 25 * hM * hM + 0.4 * (w - 25 * hM * hM) : w;
+  const protein = Math.round(Math.min(refW * (dg === 'lose' ? 2.0 : 1.8), kcal * 0.35 / 4));
   const fat = Math.round(kcal * 0.27 / 9);
   const carbs = Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4));
   return { kcal, protein, fat, carbs, bmr: Math.round(bmr), tdee: Math.round(tdee), adjust: +p.kcalAdjust || 0, floor: Math.round(floor / 10) * 10 };

@@ -113,5 +113,14 @@ check('unknown dish ids become "other" names', consensus([s([it('sushi_roll', 2,
 check('two piles of the same dish are added', consensus([s([it('roti', 1), it('roti', 2)])]).items[0].servings === 3);
 check('broken samples are ignored', consensus([null, { error: 'x' }, s([it('chai', 1)])]).items[0].dish === 'chai');
 
+{ // Protein for a heavy client uses a reference weight, not total weight.
+  const t = N.targets({ sex: 'male', age: 35, heightCm: 175, weightKg: 130, job: 'desk', trainDays: 3, dietGoal: 'lose' });
+  check('obese protein uses a reference weight', t.protein >= 150 && t.protein < 200, t.protein);
+  check('protein within 35% of kcal', t.protein * 4 <= t.kcal * 0.35 + 4);
+  const lean = N.targets({ sex: 'male', age: 30, heightCm: 180, weightKg: 80, job: 'desk', trainDays: 4, dietGoal: 'lose' });
+  check('normal weight keeps 2 g/kg on a cut', lean.protein === 160, lean.protein);
+}
+
 console.log(fails ? `\n${fails} FAILED` : '\nall nutrition checks passed');
 process.exit(fails ? 1 : 0);
+

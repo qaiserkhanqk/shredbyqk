@@ -65,7 +65,8 @@ const num = s => +String(s).replace(/[^\d]/g, '');
   const rest = await sheetKcal();
   check('restaurant karahi shows more calories than home', rest > home, `${home} → ${rest}`);
   await p.click('#foodSheet [data-step="0.5"]');
-  check('portion stepper shows grams', /1½ katori \(≈300 g\)/.test(await p.textContent('#fsServe')));
+  // Katori of meat curry is 240 g (LFAC 2024: karahi cup = 240 g; FNDDS curry cup 240 g).
+  check('portion stepper shows grams', /1½ katori \(≈360 g\)/.test(await p.textContent('#fsServe')));
   await p.click('#fsSave');
   check('logged entry appears', /Chicken karahi/.test(await p.textContent('#foodLog')));
 
@@ -155,7 +156,7 @@ const num = s => +String(s).replace(/[^\d]/g, '');
   check('photo: meal added to the log immediately', (await rows()).length === before + 2, `${before} → ${(await rows()).length}`);
   const names = await p.$$eval('#foodPhotoBox .row b', els => els.map(e => e.textContent));
   check('photo: consensus keeps karahi and naan, drops the one-off raita', names.join() === 'Chicken karahi,Naan', names.join());
-  check('photo: remembered style used for karahi (restaurant)', /1 katori \(≈200 g\) · restaurant/.test(await p.textContent('#foodPhotoBox')));
+  check('photo: remembered style used for karahi (restaurant)', /1 katori \(≈240 g\) · restaurant/.test(await p.textContent('#foodPhotoBox')));
   check('photo: asks once who usually cooks', await p.isVisible('[data-usual=home]'));
   await shot('3-snap');
   await p.click('[data-usual=home]');

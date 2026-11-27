@@ -66,8 +66,8 @@ const RULES = `For each separate food:
 - alternative: the second most likely catalogue id for the same food (another member of its family is typical:
   naan vs roghni naan, chicken karahi vs chicken handi), or "none" if you're sure.
 - servings: how many of that dish's serving unit (given per dish). Count breads, kebabs, samosas, eggs and pieces one
-  by one. For curries and rice judge volume: a katori is about 200 g (a small bowl, about 1 cup); a full dinner plate of
-  rice is about 300 g. Use halves (0.5, 1.5). If only part of a roti or naan is left, count what is left.
+  by one. For curries and rice judge volume: a katori of meat curry is about 240 g (daal about 200 g, a small bowl,
+  about 1 cup); a full dinner plate of rice or biryani is about 350 g. Use halves (0.5, 1.5). If only part of a roti or naan is left, count what is left.
   Breads differ a lot: a thin phulka, a roti/chapati, a big tandoori roti, a naan, a roghni naan (glossy, sesame),
   a kulcha, taftan or sheermal (sweet, yellowish), a paratha (layered, oily sheen) or a puri (puffed, fried).
 - meat_share (curries and rice with meat only, else "na"): "more" if mostly meat pieces, "less" if mostly gravy or rice, else "normal".

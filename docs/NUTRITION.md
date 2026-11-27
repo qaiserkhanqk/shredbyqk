@@ -245,6 +245,30 @@ For clients in Dubai, Abu Dhabi and Sharjah:
 - **When the client's city is in the UAE, UAE branches and places come first**, and Pakistani ones come first in Pakistan.
 - **Menu calories from clients.** UAE menus must show calories, so when an item has no official number, clients can type in the one on the menu. That number is used for the item from then on, and it syncs to QK for review, so the chain list fills in as clients eat. The one official number is split into protein, carbs and fat the way the dish model splits them.
 
+## Portion standards (QK's calibration, November 2026)
+
+Every common dish was re-checked against published recipes and measured portions. The standards the app uses:
+
+| Food | One serving | kcal |
+|---|---|---|
+| Roti / chapati | 80 g | ~200 |
+| Naan | 140 g | ~411 |
+| Puri | 65 g | ~241 |
+| Halwa puri plate (2 puri, halwa, cholay) | 400 g | ~1,145 |
+| Chicken tikka, leg piece (quarter) | 160 g | ~349 |
+| Chicken tikka, chest piece (quarter, bigger) | 190 g | ~406 |
+| Seekh kebab | 70 g | ~214 |
+| Shami kebab | 75 g | ~221 |
+| Samosa | 100 g | ~288 |
+| Biryani / pulao plate | 350 g | by recipe |
+| Meat curry katori | 240 g | by recipe |
+| Daal katori | 200 g | by recipe |
+| Gulab jamun (one) | | ~121 |
+
+Typed and spoken units follow the same numbers: "ek katori" is 240 g of curry, "ek plate" is 300 g, and a "mutthi"
+(handful) is 30 g. Protein targets for clients with a BMI over 30 use a reference weight (the weight at BMI 25 plus
+40% of the rest), and protein never goes over 35% of the day's calories.
+
 ## Making it more accurate over time
 
 - **Weigh real plates.** Order or cook each top dish a few times, weigh the katori, and skim and weigh the oil. Then adjust the fat grams in `DISHES`. This is the single biggest accuracy gain, and the tests show how far each change moves away from INDB.

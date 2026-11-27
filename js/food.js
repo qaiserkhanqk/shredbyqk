@@ -409,8 +409,8 @@ async function runPhoto(file, hint = null) {
   // Words typed or said before snapping ("restaurant karahi, 2 naan") go with the photo as a hint.
   if (hint === null) { hint = $('#foodSearch').value.trim(); if (hint) { $('#foodSearch').value = ''; renderResults(); } }
   box.hidden = false; box.innerHTML = '<div class="card snap-card"><b>Adding your meal…</b><p class="muted small" style="margin:6px 0 0">QK is naming each dish and counting portions.</p></div>';
+  const readId = uid(); // which read this is: a late double-check of an earlier read must not replace it
   try {
-    const readId = uid();
     const r = await recognise(file, { hint, plateCm: +F().plateCm || null, usual: usualDishes() }, better => {
       // QK's double-check came back. Swap it in only if it differs and they haven't touched the entries.
       if (snap?.file !== file || snap.readId !== readId || snap.touched || sameRead(snapRead, better)) return;
