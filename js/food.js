@@ -433,7 +433,7 @@ async function runPhoto(file, hint = null) {
     renderFood(); renderSnap();
     box.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
   } catch (err) {
-    box.innerHTML = `<div class="card"><b>Couldn’t read the photo</b><p class="muted small" style="margin:6px 0 0">${esc(err.message === 'no-endpoint' ? 'Photo recognition isn’t switched on yet.' : 'Check your connection and try again, or search for the dish.')}</p></div>`;
+    box.innerHTML = `<div class="card"><b>Couldn’t read the photo</b><p class="muted small" style="margin:6px 0 0">${esc(err.message === 'no-endpoint' ? 'Photo recognition isn’t switched on yet.' : err.message === 'busy' ? 'Lots of people are snapping right now. Try again in a minute, or say or search what you ate.' : 'Check your connection and try again, or search for the dish.')}</p></div>`;
   }
 }
 function renderSnap() {
