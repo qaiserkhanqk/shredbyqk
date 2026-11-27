@@ -7,6 +7,13 @@
 - The full sourced notes (one section per product, each claim with its URL) are in `docs/competitor-research-2026-11-27.md`.
 - **Caveat:** pages on ouraring.com and whoop.com could not be opened directly, so those details come from search-engine copies and press coverage. They should be checked on the live sites.
 
+> **What this comparison is, and is not (added 2026-11-27 after the product owner asked "have you checked their systems?"):**
+> - It compares **our design** with **what each company says publicly**.
+> - **Nobody has installed, used or tested any of these apps for this document.** Nobody has seen how their predictions work inside. No accuracy was compared on the same data.
+> - "Not found" means "not found in public sources". The feature may exist.
+> - We have no users, so nothing here shows that our design works better in practice.
+> - To really know, someone would need to use each app for a few cycles with the same (synthetic) entries, and compare what each one says and does.
+
 **Rules for this comparison:**
 - Competitor accuracy figures are **theirs**, from their own studies, populations and reference tests. They say nothing about Shred by QK, and we do not borrow them.
 - Our only accuracy figure comes from our own test on one public research dataset (Marquette, dates only). It is not clinical validation.
@@ -47,11 +54,11 @@
 | Cost | 4 (free + $40–60/yr) | 2 ($349–399 + $70/yr) | 2 ($199–239/yr) | 2 ($150–195/yr) | 4 (free with iPhone) | 4 | **5.** Works without any hardware. |
 | Scale and real-world use | 5 | 5 | 5 | 5 | 5 | 5 | **0.** Not launched. |
 
-## 3. Where we are ahead
-1. **Honesty about uncertainty.** Competitors give a date, often with no range. We give a range and say how often a range like that held in real data. We refuse to estimate when the data can't support it.
-2. **Logging quality.** Real-start-day check-ins, missed-period questions, and the long-gap notice address the main real-world error source we measured (late logging raised error from 2.21 to 2.99 days). We found no competitor that asks about a likely forgotten period. Apple's irregularity alerts are the closest.
+## 3. Where our design differs on paper (not shown in practice)
+1. **Honesty about uncertainty.** From their public descriptions, competitors give a date, often with no stated range. We give a range and say how often a range like that held in real data. We refuse to estimate when the data can't support it.
+2. **Logging quality.** Real-start-day check-ins, missed-period questions, and the long-gap notice address the main real-world error source we measured (late logging raised error from 2.21 to 2.99 days). In public sources we found no competitor that asks about a likely forgotten period, but we have not used their apps, so they may. Apple's irregularity alerts are the closest we found.
 3. **Privacy.** Flo's history (FTC order, settlements, the 2025 verdict against Meta over Flo users' data) and Stardust's disputed encryption claims show what goes wrong. Our design never uploads cycle data.
-4. **Learning what helps her.** No competitor was found to ask "did it help?" and adapt to her answers.
+4. **Learning what helps her.** In public sources we found no competitor that asks "did it help?" and adapts to her answers. Not verified by using their apps.
 5. **The fitness link.** Camera form coaching, rehab and workouts in the same app, without making up cycle-phase training rules.
 
 ## 4. Where they are ahead, and what it would take
