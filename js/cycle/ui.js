@@ -37,14 +37,27 @@ const now = () => ({ today: localToday(), nowMin: localMinutes(Date.now(), devic
 export async function initCycle(opts) {
   root = opts.root; toast = opts.toast;
   root.addEventListener('click', onClick); root.addEventListener('change', onChange);
+  // Never swap the page under her finger: a redraw between press and release means the browser fires no click, so
+  // her tap was silently lost (found investigating the intermittent Firefox two-tab failures, 2026-11-27). A redraw
+  // asked for by another tab waits until the press ends, then runs after the click has been handled.
+  root.addEventListener('pointerdown', () => { pressing = true; clearTimeout(pressTimer); pressTimer = setTimeout(release, 5000); }, true);
+  for (const k of ['pointerup', 'pointercancel']) window.addEventListener(k, release, true);
   // Another tab saved or deleted: re-read instead of overwriting. IndexedDB writes don't fire 'storage' events,
   // so tabs tell each other through a BroadcastChannel; 'storage' still covers a cleared localStorage.
-  if (typeof BroadcastChannel !== 'undefined') { channel = new BroadcastChannel('shred-cycle'); channel.onmessage = () => { if (root.closest('.screen.on')) renderCycle(); }; }
+  if (typeof BroadcastChannel !== 'undefined') { channel = new BroadcastChannel('shred-cycle'); channel.onmessage = () => fromOtherTab(); }
   window.addEventListener('storage', e => {
     if (e.key !== null && !/^shred_cycle_/.test(e.key)) return; // null = storage cleared
     if (e.key === null || e.key === 'shred_cycle_uid') reopen();
-    if (root.closest('.screen.on')) renderCycle();
+    fromOtherTab();
   });
+}
+let pressing = false, pendingRedraw = false, pressTimer = null;
+function fromOtherTab() { if (pressing) { pendingRedraw = true; return; } if (root.closest('.screen.on')) renderCycle(); }
+function release() {
+  clearTimeout(pressTimer);
+  if (!pressing) return;
+  pressing = false;
+  if (pendingRedraw) { pendingRedraw = false; setTimeout(fromOtherTab, 0); } // after this tap's click has run
 }
 let channel = null;
 const storage = indexedDbStorage(), keys = indexedDbKeys();
