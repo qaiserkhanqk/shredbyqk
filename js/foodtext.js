@@ -179,7 +179,51 @@ export function readPhrase(phrase) {
 }
 
 /** "do roti aur aadhi plate biryani" → { items: [{ ref, opts: { servings }, name, said }], unknown: [...] }. */
+// Where it was eaten, said once for the whole meal: "… from Burger Hub", "… at Johnny Rockets",
+// "Ravi se karahi aur 2 naan", "ghar ka khana", "dhabay se". Every dish in the sentence takes it.
+const HOME = /\b(ghar|gher|home|homemade|ammi)\b/, OILY = /\b(dhaba|dhabay|dhabe|shaadi|shadi|wedding|walima|mehndi|dawat|street|thela|thelay|cart|stall)\b/;
+const CLAUSE_FILLER = new Set(['the', 'a', 'some', 'one', 'ek', 'aik', 'my', 'our', 'restaurant', 'hotel', 'place', 'shop', 'wala', 'wali', 'walay', 'se', 'say', 'sy', 'today', 'aaj', 'khaya', 'khayi', 'khai', 'ate', 'had', 'eaten', 'pi', 'piya', 'liya', 'li', 'mangwaya', 'order', 'ordered', 'delivery']);
+function placeContext(text) {
+  const n = norm(text), style = HOME.test(n) ? 'home' : OILY.test(n) ? 'shaadi' : null;
+  const tries = [];
+  const en = n.match(/^(.*?)\b(?:from|at)\s+(.+)$/);
+  if (en) tries.push({ place: en[2], rest: en[1] });
+  const ur = n.match(/^(.+?)\s+(?:se|say|sy|ka|ki|ke)\s+(.+)$/);
+  if (ur) tries.push({ place: ur[1], rest: ur[2], urdu: true, se: /\s(se|say|sy)\s/.test(` ${n.slice(ur[1].length, ur[1].length + 5)} `) });
+  for (const t of tries) {
+    const pw = words(t.place).filter(w => !CLAUSE_FILLER.has(w) && !HOME.test(w) && !OILY.test(w)), q = pw.join(' ');
+    if (!q) { if (style) return { style, rest: t.rest }; continue; }
+    const hit = searchPlaces(q, [], 1)[0];
+    if (hit && placeNamed(hit.place.name, q)) return { place: hit.place, style: style || (['Street', 'Dhaba'].includes(hit.place.type) ? 'shaadi' : 'restaurant'), rest: t.rest };
+    // Not in the database: keep its name; it's restaurant food unless they said dhaba or home. "aloo ka paratha" is not a place.
+    if ((!t.urdu || t.se) && !match(pw) && pw.length <= 4 && words(t.rest).length) return { unknownPlace: pw.map(w => w[0].toUpperCase() + w.slice(1)).join(' '), style: style || 'restaurant', rest: t.rest };
+  }
+  return style ? { style, rest: n } : null;
+}
+// Use the place's own menu item for a dish when it has one (same dish, or same family: "burger" → their burger).
+function atPlace(it, ctx) {
+  const P = ctx.place, d = DISH[it.ref.id];
+  if (P) {
+    // Same family is enough when they said it generically ("burger"); a specific word ("zinger") must match the item.
+    const said = words(it.said || '').filter(w => !GENERIC.has(w) && !(w in NUM) && !(w in UNIT) && !FILLER.has(w));
+    const famOk = x => d?.fam && DISH[x.dish]?.fam === d.fam && (!said.length || said.every(w => words(x.name).some(v => exact(v, w) || near(v, w))));
+    const own = P.items.find(x => x.dish === it.ref.id) || P.items.find(famOk);
+    if (own) return { ...it, ref: { t: 'dish', id: own.dish }, opts: { ...own.opts, menuBase: own.opts.servings || 1, servings: (own.opts.servings || 1) * (it.opts.servings || 1) }, name: `${P.name} · ${own.name}`, official: own.official && { ...own.official, base: own.opts.servings || 1 } };
+    return { ...it, opts: { ...it.opts, style: ctx.style, styleKnown: true }, name: `${P.name} · ${d.name}` };
+  }
+  if (ctx.unknownPlace) return { ...it, opts: { ...it.opts, style: ctx.style, styleKnown: true }, name: `${d.name} · ${ctx.unknownPlace}`, place: ctx.unknownPlace };
+  return { ...it, opts: { ...it.opts, style: ctx.style, styleKnown: true } };
+}
+
 export function parseMeal(text) {
+  const ctx = placeContext(text);
+  if (ctx) {
+    const r = parseMealPlain(ctx.rest);
+    return { items: r.items.map(it => it.name?.includes(' · ') && !ctx.unknownPlace && !ctx.place ? it : atPlace(it, ctx)), unknown: r.unknown, place: ctx.place?.name || ctx.unknownPlace || null, style: ctx.style };
+  }
+  return parseMealPlain(text);
+}
+function parseMealPlain(text) {
   const items = [], unknown = [];
   for (const ph of splitMeal(text)) {
     const { amount, unit, words: qw } = readPhrase(ph);

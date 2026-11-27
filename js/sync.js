@@ -7,6 +7,8 @@
 
 import { foodDayRows, foodWeekSummary, placeRows } from './foodsync.js';
 import { careSummary } from './dash.js';
+import { allWeights, daysToCheckin } from './adapt.js';
+import { notifyLevel } from './signals.js';
 
 export class Cloud {
   /** @param o { url, anonKey, fetch, session: { access_token, refresh_token, expires_at, user } | null, onSession } */
@@ -44,6 +46,10 @@ export class Cloud {
   /* ---- client ---- */
   joinCoach(code) { return this.req('/rest/v1/rpc/join_coach', { method: 'POST', body: { code } }); }
   me() { return this.req(`/rest/v1/profiles?id=eq.${this.uid}&select=*`).then(r => r?.[0] || null); }
+  /** Save this phone's push address so check-in reminders reach it while the app is closed. */
+  savePush(sub) { const j = sub.toJSON ? sub.toJSON() : sub; return this.upsert('push_subs', [{ client_id: this.uid, endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth }], 'endpoint'); }
+  /** The plan QK edited for me, or null. */
+  coachPlan() { return this.req(`/rest/v1/coach_plans?client_id=eq.${this.uid}&select=plan,note,updated_at`).then(r => r?.[0] || null); }
   updateMe(fields) { return this.req(`/rest/v1/profiles?id=eq.${this.uid}`, { method: 'PATCH', body: fields, headers: { Prefer: 'return=minimal' } }); }
   upsert(table, rows, conflict) {
     if (!rows.length) return Promise.resolve();
@@ -59,6 +65,9 @@ export class Cloud {
     if (!ids.length) return Promise.resolve([]);
     return this.req(`/rest/v1/${table}?client_id=in.(${ids.join(',')})&at=gte.${encodeURIComponent(fromIso)}&order=at.asc&limit=10000`);
   }
+  /** Coach: save a client's edited diet plan (they see it next time the app syncs, plus a notification). */
+  setPlan(clientId, plan, note = '') { return this.upsert('coach_plans', [{ client_id: clientId, coach_id: this.uid, plan, note, updated_at: new Date().toISOString(), notified_at: null }], 'client_id'); }
+  plans(ids) { return ids.length ? this.req(`/rest/v1/coach_plans?client_id=in.(${ids.join(',')})&select=*`) : Promise.resolve([]); }
   send(clientId, kind, body) { return this.req('/rest/v1/messages', { method: 'POST', body: { coach_id: this.uid, client_id: clientId, kind, body }, headers: { Prefer: 'return=minimal' } }); }
   sent(fromIso) { return this.req(`/rest/v1/messages?coach_id=eq.${this.uid}&created_at=gte.${encodeURIComponent(fromIso)}&order=created_at.desc`); }
 }
@@ -88,6 +97,11 @@ export async function pushAll(cloud, S, mark = {}) {
     await cloud.upsert('places', placeRows(uid, S), 'client_id,name');
     food = foodWeekSummary(S);
   } catch (e) { console.warn('food sync skipped:', e.message); }
+  // The next check-in date (for reminders while the app is closed) and the full diet plan (for QK to edit).
+  // Servers set up before these columns existed just skip them.
+  const lastFood = Math.max(0, ...(S.food?.log || []).map(e => e.at));
+  const extra = { next_checkin: nextCheckin(S), diet_plan: S.food?.plan || null, notify: notifyLevel(S), last_food: lastFood ? new Date(lastFood).toISOString().slice(0, 10) : null };
+  try { await cloud.updateMe(extra); } catch (e) { console.warn('check-in/plan sync skipped:', e.message); }
   await cloud.updateMe({
     ...(food ? { food_week: food } : {}),
     name: S.profile?.name || null, goal: S.profile?.goal || null, weekly_goal: S.profile?.weeklyGoal || null,
@@ -100,4 +114,10 @@ export async function pushAll(cloud, S, mark = {}) {
     classes: Math.max(mark.classes || 0, ...classSets.map(s => s.at)),
     checkins: Math.max(mark.checkins || 0, ...checks.map(c => c.at)),
   };
+}
+
+/** The date of the next two-weekly check-in, as YYYY-MM-DD (today when it's due). */
+export function nextCheckin(S, now = Date.now()) {
+  const d = new Date(now + daysToCheckin(allWeights(S), S.food?.adapt || {}, now) * 864e5);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }

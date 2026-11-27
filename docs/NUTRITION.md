@@ -113,6 +113,112 @@ No public database lists Pakistani restaurant and cart menus with nutrition. `js
 
 Every item points at a dish model with that place's portion and oil level. When a chain publishes official values, add them as `official` on the item and they replace the estimate. Clients add their own places with **Add a place**: they pick the closest dish, so the numbers stay realistic. Places are stored on the phone for now. With a backend, places added by one client could be shared with all (after QK reviews them).
 
+## Calories that keep up with the body
+
+**Starting target** (`maintenance()` and `targets()` in `js/nutrition.js`):
+- **Resting burn:** Mifflin-St Jeor, from weight, height, age and sex.
+- **Daily movement, by job:** desk or student ×1.2, on their feet ×1.35, physical work ×1.5.
+- **Training:** each session adds about 4 kcal per kg, spread over the week. Training days default to the client's training plan.
+- **Goal:** −20% to lose, +10% to gain. Protein is 2.0 g/kg when losing and 1.8 g/kg otherwise.
+- **Floor:** never below 90% of resting burn, and never below 1,500 kcal (men) or 1,200 kcal (women).
+
+**Two-weekly check-ins** (`js/adapt.js`). Bodies adapt: a lighter body burns less, so a target that worked stops working. Every 14 days the app asks for a morning weigh-in and reads the trend from the last 2–3 weeks of weigh-ins, ignoring day-to-day water swings. Then it offers a small next step, and the client chooses:
+
+| Last two weeks | What QK offers |
+|---|---|
+| Cutting, weight held steady | First, kindly: walk 2,000 more steps a day (food stays the same). Or eat 150 kcal less, or give it two more weeks |
+| Cutting, losing 0.15–1% of body weight a week | Keep going as is, or one small step: 1,500 more steps or 100 kcal less |
+| Cutting, losing over 1% a week | Eat 150 kcal more to protect muscle |
+| Bulking, not gaining / gaining over 0.6% a week | 150 kcal more / 100 kcal less |
+| Maintaining, drifting more than 0.3% a week | ±100 kcal (or more steps if drifting up) |
+
+Guardrails:
+- Changes are capped at ±600 kcal in total.
+- "Eat less" is never offered below the floor or during rehab.
+- Messages are worded to motivate, never to blame.
+
+Reminders reach the phone even when the app is closed. Web Push (`js/push.js`, `tools/webpush.mjs`, `tools/push-checkins.mjs`) runs from a daily GitHub Actions job, with no server to keep running; setup is in supabase/README.md, step 6. There's also an in-app notice and an optional calendar reminder every two weeks. QK sees each client's last check-in choice on the dashboard.
+
+**Weight graph:** every weigh-in is kept, with ranges of 1 month, 3 months, 1 year and all time, a 7-day smoothed trend line, and the change over the range and since the client started.
+
+## Diet plans
+
+The questionnaire QK used to send by form is now in the app (Food → Your diet plan). It asks:
+- what the client eats (everything, no beef, chicken and fish only, vegetarian with or without eggs)
+- meals a day (3, 4 or 5)
+- the breakfasts, lunches, dinners and snacks they like
+- anything they can't eat (dairy, gluten, nuts, eggs)
+
+Plans start from what Pakistanis actually eat. Research on everyday eating (Gallup Pakistan, dietitian and coach pages) shaped the meals:
+- **Breakfast:** paratha and anda, anda and roti, bread with peanut butter and eggs, chana chaat, lassi. Oats, cereal and dahi bowls are there for those who like them.
+- **Lunch and dinner:** roti or chapati with chicken tikka, boti, seekh, karahi, salan, qeema, daal or sabzi. There's also a biryani day, plus salad and raita.
+- **Snacks:** chai with nuts, fruit, boiled eggs, chana chaat.
+- **Choosing foods:** the client picks from chips like "BBQ (tikka, boti, seekh)" or "Karahi", and each chip covers the matching foods.
+
+`js/dietplan.js` then builds the plan:
+- **Each meal gets a share of the day's targets** (calories, protein, carbs, fat from Mifflin-St Jeor).
+- **Each meal offers up to 3 options of the same size**, built from foods the client likes.
+- **Every food gets an exact amount on real portion steps**: 25 g of chicken, whole eggs, whole rotis, half katoris. A small search finds the amounts closest to the calories and protein first, then carbs and fat.
+- **Meat is given raw**, with the cooked weight beside it, plus the oil to cook it in.
+- **Values come from the same USDA ingredients and home-cooked dish models as the rest of the app.** "I ate this" therefore logs exactly what was planned.
+- **Tests check the results** for five client types (`tests/dietplan.test.mjs`): calories within 8% of target, diet and allergies respected, and logged numbers equal to planned numbers.
+
+QK sees each client's plan (calories, protein, meals) on the coach dashboard. QK editing a client's plan from the dashboard is the next step. It needs a coach-writable table, because today the database only lets coaches send messages.
+
+## Say where you ate it
+
+Clients can say or type where the food came from, and every dish in the sentence takes that place's portion, oil level and official numbers (`js/foodtext.js`, tested in `tests/placemeal.test.mjs`):
+
+| Said | Logged as |
+|---|---|
+| "Nagina se anda shami burger khaya" | Nagina Burger Point's anda shami burger |
+| "Ravi restaurant se chicken karahi aur 2 naan" | Ravi's karahi and 2 of Ravi's naans |
+| "big mac from mcdonalds" | McDonald's Big Mac, official values |
+| "zinger burger from Burger Hub" (not on their menu) | A zinger cooked restaurant-style, labelled Burger Hub |
+| "beef burger at Johnny Rockets" (not in the database) | Restaurant-style, with the place's name kept |
+| "ghar ka daal chawal" / "karahi from a dhaba" | Home cooking / dhaba oil levels |
+
+## Signals, not paperwork
+
+The app reads the small signals a coach watches, from what clients already do (`js/signals.js`). Nothing extra to type:
+
+| Signal | Comes from | What changes |
+|---|---|---|
+| Logging | food logs, weigh-ins, sessions, morning cards | A warm "no catching up needed" line after 3 quiet days. A check-in with few logs says it's reading the scale, not the meals |
+| Sleep and stress | the one-tap morning "How do you feel?" card | A stall during a rough week: no cut; keep the plan and protect sleep |
+| Strength | the best lift of each exercise, last 2 weeks vs the 4 before | Losing weight while lifts drop 5%+: a little more food is offered first |
+| Cycle (women, opt-in, one tap a month, stays on the phone) | "Period started today" | A stall in the week before or the first days of a period: nothing changes ("water weight, not fat") |
+
+QK sees logging, sleep, rough mornings and strength on the dashboard. The cycle is never synced.
+
+**Notifications stay few.** Clients choose under Your targets → Reminders from QK:
+- **Just the essentials** (the default): the check-in every two weeks, and QK's plan updates.
+- **A gentle nudge too:** adds at most one reminder a week, only after 3 days without logging food, never on a check-in day. The wording never blames.
+- **Off.**
+
+Whatever they choose, they never get more than one notification a day; QK's plan update beats a check-in, which beats a nudge.
+
+## QK edits plans on the dashboard
+
+Each client's plan shows on the coach dashboard. QK can do all of this, and every total updates as he types:
+- change any amount
+- remove a food
+- add a food from the plan list
+- write a note
+
+When QK saves, the client's app shows "Edited by QK" with the note, and they get a notification. The app never overwrites QK's version with its own: not when the client's targets change, and not when they ask for other options.
+
+## The UAE
+
+For clients in Dubai, Abu Dhabi and Sharjah:
+- **36 Gulf, Levantine, Iranian and cafeteria dishes** are modelled from their ingredients, the same way as the desi ones. They include mandi, machboos, kabsa, harees, hummus, mutabbal, falafel, manakish, shish tawook, mixed grill, koobideh, karak chai, luqaimat and Kerala parotta. The UAE build-ups were checked against published values where they exist (Saudi MOH, FatSecret, USDA hummus and tabbouleh).
+- **15 café and chain foods** were added too, including lattes, Spanish latte, Iced Capp, croissant and toum.
+- **89 places with 358 items are in `js/places-uae.js`.** Of these:
+  - **30 are chains.** Dubai requires calories on chain menus, but most chains don't publish them online. Only 18 items have official values so far (Papa John's UAE, Calo, Kcal, Five Guys, two McDonald's UAE items via a third-party calculator, one Zaatar w Zeit item). The rest are marked `check`, to fill in from the menus or the delivery apps.
+  - **59 are local places:** Ravi, Karachi Darbar, Al Ustad, Bait Al Mandi, Al Fanar, Logma, Al Mallah and more.
+- **When the client's city is in the UAE, UAE branches and places come first**, and Pakistani ones come first in Pakistan.
+- **Menu calories from clients.** UAE menus must show calories, so when an item has no official number, clients can type in the one on the menu. That number is used for the item from then on, and it syncs to QK for review, so the chain list fills in as clients eat. The one official number is split into protein, carbs and fat the way the dish model splits them.
+
 ## Making it more accurate over time
 
 - **Weigh real plates.** Order or cook each top dish a few times, weigh the katori, and skim and weigh the oil. Then adjust the fat grams in `DISHES`. This is the single biggest accuracy gain, and the tests show how far each change moves away from INDB.
@@ -128,7 +234,7 @@ Facts about other apps come from their store listings and press coverage (see th
 |---|---|---|---|---|---|---|
 | Desi dishes | 113 recipe models + 1,014 INDB recipes | 750+ home and street dishes | Desi foods | User-entered | Large Indian database | Generic |
 | Oil, who cooked it, meat vs gravy | **Yes, with a range** | Not mentioned | Not mentioned | No | Not mentioned | No |
-| Restaurants and carts | 45 places / 170 items, 20 with official values; clients add their own | **223 chains / 12,500+ items** | Local cafés | Large, mostly Western | Indian chains | Few |
+| Restaurants and carts | 45 chains (170 items, 20 with official values) + 259 local places in 11 cities (646 items); clients add their own | **223 chains / 12,500+ items** | Local cafés | Large, mostly Western | Indian chains | Few |
 | Photo logging | One tap, same answer every time, learns your portions | Not mentioned | Not mentioned | Meal Scan + Cal AI | Snap | Yes |
 | Say it / type the meal (Urdu, Roman Urdu) | **Yes** | Not mentioned | Not mentioned | English voice | Ria AI chat | Text describe |
 | Barcode | Yes (Open Food Facts) | Not mentioned | Not mentioned | Yes | Yes | Yes |

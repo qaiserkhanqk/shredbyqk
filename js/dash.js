@@ -133,5 +133,6 @@ export function localClient(S, now = Date.now()) {
     program: S.program ? { id: S.program.id, block: S.program.block || 1, name: (S.customPrograms || []).find(p => p.id === S.program.id)?.name } : null };
   profile.food_week = foodWeekSummary(S, now);
   profile.care = careSummary(S, now);
+  profile.diet_plan = S.food?.plan || null;
   return { profile, sets, opens, checks: (S.checkins || []).map(c => ({ ...c, client_id: LOCAL_ID })), food: foodDayRows(LOCAL_ID, S, now) };
 }

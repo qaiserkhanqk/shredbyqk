@@ -43,3 +43,14 @@ body.coach-page { background: var(--ink); color: var(--text); min-height: 100vh;
 /* What the coach should know: sore areas, rough days, travel, Ramadan */
 .cd-care { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; }
 .cd-care i { font-style: normal; font-size: .72rem; padding: 2px 8px; border-radius: 99px; background: rgba(229, 168, 76, .16); color: var(--text); }
+
+/* Diet plan editor */
+.cd-plan .cdp-meal { display: grid; gap: 6px; margin-top: 8px; }
+.cd-plan .cdp-opt { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; display: grid; gap: 4px; }
+.cd-plan .cdp-head { display: flex; justify-content: space-between; gap: 8px; font-weight: 650; }
+.cd-plan .cdp-item { display: grid; grid-template-columns: 1fr 72px 54px 40px 28px; gap: 6px; align-items: center; font-size: .88rem; }
+.cd-plan .cdp-item input { width: 100%; padding: 4px 6px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font: inherit; }
+.cd-plan .cdp-k { text-align: right; }
+.cd-plan .cdp-x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 1rem; }
+.cd-plan .cdp-add select { width: 100%; padding: 4px; border-radius: 8px; border: 1px dashed var(--line); background: transparent; color: var(--muted); font: inherit; }
+.cd-plan textarea { width: 100%; min-height: 54px; border-radius: 10px; border: 1px solid var(--line); padding: 8px; background: transparent; color: inherit; font: inherit; }
