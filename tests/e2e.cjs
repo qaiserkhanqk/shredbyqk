@@ -557,7 +557,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.click('#memCard [data-mem="mindshare"]'); await p.waitForTimeout(200);
   check('mind: sharing tells the coach only "asked for support"', await p.evaluate(async () => { const { careSummary, careChips } = await import('/js/dash.js'); return careChips(careSummary(JSON.parse(localStorage.getItem('shred_qk_v1')))).includes('Asked for support'); }));
   // Fitness Age slips after two weeks without training.
-  await setS(`S.memory = { done: {} }; S.readiness = []; S.mindReply = null; S.fitage = [{ at: Date.now() - 40 * 864e5, sex: 'male', age: 40, waist: 90, rhr: 62, active: true, fitnessAge: 36 }]; S.sessions = S.sessions.map(x => ({ ...x, at: Math.min(x.at, Date.now() - 18 * 864e5) })); S.classes = [];`);
+  await setS(`S.memory = { done: {} }; S.readiness = []; S.checkinLog = []; S.checkin = null; S.mindReply = null; S.fitage = [{ at: Date.now() - 40 * 864e5, sex: 'male', age: 40, waist: 90, rhr: 62, active: true, fitnessAge: 36 }]; S.sessions = S.sessions.map(x => ({ ...x, at: Math.min(x.at, Date.now() - 18 * 864e5) })); S.classes = [];`);
   await p.reload(); await p.waitForTimeout(600); await go('today'); await p.waitForTimeout(300);
   check('lapse: "Your Fitness Age has gone up" after 18 days off', /Your Fitness Age has gone up to \d+/.test(await p.textContent('#memCard')), await p.textContent('#memCard').catch(() => ''));
   // Leaderboard: the score card on Progress opens the board with points, parts and how to earn more.
