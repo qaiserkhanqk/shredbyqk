@@ -177,6 +177,7 @@ alter table public.profiles add column if not exists next_checkin date;   -- set
 alter table public.profiles add column if not exists diet_plan jsonb;     -- the client's current diet plan
 alter table public.profiles add column if not exists notify text;         -- essential | normal | off (the client chooses)
 alter table public.profiles add column if not exists last_food date;      -- last day they logged food (for the weekly nudge)
+alter table public.profiles add column if not exists scores jsonb;         -- health, nutrition, recovery, activity, workout, fitness age
 create table if not exists public.push_subs (
   endpoint text primary key,
   client_id uuid not null references public.profiles (id) on delete cascade,

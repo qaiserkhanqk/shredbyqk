@@ -178,6 +178,32 @@ Clients can say or type where the food came from, and every dish in the sentence
 | "beef burger at Johnny Rockets" (not in the database) | Restaurant-style, with the place's name kept |
 | "ghar ka daal chawal" / "karahi from a dhaba" | Home cooking / dhaba oil levels |
 
+## Scores (Today, and per client on the dashboard)
+
+`js/scores.js` works out each score over the last 7 days, so one bad meal or night doesn't swing it.
+
+| Score | From | Unlocks after |
+|---|---|---|
+| Nutrition | calories near target (35%), protein (30%), veg and fruit (20%), logging (15%) | 3 logged days |
+| Recovery | the one-tap morning card (sleep, tiredness, stress, soreness) against the client's own baseline; −8 if under 6.5 h sleep | 3 mornings |
+| Activity | steps against the step goal (8,000 a day until a check-in sets one) | 3 days of steps |
+| Workout | training days vs plan (50%), clean reps (25%), strength trend (25%) | the first workout |
+| Health | the others, weighted: nutrition 30%, workout 25%, recovery 25%, activity 20% | 2 of the above |
+| Fitness age | an estimate from age, sex, waist, resting heart rate and training (HUNT Fitness Study, Nes et al. 2011) | waist + resting HR measured |
+
+**Colours:**
+- **75+ green, "Strong".**
+- **50–74 amber, "Building".**
+- **Under 50 red, "Needs attention".** It always comes with the one fix that would raise it most ("Fix first: aim for 7–8 hours…").
+
+Why this differs slightly from a plain "red = danger":
+- **The word.** Red says "Needs attention", not "danger". It motivates without frightening anyone off the app.
+- **Missing data is grey.** A new client sees "not enough data yet", never red for something they haven't logged.
+- **A score turns red only on a pattern**, over 7 days, never from one day.
+- **One fix, the most useful one.** Not a list of everything wrong.
+
+Fitness age is labelled as an estimate everywhere and is not a medical test. QK sees each client's score chips, and a health chip in the client list.
+
 ## Signals, not paperwork
 
 The app reads the small signals a coach watches, from what clients already do (`js/signals.js`). Nothing extra to type:

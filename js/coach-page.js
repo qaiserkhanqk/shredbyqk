@@ -8,6 +8,7 @@ import { byId as programById } from './programs.js';
 import { EXERCISES, allRules } from './exercises.js';
 import { retotal, FOOD_CHOICES, FOODS } from './dietplan.js';
 import { initCoachExtra, loadBoard } from './coach-extra.js';
+import { scoreChips } from './scoreview.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -61,10 +62,11 @@ function render() {
   $('#cdList').innerHTML = list.map(c => `<button type="button" role="listitem" class="cd-row ${c.id === state.sel ? 'sel' : ''}" data-client="${esc(c.id)}">
       <span class="cd-dot ${statusCls(c.status)}" aria-label="${c.status}"></span><b>${esc(c.name)}</b>
       <span class="nums"><strong>${c.daysTrained}/${c.weeklyGoal}</strong> days<span>${c.form == null ? '–' : c.form + '%'} form</span></span>
-      <span class="why">${esc(c.reason)} · seen ${ago(c.lastSeen)}</span>${careChips(c.care).length ? `<span class="cd-care">${careChips(c.care).map(x => `<i>${esc(x)}</i>`).join('')}</span>` : ''}</button>`).join('') || '<p class="empty">No clients match.</p>';
+      <span class="why">${esc(c.reason)} · seen ${ago(c.lastSeen)}${healthOf(c.id) != null ? ` · <span class="sc-chip ${healthOf(c.id) >= 75 ? 'good' : healthOf(c.id) >= 50 ? 'mid' : 'low'}">Health ${healthOf(c.id)}</span>` : ''}</span>${careChips(c.care).length ? `<span class="cd-care">${careChips(c.care).map(x => `<i>${esc(x)}</i>`).join('')}</span>` : ''}</button>`).join('') || '<p class="empty">No clients match.</p>';
   renderDetail();
 }
 
+const healthOf = id => state.raw?.profiles.find(p => p.id === id)?.scores?.health ?? null;
 function renderDetail() {
   const c = state.cards.find(x => x.id === state.sel), box = $('#cdDetail');
   if (!c) { box.innerHTML = '<p class="empty">Pick a client to see their week, lifts and form, and to send a message.</p>'; return; }
@@ -72,6 +74,7 @@ function renderDetail() {
   const kind = c.status === 'on track' ? 'cheer' : 'nudge', sent = state.sent[c.id] || [];
   const fault = c.topFault ? (RULES_BY_ID[c.topFault.id] || c.topFault.id) : null;
   box.innerHTML = `<div><span class="cd-badge ${statusCls(c.status)}">${c.status}</span><h2 class="display h2" style="margin-top:6px">${esc(c.name)}</h2><p class="muted small" style="margin:2px 0 0">${esc(c.reason)}</p></div>
+    <div class="cd-scores">${scoreChips(state.raw?.profiles.find(p => p.id === c.id)?.scores)}</div>
     <div class="cd-kv">
       <span>Last opened the app</span><span>${ago(c.lastSeen)}</span>
       <span>Training days this week</span><span>${c.daysTrained} of ${c.weeklyGoal}</span>

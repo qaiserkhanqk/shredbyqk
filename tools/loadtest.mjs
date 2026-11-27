@@ -41,7 +41,7 @@ const cat = catalogue();
 const photoReq = vu => () => {
   // A unique fake image per request so the server's photo cache doesn't hide the load.
   const image = 'data:image/jpeg;base64,' + Buffer.from(`vu${vu}-${Math.random()}`.repeat(400)).toString('base64');
-  return fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ image, hash: `${vu}-${Math.random()}`, samples: 'auto', catalogue: cat }), signal: AbortSignal.timeout(90e3) });
+  return fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ image, hash: `${vu}-${Math.random()}`, samples: args.samples || 'fast', catalogue: cat }), signal: AbortSignal.timeout(90e3) });
 };
 const STATIC = ['', 'index.html', 'css/styles.css', 'js/app.js', 'js/food.js', 'js/nutrition.js'];
 const staticReq = () => () => Promise.all(STATIC.map(p => fetch(new URL(p, url), { signal: AbortSignal.timeout(30e3) }).then(r => r.arrayBuffer().then(() => r)))).then(rs => rs.find(r => !r.ok) || rs[0]);

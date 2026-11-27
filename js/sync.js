@@ -10,6 +10,7 @@ import { careSummary } from './dash.js';
 import { weekScore, weekStart, weekKey } from './leaderboard.js';
 import { allWeights, daysToCheckin } from './adapt.js';
 import { notifyLevel } from './signals.js';
+import { allScores, scoreSummary } from './scores.js';
 
 export class Cloud {
   /** @param o { url, anonKey, fetch, session: { access_token, refresh_token, expires_at, user } | null, onSession } */
@@ -111,7 +112,7 @@ export async function pushAll(cloud, S, mark = {}) {
   // The next check-in date (for reminders while the app is closed) and the full diet plan (for QK to edit).
   // Servers set up before these columns existed just skip them.
   const lastFood = Math.max(0, ...(S.food?.log || []).map(e => e.at));
-  const extra = { next_checkin: nextCheckin(S), diet_plan: S.food?.plan || null, notify: notifyLevel(S), last_food: lastFood ? new Date(lastFood).toISOString().slice(0, 10) : null };
+  const extra = { next_checkin: nextCheckin(S), diet_plan: S.food?.plan || null, notify: notifyLevel(S), scores: scoreSummary(allScores(S)), last_food: lastFood ? new Date(lastFood).toISOString().slice(0, 10) : null };
   try { await cloud.updateMe(extra); } catch (e) { console.warn('check-in/plan sync skipped:', e.message); }
   // Leaderboard: this week's and last week's score (last week settles on Monday), nickname, last training day.
   try {

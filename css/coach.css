@@ -64,3 +64,7 @@ body.coach-page { background: var(--ink); color: var(--text); min-height: 100vh;
 .bc-who .check { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); }
 .bc-who .check:first-child { border-top: 0; }
 .bc-who .check .small { grid-column: 2; }
+
+.cd-scores { margin: 6px 0 2px; }
+.sc-chip { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: .78rem; font-weight: 650; background: #eef1ee; color: #5b625e; margin: 2px 2px 0 0; }
+.sc-chip.good { background: #e3f4ec; color: #1f7a50; } .sc-chip.mid { background: #fbf0da; color: #946510; } .sc-chip.low { background: #fbe4e4; color: #b03030; }

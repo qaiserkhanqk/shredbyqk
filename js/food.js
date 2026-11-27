@@ -335,6 +335,7 @@ function addEntry(ref, opts, source, extra = {}) {
 }
 function editEntry(id) {
   const it = byId(id); if (!it) return;
+  if (snap?.ids?.includes(id)) snap.touched = true; // their correction wins over QK's double-check
   const custom = it.name !== N.lookup(it.ref)?.name ? it.name : null; // a place item keeps its own name
   const weigh = it.source === 'photo' && it.ref.t === 'dish';
   openSheet(it.ref, it.opts, (o, ref, extra) => {
@@ -346,6 +347,7 @@ function editEntry(id) {
 }
 function removeEntries(ids, quiet = false) {
   const L = F().log;
+  if (!quiet && snap?.ids?.some(id => ids.includes(id))) snap.touched = true;
   for (const id of ids) { const i = L.findIndex(x => x.id === id); if (i >= 0) L.splice(i, 1); }
   ctx.persist(); if (quiet) return; renderFood(); renderSnap();
 }
@@ -403,8 +405,18 @@ async function runPhoto(file, hint = null) {
   if (hint === null) { hint = $('#foodSearch').value.trim(); if (hint) { $('#foodSearch').value = ''; renderResults(); } }
   box.hidden = false; box.innerHTML = '<div class="card snap-card"><b>Adding your meal…</b><p class="muted small" style="margin:6px 0 0">QK is naming each dish and counting portions.</p></div>';
   try {
-    const r = await recognise(file, { hint, plateCm: +F().plateCm || null, usual: usualDishes() });
+    const r = await recognise(file, { hint, plateCm: +F().plateCm || null, usual: usualDishes() }, better => {
+      // QK's double-check came back. Swap it in only if it differs and they haven't touched the entries.
+      if (snap?.file !== file || snap.touched || sameRead(snapRead, better)) return;
+      removeEntries(snap.ids, true); place(better); ctx.toast('QK double-checked your plate and updated it');
+    });
+    let snapRead = r;
     if (snap?.file === file) removeEntries(snap.ids, true); // re-reading the same photo with a note replaces the first try
+    place(r);
+  } catch (err) {
+    box.innerHTML = `<div class="card"><b>Couldn’t read the photo</b><p class="muted small" style="margin:6px 0 0">${esc(err.message === 'no-endpoint' ? 'Photo recognition isn’t switched on yet.' : err.message === 'busy' ? 'Lots of people are snapping right now. Try again in a minute, or say or search what you ate.' : 'Check your connection and try again, or search for the dish.')}</p></div>`;
+  }
+  function place(r) {
     // Food on a stove or a stall's display isn't a meal yet: don't log it unless the person says so.
     if (['cooking_or_display', 'not_food'].includes(r.scene) && !snap?.force) {
       pendingPhoto = { file, hint, r };
@@ -430,12 +442,13 @@ async function runPhoto(file, hint = null) {
     const tot = ids.map(byId).reduce((a, e) => a + e.kcal, 0);
     const share = needsShareCheck(r.scene, ids.map(byId).map(e => ({ kind: N.DISH[e.ref.id].kind, servings: e.opts.servings })), tot);
     snap = { file, hint, share, dataUrl: r.dataUrl, ids, quality: r.quality, unsure: r.agreement < 0.75 || r.items.some(i => i.confidence < 0.6), unknown: r.items.filter(i => !i.dish).map(i => i.otherName) };
+    snap.refining = !!r.refining;
     renderFood(); renderSnap();
     box.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
-  } catch (err) {
-    box.innerHTML = `<div class="card"><b>Couldn’t read the photo</b><p class="muted small" style="margin:6px 0 0">${esc(err.message === 'no-endpoint' ? 'Photo recognition isn’t switched on yet.' : err.message === 'busy' ? 'Lots of people are snapping right now. Try again in a minute, or say or search what you ate.' : 'Check your connection and try again, or search for the dish.')}</p></div>`;
   }
 }
+// Same dishes and portions? Then the double-check changes nothing on screen.
+const sameRead = (a, b) => JSON.stringify((a?.items || []).map(i => [i.dish, i.servings]).sort()) === JSON.stringify((b?.items || []).map(i => [i.dish, i.servings]).sort());
 function renderSnap() {
   const box = $('#foodPhotoBox');
   if (!snap) return;

@@ -26,14 +26,14 @@ export const FOODS = Object.fromEntries([
   f('cholay', 'Cholay (home-cooked)', dish('cholay'), 'katori', 0.5, 0.5, 1.5, {}),
   f('paneer', 'Paneer', ing('paneer'), 'g', 25, 50, 150, { tags: ['dairy'] }),
   f('eggs', 'Eggs, boiled or omelette', ing('egg'), 'egg', 1, 1, 4, { per: 50, tags: ['egg'] }),
-  f('eggWhites', 'Egg whites', ing('eggWhite'), 'white', 1, 0, 4, { per: 33, tags: ['egg'] }),
+  f('eggWhites', 'Egg whites', ing('eggWhite'), 'white', 1, 0, 6, { per: 33, tags: ['egg'] }),
   f('greekYogurt', 'Greek yogurt, low fat', ing('greekYogurt'), 'g', 50, 100, 300, { tags: ['dairy'] }),
   f('dahi', 'Dahi (yogurt)', ing('dahi'), 'g', 50, 100, 250, { tags: ['dairy'] }),
   f('whey', 'Whey protein', ing('whey'), 'scoop', 0.5, 0.5, 2, { per: 30, tags: ['dairy'] }),
   f('milk', 'Milk, low fat', ing('milkLow'), 'ml', 50, 150, 400, { tags: ['dairy'] }),
   // Carbs
-  f('roti', 'Roti (medium, no ghee)', dish('roti'), 'roti', 1, 1, 5, { tags: ['gluten'] }),
-  f('paratha', 'Paratha (home, light ghee)', dish('paratha'), 'paratha', 1, 1, 2, { tags: ['gluten'] }),
+  f('roti', 'Roti (medium, 80 g, no ghee)', dish('roti'), 'roti', 0.5, 1, 4, { tags: ['gluten'] }),
+  f('paratha', 'Paratha (small, home, light ghee)', dish('paratha'), 'paratha', 1, 1, 2, { tags: ['gluten'], size: 's' }),
   f('bread', 'Brown bread', ing('brownBread'), 'slice', 1, 1, 4, { per: 30, tags: ['gluten'] }),
   f('rice', 'Rice, cooked', ing('riceCooked'), 'g', 25, 100, 450, {}),
   f('oats', 'Oats', ing('oats'), 'g', 10, 30, 100, { raw: true }),
@@ -51,7 +51,8 @@ export const FOODS = Object.fromEntries([
   f('boiledEgg', 'Boiled egg', dish('boiled_egg'), 'egg', 1, 1, 4, { tags: ['egg'] }),
   f('alooParatha', 'Aloo paratha (home)', dish('aloo_paratha'), 'paratha', 1, 1, 2, { tags: ['gluten'] }),
   f('chapati', 'Chapati / phulka (thin)', dish('chapati_thin'), 'phulka', 1, 1, 5, { tags: ['gluten'] }),
-  f('chickenTikka', 'Chicken tikka (leg or breast piece)', dish('chicken_tikka'), 'piece', 1, 1, 2, { tags: ['chicken'] }),
+  f('chickenTikka', 'Chicken tikka (leg piece)', dish('chicken_tikka'), 'piece', 1, 1, 2, { tags: ['chicken'] }),
+  f('chickenTikkaChest', 'Chicken tikka (chest piece)', dish('chicken_tikka_chest'), 'piece', 1, 1, 2, { tags: ['chicken'] }),
   f('chickenBoti', 'Chicken boti (seekh of pieces)', dish('chicken_boti'), 'seekh', 1, 1, 3, { tags: ['chicken'] }),
   f('seekhKebab', 'Seekh kebab', dish('seekh_kebab'), 'kebab', 1, 1, 4, { tags: ['beef', 'redmeat'] }),
   f('shamiKebab', 'Shami kebab (pan-fried)', dish('shami_kebab'), 'kebab', 1, 1, 3, { tags: ['beef', 'redmeat'] }),
@@ -87,7 +88,7 @@ export const LIKES = {
 // What each chip means in foods.
 export const LIKE_FOODS = {
   eggs: ['andaFry', 'eggs', 'boiledEgg'], paratha: ['paratha', 'alooParatha'], roti: ['roti', 'chapati'],
-  chicken: ['chicken', 'chickenTikka'], bbq: ['chickenTikka', 'chickenBoti', 'seekhKebab'], karahi: ['chickenKarahi', 'muttonKarahi'],
+  chicken: ['chicken', 'chickenTikka'], bbq: ['chickenTikka', 'chickenTikkaChest', 'chickenBoti', 'seekhKebab'], karahi: ['chickenKarahi', 'muttonKarahi'],
   kebabs: ['seekhKebab', 'shamiKebab'], fruit: ['banana', 'apple', 'orange', 'guava', 'dates'], lassi: ['lassi', 'sweetLassi'],
   greekYogurt: ['greekYogurt', 'dahi'], dahi: ['dahi', 'raita'],
 };
@@ -134,7 +135,7 @@ const TEMPLATES = {
   ],
   main: [
     // One template per protein; the carb alternates between the client's choices.
-    ...['chickenTikka', 'chicken', 'chickenKarahi', 'chickenBoti', 'seekhKebab', 'chickenSalan', 'muttonKarahi', 'qeema', 'shamiKebab', 'fish', 'beef', 'mutton', 'paneer'].map(p => ({
+    ...['chickenTikka', 'chickenTikkaChest', 'chicken', 'chickenKarahi', 'chickenBoti', 'seekhKebab', 'chickenSalan', 'muttonKarahi', 'qeema', 'shamiKebab', 'fish', 'beef', 'mutton', 'paneer'].map(p => ({
       name: FOODS[p].name.replace(/ \(.*\)$/, ''), slots: [{ foods: [p], key: true }, { foods: ['roti', 'chapati', 'rice'], carb: true }, SIDE, { foods: ['raita', 'dahi'], liked: true, opt: true }, { foods: ['chicken', 'eggWhites'], boost: true, opt: true }],
     })),
     { name: 'Biryani day', slots: [{ foods: ['biryani'], key: true }, { foods: ['raita'], fixed: true, opt: true }, { foods: ['salad'], fixed: true, opt: true }, { foods: ['chickenTikka', 'chicken'], boost: true, opt: true }] },
@@ -160,11 +161,11 @@ const unitCache = {};
 export function perUnit(id) {
   if (unitCache[id]) return unitCache[id];
   const fd = FOODS[id];
-  const e = fd.ref.t === 'dish' ? N.estimate(fd.ref, { servings: 1, style: 'home', styleKnown: true, size: 'm' }) : N.estimate(fd.ref, { grams: fd.per });
+  const e = fd.ref.t === 'dish' ? N.estimate(fd.ref, { servings: 1, style: 'home', styleKnown: true, size: fd.size || 'm' }) : N.estimate(fd.ref, { grams: fd.per });
   return (unitCache[id] = { kcal: e.kcal, protein: e.protein, carbs: e.carbs, fat: e.fat });
 }
 export const optsFor = (id, amount) => FOODS[id].ref.t === 'dish'
-  ? { servings: amount, style: 'home', styleKnown: true, size: 'm' }
+  ? { servings: amount, style: 'home', styleKnown: true, size: FOODS[id].size || 'm' }
   : { grams: Math.round(amount * FOODS[id].per) };
 
 const KEYS = ['kcal', 'protein', 'carbs', 'fat'];
