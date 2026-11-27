@@ -482,3 +482,44 @@ doi:10.1123/ijspp.2022-0268), so QK suggests training after iftar.
   sessions), a finished program, and a 3-monthly "same goal?" check.
 - **The coach sees what to know:** sore areas, rough days this week, travel and Ramadan, as labels and
   counts only.
+
+## Fitness Age
+
+**What it is.** Your estimated aerobic fitness (VO2peak, mL/kg/min), shown as the age whose healthy average matches it. Code: `js/fitnessage.js` (maths, tested in `tests/fitnessage.test.mjs`) and `js/fitage-ui.js` (screen).
+
+**Step 1: estimated fitness.** The HUNT Study non-exercise model (Nauman et al. 2017), with coefficients exactly as printed in three open-access papers: Frontiers in Behavioral Neuroscience 2019 (doi:10.3389/fnbeh.2019.00053), JAHA 2019 (doi:10.1161/JAHA.118.010293) and Scientific Reports 2025 (doi:10.1038/s41598-025-29410-7).
+
+- Men: 105.91 − 0.334·age − 0.402·waist(cm) − 0.144·resting HR + 3.102·PA (goodness of fit 0.58, SEE 5.88)
+- Women: 78.00 − 0.297·age − 0.270·waist(cm) − 0.110·resting HR + 2.674·PA (goodness of fit 0.52, SEE 5.37)
+- PA = 1 if the person meets 150 min moderate or 75 min vigorous activity a week, else 0.
+
+We use this version rather than the 2011 version with a graded activity index because every term is fully specified in print. Activity is pre-filled from the training log: average training days over the last full weeks (at least 2) × session length (the time cap, else 50 min) ≥ 150. The client can override it with one tap. Resting HR is the lowest camera reading in the last 30 days, or a fresh one.
+
+**Step 2: Fitness Age.** The mean VO2max of 4,631 healthy HUNT 3 adults by sex and decade (Aspenes et al. 2011, PLOS ONE, doi:10.1371/journal.pone.0064319, Table 2):
+
+| Age | Men | Women |
+|---|---|---|
+| 20–29 | 54.4 | 43.0 |
+| 30–39 | 49.1 | 40.0 |
+| 40–49 | 47.2 | 38.4 |
+| 50–59 | 42.6 | 34.4 |
+| 60–69 | 39.2 | 31.1 |
+| 70+ | 35.3 | 28.3 |
+
+Each group mean sits at its mid-age (25, 35, … 75). We interpolate linearly between points and carry the end slopes beyond them. Fitness Age is the age at which this curve equals your estimate, rounded and kept between 18 and 90. The same paper reports VO2max falling about 3.5 mL/kg/min per decade in both sexes. "% of average" is your estimate divided by the curve at your real age.
+
+**Why it matters.** Estimated fitness from this model predicts mortality: each 1 MET (3.5 mL/kg/min) higher goes with about 15% lower all-cause mortality in men (Nes et al. 2014, doi:10.1249/MSS.0000000000000219).
+
+**What would make you younger.** The model is re-run with one change at a time, and a change shows only if it is worth at least a year:
+
+- meeting the activity guideline
+- 5 cm off the waist (only above the WHO raised-risk cut-offs: 94 cm men, 80 cm women)
+- 5 bpm lower resting HR (only above 60)
+
+**Extra checks.** Optional, and not part of the number:
+
+- Push-ups in one go: men doing over 40 had 96% fewer cardiovascular events over 10 years than those doing 10 or fewer (Yang et al. 2019, doi:10.1001/jamanetworkopen.2018.8341). The study was in men, so this check is shown only to men.
+- Sit-and-rise score, 0–10: each point is linked to 21% lower mortality, and 8–10 is the lowest-risk group (Brito et al. 2012, doi:10.1177/2047487312471759).
+- Resting HR: each 10 bpm higher goes with about 9% higher all-cause mortality (Zhang et al. 2016, doi:10.1503/cmaj.150535).
+
+**Follow-up.** The first test is offered after two weeks of training (when age is known). After that, a retest reminder comes every 30 days through QK remembers. The trend line appears from the second test. The coach sees the latest Fitness Age as a chip.

@@ -43,6 +43,7 @@ import { ExerciseDetector, PICK_LIST } from './detect.js';
 import { initCalm, renderCalm, startCalmNow } from './calm.js';
 import { WEIGHTED, lastLoad, weekSummary } from './share.js';
 import { initVitals, renderVitals } from './vitals.js';
+import { initFitAge, renderFitAge } from './fitage-ui.js';
 import { vitalNotes } from './hr.js';
 import { nextStep } from './today.js';
 import { initFood, renderFood } from './food.js';
@@ -62,6 +63,7 @@ const persist = () => {
 ErrorLog.install();
 initCalm({ S, persist: () => persist(), toast: m => toast(m) });
 initVitals({ S, persist: () => persist(), toast: m => toast(m) });
+initFitAge({ S, persist: () => persist(), toast: m => toast(m), say: (t, o) => say(t, o) });
 initFood({ S, persist: () => persist(), toast: m => toast(m), rehab: () => !!S.rehab?.active });
 const recorder2 = new SessionRecorder();
 const bar = new BarTracker();
@@ -90,7 +92,7 @@ function mountOrbs() {
 /* ---------- Navigation ---------- */
 function tab(id) {
   $$('.screen').forEach(s => s.classList.toggle('on', s.id === id));
-  const tabFor = ['body', 'gait', 'scan', 'rehab', 'calm', 'vitals'].includes(id) ? 'today' : id; // tools live under Today
+  const tabFor = ['body', 'gait', 'scan', 'rehab', 'calm', 'vitals', 'fitage'].includes(id) ? 'today' : id; // tools live under Today
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tabFor));
   if (id === 'today') renderToday();
   if (id === 'train') renderPrograms();
@@ -98,6 +100,7 @@ function tab(id) {
   if (id === 'rehab') renderRehab();
   if (id === 'calm') renderCalm();
   if (id === 'vitals') renderVitals();
+  if (id === 'fitage') renderFitAge();
   if (id === 'food') renderFood();
   if (id === 'scan') $('#hipWrap').hidden = S.profile.sex === 'male';
   if (id === 'body') { const first = { recover: 'rehab', calm: 'calm' }[S.profile.focus]; const t = first && $(`#body [data-go=${first}]`); if (t) $('#body .page-head').after(t); }
@@ -2871,6 +2874,8 @@ document.addEventListener('click', e => {
     S.plan.time = `${a}:${v}`; toast(`Reminder moved to ${a}:${v}. Re-add it to your calendar from Training days to update it there.`); bindPlan();
   } else if (kind === 'programs') {
     tab('train');
+  } else if (kind === 'fitage') {
+    tab('fitage');
   } else if (kind === 'skip' && v === 'swap') {
     const P = (S.prefs ||= {}); P.avoid = [...new Set([...(P.avoid || []), a])]; toast(`Swapped for good: no more ${LIB[a]?.name}.`);
   }

@@ -538,6 +538,15 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('classes: finished class asks how hard it was', await p.isVisible('#classSave'));
   await p.click('#classSave'); await p.waitForTimeout(200);
   check('classes: the class is saved', /done 1×/.test(await p.textContent('[data-class=ignite20] .meta')));
+  // Fitness Age: waist, resting heart rate, activity → one number and what would make you younger.
+  await p.goto('https://shred.local/'); await p.waitForTimeout(400);
+  await setS(`S.profile.age = 40; S.profile.sex = 'male'; S.vitals = [...(S.vitals || []), { at: Date.now() - 864e5, kind: 'hr', bpm: 72, source: 'camera' }];`);
+  await p.reload(); await p.waitForTimeout(500); await go('body'); await tap('[data-go=fitage]'); await p.waitForTimeout(200);
+  check('fitness age: resting heart rate filled from the camera reading', (await p.inputValue('#faRhr')) === '72', await p.inputValue('#faRhr'));
+  await p.fill('#faWaist', '100'); await tap('[data-faact=no]'); await tap('#faGo'); await p.waitForTimeout(200);
+  const faTxt = await p.textContent('#faResult');
+  check('fitness age: a number, compared with their age, plus levers', /older than your age|younger than your age|Right on your age/.test(faTxt) && /What would make you younger/.test(faTxt) && /150 minutes/.test(faTxt), faTxt.slice(0, 200));
+  check('fitness age: no medical disclaimer on the screen', !/not a medical|medical test|not medically|diagnos/i.test(await p.textContent('#fitage')));
   // Coach dashboard demo: this phone's training is the first client.
   await p.goto('https://shred.local/coach.html'); await p.waitForTimeout(700);
   check('dashboard demo: your own training is the first client, with sample clients', /\(this phone\)/.test(await p.textContent('.cd-row')) && (await p.$$('.cd-row')).length >= 7, (await p.textContent('.cd-row')).replace(/\s+/g, ' '));

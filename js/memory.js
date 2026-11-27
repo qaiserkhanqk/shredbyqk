@@ -86,7 +86,17 @@ export function followUps(S, { now = Date.now(), lib = {}, program = null } = {}
     add({ id: `goal:${S.program.start}:${q}`, kind: 'goal', title: `Still training for the same thing${name}?`, text: `It's been ${q * 3} months on ${program?.name || 'your program'}. Goals change: QK can switch you to something new in one tap.`,
       say: 'Quick check. Is your goal still the same?', actions: [{ label: 'Same goal', act: 'ok' }, { label: 'Change it', act: 'programs' }] });
   }
-  const order = ['pain', 'rough', 'missed', 'ramadan', 'travel', 'finished', 'pr', 'goal', 'skip', 'time', 'milestone'];
+  // 11. Fitness Age: retest monthly; first test offered after two weeks of training.
+  const FA = S.fitage || [];
+  if (FA.length && now - FA[FA.length - 1].at >= 30 * DAY) {
+    const l = FA[FA.length - 1];
+    add({ id: `fitage:${l.at}`, kind: 'fitage', title: 'Time to retest your Fitness Age', text: `Last month it was ${l.fitnessAge}. A month of training is enough to move it. Takes two minutes.`,
+      say: 'It has been a month. Let\'s see if your fitness age has dropped.', actions: [{ label: 'Retest now', act: 'fitage' }, { label: 'Later', act: 'ok' }] });
+  } else if (!FA.length && real.length && now - first >= 14 * DAY && p.age) {
+    add({ id: 'fitage:first', kind: 'fitage', title: 'Want to know your Fitness Age?', text: 'How old your body really is, from the HUNT fitness research. You need your waist size and a resting heart rate.',
+      say: 'Want to find out your fitness age? It takes two minutes.', actions: [{ label: 'Find out', act: 'fitage' }, { label: 'Not now', act: 'ok' }] });
+  }
+  const order = ['pain', 'rough', 'missed', 'ramadan', 'travel', 'finished', 'pr', 'goal', 'skip', 'time', 'fitage', 'milestone'];
   return out.sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
 }
 

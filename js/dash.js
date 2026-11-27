@@ -80,10 +80,12 @@ export function careSummary(S, now = Date.now()) {
     travel: p.travel && now < p.travel.until ? p.travel.kind : null,
     ramadan: !!(p.ramadan && now < p.ramadan.until),
   };
-  return care.pain.length || care.rough7 || care.travel || care.ramadan ? care : null;
+  const fa = (S?.fitage || []).slice(-1)[0];
+  if (fa) care.fitAge = { fa: fa.fitnessAge, age: fa.age, at: fa.at };
+  return care.pain.length || care.rough7 || care.travel || care.ramadan || care.fitAge ? care : null;
 }
 /** Short chips for the coach: "Sore: knee", "2 rough days", "Travelling", "Ramadan". */
-export const careChips = c => (c ? [...(c.pain?.length ? [`Sore: ${c.pain.join(', ')}`] : []), ...(c.rough7 ? [`${c.rough7} rough day${c.rough7 > 1 ? 's' : ''}`] : []), ...(c.travel ? ['Travelling'] : []), ...(c.ramadan ? ['Ramadan'] : [])] : []);
+export const careChips = c => (c ? [...(c.pain?.length ? [`Sore: ${c.pain.join(', ')}`] : []), ...(c.rough7 ? [`${c.rough7} rough day${c.rough7 > 1 ? 's' : ''}`] : []), ...(c.travel ? ['Travelling'] : []), ...(c.ramadan ? ['Ramadan'] : []), ...(c.fitAge ? [`Fitness Age ${c.fitAge.fa} (${c.fitAge.fa - c.fitAge.age > 0 ? '+' : ''}${c.fitAge.fa - c.fitAge.age})`] : [])] : []);
 
 /** Ready-made messages. {name} is the client's first name. */
 export const TEMPLATES = {
