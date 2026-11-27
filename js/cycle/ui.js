@@ -14,7 +14,7 @@ import { clinicianSummary, summaryText, SUMMARY_MONTHS } from './summary.js';
 import { learningStage } from './learning.js';
 import { companionToday, answerCheckIn, dismissCompanion, setCompanionName, companionName } from './companion.js';
 import { adjustedEstimate, cardLines } from './adjust.js';
-import { periodCheckIn, answerPeriodCheckIn, missedLogQuestion, answerMissedLog } from './checkins.js';
+import { periodCheckIn, answerPeriodCheckIn, missedLogQuestion, answerMissedLog, gapReview, confirmGap, dismissGapReview } from './checkins.js';
 import * as PG from './pregnancy.js';
 import { midlifeObservations, SOURCES as MIDLIFE_SOURCES, INTRO as MIDLIFE_INTRO } from './midlife.js';
 import { comfortSuggestions, pendingComfortQuestions, logComfortTry, answerComfort, deleteComfort, ANSWERS, REVIEW_STATUS } from './comfort.js';
@@ -101,12 +101,32 @@ function render() {
     wearableHTML(s, today, f, tempShift), situationHTML(s, f), settingsHTML(s, f)].join('');
   for (const id of open) { const d = root.querySelector('#' + id); if (d) d.open = true; }
   restoreInputs(unsaved);
+  checkPickedDate(unsaved);
+  showCheckDateNote();
   notifyDue();
+}
+/* An unsaved "Another day" date (check-in) survives a redraw, but if it is no longer possible (for example her last
+   start was corrected to a later day) it is cleared with a visible note, never kept or silently dropped
+   (reported against a531ff2). */
+let checkDateNote = null; // stays through later redraws until she picks a new day or the question closes
+function checkPickedDate(saved) {
+  const v = saved.cyCheckDate?.value; if (!v) return;
+  const el = root.querySelector('#cyCheckDate');
+  if (!el) { if (!repo.read().periods.some(p => p.start === v)) toast(`The day you picked (${human(v)}) was not saved: the question has closed. Check your history if you need to.`); return; }
+  const why = el.min && v < el.min ? 'it is on or before your last logged start' : el.max && v > el.max ? 'it is in the future' : null;
+  if (!why) return;
+  el.value = '';
+  checkDateNote = `The day you picked (${human(v)}) was not saved and can't be used now: ${why}. Please pick the day again.`;
+}
+function showCheckDateNote() {
+  const el = root.querySelector('#cyCheckDate');
+  if (!el) { checkDateNote = null; return; }
+  if (checkDateNote && !root.querySelector('#cyCheckDateNote')) el.closest('.btn-row').insertAdjacentHTML('afterend', `<p class="small" id="cyCheckDateNote" role="status">${esc(checkDateNote)}</p>`);
 }
 
 /* Unsaved form input survives redraws (defect found by the simultaneous-save browser test on this fix: a redraw
    triggered by another tab reset the date field to today, so the person's click saved today instead of their date). */
-const FORM = '#cyDate, #cyUnwell, #cyTravel, #cyAlcohol, #cyLateNight, #cyRoomTemp, #cyRemKind, #cyRemTime, #cyLh, #cySumMonths, [data-sym]';
+const FORM = '#cyDate, #cyCheckDate, #cyUnwell, #cyTravel, #cyAlcohol, #cyLateNight, #cyRoomTemp, #cyRemKind, #cyRemTime, #cyLh, #cySumMonths, [data-sym]';
 const inputKey = el => el.id || `sym:${el.dataset.sym}`;
 function unsavedInputs() {
   const out = {};
@@ -153,6 +173,10 @@ function promptsHTML(s, est, today) {
   const mq = missedLogQuestion(s, today);
   if (mq) out.push(`<div class="card cy-ask" id="cyMissed"><b>Did you miss logging a period?</b><p class="muted small">${esc(mq.text)} If yes, that gap won't be used as one long cycle in your estimate.</p>
     <div class="btn-row"><button class="ghost" type="button" data-act="missedYes" data-id="${esc(mq.periodId)}">Yes, I missed one</button><button class="ghost" type="button" data-act="missedNo" data-id="${esc(mq.periodId)}">No, it was one long cycle</button></div></div>`);
+  // After "No, it was one long cycle" for a gap outside the app's 15-90 day check: say so, and let her review or confirm.
+  const g = gapReview(s, today);
+  if (g) out.push(`<div class="card cy-ask" id="cyGap"><b>This long gap isn't used in your estimate</b><p class="muted small">${esc(g.text)}</p>
+    <div class="btn-row"><button class="ghost" type="button" data-act="gapReview" data-id="${esc(g.periodId)}">Review dates</button><button class="ghost" type="button" data-act="gapConfirm" data-id="${esc(g.periodId)}">Use this gap in my estimate</button><button class="ghost" type="button" data-act="gapKeep" data-id="${esc(g.periodId)}">Keep it out</button></div></div>`);
   return out.join('');
 }
 
@@ -437,7 +461,10 @@ async function onClick(e) {
     logStartOn: () => act((s, t) => answerPeriodCheckIn(s, t, ds.date), 'Period start saved'),
     logStartPicked: () => { const d = root.querySelector('#cyCheckDate')?.value; if (!d) return; return act((s, t) => answerPeriodCheckIn(s, t, d), 'Period start saved'); },
     missedYes: () => act((s, t) => answerMissedLog(s, ds.id, true, { today: t }), 'Thanks. That gap won\'t be used as one cycle.'),
-    missedNo: () => act((s, t) => answerMissedLog(s, ds.id, false, { today: t }), 'Thanks, noted'),
+    missedNo: () => act((s, t) => answerMissedLog(s, ds.id, false, { today: t }), 'Thanks, noted. Your dates are saved as you entered them.'),
+    gapReview: () => { const h = root.querySelector('#cyHistory'); if (!h) return; h.open = true; const row = h.querySelector(`[data-pid="${CSS.escape(ds.id)}"]`) || h; row.scrollIntoView?.({ block: 'center' }); row.querySelector?.('input[data-edit=start]')?.focus(); },
+    gapConfirm: () => act((s, t) => confirmGap(s, ds.id, { today: t }), 'Confirmed. That gap is now used in your estimate.'),
+    gapKeep: () => act((s, t) => dismissGapReview(s, ds.id, { today: t }), 'Kept out of your estimate. Your dates are unchanged.'),
     companionStartOn: () => act((s, t) => answerCheckIn(s, t, 'periodStarted', { date: ds.date, today: t }), 'Period start saved'),
     confirmStart: () => act((s, t) => M.logPeriodStart(s, ds.date, { today: t }), 'Period start saved'),
     wasSpotting: () => act((s, t) => M.logDay(s, ds.date, { bleeding: 'spotting' }, { today: t }), 'Saved as spotting'),
@@ -513,6 +540,7 @@ function daySnapshot() {
 }
 async function onChange(e) {
   const t = e.target; if (!repo) return;
+  if (t.id === 'cyCheckDate' && t.value) { checkDateNote = null; root.querySelector('#cyCheckDateNote')?.remove(); return; }
   // As in onClick: read the changed control now, never inside the (possibly delayed or retried) transaction.
   const checked = t.checked, value = t.value, data = { ...t.dataset }, rowRid = t.closest('[data-rid]')?.dataset.rid;
   if (t.dataset.edit) {

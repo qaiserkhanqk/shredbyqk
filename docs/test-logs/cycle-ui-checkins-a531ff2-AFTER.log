@@ -1,0 +1,15 @@
+ok   15, 15, 35, 15 days, on her typical date: the forecast has a range
+ok   …and "Has your period started?" appears
+ok   control: the 96-day gap is asked about
+ok   "No": she is told her dates are saved but the 96-day gap is not used
+ok   …the gap is still left out (safeguard kept, history not changed)
+ok   "Review dates" opens her history
+ok   "Use this gap in my estimate": only then is the 96-day gap used, and the notice goes away
+ok   control: the 56-day gap is asked about
+ok   while "Pregnant" is ticked: no "missed period" question
+ok   …her history can still be edited by hand (marking a missed log is saved)
+ok   control: the check-in is shown
+ok   an unsaved "Another day" date survives a redraw
+ok   …and when it becomes invalid, it is cleared with a visible note (not kept, not silently dropped)
+ok   no JavaScript errors
+ALL PASS (14)

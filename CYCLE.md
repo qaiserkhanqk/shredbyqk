@@ -94,11 +94,16 @@ Flags live in `localStorage['shred_flags_v1']` because they are not health data.
   | 2 in 3 | 2.99 days |
 
 - **"Has your period started?"** appears from the first day of her range.
+  - It stays quiet about the period she has just logged: until its logged end, or her usual period length, or 7 days, and always ends before her typical date. (The first version assumed about 4-week cycles and never asked people with short or variable cycles; fixed after a531ff2.)
   - It offers the **real start day**: Today, Yesterday, 2 days ago, or another date. It never offers a day on or before her last start.
+  - An unsaved "Another day" date survives a redraw. If it becomes impossible (for example her last start was corrected to a later day), it is cleared with a note saying so.
   - It also offers "Spotting only" and "Not yet" ("Not yet" quiets it for the day).
   - **If late:** it asks daily for 7 days after her range, then every 3 days. These are UI choices, not physiology, and the wording stays gentle.
 - **Zara's "My period started"** also asks which day.
-- **A possibly forgotten period:** if her latest gap is about two of her usual cycles (within max(3 days, her spread)), it **asks** whether she missed logging one. "Yes" stops that gap being used as one long cycle. It never assumes.
+- **A possibly forgotten period:** if her latest gap is about two of her usual cycles (within max(3 days, her spread), and longer than any of her earlier cycles), it **asks** whether she missed logging one. It never assumes.
+  - "Yes" stops that gap being used as one long cycle.
+  - "No" keeps her dates exactly as entered. If the gap is outside the app's 15–90 day check (for example 96 days), it still isn't used in her estimate, and a card says so: her dates are saved, but the gap isn't used unless she confirms it. She can **review the dates**, **use this gap in her estimate** (her explicit tap), or **keep it out**. The same "Gap before is correct" box is in her history.
+  - **Not during or across a pregnancy:** no question while she is pregnant (pregnancy mode or the "Pregnant" tick), none for a gap that crosses a pregnancy, and after a pregnancy only cycles since then count as her usual cycle (the same restart the estimate uses). Her history can still be edited by hand.
 - **Never automatic:** nothing is logged without her tap.
 
 ## Next-period estimate: the algorithm

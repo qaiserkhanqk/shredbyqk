@@ -1,0 +1,27 @@
+ok   control: before the pregnancy, the gap is asked about
+ok   while pregnant (pregnancy mode): no "missed period" question
+ok   …manual history editing still works while pregnant
+ok   while "Pregnant" is ticked: no "missed period" question
+ok   a gap that crosses a pregnancy is not asked about as a missed log
+ok   after the restart: pre-pregnancy cycles are not used to call a gap "about twice your usual"
+ok   …but with enough cycles since the restart, a gap of about two of them is asked about
+ok   a gap during which she had ticked "Pregnant" is not asked about
+ok   control: the forecast has a range
+ok   the check-in appears on her typical date
+ok   …and on every day from her typical date to the end of her range
+ok   no duplicate question on the day of, or just after, her newly logged start
+ok   once her period end is logged (day 4), the check-in appears from the first day of her range (day 7)
+ok   after she logs the new start, it does not ask again that day or the next
+ok   a 15-day cycle after 15, 15, 35 is not asked about as "about twice your usual"
+ok   control: the 96-day gap is asked about
+ok   "No": her dates are not changed
+ok   "No": the unusual-gap safeguard stays (the 96-day gap is still not used)
+ok   …and the missed-period question is gone
+ok   …she is told the dates are saved but the gap is not used
+ok   …with no forbidden wording or medical claims
+ok   …and asking or showing this never changes her data
+ok   "Keep it out": the notice goes away and the gap stays out
+ok   "Use this gap": only her explicit tap makes the 96-day gap count
+ok   …and the notice goes away
+ok   a gap that is used anyway (56 days) gets no notice
+ALL PASS (26)
