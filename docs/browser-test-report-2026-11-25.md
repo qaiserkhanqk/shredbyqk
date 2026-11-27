@@ -57,3 +57,26 @@ For the research dashboard in WebKit over local http, set `RESEARCH_E2E_INSECURE
 - In WebKit, the plain-http dashboard files ran in the labelled local-cookie mode.
 - Not tested here, because the browser builds lack the feature: recording in WebKit (no MediaRecorder) and pose analysis in Firefox (no WebGL). Each log says so in a `note` line.
 - Still not tested: real iPhone or Mac Safari.
+
+## Re-run on afef86e (2026-11-27): WebKit 26.6 and Firefox 155
+**The version tested** includes the period-start check-ins (`a531ff2`) and the fixes reported against them (`afef86e`).
+
+**Results** (each browser test file run separately: 18 files, 330 checks per browser):
+
+| Browser | Result |
+|---|---|
+| WebKit | **330 ok, 0 failures.** The 3 plain-http dashboard files failed in the default Secure-cookie mode, as on every earlier run (finding 3). They passed in the labelled local-cookie mode (`RESEARCH_E2E_INSECURE_COOKIES=1`): 26, 14 and 20 checks. The HTTPS dashboard test passed with the default Secure cookie. |
+| Firefox | **329 ok, 1 failure, in `tests/e2e.cjs`.** All other 17 files passed. |
+
+**The Firefox failure: an intermittent two-tab race, already present before these changes.**
+- **What fails:** one of the two-tab checks in `tests/e2e.cjs`, a different one on different runs:
+  - "simultaneous saves (Web Locks removed): neither period is lost". One of the two periods saved at the same moment was missing.
+  - "simultaneous save + delete (Web Locks available)".
+- **On afef86e:** it failed in the main run and in 2 of 3 re-runs; 1 re-run passed (66/66).
+- **On a531ff2, before the fixes:** the same failure happened in 2 of 4 runs; the other 2 passed. So the fixes did not cause it.
+- **On d96884a:** it passed in the single run.
+- **Status:** not fixed and not explained yet. It may be a real lost update in the store's fallback path when two Firefox tabs save at the same moment, or the test may not wait long enough. It needs its own investigation. The test has not been weakened.
+
+**As before:**
+- Not tested here, because the browser builds lack the feature: recording in WebKit (no MediaRecorder) and pose analysis in Firefox (no WebGL).
+- Still not tested: real iPhone, Android or Mac Safari.
