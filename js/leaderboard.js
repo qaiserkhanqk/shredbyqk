@@ -62,9 +62,40 @@ export function ranked(rows = []) {
   return s.map((r, i) => { if (i === 0 || s[i - 1].score !== r.score) rank = i + 1; return { ...r, rank }; });
 }
 
-/** Month standings from weekly rows [{ client_id, week, score }]: weeks that start in that month, summed. */
-export function monthTotals(rows = [], month /* 'YYYY-MM' */) {
-  const m = new Map();
-  for (const r of rows) if (String(r.week).startsWith(month)) m.set(r.client_id, (m.get(r.client_id) || 0) + r.score);
-  return ranked([...m].map(([client_id, score]) => ({ client_id, score })));
+/** The Mondays of a month (weeks that start in it), up to and including the week asOf ('YYYY-MM-DD'). */
+export function weeksOfMonth(month /* 'YYYY-MM' */, asOf) {
+  const [y, m] = month.split('-').map(Number), out = [];
+  for (let d = new Date(y, m - 1, 1); d.getMonth() === m - 1; d.setDate(d.getDate() + 1)) {
+    const k = weekKey(d.getTime());
+    if (d.getDay() === 1 && (!asOf || k <= asOf)) out.push(k);
+  }
+  return out;
 }
+/**
+ * Month standings, fair to people who joined mid-month: average points per week over the month's weeks so far,
+ * counted from their first week on the board (weeks skipped after that count as 0). Same rule as leaderboard()
+ * on the server. rows: [{ client_id, week, score }] (their history, including earlier months); asOf: this week's key.
+ */
+export function monthTotals(rows = [], month, { asOf } = {}) {
+  const weeks = weeksOfMonth(month, asOf), sum = new Map(), first = new Map();
+  for (const r of rows) { const w = String(r.week).slice(0, 10); if (!first.has(r.client_id) || w < first.get(r.client_id)) first.set(r.client_id, w); }
+  for (const r of rows) if (weeks.includes(String(r.week).slice(0, 10))) sum.set(r.client_id, (sum.get(r.client_id) || 0) + r.score);
+  return ranked([...sum].map(([client_id, total]) => {
+    const n = Math.max(1, weeks.filter(w => w >= first.get(client_id)).length);
+    return { client_id, score: Math.round(total / n), total };
+  }));
+}
+
+/** The line under your score: how far the next place is, or how far ahead you are. rows from the board, ranked. */
+export function gapLine(rows = [], { unit = 'points', perDay = 9 } = {}) {
+  const me = rows.find(r => r.me); if (!me) return null;
+  const above = rows.filter(r => r.rank < me.rank).sort((a, b) => b.rank - a.rank)[0];
+  if (!above) {
+    const next = rows.filter(r => r.rank > me.rank).sort((a, b) => a.rank - b.rank)[0];
+    return next ? `You're #1. ${next.name} is ${me.score - next.score} ${unit} behind you. Keep it.` : "You're #1. Keep it.";
+  }
+  const gap = above.score - me.score + 1, days = Math.max(1, Math.ceil(gap / perDay));
+  return `${gap} ${unit} to pass #${above.rank}. ${days === 1 ? 'One training day' : `${days} training days`} gets you there.`;
+}
+/** Points one training day is worth this week (training is 35 points over the planned days). */
+export const pointsPerDay = S => Math.round(MAX.train / target(S));

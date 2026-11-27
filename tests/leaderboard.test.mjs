@@ -1,5 +1,5 @@
 // Leaderboard score, mind check, Fitness Age lapse, broadcasts and the "Fitness Age went up" push.
-import { weekScore, weekStart, weekKey, displayName, ranked, monthTotals, MAX } from '../js/leaderboard.js';
+import { weekScore, weekStart, weekKey, displayName, ranked, monthTotals, weeksOfMonth, gapLine, pointsPerDay, MAX } from '../js/leaderboard.js';
 import { poorDays, mindDue, goodNews, reply } from '../js/mind.js';
 import { liveFitAge, ifStopped, daysSinceTraining } from '../js/fitnessage.js';
 import { audienceOf, awayText, BROADCAST_TEMPLATES, fill } from '../js/dash.js';
@@ -39,7 +39,17 @@ check('score: tips say how to earn more, biggest first', twoChecks.tips[0].pts >
 check('board name: nickname wins', displayName({ name: 'Ali Khan', nickname: 'Beast Mode' }) === 'Beast Mode');
 check('board name: otherwise first name + initial, never the full name', displayName({ name: 'Ali Raza Khan' }) === 'Ali R.' && displayName({}) === 'Shredder');
 check('ranking: ties share a rank', ranked([{ score: 80 }, { score: 90 }, { score: 80 }, { score: 70 }]).map(r => r.rank).join() === '1,2,2,4');
-check('month totals: weeks that start in the month, summed', monthTotals([{ client_id: 'a', week: '2026-11-02', score: 50 }, { client_id: 'a', week: '2026-11-30', score: 40 }, { client_id: 'b', week: '2026-11-09', score: 80 }, { client_id: 'b', week: '2026-10-26', score: 99 }], '2026-11').map(r => `${r.client_id}${r.score}`).join() === 'a90,b80');
+check('month: weeks are the Mondays in the month, up to this week', weeksOfMonth('2026-11', '2026-11-23').join() === '2026-11-02,2026-11-09,2026-11-16,2026-11-23');
+const mt = monthTotals([
+  { client_id: 'steady', week: '2026-11-02', score: 60 }, { client_id: 'steady', week: '2026-11-09', score: 60 }, { client_id: 'steady', week: '2026-11-16', score: 60 }, { client_id: 'steady', week: '2026-11-23', score: 60 },
+  { client_id: 'late', week: '2026-11-16', score: 70 }, { client_id: 'late', week: '2026-11-23', score: 70 },
+  { client_id: 'quit', week: '2026-10-26', score: 90 }, { client_id: 'quit', week: '2026-11-02', score: 90 },
+], '2026-11', { asOf: '2026-11-23' });
+check('month: average a week from their first week, so a mid-month joiner can win', mt.map(r => `${r.client_id}${r.score}`).join() === 'late70,steady60,quit23', JSON.stringify(mt));
+const board = [{ rank: 1, name: 'Sara A.', score: 80 }, { rank: 2, name: 'Omar', score: 71 }, { rank: 3, name: 'Ali K.', score: 65, me: true }];
+check('gap: how far to the next place, in training days', gapLine(board, { perDay: 9 }) === '7 points to pass #2. One training day gets you there.', gapLine(board, { perDay: 9 }));
+check('gap: #1 sees their lead', /You're #1\. Omar is 9 points behind you/.test(gapLine([{ rank: 1, name: 'Sara', score: 80, me: true }, { rank: 2, name: 'Omar', score: 71 }])));
+check('gap: one training day is worth 35 ÷ planned days', pointsPerDay({ plan: { days: [1, 2, 3, 4, 5] } }) === 7 && pointsPerDay({}) === 9);
 
 // ---- Mind check ----
 const rough = { readiness: [{ at: NOW - DAY, sleepQ: 6, stress: 3 }, { at: NOW - 2 * DAY, sleepQ: 3, stress: 6 }] };

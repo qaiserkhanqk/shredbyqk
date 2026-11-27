@@ -541,7 +541,7 @@ Fourteen days means one busy week never counts against anyone. This is the model
 - QK does not diagnose and never claims to replace a person.
 
 ## Leaderboard (`js/leaderboard.js`, server: `leaderboard()` in supabase/schema.sql)
-A weekly health score out of 100, reset every Monday. It is built to be fair at any age: Fitness Age counts against your own age, recovery against your own scale, and most points come from showing up and checking in.
+A health score out of 100 for each week (Monday to Sunday). The month board averages them, so nobody drops to zero on Monday. It is built to be fair at any age: Fitness Age counts against your own age, recovery against your own scale, and most points come from showing up and checking in.
 
 | Part | Points | How |
 |---|---|---|
@@ -555,7 +555,7 @@ The app shows the five parts and the top ways to earn more this week.
 
 - **Ranking:** done on the server, among one coach's clients. It returns the top 50 plus your own row, so someone in 70th place sees "#70".
 - **Board name:** nickname, else first name + last initial, or "Anonymous" if hidden. Scores' health details are never visible to other clients.
-- **Month:** the sum of weekly scores for weeks starting in that month.
+- **Month:** average points a week, counted from each person's first week on the board (see below).
 - **Trust:** scores are computed on the phone. The coach sees each client's real training on the dashboard to sanity-check the top 3 before recording prizes.
 
 ## Broadcasts (`js/coach-extra.js`, `js/dash.js` audienceOf, `tools/push-checkins.mjs` broadcastJobs)
@@ -564,3 +564,8 @@ The app shows the five parts and the top ways to earn more this week.
 - **Audiences:** everyone, not trained in 7+ days, trained this week, or this week's top 10.
 - **Notifications off:** clients who turned notifications off still see it in the app.
 - **Templates:** ready-made ones in QK's voice (Roman Urdu and English), e.g. "Dr. Doom aa gaya lekin tum gym nahi aaye, {name}?".
+
+**Month board is the main board (the prizes), and it never drops to zero.**
+- **The score** is the average points a week over the month's weeks so far (weeks that start on a Monday in that month). It counts from each person's first week on the board, and weeks skipped after that count as 0. A steady trainer isn't overtaken by one big week, and someone who joins on the 15th can still win.
+- **"Points to pass" line:** under your score, e.g. "7 points to pass #2. One training day gets you there". One training day is worth 35 ÷ planned days. People see a small, reachable next step instead of the distance to #1.
+- **The weekly race** restarts every Monday as a fresh chance. Its #1 is the MVP, and the coach can shout them out with one tap. Monthly points are never reset on Monday.

@@ -917,3 +917,5 @@ details.adj[hidden] { display: none; }
 .b-parts > div { display: grid; grid-template-columns: 7.5em 1fr 3.2em; align-items: center; gap: 8px; font-size: .85rem; }
 .b-parts .bar { height: 6px; }
 .b-parts b { text-align: right; }
+.b-gap-line { margin: 0 0 8px; padding: 10px 12px; border-radius: 12px; background: rgba(var(--z3-rgb), .14); font-weight: 600; font-size: .9rem; }
+.b-mvp { font-size: .7rem; font-weight: 800; letter-spacing: .06em; padding: 2px 6px; border-radius: 6px; background: var(--z3); color: #fff; vertical-align: middle; }

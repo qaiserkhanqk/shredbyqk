@@ -6,7 +6,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const D = 864e5;
 let X; // { state, cloud, toast }
-let board = { range: 'week', scores: [], rewards: [] };
+let board = { range: 'month', scores: [], rewards: [] };
 let unticked = new Set(); // clients the coach unticked from the current list
 const monthKey = (t = Date.now()) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 const medal = r => (r === 1 ? '🥇' : r === 2 ? '🥈' : r === 3 ? '🥉' : `#${r}`);
@@ -25,6 +25,11 @@ export function initCoachExtra(x) {
   document.addEventListener('click', e => {
     const t = e.target.closest('[data-bctpl]');
     if (t) { const tp = BROADCAST_TEMPLATES[+t.dataset.bctpl]; $('#bcTitle').value = tp.title; $('#bcBody').value = tp.body; preview(); }
+    if (e.target.closest('#cbMvp')) {
+      const [n, sc] = $('#cbMvp').dataset.mvp.split('|');
+      $('#bcTitle').value = 'Weekly MVP 🏆'; $('#bcBody').value = `This week's MVP is ${n} with ${sc} points! Can you take it next week, {name}?`;
+      $('#bcAud').value = 'all'; $('#bcAud').dispatchEvent(new Event('change')); $('#cdBroadcast').scrollIntoView({ behavior: 'smooth' }); X.toast('MVP shout-out ready. Check it and press Send.');
+    }
     const r = e.target.closest('[data-cbrange]');
     if (r) { board.range = r.dataset.cbrange; renderBoard(); }
     const w = e.target.closest('[data-award]');
@@ -95,7 +100,9 @@ const weekRows = () => ranked(board.scores.filter(s => s.week === weekKey(Date.n
 function renderBoard() {
   document.querySelectorAll('[data-cbrange]').forEach(b => b.classList.toggle('on', b.dataset.cbrange === board.range));
   const P = new Map((X.state.raw?.profiles || []).map(p => [p.id, p]));
-  const rows = board.range === 'week' ? weekRows() : monthTotals(board.scores, monthKey());
+  const rows = board.range === 'week' ? weekRows() : monthTotals(board.scores, monthKey(), { asOf: weekKey(Date.now()) });
+  const mvp = board.range === 'week' && rows[0] ? P.get(rows[0].client_id) : null;
+  $('#cbMvp').hidden = !mvp; if (mvp) $('#cbMvp').dataset.mvp = `${displayName(mvp)}|${rows[0].score}`;
   const won = new Map(board.rewards.map(r => [r.client_id, r]));
   $('#cbList').innerHTML = rows.length ? rows.slice(0, 30).map(r => {
     const p = P.get(r.client_id) || {}, nick = displayName(p), w = won.get(r.client_id);

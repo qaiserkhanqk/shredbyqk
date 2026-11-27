@@ -106,7 +106,8 @@ insert into public.scores (client_id, week, score) values (auth.uid(), '2026-11-
 update public.profiles set nickname = 'Beast Mode' where id = auth.uid();
 select pg_temp.check('board: both clients ranked, highest first', (select string_agg(rank || ':' || name || ':' || score, ',' order by rank) from public.leaderboard('2026-11-23')) = '1:Sara A.:81,2:Beast Mode:64');
 select pg_temp.check('board: my own row is marked', (select rank from public.leaderboard('2026-11-23') where me) = 2);
-select pg_temp.check('board: month totals add the weeks up', (select score from public.leaderboard('2026-11-01', 1) where me) = 134);
+select pg_temp.check('board: month = average points a week since joining (64 + 70 over 2 weeks = 67), counted from their first week', (select score from public.leaderboard('2026-11-30', 1) where me) = 67);
+select pg_temp.check('board: a week that hasn''t happened yet doesn''t count', (select score from public.leaderboard('2026-11-23', 1) where me) = 64);
 select pg_temp.check('board: other clients'' health details stay private', (select count(*) from public.scores where client_id <> auth.uid()) = 0);
 update public.profiles set board_hidden = true where id = auth.uid();
 select pg_temp.check('board: hidden shows as Anonymous', (select name from public.leaderboard('2026-11-23') where me) = 'Anonymous');

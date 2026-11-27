@@ -585,9 +585,11 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('dashboard: untick someone → one fewer selected', /^(\d+) of (\d+)/.exec(await p.textContent('#bcCount'))[1] === String(+/^(\d+)/.exec(cntBefore)[1] - 1), `${cntBefore} → ${await p.textContent('#bcCount')}`);
   await p.selectOption('#bcAud', 'noopen'); await p.selectOption('#bcAway', '90'); await p.waitForTimeout(100);
   check('dashboard: "hasn\'t opened the app for 3 months" works too', /selected/.test(await p.textContent('#bcCount')));
-  check('dashboard: leaderboard lists clients by score', (await p.$$('#cbList .b-row')).length >= 5);
-  await p.click('[data-cbrange=month]'); await p.waitForTimeout(100);
-  check('dashboard: month view lets QK record the top 3', (await p.$$('#cbList [data-award]')).length === 3);
+  check('dashboard: opens on the month board (the prize one), QK can record the top 3', (await p.$$('#cbList .b-row')).length >= 5 && (await p.$$('#cbList [data-award]')).length === 3);
+  await p.click('[data-cbrange=week]'); await p.waitForTimeout(100);
+  check('dashboard: week view offers a weekly MVP shout-out', await p.isVisible('#cbMvp'));
+  await p.click('#cbMvp'); await p.waitForTimeout(150);
+  check('dashboard: MVP shout-out fills the notification', /MVP is .+ with \d+ points/.test(await p.inputValue('#bcBody')), await p.inputValue('#bcBody'));
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();
   console.log(fails ? `${fails} FAILED` : 'ALL PASS'); process.exit(fails ? 1 : 0);

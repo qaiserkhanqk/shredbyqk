@@ -264,10 +264,18 @@ create or replace function public.leaderboard(wk date, months int default 0)
 returns table (rank bigint, name text, score bigint, me boolean, players bigint)
 language sql stable security definer set search_path = public as $$
   with caller as (select coalesce(case when role = 'coach' then id end, coach_id) as cid from public.profiles where id = auth.uid()),
+  -- Month mode: the Mondays of wk's month up to wk. Score = average points per week, counted from their first week
+  -- on the board (weeks skipped after that count as 0), so someone who joins on the 15th can still win.
+  m as (select date_trunc('month', wk)::date as m0),
+  weeks as (select g::date as w from m, generate_series((m0 + ((8 - extract(isodow from m0)::int) % 7))::timestamp, wk::timestamp, interval '7 days') g
+            where g::date < (m0 + interval '1 month')::date),
   totals as (
-    select s.client_id, sum(s.score) as score from public.scores s join public.profiles p on p.id = s.client_id
-    where p.coach_id = (select cid from caller)
-      and (case when months > 0 then s.week >= date_trunc('month', wk)::date and s.week < (date_trunc('month', wk) + interval '1 month')::date else s.week = wk end)
+    select s.client_id, s.score::bigint as score from public.scores s join public.profiles p on p.id = s.client_id
+    where months = 0 and p.coach_id = (select cid from caller) and s.week = wk
+    union all
+    select s.client_id, round(sum(s.score)::numeric / greatest(1, (select count(*) from weeks where w >= (select min(s2.week) from public.scores s2 where s2.client_id = s.client_id))))::bigint
+    from public.scores s join public.profiles p on p.id = s.client_id
+    where months > 0 and p.coach_id = (select cid from caller) and s.week in (select w from weeks)
     group by s.client_id),
   r as (select t.client_id, t.score, rank() over (order by t.score desc) as rank, count(*) over () as players from totals t)
   select r.rank, public.board_name(p), r.score, r.client_id = auth.uid(), r.players
