@@ -46,7 +46,9 @@ const human = s => { const [, m, d] = s.split('-'); return `${+d} ${MONTHS[+m - 
       await c.close();
     }
     { // the companion's "My period started" also asks which day
-      const starts = [day(-27 - 112), day(-27 - 84), day(-27 - 56), day(-27 - 28), day(-27)];
+      // 2026-11-27: one check-in a day (product owner). On days "Has your period started?" shows, Zara no longer asks
+      // the same thing, so this runs 2 days before her range (a Zara day without the check-in), not inside it.
+      const starts = [day(-24 - 112), day(-24 - 84), day(-24 - 56), day(-24 - 28), day(-24)];
       const { c, p } = await page({ cycleTracking: true, companion: true }, starts);
       await p.click('#cyCompanion [data-act=companionAnswer][data-ans=periodStarted]'); await p.waitForTimeout(300);
       check('Zara: "My period started" asks which day', (await p.$$('#cyCompanionStart [data-act=companionStartOn]')).length === 3);

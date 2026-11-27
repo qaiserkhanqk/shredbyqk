@@ -102,6 +102,23 @@ Flags live in `localStorage['shred_flags_v1']` because they are not health data.
 - **Tests:** `tests/onboarding.test.mjs` (23) and `tests/onboarding-ui.cjs` (27, Chromium, WebKit and Firefox). They were written first; the failing runs are in `docs/test-logs/`.
 - **Not built:** a teen mode (it needs verified parental consent, age-appropriate wording, clinician review and legal advice).
 
+## Her premenstrual pattern and the question budget (flag `premenstrualPatterns`, off; 2026-11-27)
+- **New optional symptoms:** appetite, bloating, breast tenderness and headache.
+- **The rule:** after 3 cycles with logs before and after her period, a symptom that was clearly stronger in the 7 days before her period than on cycle days 4 to 10 is "her pattern". This is the published C-PASS rule; the counts are always shown.
+- **In the 7 days before her expected period:** a gentle in-app note ("may be part of that pattern"; other causes named) and at most 3 one-tap questions.
+- **PMDD note:** shown for a mood pattern.
+- **Never:** labels, diets or calories.
+- **Question budget:** one check-in a day (Zara stays quiet on days "Has your period started?" or the premenstrual questions show); no new notifications; backs off after 3 "Not now" in a row; a "Light" setting.
+- **Synthetic comparison:**
+
+  | Method | False patterns | Patterns found |
+  |---|---|---|
+  | C-PASS (the app's rule) | 0.2–0.5% | 32–34% |
+  | Strict rule | 0.7% | 13–14% |
+  | Older finder | 32–33% | ~90% |
+
+- **More detail:** `docs/premenstrual-patterns.md`, `docs/premenstrual-eval-synthetic.md`.
+
 ## Period-start check-ins (`js/cycle/checkins.js`, always on with cycle tracking)
 - **Why:** logging quality decides accuracy. On the real Marquette data, recording starts 1–3 days late (the day she remembered, not the real day) raised the dates-only error:
 

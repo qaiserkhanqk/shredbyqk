@@ -16,6 +16,8 @@ import { companionToday, answerCheckIn, dismissCompanion, setCompanionName, comp
 import { adjustedEstimate, cardLines } from './adjust.js';
 import { periodCheckIn, answerPeriodCheckIn, missedLogQuestion, answerMissedLog, gapReview, confirmGap, dismissGapReview, answerNotYet, answerSpotting } from './checkins.js';
 import * as PG from './pregnancy.js';
+import { premenstrualPatterns, premenstrualNow, saveQuickLog, dismissPremenstrual, SOURCES as PM_SOURCES } from './premenstrual.js';
+import { askLevel, setAskLevel, ASK_LEVELS } from './asks.js';
 import { ZARA_WELCOME } from '../onboarding.js';
 import { midlifeObservations, SOURCES as MIDLIFE_SOURCES, INTRO as MIDLIFE_INTRO } from './midlife.js';
 import { comfortSuggestions, pendingComfortQuestions, logComfortTry, answerComfort, deleteComfort, ANSWERS, REVIEW_STATUS } from './comfort.js';
@@ -112,7 +114,11 @@ function render() {
   const unsaved = unsavedInputs(); // a redraw (e.g. another tab saved) must never change what the person typed
   const est = estimateNext(s, today);
   const tempShift = f.temperatureResearch && est.lastStart ? retrospectiveShift(s, est.lastStart, addDays(today, 1)) : null;
-  root.innerHTML = [banner(), f.companion ? zaraFirstHTML(s, today) : '', f.companion ? companionHTML(s, today, est, f) : '', f.pregnancyMode ? pregnancyCardsHTML(s, today) : '', summaryMonths ? summaryHTML(s, today) : '', promptsHTML(s, est, today), dueHTML(s, est, today, nowMin), estimateHTML(s, est), f.temperatureEstimate ? adjustHTML(s, today) : '', learningHTML(s, today), f.midlifeMode && s.situation?.perimenopause ? midlifeHTML(s, today) : '', logHTML(s, today), f.comfortSuggestions ? comfortHTML(s, today) : '', f.patternInsights ? insightHTML(s, today) : '',
+  // One check-in a day (product owner, 2026-11-27): on a day she gets "Has your period started?" or her premenstrual
+  // questions, Zara does not ask as well.
+  const pmNow = f.premenstrualPatterns ? premenstrualNow(s, today, est) : null;
+  const askedToday = !!pmNow || !!periodCheckIn(s, today);
+  root.innerHTML = [banner(), f.companion ? zaraFirstHTML(s, today) : '', f.companion && !askedToday ? companionHTML(s, today, est, f) : '', f.premenstrualPatterns ? premenstrualHTML(s, today, pmNow) : '', f.pregnancyMode ? pregnancyCardsHTML(s, today) : '', summaryMonths ? summaryHTML(s, today) : '', promptsHTML(s, est, today), dueHTML(s, est, today, nowMin), estimateHTML(s, est), f.temperatureEstimate ? adjustHTML(s, today) : '', learningHTML(s, today), f.midlifeMode && s.situation?.perimenopause ? midlifeHTML(s, today) : '', logHTML(s, today), f.comfortSuggestions ? comfortHTML(s, today) : '', f.patternInsights ? insightHTML(s, today) : '',
     f.phaseEducation ? phaseHTML(s, today, tempShift, est) : '', historyHTML(s), f.patternInsights ? patternsHTML(s, today, f) : '', remindersHTML(s, est, today, nowMin),
     wearableHTML(s, today, f, tempShift), situationHTML(s, f), settingsHTML(s, f)].join('');
   for (const id of open) { const d = root.querySelector('#' + id); if (d) d.open = true; }
@@ -175,6 +181,19 @@ function consentHTML(f = {}) {
   </ul>
   <label class="check"><input type="checkbox" id="cyAgree"> I understand and want to start</label>
   <button class="cta" type="button" data-act="consent">Agree and start</button></div>`;
+}
+
+/* Her premenstrual pattern (js/cycle/premenstrual.js; flag premenstrualPatterns). In the days before her expected
+   period, at most 3 one-tap questions about her own pattern symptoms; otherwise a short summary. In the app only. */
+function premenstrualHTML(s, today, now) {
+  const r = premenstrualPatterns(s, today); if (!r) return '';
+  const list = r.patterns.length ? `<ul class="issues">${r.patterns.map(p => `<li>${esc(p.text)}</li>`).join('')}</ul>` : '';
+  const qs = now ? `<p class="small">${esc(now.text)}</p><div class="stack">${now.questions.map(q => `<label class="field">${esc(q.label)} today<select data-pmq="${q.category}"><option value="">—</option>${q.options.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')}</select></label>`).join('')}</div>
+    <div class="btn-row"><button class="cta" type="button" data-act="pmSave">Save</button><button class="ghost" type="button" data-act="pmNotNow">Not now</button></div>` : '';
+  return `<div class="card stack" id="cyPremenstrual"><span class="eyebrow">Your premenstrual pattern · research</span>
+    ${now ? '' : `<p class="small">${esc(r.text)}</p>`}${qs}${list}
+    ${r.note ? `<p class="small"><b>${esc(r.note)}</b></p>` : ''}
+    <details><summary class="linkbtn">How this works</summary><p class="muted small">A symptom counts only if, in each of your last 3 cycles where you logged it, it was clearly stronger in the 7 days before your period than in the week after it (days 4 to 10 of your cycle). This follows published research methods (${PM_SOURCES.map(x => esc(x.title.split('.')[0])).join('; ')}). It comes only from your own logs, has not been tested on real people yet, and is not a diagnosis. Shown in the app only, never in a notification.</p></details></div>`;
 }
 
 /* Zara's first question after sign-up: when did her last period start (and the one before, if she remembers)?
@@ -437,6 +456,8 @@ function situationHTML(s, f = {}) {
 
 function settingsHTML(s, f) {
   return `<details class="card" id="cySettings"><summary><span class="eyebrow">Settings, export &amp; delete</span></summary><div class="stack" style="margin-top:10px">
+    <label class="field">How often may ${esc(companionName(s))} ask you questions?<select id="cyAskLevel">${ASK_LEVELS.map(l => `<option value="${l}" ${askLevel(s) === l ? 'selected' : ''}>${l === 'light' ? 'Light: only before my period and on its first day' : 'Normal'}</option>`).join('')}</select></label>
+    <p class="muted small">At most one check-in a day. After a few "Not now" taps in a row, questions come less often until you answer again.</p>
     <b class="small">Symptom categories (each is optional)</b>
     ${catRows(s, Object.entries(M.CATEGORIES).filter(([, c]) => !c.group))}
     ${[['pregnancy', 'Pregnancy symptoms', s.situation?.pregnant], ['postpartum', 'After the birth', s.postpartum]].map(([g, title, active]) => { const cs = Object.entries(M.CATEGORIES).filter(([k, c]) => c.group === g && ((f.pregnancyMode && active) || M.categoryOn(s, k))); return cs.length ? `<b class="small">${title}</b>${catRows(s, cs)}` : ''; }).join('')}
@@ -530,6 +551,10 @@ async function onClick(e) {
     },
     companionSeverity: () => act((s, t) => answerCheckIn(s, t, 'cramps', { severity: ds.sev, today: t }), 'Saved. Take care of yourself today.'),
     companionDismiss: () => act((s, t) => dismissCompanion(s, t)),
+    pmSave: () => { const vals = Object.fromEntries([...root.querySelectorAll('#cyPremenstrual [data-pmq]')].map(x => [x.dataset.pmq, x.value]).filter(([, v]) => v)); // read now
+      if (!Object.keys(vals).length) return toast('Choose at least one answer, or tap Not now.');
+      return act((s, t) => saveQuickLog(s, t, vals), 'Saved. Thank you.'); },
+    pmNotNow: () => act((s, t) => dismissPremenstrual(s, t), 'No problem.'),
     pregStart: () => { const due = root.querySelector('#cyPregDue')?.value || undefined, lmp = root.querySelector('#cyPregLmp')?.value || undefined; return act((s, t) => PG.startPregnancy(s, { dueDate: due, lmp, today: t }), 'Pregnancy mode is on'); },
     ppStart: () => { const b = root.querySelector('#cyPpBirth')?.value; return act((s, t) => PG.startPostpartum(s, { birthDate: b, today: t }), 'Postpartum mode is on'); },
     pregDue: () => { const d = root.querySelector('#cyPregNewDue')?.value; return act((s, t) => PG.setDueDate(s, d, { today: t }), 'Due date saved'); },
@@ -604,4 +629,5 @@ async function onChange(e) {
   if (data.rtime != null) return act(s => updateReminder(s, rowRid, { time: value }), 'Time changed');
   if (t.id === 'cyQs' || t.id === 'cyQe') { const qh = { start: val('#cyQs'), end: val('#cyQe') }; return act(s => { s.settings.quietHours = qh; }, 'Quiet hours saved'); }
   if (t.id === 'cyLockDetail') return act(s => { s.settings.lockScreenDetail = checked; });
+  if (t.id === 'cyAskLevel') return act(s => setAskLevel(s, value), 'Saved');
 }

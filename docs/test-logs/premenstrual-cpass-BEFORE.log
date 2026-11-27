@@ -1,0 +1,40 @@
+FAIL the app uses the C-PASS rule: days -7..-1 vs cycle days 4..10, a rise of at least 30% of the scale, in 3 cycles  — {"r":{"BEFORE_DAYS":7,"AFTER_FROM_DAY":4,"AFTER_TO_DAY":10,"ELEVATION":0.3,"MIN_CYCLES":3,"RECENT":6,"note":"Windows and the 30% elevation from C-PASS (calibrated against expert diagnosis); 3 cycles from ACOG (C-PASS needs 2)."}}
+ok   the strict ACOG rule (5 days before; nothing on days 5 to 12) is kept for comparison
+FAIL sources: ACOG guideline No. 7 (2023), the DRSP (Endicott 2006) and C-PASS (Eisenlohr-Moul 2017), with DOIs
+ok   the flag is off by default
+ok   new optional symptoms: bloating, breast tenderness, headache, appetite
+ok   …and each new symptom is off until she turns it on
+ok   strong cravings before each period and not in the week after: found, in 3 of her last 3 cycles
+FAIL …described with the counts and the timing  — In 3 of your last 3 cycles with logs, you logged strong cravings in the 5 days before your period, and not on days 5 to 12 of your cycle.
+FAIL one occasional craving in the week after does not cancel a clear pattern (the reason for C-PASS)  — {"version":"premenstrual-0.1.0","reviewStatus":"awaiting_clinician_review","rule":{"BEFORE_DAYS":5,"AFTER_FROM_DAY":5,"AFTER_TO_DAY":12,"MIN_CYCLES":3,"RECENT":6,"MAX_QUESTIONS":3,"note":"Windows and the 3-cycle minimum from ACOG's PMS criteria; RECENT (last 6 usable cycles) and MAX_QUESTIONS (3) are app choices."},"needed":3,"status":"none","patterns":[],"note":null,"text":"No symptom you track came back before your periods in each of your last 3 cycles with logs."}
+ok   found even when her cycle length varies (24, 33, 27, 31 days): counted back from each period
+ok   not a pattern if it was just as strong in the week after, in one of those cycles
+ok   not a pattern if she logs it all the time
+ok   with 2 cycles: still learning, and says how many more cycles it needs
+ok   a cycle with no logs on days 4 to 10 is skipped (unknown), never counted as "it didn't happen"
+ok   …so with only 2 cycles she logged fully, it is still learning
+ok   no symptom before her periods: no pattern, and it says so plainly
+ok   on hormonal contraception: not used (bleeds are not periods)
+ok   in pregnancy: not used
+ok   with no symptoms turned on: says which ones she can turn on
+ok   in the days before her expected period: a message about her own pattern
+ok   …it says other things cause the same (stress, illness, travel, a bad night)
+ok   …never labels her ("binge"), never gives diet or calorie advice, no forbidden wording
+ok   …asks at most 3 one-tap questions, her pattern symptoms first
+ok   not shown in the middle of her cycle
+ok   not shown once her period has started
+ok   one tap saves only what she chose, and the question is done for today
+ok   an invalid answer is refused
+ok   a mood pattern adds a note: it has a name (PMDD), treatments help, talk to a doctor
+ok   …and says to get help straight away with thoughts of harming herself
+ok   no mood pattern: no such note
+ok   asking is allowed by default
+ok   after 3 "Not now" in a row: not asked the next day
+ok   …but asked again 2 days after the last "Not now" (backs off, never stops)
+ok   …and back to normal as soon as she answers
+ok   Zara: after 3 "Not now" in a row, she stays quiet the next day
+ok   …and is back after an answer
+ok   control: on "Normal", Zara checks in on day 2 of her period
+ok   "Light": Zara checks in only on day 1 of her period and before it, not on day 2
+ok   only "light" or "normal"
+4 FAILED of 39

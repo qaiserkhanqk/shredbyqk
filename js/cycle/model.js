@@ -19,6 +19,11 @@ export const CATEGORIES = {
   mood: { label: 'Mood', why: 'A word for your mood, only if you want to track it. Nothing is inferred from sensors.', options: [['good', 'Good'], ['okay', 'Okay'], ['low', 'Low'], ['anxious', 'Anxious'], ['irritable', 'Irritable']], notable: ['low', 'anxious', 'irritable'], notableLabel: 'low, anxious or irritable mood' },
   cravings: { label: 'Cravings', why: 'Food cravings, if you notice them.', options: [['none', 'None'], ['some', 'Some'], ['strong', 'Strong']], notable: ['strong'], notableLabel: 'strong cravings' },
   sleep: { label: 'Sleep', why: 'How you felt you slept. This is your rating, not a sensor reading.', options: [['poor', 'Poor'], ['ok', 'OK'], ['good', 'Good']], notable: ['poor'], notableLabel: 'poor sleep' },
+  // Common premenstrual symptoms (ACOG premenstrual disorders guidance; docs/premenstrual-patterns.md), 2026-11-27.
+  appetite: { label: 'Appetite', why: 'Whether you felt hungrier or less hungry than usual. No calories, diets or weight.', options: [['less', 'Less than usual'], ['usual', 'Usual'], ['more', 'More than usual']], notable: ['more'], notableLabel: 'a bigger appetite' },
+  bloating: { label: 'Bloating', why: 'A swollen or full feeling in your tummy.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe bloating' },
+  breasts: { label: 'Breast tenderness', why: 'Sore, tender or swollen breasts.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe breast tenderness' },
+  headache: { label: 'Headache', why: 'Headaches, including migraines.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe headaches' },
   // Training feel (competitor-gap work, docs/competitor-gaps.md): lets her own pattern show. No training advice is
   // given by cycle phase, because the evidence for general phase-based rules is weak and individual (docs).
   // Perimenopause and menopause symptoms (group 'midlife': offered in settings only in midlife mode). Symptom areas

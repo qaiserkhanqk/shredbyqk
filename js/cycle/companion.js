@@ -12,6 +12,7 @@
 import { addDays, diffDays, human } from './dates.js';
 import { CycleError, hasConsent, categoryOn, CATEGORIES, logDay, logPeriodStart } from './model.js';
 import { inLatestPeriod } from './checkins.js';
+import { askAllowed, recordNotNow, recordAnswer, askLevel } from './asks.js';
 
 export const COMPANION_VERSION = 'companion-0.2.0'; // 0.2.0: renamed from "QK" to "Zara"; her own name; privacy line
 export const DEFAULT_NAME = 'Zara';
@@ -58,12 +59,13 @@ function dayKind(s, date, estimate, patterns = []) {
   if (quiet && !starts.some(d => d > quiet)) return null;
   const birth = s.situation?.postpartum && s.postpartum?.birthDate;
   if (birth && !starts.some(d => d > birth) && POSTPARTUM_DAYS.includes(diffDays(birth, date))) return { kind: 'postpartum', day: diffDays(birth, date) };
-  if (last && diffDays(last, date) < PERIOD_DAYS) return { kind: 'periodDays', day: diffDays(last, date) + 1 };
+  const light = askLevel(s) === 'light'; // "Light": only before her period and on its first day (asks.js)
+  if (last && diffDays(last, date) < (light ? 1 : PERIOD_DAYS)) return { kind: 'periodDays', day: diffDays(last, date) + 1 };
   const e = estimate;
   // From two days before her estimated range, and on while it is late, until she logs a start (the estimate then moves on).
   // (Fix: the old guard, last >= rangeStart - 10, assumed ~4-week cycles; she was never asked with short cycles.)
   if (e?.rangeStart && date >= addDays(e.rangeStart, -NOTICE_DAYS) && !inLatestPeriod(s, date, e)) return { kind: 'periodSoon' };
-  if (patterns.length && last) {
+  if (patterns.length && last && !light) {
     const cd = diffDays(last, date) + 1;
     const p = patterns.find(x => cd + NOTICE_DAYS >= x.from && cd <= x.to);
     if (p) return { kind: 'pattern', pattern: p, inDays: Math.max(0, p.from - cd) };
@@ -93,6 +95,7 @@ export function companionToday(s, today, { estimate = null, patternsOn = false, 
   if (!hasConsent(s)) return null;
   const c = s.companion || {};
   if (c.dismissed?.[today] || c.answered?.[today] || loggedToday(s, today)) return null;
+  if (!askAllowed(s, 'zara', today)) return null; // backs off after repeated "Not now" (asks.js)
   const k = dayKind(s, today, estimate, patternsOn ? patterns.filter(p => !s.dismissed?.[p.key]) : []);
   if (!k) return null;
   const name = companionName(s);
@@ -133,8 +136,9 @@ export function answerCheckIn(s, today, answer, { severity, date, today: t = tod
     logDay(s, today, { [q.category]: q.value }, { today: t, at, source: 'companion' });
   }
   ((s.companion ||= {}).answered ||= {})[today] = answer;
+  recordAnswer(s, 'zara');
   return s;
 }
 
 /** "Not now": hidden for the rest of today. */
-export function dismissCompanion(s, today) { ((s.companion ||= {}).dismissed ||= {})[today] = true; return s; }
+export function dismissCompanion(s, today) { ((s.companion ||= {}).dismissed ||= {})[today] = true; recordNotNow(s, 'zara', today); return s; }

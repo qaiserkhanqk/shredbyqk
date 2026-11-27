@@ -6,6 +6,12 @@
 // starting, not back before cycle day 13; ACOG Clinical Practice Guideline No. 7, 2023: timing is key and a symptom
 // log over several cycles; daily ratings as in the DRSP, Endicott et al. 2006). Cycles are counted BACKWARDS from each
 // period, so the pattern is found even when her cycle length varies.
+// UPDATE 2026-11-27 (same day, before release): the synthetic comparison (tools/premenstrual-eval.mjs,
+// docs/premenstrual-patterns.md) showed the strict rule above found only 13-16% of real patterns, because one
+// occasional symptom in the week after cancelled a cycle. The app now uses the C-PASS rule (Eisenlohr-Moul et al. 2017,
+// calibrated against expert diagnosis): in each of her last 3 cycles with logs, the average on days -7..-1 before her
+// period is at least 30% of the scale above the average on cycle days 4..10. False patterns stayed at 0.2-0.5%;
+// patterns found rose to 32-35%. The strict ACOG rule stays available for comparison.
 // Product owner (2026-11-27): personal, but never "too many questions": at most one check-in a day, no new
 // notifications, at most 3 taps, Zara backs off after repeated "Not now", and a "Light" setting.
 // Run: node tests/premenstrual.test.mjs
@@ -34,16 +40,17 @@ function person(lens, { cat = 'cravings', pre = () => 'strong', post = () => 'no
   for (const st of starts) M.logPeriodStart(s, st, { today: FAR, at: AT });
   for (let i = 0; i + 1 < starts.length; i++) {
     const next = starts[i + 1];
-    for (let d = 1; d <= 4; d++) { const v = pre(i); if (v != null) M.logDay(s, addDays(next, -d), { [cat]: v }, { today: FAR, at: AT }); }
-    for (let d = 5; d <= 12; d++) { const v = post(i); if (v != null) M.logDay(s, addDays(starts[i], d - 1), { [cat]: v }, { today: FAR, at: AT }); }
+    for (let d = 1; d <= 4; d++) { const v = pre(i); if (v != null && M.categoryOn(s, cat)) M.logDay(s, addDays(next, -d), { [cat]: v }, { today: FAR, at: AT }); }
+    for (let d = 5; d <= 12; d++) { const v = post(i); if (v != null && M.categoryOn(s, cat)) M.logDay(s, addDays(starts[i], d - 1), { [cat]: v }, { today: FAR, at: AT }); }
   }
   return { s, starts, last: starts.at(-1) };
 }
 
 run('the rule and its sources', () => {
-  check('5 days before the period, compared with cycle days 5 to 12, in 3 cycles', words(P.PMS_RULE && { b: P.PMS_RULE.BEFORE_DAYS, f: P.PMS_RULE.AFTER_FROM_DAY, t: P.PMS_RULE.AFTER_TO_DAY, n: P.PMS_RULE.MIN_CYCLES }) === words({ b: 5, f: 5, t: 12, n: 3 }), words(P.PMS_RULE));
+  check('the app uses the C-PASS rule: days -7..-1 vs cycle days 4..10, a rise of at least 30% of the scale, in 3 cycles', P.DEFAULT_RULE === 'cpass' && words(P.CPASS_RULE && { b: P.CPASS_RULE.BEFORE_DAYS, f: P.CPASS_RULE.AFTER_FROM_DAY, t: P.CPASS_RULE.AFTER_TO_DAY, e: P.CPASS_RULE.ELEVATION, n: P.CPASS_RULE.MIN_CYCLES }) === words({ b: 7, f: 4, t: 10, e: 0.3, n: 3 }), words({ d: P.DEFAULT_RULE, r: P.CPASS_RULE }));
+  check('the strict ACOG rule (5 days before; nothing on days 5 to 12) is kept for comparison', words(P.PMS_RULE && { b: P.PMS_RULE.BEFORE_DAYS, f: P.PMS_RULE.AFTER_FROM_DAY, t: P.PMS_RULE.AFTER_TO_DAY, n: P.PMS_RULE.MIN_CYCLES }) === words({ b: 5, f: 5, t: 12, n: 3 }), words(P.PMS_RULE));
   const src = words(P.SOURCES || []);
-  check('sources: ACOG guideline No. 7 (2023) and the DRSP (Endicott 2006), with DOIs', /10\.1097\/AOG\.0000000000005426/.test(src) && /10\.1007\/s00737-005-0103-y/.test(src));
+  check('sources: ACOG guideline No. 7 (2023), the DRSP (Endicott 2006) and C-PASS (Eisenlohr-Moul 2017), with DOIs', /10\.1097\/AOG\.0000000000005426/.test(src) && /10\.1007\/s00737-005-0103-y/.test(src) && /10\.1176\/appi\.ajp\.2016\.15121510/.test(src));
   check('the flag is off by default', FLAG_DEFS.premenstrualPatterns?.default === false && readFlags({ getItem: () => null }).premenstrualPatterns === false);
   check('new optional symptoms: bloating, breast tenderness, headache, appetite', ['bloating', 'breasts', 'headache', 'appetite'].every(k => M.CATEGORIES[k] && !M.CATEGORIES[k].group && M.CATEGORIES[k].notable?.length), words(Object.keys(M.CATEGORIES)));
   check('…and each new symptom is off until she turns it on', ['bloating', 'breasts', 'headache', 'appetite'].every(k => !M.categoryOn((() => { const s = M.blankState('u'); M.giveConsent(s, AT); return s; })(), k)));
@@ -55,11 +62,14 @@ run('finding her pattern', () => {
   const r = P.premenstrualPatterns(s, t);
   const c = r.patterns?.find(x => x.category === 'cravings');
   check('strong cravings before each period and not in the week after: found, in 3 of her last 3 cycles', r.status === 'found' && c?.cycles === 3 && c?.of === 3, words(r));
-  check('…described with the counts and the timing', /3 of your last 3 cycles/.test(c?.text || '') && /5 days before/.test(c?.text || ''), c?.text);
+  check('…described with the counts and the timing', /3 of your last 3 cycles/.test(c?.text || '') && /7 days before/.test(c?.text || ''), c?.text);
+  const occ = person([28, 28, 28, 28], { post: () => 'none' });
+  occ.s.days[addDays(occ.starts[2], 6)].cravings = 'strong'; // one occasional craving on day 7 of one cycle
+  check('one occasional craving in the week after does not cancel a clear pattern (the reason for C-PASS)', P.premenstrualPatterns(occ.s, t).patterns?.some(x => x.category === 'cravings'), words(P.premenstrualPatterns(occ.s, t)));
   const v = person([24, 33, 27, 31]);
   check('found even when her cycle length varies (24, 33, 27, 31 days): counted back from each period', P.premenstrualPatterns(v.s, t).patterns?.some(x => x.category === 'cravings'), words(P.premenstrualPatterns(v.s, t)));
   const w = person([28, 28, 28, 28], { post: i => i === 2 ? 'strong' : 'none' });
-  check('not a pattern if it was also notable on cycle days 5 to 12 in one of those cycles', !P.premenstrualPatterns(w.s, t).patterns?.some(x => x.category === 'cravings'), words(P.premenstrualPatterns(w.s, t)));
+  check('not a pattern if it was just as strong in the week after, in one of those cycles', !P.premenstrualPatterns(w.s, t).patterns?.some(x => x.category === 'cravings'), words(P.premenstrualPatterns(w.s, t)));
   const all = person([28, 28, 28, 28], { pre: () => 'strong', post: () => 'strong' });
   check('not a pattern if she logs it all the time', !P.premenstrualPatterns(all.s, t).patterns?.some(x => x.category === 'cravings'));
   const two = person([28, 28]);
@@ -67,7 +77,7 @@ run('finding her pattern', () => {
   check('with 2 cycles: still learning, and says how many more cycles it needs', r2.status === 'learning' && /1 more cycle/.test(r2.text || ''), words(r2));
   const gaps = person([28, 28, 28, 28], { post: i => i === 1 ? null : 'none' }); // nothing logged on days 5–12 in cycle 2
   const cg = P.premenstrualPatterns(gaps.s, t).patterns?.find(x => x.category === 'cravings');
-  check('a cycle with no logs on days 5 to 12 is skipped (unknown), never counted as "it didn\'t happen"', cg?.of === 3 && !cg.cycleStarts.includes(gaps.starts[1]), words(cg));
+  check('a cycle with no logs on days 4 to 10 is skipped (unknown), never counted as "it didn\'t happen"', cg?.of === 3 && !cg.cycleStarts.includes(gaps.starts[1]), words(cg));
   const short = person([28, 28, 28], { post: i => i === 1 ? null : 'none' }); // 3 cycles, one of them unknown
   check('…so with only 2 cycles she logged fully, it is still learning', P.premenstrualPatterns(short.s, t).status === 'learning', words(P.premenstrualPatterns(short.s, t)));
   const none = person([28, 28, 28, 28], { pre: () => 'none' });

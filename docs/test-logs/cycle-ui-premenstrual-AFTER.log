@@ -1,0 +1,39 @@
+# chromium
+browser: chromium 153.0.8010.12
+ok   a few days before her period: her own pattern, with the counts
+ok   …worded as "may", with other causes named, and no labels or diet advice
+ok   …at most 3 one-tap questions
+ok   one check-in a day: Zara does not ask as well today
+ok   no new reminder or notification is created for it
+ok   saving keeps only what she chose, and the questions are done for today
+ok   the settings ask how often Zara may ask (Light or Normal)
+ok   one check-in a day: on a day "Has your period started?" shows, Zara does not ask the same thing
+ok   with the feature off (the default), no premenstrual card
+ok   no JavaScript errors
+ALL PASS (10)
+# webkit
+browser: webkit 26.6
+ok   a few days before her period: her own pattern, with the counts
+ok   …worded as "may", with other causes named, and no labels or diet advice
+ok   …at most 3 one-tap questions
+ok   one check-in a day: Zara does not ask as well today
+ok   no new reminder or notification is created for it
+ok   saving keeps only what she chose, and the questions are done for today
+ok   the settings ask how often Zara may ask (Light or Normal)
+ok   one check-in a day: on a day "Has your period started?" shows, Zara does not ask the same thing
+ok   with the feature off (the default), no premenstrual card
+ok   no JavaScript errors
+ALL PASS (10)
+# firefox
+browser: firefox 155.0
+ok   a few days before her period: her own pattern, with the counts
+ok   …worded as "may", with other causes named, and no labels or diet advice
+ok   …at most 3 one-tap questions
+ok   one check-in a day: Zara does not ask as well today
+ok   no new reminder or notification is created for it
+ok   saving keeps only what she chose, and the questions are done for today
+ok   the settings ask how often Zara may ask (Light or Normal)
+ok   one check-in a day: on a day "Has your period started?" shows, Zara does not ask the same thing
+ok   with the feature off (the default), no premenstrual card
+ok   no JavaScript errors
+ALL PASS (10)
