@@ -143,11 +143,11 @@ function stalledBefore(days) {
 }
 
 /** Light week due: every ~7 training weeks, or when 2+ lifts had to back off in the last 3 weeks. */
-export function lightWeekDue(sets, { now = Date.now(), lastLight = 0, resets = [] } = {}) {
+export function lightWeekDue(sets, { now = Date.now(), lastLight = 0, resets = [], every = 7 } = {}) {
   const W = 7 * 864e5, real = sets.filter(s => !s.demo && !s.guided && s.kg > 0);
   if (now - lastLight < 3 * W) return false;
   const weeks = new Set(real.filter(s => s.at > Math.max(lastLight, now - 12 * W)).map(s => Math.floor(s.at / W)));
-  if (weeks.size >= 7) return true;
+  if (weeks.size >= every) return true;
   return new Set(resets.filter(r => now - r.at < 3 * W).map(r => r.ex)).size >= 2;
 }
 

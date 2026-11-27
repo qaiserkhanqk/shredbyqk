@@ -54,7 +54,7 @@ const FIXED_KINDS = ['hyrox', 'run'];
  * @param o { lib, avoid, compliance (0..1 of planned days done), clean (0..1 of reps clean) }
  * @returns { block, phase, plan, changes: [{ from, to, day }], volume: 'less'|'more'|'same', note }
  */
-export function nextBlock(def, cur, { lib, avoid = [], compliance = 1, clean = 1 } = {}) {
+export function nextBlock(def, cur, { lib, avoid = [], compliance = 1, clean = 1, keep = [] } = {}) {
   const block = (cur?.block || 1) + 1, phase = phaseOf(block), prev = cur?.plan || def.plan;
   const keepMain = KEEP_MAIN.some(g => def.goal.startsWith(g));
   const volume = compliance < 0.6 ? 'less' : compliance >= 0.9 && clean >= 0.8 ? 'more' : 'same';
@@ -65,7 +65,8 @@ export function nextBlock(def, cur, { lib, avoid = [], compliance = 1, clean = 1
     const items = day.items.map((it, ii) => {
       const orig = base.items[ii] || it;
       let id = it[0];
-      if (!(keepMain && ii === 0) && !FIXED_KINDS.includes(lib[orig[0]]?.kind)) {
+      // Favourites (`keep`) stay; everything else rotates.
+      if (!(keepMain && ii === 0) && !keep.includes(it[0]) && !FIXED_KINDS.includes(lib[orig[0]]?.kind)) {
         // Rotate through the original exercise and its close alternatives, never repeating last month's.
         const pool = [orig[0], ...alternatives(orig[0], lib, { avoid, n: 4 })].filter(x => !avoid.includes(x) && lib[x]);
         const next = pool.find(x => x !== it[0] && !used.has(x)) || it[0];

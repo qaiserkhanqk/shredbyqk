@@ -15,6 +15,7 @@ export const CONFIG = {
   anyCueGapMs: 2200,          // minimum gap between corrections
 };
 
+import { toUrdu } from './coach-ur.js';
 import { getClip } from './studio.js';
 let manifest = {};
 fetch('audio/cues/manifest.json').then(r => r.ok ? r.json() : {}).then(m => { manifest = Array.isArray(m) ? Object.fromEntries(m.map(id => [id, id + '.mp3'])) : m; }).catch(() => {});
@@ -29,6 +30,10 @@ let muted = false;
 
 export function registerAvatar(el) { avatarEls.push(el); }
 export function setMuted(v) { muted = v; if (v) speechSynthesis?.cancel(); }
+// Coaching language: 'ur' speaks the short workout cues in Urdu when the phone has an Urdu voice.
+let lang = 'en';
+export const setLang = l => { lang = l === 'ur' ? 'ur' : 'en'; };
+export const urduVoice = () => (typeof speechSynthesis !== 'undefined' ? speechSynthesis.getVoices().find(v => /^ur/i.test(v.lang)) : null) || null;
 
 function setTalking(on) {
   speaking = on;
@@ -44,6 +49,9 @@ function pickVoice() {
 }
 
 async function play(text, id) {
+  // Urdu: only lines with an Urdu version, and only with an Urdu voice; everything else stays English.
+  let voice = null;
+  if (lang === 'ur') { const ur = toUrdu(text), v = ur && urduVoice(); if (v) { text = ur; id = null; voice = v; } }
   const my = ++gen;
   setTalking(true);
   showCaption(text);
@@ -60,7 +68,7 @@ async function play(text, id) {
     await new Promise(res => {
       if (!('speechSynthesis' in window)) return setTimeout(res, 1500);
       const u = new SpeechSynthesisUtterance(text);
-      const v = pickVoice(); if (v) u.voice = v;
+      const v = voice || pickVoice(); if (v) { u.voice = v; u.lang = v.lang; }
       u.rate = 1.02; u.pitch = 0.95;
       u.onend = u.onerror = res;
       speechSynthesis.speak(u);

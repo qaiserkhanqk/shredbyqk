@@ -1,5 +1,7 @@
 import * as store from './store.js';
-import { say, registerAvatar, setMuted, greeting, CONFIG } from './coach.js';
+import { say, registerAvatar, setMuted, greeting, CONFIG, setLang as setCoachLang, urduVoice } from './coach.js';
+import * as personal from './personal.js';
+import { parse as parseVoice } from './voicecmd.js';
 import { EXERCISES, RepEngine, allRules, estimateRIR, TIPS, BREATHING } from './exercises.js';
 import { FeedbackCoach, restSeconds } from './feedback.js';
 import { getVideoLandmarker, drawPose, liveModelName } from './pose.js';
@@ -120,11 +122,46 @@ const daysView = (p, n) => {
 };
 const activeProgram = () => { const b = baseProgram(); return b ? daysView(b, S.program.days) : b; };
 const programDay = () => { const p = activeProgram(); return p ? currentDay(p, S.program) : null; };
-const capToday = () => (S.timeCap?.day === new Date().toDateString() ? S.timeCap.mins : null);
+// Minutes allowed today: a one-off "short on time" cap, else the client's budget for this weekday.
+const capToday = () => personal.minutesFor(S.plan?.minutes, S.timeCap?.day === new Date().toDateString() ? S.timeCap.mins : null);
 // Rough count of warm-up sets for a day (heavy barbell lifts get about three).
 const warmCount = items => items.reduce((a, it) => a + ((prog.liftClass(LIB[it[0]]) || '').startsWith('big') ? 3 : prog.liftClass(LIB[it[0]]) === 'mid' ? 1 : 0), 0);
-const dayItemsRaw = () => programDay()?.day?.items || null;
-const dayItems = () => { const raw = dayItemsRaw(); if (!raw) return null; const cap = capToday(); return cap ? warm.fitTo(raw, cap, warmCount(raw)).items : raw; };
+// Today's session, made personal: starting volume (age, experience), the client's equipment, pain areas and
+// skipped exercises, today's "machine taken" swaps, and a missed session's main lifts; then readiness and time.
+let personalNote = { swaps: [], rescue: null }, rawMemo = { key: null, items: null, note: null };
+const todayKey = () => new Date().toDateString();
+const avoidList = () => [...new Set([...(S.prefs?.avoid || []), ...personal.skipDrops(S.prefs?.skips)])];
+function dayItemsRaw() {
+  const d = programDay(); if (!d?.day) return null;
+  const p = activeProgram(), key = JSON.stringify([p.id, p.days, d.index, d.doneToday, S.program.block, (S.program.log || []).length, S.program.restartAt, S.profile.equip, S.profile.pain, S.profile.age, S.profile.experience, avoidList(), S.todaySwap, S.rescueOff, S.plan?.days, todayKey(), S.program.plan ? 1 : 0, S.timeCap, S.program.daysSince]);
+  if (rawMemo.key === key) { personalNote = rawMemo.note; return rawMemo.items; }
+  let items = personal.startItems(d.day.items, LIB, S.profile, S.program.block || 1);
+  const pd = personal.personalDay(items, LIB, { have: S.profile.equip, pain: S.profile.pain || [], avoid: avoidList() });
+  items = pd.items;
+  const sw = S.todaySwap?.day === todayKey() ? S.todaySwap.map : {};
+  items = items.map(it => (sw[it[0]] ? [sw[it[0]], ...it.slice(1)] : it));
+  let rescue = null;
+  if (!d.doneToday && S.rescueOff !== todayKey() && p.plan.length > 1) {
+    const b = personal.behind((S.program.log || []).slice(S.program.restartAt || 0), { perWeek: p.days, weekdays: S.plan?.days || [], since: S.program.daysSince || S.program.start });
+    if (b) {
+      const ni = (d.index + 1) % p.plan.length, nextItems = personal.personalDay(p.plan[ni].items, LIB, { have: S.profile.equip, pain: S.profile.pain || [], avoid: avoidList() }).items;
+      const r = personal.rescue(items, nextItems, LIB, { maxMinutes: Math.max(80, capToday() || 0) });
+      if (r.added.length) { items = r.items; rescue = { ...b, next: ni, nextName: p.plan[ni].name, added: r.added }; }
+    }
+  }
+  personalNote = { swaps: [...pd.swaps, ...Object.entries(sw).map(([from, to]) => ({ from, to, why: 'busy' }))], rescue };
+  rawMemo = { key, items, note: personalNote };
+  return items;
+}
+// Today's readiness: the pre-workout check-in, else the morning "How do you feel?" card on Today.
+const MORNING = { go: null, adjust: { sleep: 'bad', sore: 'some', energy: 'ok' }, recover: { sleep: 'bad', sore: 'very', energy: 'low' } };
+function readyToday() {
+  if (S.checkin?.day === todayKey()) return S.checkin.r;
+  const c = (S.readiness || []).find(x => dayKey(x.at) === dayKey(Date.now())); if (!c) return null;
+  const lvl = recommendToday({ check: c, history: S.readiness.filter(x => x !== c), sessions: S.loads || [] }).level, a = MORNING[lvl];
+  return a ? { ...personal.readiness(a), note: lvl === 'recover' ? 'Your morning check says recover. QK made today lighter: 10% less weight and one set fewer on the extras. A recovery session is also an option.' : 'Your morning check says go lighter: 5% off and one set fewer on the extras. Main lifts stay.' } : null;
+}
+const dayItems = () => { let raw = dayItemsRaw(); if (!raw) return null; raw = personal.readyItems(raw, readyToday(), LIB); const cap = capToday(); return cap ? warm.fitTo(raw, cap, warmCount(raw)).items : raw; };
 const todayItems = () => { const items = dayItems(); return items ? items.map(it => [it[0], `${it[1]}×${it[2]}`]) : TODAY_DEFAULT; };
 const todayName = () => { const p = activeProgram(), d = programDay(); return p && d ? `${p.name}: ${d.day.name}` : 'Glute Builder'; };
 const ICONS = {
@@ -240,11 +277,11 @@ function bindPlan() {
     const d = +b.dataset.day, i = S.plan.days.indexOf(d);
     i >= 0 ? S.plan.days.splice(i, 1) : S.plan.days.push(d);
     if (S.plan.days.length) S.profile.weeklyGoal = S.plan.days.length;
-    if (S.program && S.plan.days.length >= 3 && S.plan.days.length <= 5) setDays(S.plan.days.length, 'plan');
+    if (S.program && S.plan.days.length >= freq.MIN_DAYS && S.plan.days.length <= freq.MAX_DAYS) setDays(S.plan.days.length, 'plan');
     persist(); draw(); renderToday(); renderPrograms();
   };
-  $('#planTime').value = S.plan.time; $('#planPlace').value = S.plan.place;
-  $('#planTime').onchange = e => { S.plan.time = e.target.value; persist(); draw(); renderToday(); };
+  $('#planAt').value = S.plan.time; $('#planPlace').value = S.plan.place;
+  $('#planAt').onchange = e => { S.plan.time = e.target.value; persist(); draw(); renderToday(); };
   $('#planPlace').onchange = e => { S.plan.place = e.target.value.trim(); persist(); draw(); renderToday(); };
   draw();
 }
@@ -358,6 +395,8 @@ function openSetup(k) {
   const ll = lastLoad(S.sessions, k);
   $('#setupLast').textContent = ll ? `Last time: ${prog.fmtW(ll.kg, unit())} × ${ll.reps}` : '';
   showRx(k);
+  const inT = (dayItems() || []).some(x => x[0] === k);
+  $('#busyBtn').hidden = $('#painBtn').hidden = !inT; $('#skipEx').hidden = !flow || !inT;
   $('#setup').hidden = false;
 }
 const setsToday = k => { const d = new Date(); d.setHours(0, 0, 0, 0); return S.sessions.filter(s => s.ex === k && s.at >= d.getTime()).length; };
@@ -1252,7 +1291,7 @@ function unitLabels() {
 function lightWeek() {
   const P = (S.prog ||= {}), now = Date.now(), W = 7 * 864e5;
   if (P.lightAt && now - P.lightAt < W) return true;
-  if (prog.lightWeekDue(S.sessions, { now, lastLight: P.lightAt || 0, resets: P.resets || [] })) { P.lightAt = now; persist(); return true; }
+  if (prog.lightWeekDue(S.sessions, { now, lastLight: P.lightAt || 0, resets: P.resets || [], every: personal.lightEvery(S.profile) })) { P.lightAt = now; persist(); return true; }
   return false;
 }
 // The prescription for an exercise, with a coach/lifter override if one was set since the last session.
@@ -1265,6 +1304,8 @@ function rxFor(k) {
     return { ...base, kg: o.kg, action: 'set', why: 'Weight set by you.' };
   }
   if (r?.action === 'reset') { const P = (S.prog ||= {}); P.resets ||= []; if (!P.resets.some(x => x.ex === k && Date.now() - x.at < 3 * 864e5)) { P.resets.push({ ex: k, at: Date.now() }); persist(); } }
+  const rd = readyToday();
+  if (r && rd && rd.load < 1 && r.action !== 'set') return { ...r, kg: prog.roundLoad(r.kg * rd.load, r.cls, unit()), why: rd.note };
   return r;
 }
 const rxLine = r => `${r.sets} × ${r.reps} at ${prog.fmtW(r.kg, unit())}${r.day ? ` · ${r.day} day` : ''}`;
@@ -1334,7 +1375,11 @@ $('#stLift').onchange = renderStrength;
 $('#stRange').onclick = e => { const b = e.target.closest('[data-r]'); if (!b) return; stRange = b.dataset.r; $('#stRange').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); renderStrength(); };
 
 /* ---------- QK's plan: every weight decided before the lifter asks ---------- */
-const planToday = () => brief.planRows(todayItems().map(x => x[0]), { lib: LIB, sets: S.sessions, unit: unit(), light: lightWeek(), schemeFor: programScheme });
+const planToday = () => {
+  const rows = brief.planRows(todayItems().map(x => x[0]), { lib: LIB, sets: S.sessions, unit: unit(), light: lightWeek(), schemeFor: programScheme }), r = readyToday();
+  if (!r || r.load >= 1) return rows;
+  return rows.map(x => { if (!x.rx) return x; const kg = prog.roundLoad(x.rx.kg * r.load, x.rx.cls, unit()); return { ...x, rx: { ...x.rx, kg }, change: x.change === 'up' ? 'same' : x.change, tag: 'easier today', line: `${x.rx.sets} × ${x.rx.reps} · ${prog.fmtW(kg, unit())}`, why: r.note }; });
+};
 function renderPlan(rows) {
   // With a program, every item of the day is listed (runs and stations too); without one, only weighted lifts.
   const sets = Object.fromEntries(todayItems()), prg = !!activeProgram();
@@ -1395,7 +1440,33 @@ const flowStep = () => {
   return SS.nextUp(its, Object.fromEntries(its.map(it => [it[0], setsToday(it[0])])), Object.fromEntries(its.map(it => [it[0], plannedSets(it[0])])), exKey);
 };
 const flowNextId = () => flowStep()?.id;
+function hrToday() {
+  const hr = (S.vitals || []).filter(v => v.bpm && (v.kind === 'hr' || v.kind === 'hrv')), t = todayKey();
+  const now = hr.filter(v => new Date(v.at).toDateString() === t).pop()?.bpm, past = hr.filter(v => new Date(v.at).toDateString() !== t && Date.now() - v.at < 30 * 864e5).map(v => v.bpm).sort((a, b) => a - b);
+  return past.length >= 3 && now ? { restHr: now, baseHr: past[Math.floor(past.length / 2)] } : {};
+}
+// Three taps: sleep, soreness, energy. QK lightens a rough day; it never pushes past the plan.
+function askReadiness(then) {
+  const a = {};
+  const draw = () => {
+    const done = personal.READY_Q.every(q => a[q.key]), r = done ? personal.readiness(a, hrToday()) : null;
+    openSheet(`<div><span class="eyebrow">Before you train</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">How are you today?</h2></div>
+      ${personal.READY_Q.map(q => `<div class="rq"><span class="small">${esc(q.label)}</span><div class="seg">${q.opts.map(([v, l]) => `<button type="button" data-rq="${q.key}:${v}" class="${a[q.key] === v ? 'on' : ''}">${esc(l)}</button>`).join('')}</div></div>`).join('')}
+      ${r ? `<p class="ready-note ${r.level}">${esc(r.note)}</p>` : '<p class="muted small" style="margin:0">QK adjusts today\'s weights to how you feel.</p>'}
+      <div class="btn-row"><button class="ghost" type="button" id="rqSkip">Skip</button>${r?.level === 'rest' ? '<button class="ghost" type="button" id="rqRecover">Recovery session instead</button>' : ''}<button class="cta" type="button" id="rqGo" ${r ? '' : 'disabled'}>${r ? 'Start workout' : 'Answer all three'}</button></div>`);
+    $('#rsheetBody').onclick = e => {
+      const b = e.target.closest('[data-rq]'); if (b) { const [k, v] = b.dataset.rq.split(':'); a[k] = v; draw(); return; }
+      if (e.target.id === 'rqSkip') { S.checkin = { day: todayKey(), r: null }; persist(); closeSheet(); then(); }
+      if (e.target.id === 'rqGo' && r) { S.checkin = { day: todayKey(), a: { ...a }, r }; (S.checkinLog ||= []).push({ at: Date.now(), ...a, level: r.level }); persist(); closeSheet(); renderToday(); then(); }
+      if (e.target.id === 'rqRecover') { S.checkin = { day: todayKey(), a: { ...a }, r }; persist(); closeSheet(); startClass(routineById('restDay15')); }
+    };
+  };
+  draw();
+}
 function startFlow() {
+  const morning = (S.readiness || []).some(x => dayKey(x.at) === dayKey(Date.now())); // already answered on Today
+  if (S.prefs?.checkin !== false && S.checkin?.day !== todayKey() && !morning && activeProgram()) return askReadiness(startFlow);
+  $('#rsheetBody').onclick = null;
   const ids = todayItems().map(x => x[0]);
   if (!S.prog?.skipDrills && !(S.classes || []).some(r => r.routine === 'drills' && new Date(r.at).toDateString() === new Date().toDateString())) {
     const wu = routines.warmupFor(ids, LIB);
@@ -1409,7 +1480,7 @@ function startFlow() {
   beginFlow(ids);
 }
 function beginFlow(ids) {
-  flow = { items: ids };
+  flow = { items: ids }; voiceListen(true);
   say(`Let's go. ${flow.items.length} exercises today. I'll take you through every set.`, { id: 'flow_start', priority: 'high' });
   nextInFlow(true);
 }
@@ -1418,7 +1489,7 @@ function nextInFlow(first) {
   const k = flowNextId();
   stopRest(); $('#summary').hidden = true; $('#flowNext').hidden = true;
   if (!k) {
-    const trained = flow.items; flow = null; keepAwake(false); tab('today'); renderToday();
+    const trained = flow.items; flow = null; voiceListen(false); keepAwake(false); tab('today'); renderToday();
     say('Workout done. Every set is logged and your next session is already planned. Cool-down stretch? Six minutes.', { id: 'flow_done', priority: 'high' });
     toast('Workout done ✓ Next session is planned.');
     const st = routines.stretchFor(trained, LIB);
@@ -1453,7 +1524,7 @@ $('#planStart').onclick = () => startFlow();
 
 /* ---------- Training-day reminders ---------- */
 $('#remindCal').onclick = () => {
-  const text = icsFor(S.plan, { name: S.profile.name, url: location.href.split('#')[0].split('?')[0] });
+  const text = icsFor(S.plan, { name: S.profile.name, url: location.href.split('#')[0].split('?')[0] + '?start=today' });
   if (!text) return toast('Pick your training days first.');
   const url = URL.createObjectURL(new Blob([text], { type: 'text/calendar' }));
   const a = document.createElement('a'); a.href = url; a.download = 'shred-qk-training.ics'; document.body.appendChild(a); a.click(); a.remove();
@@ -1527,19 +1598,21 @@ function rollMonth() {
   const P = S.program, def = P?.id && programById(P.id); if (!def) return;
   P.blockStart ||= P.start; P.block ||= 1;
   if (Date.now() - P.blockStart < MONTH) return;
-  const nb = refresh.nextBlock(def, { block: P.block, plan: P.plan || def.plan }, { lib: LIB, avoid: S.prefs?.avoid || [], compliance: refresh.compliance(P, P.days || def.days), clean: cleanRate() });
-  Object.assign(P, { block: nb.block, plan: nb.plan, blockStart: Date.now(), news: { block: nb.block, changes: nb.changes, note: nb.note, seen: false } });
+  const nb = refresh.nextBlock(def, { block: P.block, plan: P.plan || def.plan }, { lib: LIB, avoid: avoidList(), compliance: refresh.compliance(P, P.days || def.days), clean: cleanRate(), keep: personal.favourites(S.sessions) });
+  const weak = personal.weakPoints(S.sessions, LIB, { plan: nb.plan, have: S.profile.equip, pain: S.profile.pain || [], avoid: avoidList() });
+  if (weak.length) nb.plan = personal.addWeak(nb.plan, weak);
+  Object.assign(P, { block: nb.block, plan: nb.plan, blockStart: Date.now(), news: { block: nb.block, changes: nb.changes, note: nb.note, weak, seen: false } });
   persist();
   say(`Month ${nb.block} of ${def.name} is ready. ${nb.changes.length} new exercises, same formula. ${nb.note}`, { id: 'month_' + nb.block, priority: 'high' });
 }
 function renderNews() {
-  renderDaysNews();
+  renderDaysNews(); renderPersonalNotes();
   const n = S.program?.news, box = $('#planNews');
   if (!n || n.seen) { box.hidden = true; return; }
   box.hidden = false;
   $('#newsTitle').textContent = `Month ${n.block} is ready: new exercises, same formula`;
   $('#newsNote').textContent = n.note;
-  $('#newsList').innerHTML = n.changes.slice(0, 6).map(c => `<li>${esc(LIB[c.from]?.name || c.from)} → <b>${esc(LIB[c.to]?.name || c.to)}</b></li>`).join('') + (n.changes.length > 6 ? `<li class="muted">and ${n.changes.length - 6} more</li>` : '');
+  $('#newsList').innerHTML = (n.weak || []).map(w => `<li><b>+ ${esc(LIB[w.id]?.name || w.id)}</b>: ${esc(w.why)}</li>`).join('') + n.changes.slice(0, 6).map(c => `<li>${esc(LIB[c.from]?.name || c.from)} → <b>${esc(LIB[c.to]?.name || c.to)}</b></li>`).join('') + (n.changes.length > 6 ? `<li class="muted">and ${n.changes.length - 6} more</li>` : '');
 }
 $('#newsOk').onclick = () => { if (S.program?.news) { S.program.news.seen = true; persist(); renderNews(); } };
 // Swap an exercise the lifter doesn't like: similar options, and it never comes back in later months.
@@ -1858,8 +1931,9 @@ function programScheme(k) {
 }
 // A program day counts as trained when a set of one of its exercises is saved.
 function logProgramDay(k) {
-  const d = programDay(); if (!d || d.doneToday || !d.day.items.some(x => x[0] === k)) return;
-  (S.program.log ||= []).push({ day: d.index, at: Date.now() }); persist();
+  const d = programDay(); if (!d || d.doneToday || !(dayItems() || []).some(x => x[0] === k)) return;
+  const r = personalNote.rescue;
+  (S.program.log ||= []).push({ day: d.index, at: Date.now(), ...(r ? { merged: r.next } : {}) }); persist();
 }
 // Train tab, program first: your program (or the pick), then every program grouped by goal.
 let collFilter = 'all';
@@ -1871,7 +1945,7 @@ function progCard(p, rec) {
   return `<button type="button" role="listitem" class="prog-card big" data-prog="${p.id}" data-coll="${c?.key || 'yours'}">
     <span class="pgoal">${p.custom ? 'Yours' : esc(c?.name || p.goal)} · ${esc(p.level)}</span><b>${esc(p.name)}</b><p>${esc(progText(p))}</p>
     ${rec ? '<span class="rec-tag">Recommended for your goal</span>' : ''}
-    <span class="meta">${flex ? '3–5' : p.days} days/week · ~${progMins(v)} min · ${p.weeks} weeks${progEquip(p) ? ' · ' + progEquip(p) : ''}</span></button>`;
+    <span class="meta">${flex ? '3–6' : p.days} days/week · ~${progMins(v)} min · ${p.weeks} weeks${progEquip(p) ? ' · ' + progEquip(p) : ''}</span></button>`;
 }
 function weekDone() {
   const wk = brief.weekOf(Date.now());
@@ -1927,8 +2001,8 @@ function renderPrograms() {
 }
 $('#collChips').onclick = e => { const b = e.target.closest('[data-coll]'); if (!b) return; collFilter = b.dataset.coll; renderPrograms(); };
 let pickDays = {};
-// Starting days: the client's pick, else the number of weekdays they already train (3–5), else the program default.
-const startDays = p => { const known = S.plan?.days?.length || 0; return pickDays[p.id] || (known >= 3 && known <= 5 ? known : freq.defaultDaysFor(p)); };
+// Starting days: the client's pick, else the number of weekdays they already train (3–6), else the program default.
+const startDays = p => { const known = S.plan?.days?.length || 0; return pickDays[p.id] || (known >= freq.MIN_DAYS && known <= freq.MAX_DAYS ? known : freq.defaultDaysFor(p)); };
 function showProgram(id) {
   const on = S.program?.id === id, base = on ? baseProgram() : programById(id); if (!base) return;
   const flex = freq.canAdapt(base), n = flex ? (on ? S.program.days || base.days : startDays(base)) : base.days, p = daysView(base, n);
@@ -2005,7 +2079,7 @@ function renderRewards() {
 }
 
 function renderProgress() {
-  renderRewards(); renderStrength();
+  renderRewards(); renderStrength(); renderWeak();
   const sets = S.sessions.filter(s => s.reps && !s.guided).slice(-12);
   const scores = sets.map(s => Math.round(s.good / s.reps * 100));
   $('#pfScore').textContent = scores.length ? scores[scores.length - 1] + '%' : '–';
@@ -2471,7 +2545,7 @@ $('#studioList').onclick = async e => {
 $('#studioExport').onclick = async () => { const data = await exportClips(); if (!Object.keys(data.clips).length) return toast('Record some lines first.'); downloadJSON(`shred-voice-${Date.now()}.json`, data); };
 
 /* ---------- Boot ---------- */
-mountOrbs(); bindPlan(); bindProfile(); renderTrain(); renderToday(); applyMute(); renderTestHistory();
+mountOrbs(); bindPlan(); bindProfile(); bindPersonal(); renderTrain(); renderToday(); applyMute(); renderTestHistory();
 if (S.profile.name) {
   // Returning client: straight to Today. The first tap anywhere wakes the voice (phones need a tap before sound).
   $('#welcome').hidden = true;
@@ -2481,6 +2555,8 @@ if (S.profile.name) {
 if (new URLSearchParams(location.search).has('calm') || location.hash === '#calm') { $('#welcome').hidden = true; tab('calm'); startCalmNow(); }
 // A notification tap: ?tab=food opens Food (check-in day, or a plan QK updated).
 else if (['food', 'train', 'today', 'progress'].includes(new URLSearchParams(location.search).get('tab')) && S.profile?.name) { $('#welcome').hidden = true; tab(new URLSearchParams(location.search).get('tab')); }
+// From a calendar reminder or the app-icon shortcut: ?start=today opens straight into today's workout.
+if (new URLSearchParams(location.search).get('start') === 'today' && S.profile.name) { $('#welcome').hidden = true; tab('today'); if (activeProgram()) setTimeout(startFlow, 500); }
 // First run: three short questions, then straight to Today.
 const OB_STEPS = ['ob1', 'ob2', 'ob3', 'obGoal', 'obExp'];
 const obStep = n => { const id = typeof n === 'number' ? ['ob1', 'ob2', 'ob3'][n - 1] : n; OB_STEPS.forEach(x => $('#' + x).hidden = x !== id); $('#obIntro').hidden = id !== 'ob1'; };
@@ -2512,7 +2588,7 @@ function chooseProgram(id) {
   S.program = { id, start: Date.now(), blockStart: Date.now(), block: 1, log: [], ...(freq.canAdapt(p) ? { days: nd } : {}) };
   if (!S.plan.days.length) { S.plan.days = defaultDays(nd); S.profile.weeklyGoal = nd; }
   persist(); drawObDays();
-  $('#obDaysNote').textContent = `QK picked ${p.name}: ${p.tagline} It's ${nd} days a week, so QK suggested days. Change them to fit your life${freq.canAdapt(p) ? ': pick 3, 4 or 5 and QK re-packs the program' : ''}.`;
+  $('#obDaysNote').textContent = `QK picked ${p.name}: ${p.tagline} It's ${nd} days a week, so QK suggested days. Change them to fit your life${freq.canAdapt(p) ? ': pick 3 to 6 and QK re-packs the program' : ''}.`;
   obStep(3);
 }
 const OB_ORDER = [1, 2, 3, 4, 5, 6, 0], OB_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -2528,3 +2604,136 @@ function finishWelcome() {
 // The website caches itself for offline use; the native app (native/README.md) ships its files inside, so it skips this.
 if ('serviceWorker' in navigator && location.protocol === 'https:' && !globalThis.Capacitor?.isNativePlatform?.()) navigator.serviceWorker.register('sw.js').catch(() => {});
 window.__shred = { S, CONFIG };
+
+
+/* ---------- Make it yours: equipment, pain, age, time per day, check-in, voice, language ---------- */
+// A function, not a constant: startup code calls bindPersonal() before this line runs.
+function WDAY_(d) { return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]; }
+function bindPersonal() {
+  const p = S.profile, P = (S.prefs ||= {});
+  $('#pAge').value = p.age || ''; $('#pExp').value = p.experience || '';
+  $('#pAge').onchange = e => { const v = +e.target.value; p.age = v >= 12 && v <= 99 ? v : undefined; persist(); renderToday(); renderPrograms(); };
+  $('#pExp').onchange = e => { p.experience = e.target.value || undefined; persist(); renderToday(); };
+  const chips = () => {
+    $('#eqChips').innerHTML = personal.EQUIP.map(e => `<button type="button" class="mchip ${(p.equip || []).includes(e.key) ? 'on' : ''}" data-eq="${e.key}" aria-pressed="${(p.equip || []).includes(e.key)}">${esc(e.label)}</button>`).join('');
+    $('#painChips').innerHTML = Object.entries(personal.PAIN).map(([k, a]) => `<button type="button" class="mchip ${(p.pain || []).includes(k) ? 'on' : ''}" data-painarea="${k}" aria-pressed="${(p.pain || []).includes(k)}">${esc(a.label)}</button>`).join('');
+    const days = [...(S.plan?.days || [])].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)), mins = S.plan?.minutes || {};
+    $('#dayMins').innerHTML = days.length ? days.map(d => `<label class="field inline-field">${WDAY_(d)}<select data-dmin="${d}">${['', 30, 45, 60, 75, 90].map(m => `<option value="${m}" ${String(mins[d] || '') === String(m) ? 'selected' : ''}>${m ? m + ' min' : 'No limit'}</option>`).join('')}</select></label>`).join('') : '<p class="muted small" style="margin:0">Pick your training days first (Training days, above).</p>';
+  };
+  chips();
+  $('#eqChips').onclick = e => { const b = e.target.closest('[data-eq]'); if (!b) return; const s = new Set(p.equip || []); s.has(b.dataset.eq) ? s.delete(b.dataset.eq) : s.add(b.dataset.eq); p.equip = [...s]; persist(); chips(); renderToday(); };
+  $('#painChips').onclick = e => { const b = e.target.closest('[data-painarea]'); if (!b) return; const s = new Set(p.pain || []); s.has(b.dataset.painarea) ? s.delete(b.dataset.painarea) : s.add(b.dataset.painarea); p.pain = [...s]; persist(); chips(); renderToday(); };
+  $('#dayMins').onchange = e => { const sel = e.target.closest('[data-dmin]'); if (!sel) return; S.plan.minutes ||= {}; if (sel.value) S.plan.minutes[sel.dataset.dmin] = +sel.value; else delete S.plan.minutes[sel.dataset.dmin]; persist(); renderToday(); };
+  $('#meCard').ontoggle = () => { if ($('#meCard').open) bindPersonal(); };
+  $('#pCheckin').checked = P.checkin !== false; $('#pCheckin').onchange = e => { P.checkin = e.target.checked; persist(); };
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  $('#pVoiceCmd').checked = !!P.voiceCmd; $('#pVoiceCmd').disabled = !SR;
+  if (!SR) $('#voiceCmdNote').textContent = 'This browser has no speech recognition, so voice commands are off. Chrome on Android supports them.';
+  $('#pVoiceCmd').onchange = e => { P.voiceCmd = e.target.checked; persist(); if (!P.voiceCmd) voiceListen(false); };
+  const lang = () => {
+    setCoachLang(p.coachLang); $('#pLang').value = p.coachLang || 'en';
+    const noVoice = p.coachLang === 'ur' && 'speechSynthesis' in window && !urduVoice();
+    $('#langNote').hidden = !noVoice;
+    $('#langNote').textContent = noVoice ? 'This phone has no Urdu voice yet, so QK keeps speaking English. Add Urdu in your phone\'s text-to-speech settings and QK switches by itself.' : '';
+  };
+  $('#pLang').onchange = e => { p.coachLang = e.target.value; persist(); lang(); };
+  lang(); if (!bindPersonal.bound && 'speechSynthesis' in window) { bindPersonal.bound = true; speechSynthesis.addEventListener?.('voiceschanged', () => bindPersonal()); }
+}
+
+// Notes on the Today plan: a missed session folded in, exercises fitted to the client, how they feel today.
+function renderPersonalNotes() {
+  const r = personalNote.rescue, box = $('#rescueNews');
+  box.hidden = !r;
+  if (r) box.innerHTML = `<b>Missed ${r.missedDays.map(d => WDAY_(d)).join(' and ')}? Nothing is lost.</b><p class="muted small">Today also has the main lifts from ${esc(r.nextName)}: ${r.added.map(id => esc(LIB[id]?.name || id)).join(', ')}. One set lighter each, so it still fits.</p><div class="btn-row"><button class="ghost" type="button" id="rescueOff">Just today's session</button></div>`;
+  const sw = personalNote.swaps, why = { equipment: 'your equipment', pain: 'easy on the sore spot', skipped: 'you skipped it twice', busy: 'machine taken' };
+  $('#swapNote').hidden = !sw.length;
+  $('#swapNote').textContent = sw.length ? 'Fitted to you: ' + sw.map(x => `${LIB[x.from]?.name} → ${LIB[x.to]?.name} (${why[x.why]})`).join('; ') + '.' : '';
+  const rd = readyToday();
+  $('#readyNote').hidden = !rd || rd.level === 'normal';
+  if (rd) { $('#readyNote').textContent = rd.note; $('#readyNote').className = 'ready-note ' + rd.level; }
+}
+document.addEventListener('click', e => { if (e.target.id === 'rescueOff') { S.rescueOff = todayKey(); persist(); renderToday(); toast('Just today\'s session. The rest of your week stays as planned.'); } });
+
+// Machine taken: an equivalent exercise for today only.
+$('#busyBtn').onclick = () => {
+  const k = exKey, ids = (dayItems() || []).map(x => x[0]);
+  const opts = refresh.alternatives(k, LIB, { avoid: avoidList(), exclude: ids, n: 16 }).filter(id => personal.canDo(LIB, id, S.profile.equip) && !personal.hurts(LIB, id, S.profile.pain || [])).slice(0, 4);
+  if (!opts.length) return toast('No close alternative here. Do the next exercise first and come back.');
+  $('#setup').hidden = true;
+  openSheet(`<div><span class="eyebrow">Machine taken</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Do one of these today</h2></div>
+    <p class="muted small" style="margin:0">Same muscles, same sets and reps. ${esc(LIB[k].name)} is back next time.</p>
+    <div class="swap-list">${opts.map(id => `<button type="button" class="ghost" data-busyto="${id}"><b>${esc(LIB[id].name)}</b><span>${esc(LIB[id].muscles.slice(0, 3).join(' · '))} · ${esc(LIB[id].equipment)}${LIB[id].pattern ? ' · form check' : ''}</span></button>`).join('')}</div>`);
+  $('#rsheetBody').dataset.busyFrom = k;
+};
+$('#rsheetBody').addEventListener('click', e => {
+  const b = e.target.closest('[data-busyto]'); if (!b) return;
+  const from = $('#rsheetBody').dataset.busyFrom, to = b.dataset.busyto, t = todayKey();
+  if (S.todaySwap?.day !== t) S.todaySwap = { day: t, map: {} };
+  const orig = Object.keys(S.todaySwap.map).find(o => S.todaySwap.map[o] === from) || from;
+  S.todaySwap.map[orig] = to; persist();
+  if (flow) flow.items = flow.items.map(x => (x === from ? to : x));
+  closeSheet(); renderToday(); openSetup(to);
+  toast(`${LIB[to].name} today. ${LIB[from].name} is back next time.`);
+});
+// Skip: twice in four weeks and QK swaps it out for good.
+$('#skipEx').onclick = () => {
+  const k = exKey, P = (S.prefs ||= {}); P.skips ||= {}; (P.skips[k] ||= []).push(Date.now()); persist();
+  const dropped = personal.skipDrops(P.skips).includes(k);
+  $('#setup').hidden = true;
+  if (flow) { flow.items = flow.items.filter(x => x !== k); nextInFlow(); }
+  toast(dropped ? `Skipped twice in 4 weeks: QK swaps ${LIB[k].name} for something similar from now on.` : `Skipped ${LIB[k].name}.`);
+};
+// This hurts: mark the area; today's session and every later one work around it.
+$('#painBtn').onclick = () => {
+  $('#setup').hidden = true;
+  openSheet(`<div><span class="eyebrow">This hurts</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Where is it?</h2></div>
+    <div class="chip-wrap">${Object.entries(personal.PAIN).map(([k, a]) => `<button type="button" class="mchip" data-painto="${k}">${esc(a.label)}</button>`).join('')}</div>
+    <p class="muted small" style="margin:0">QK swaps moves that load it and adds two gentle rehab exercises. Remove it any time in Me → Make it yours. Sharp pain, swelling, numbness or pain lasting more than two weeks: see a physio or doctor.</p>`);
+};
+$('#rsheetBody').addEventListener('click', e => {
+  const b = e.target.closest('[data-painto]'); if (!b) return;
+  const p = S.profile; p.pain = [...new Set([...(p.pain || []), b.dataset.painto])]; persist(); closeSheet();
+  if (flow) { flow.items = (dayItems() || []).map(x => x[0]); nextInFlow(); }
+  renderToday(); bindPersonal();
+  toast(`${personal.PAIN[b.dataset.painto].label}: QK works around it from now on.`);
+});
+
+// Weak points on the Progress tab: what QK will add next month, and why.
+function renderWeak() {
+  const w = personal.weakPoints(S.sessions, LIB, { plan: activeProgram()?.plan || [], have: S.profile.equip, pain: S.profile.pain || [], avoid: avoidList() });
+  $('#weakTitle').textContent = w.length ? `${w.length} to work on` : 'None found';
+  $('#weakList').innerHTML = w.length ? w.map(x => `<p style="margin:0"><b>+ ${esc(LIB[x.id].name)}</b><br><span class="muted small">${esc(x.why)}</span></p>`).join('') + '<p class="muted small" style="margin:0">QK adds these to your program next month.</p>'
+    : '<p class="muted small" style="margin:0">Your lifts are moving together and your form is steady. QK checks your numbers and form every time you train.</p>';
+}
+
+// Hands-free voice commands (opt-in). The parser is in voicecmd.js.
+let recog = null;
+function voiceListen(on) {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!on) { const r = recog; recog = null; try { r?.stop(); } catch {} return; }
+  if (!SR || recog || !S.prefs?.voiceCmd) return;
+  recog = new SR(); recog.continuous = true; recog.interimResults = false; recog.lang = S.profile.coachLang === 'ur' ? 'ur-PK' : 'en-US';
+  recog.onresult = e => handleVoice(e.results[e.results.length - 1][0].transcript);
+  recog.onend = () => { if (recog && flow) try { recog.start(); } catch {} };
+  try { recog.start(); } catch { recog = null; }
+}
+function handleVoice(text) {
+  const c = parseVoice(text); if (!c) return null;
+  const setupOpen = !$('#setup').hidden, sumOpen = !$('#summary').hidden;
+  const showKg = kg => +prog.toUnit(kg, unit()).toFixed(2);
+  const setRx = kg => { $('#rxKg').value = showKg(kg); $('#rxSave').click(); };
+  if (c.cmd === 'weight') {
+    const kg = prog.fromUnit(c.kg, c.unit), said = `${c.kg} ${c.unit === 'lb' ? 'pounds' : 'kilos'}.`;
+    if (setupOpen) { setRx(kg); say(said, { priority: 'high' }); }
+    else if (sumOpen) { $('#setKg').value = showKg(kg); $('#setKg').dispatchEvent(new Event('change')); say(said, { priority: 'high' }); }
+    else return null;
+  } else if ((c.cmd === 'heavier' || c.cmd === 'lighter') && setupOpen && curRx) {
+    const st = prog.stepKg(curRx.cls, unit()); setRx(Math.max(0, curRx.kg + (c.cmd === 'heavier' ? st : -st))); say(c.cmd === 'heavier' ? 'Heavier.' : 'Lighter.', { priority: 'high' });
+  } else if (c.cmd === 'start' && setupOpen) (!$('#startCam').hidden ? $('#startCam') : $('#startGuided')).click();
+  else if (c.cmd === 'done' && live) $('#endLive').click();
+  else if (c.cmd === 'next' && flow && sumOpen) nextInFlow();
+  else if (c.cmd === 'skip' && flow && setupOpen) $('#skipEx').click();
+  else return null;
+  return c;
+}
+window.__qkVoice = handleVoice;

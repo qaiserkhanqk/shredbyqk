@@ -15,7 +15,7 @@ check('same days → the program itself', adapt(byId('massMonster'), 4, LIB) ===
 check('default: 5 days, beginner programs keep their 3', defaultDaysFor(byId('massMonster')) === 5 && defaultDaysFor(byId('gainsEngine')) === 3 && defaultDaysFor(byId('raceReady')) === 4);
 
 const big = id => (liftClass(LIB[id]) || '').startsWith('big');
-for (const id of FLEX) for (const n of [3, 4, 5]) {
+for (const id of FLEX) for (const n of [3, 4, 5, 6]) {
   const p = byId(id), a = adapt(p, n, LIB), tag = `${id} at ${n} days`;
   if (n === p.days) continue;
   const bad = [];
@@ -66,7 +66,8 @@ check('mixed weeks (3, 5, 3) → no change', judge([5, 3, 5, 3], 5) === null);
 check('a week with no training (holiday) is skipped, not counted as 0', judge([3, 3, 0, 3], 5)?.days === 3 && judge([5, 5, 0, 5], 5) === null);
 check('never below 3 days (2 a week → 3)', judge([2, 2, 2, 2], 5)?.days === 3 && judge([2, 2, 2, 2], 3) === null);
 check('training more: 5 a week for 3 weeks on a 3-day plan → 5', judge([5, 5, 5, 5], 3)?.days === 5 && judge([4, 5, 4, 4], 3)?.days === 4);
-check('never above 5 days', judge([6, 6, 6, 6], 5) === null);
+check('up to 6 days: 6 a week for 3 weeks on a 5-day plan → 6', judge([5, 6, 6, 6], 5)?.days === 6);
+check('never above 6 days (7 a week → 6, and nothing past 6)', judge([7, 7, 7, 7], 5)?.days === 6 && judge([7, 7, 7, 7], 6) === null);
 check('the current week is never judged (half a week of 1 session)', judge([5, 5, 5, 5], 5, { now: weekStart(4) + 2 * DAY }) === null && judgeDays([...logOf([5, 5, 5, 5]), { day: 0, at: weekStart(4) }], { current: 5, since: weekStart(0) - DAY, now: weekStart(4) + 2 * DAY }) === null);
 check('the first partial week after starting is not judged', judgeDays(logOf([1, 3, 3]), { current: 5, since: weekStart(0) + 3 * DAY, now: weekStart(3) + DAY }) === null);
 check('after a change: three new full weeks needed before judging again', judgeDays(logOf([3, 3, 3, 3, 3]), { current: 5, since: weekStart(3) + DAY, now: weekStart(5) + DAY }) === null);
@@ -78,6 +79,7 @@ const mwf = [0, 1, 2].flatMap(w => [0, 2, 4].map(k => ({ day: k, at: weekStart(w
 check('usual days: Mon/Wed/Fri trainer → Mon, Wed, Fri', usualDays(mwf, 3, { now: weekStart(3) }).join() === '1,3,5', usualDays(mwf, 3, { now: weekStart(3) }).join());
 check('fit weekdays: keeps the chosen days and adds evenly (Tue/Fri/Sat → 4 days)', (await import('../js/frequency.js')).fitWeekdays([2, 5, 6], 4).join() === '1,2,5,6');
 check('fit weekdays: trims to n, keeping the earliest in the week', (await import('../js/frequency.js')).fitWeekdays([1, 2, 3, 4, 5], 3).join() === '1,2,3');
+check('6 days: Mass Monster re-packs into 6 sessions, Mon–Sat reminders', adapt(byId('massMonster'), 6, LIB).plan.length === 6 && usualDays([], 6, { now: weekStart(3) }).join() === '1,2,3,4,5,6');
 check('usual days: fills missing days evenly', usualDays([], 4, { now: weekStart(3) }).join() === '1,2,4,5');
 
 if (fail) { console.log(`${fail} FAILED`); process.exit(1); }

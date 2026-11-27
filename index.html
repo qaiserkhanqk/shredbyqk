@@ -66,6 +66,9 @@
     <div class="card stack" id="qkPlan" hidden>
       <div class="card-head" style="margin:0"><div><span class="eyebrow" id="planEyebrow">QK's plan for today</span><h2 class="display h2" id="planTitle">Your weights are set</h2></div><button class="linkbtn" type="button" id="planListen" aria-label="Hear the plan"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Hear it</button></div>
       <div class="news" id="daysNews" hidden></div>
+      <div class="news" id="rescueNews" hidden></div>
+      <p class="ready-note" id="readyNote" hidden></p>
+      <p class="muted small" style="margin:0" id="swapNote" hidden></p>
       <div class="news" id="planNews" hidden><b id="newsTitle"></b><p class="muted small" id="newsNote"></p><ul id="newsList"></ul><button class="ghost" type="button" id="newsOk">Got it</button></div>
       <p class="muted small" style="margin:0" id="planSummary"></p>
       <div class="time-cap" id="planTime"><span id="planMins"></span><span class="tc-btns">Short on time? <button type="button" data-cap="30">30</button><button type="button" data-cap="45">45</button><button type="button" data-cap="60">60</button> min</span></div>
@@ -394,6 +397,7 @@
       <p class="muted small" style="margin:0" id="rwPerfect"></p>
     </div>
 
+    <div class="card stack" id="weakCard"><div><span class="eyebrow">Weak points</span><h2 class="display h2" id="weakTitle">Checking your lifts</h2></div><div class="stack" id="weakList"></div></div>
     <div class="card stack" id="strengthCard">
       <div class="card-head" style="margin:0"><div><span class="eyebrow">Strength</span><h2 class="display h2" id="stTitle">Your lifts</h2></div><span class="data small" id="stDelta"></span></div>
       <div class="grid2"><label class="field">Lift<select id="stLift"></select></label><div class="seg" id="stRange" role="group" aria-label="Time range"><button type="button" data-r="1M">1M</button><button type="button" data-r="3M" class="on">3M</button><button type="button" data-r="1Y">1Y</button><button type="button" data-r="ALL">All</button></div></div>
@@ -443,7 +447,7 @@
         <p class="muted small" style="margin:0">People who decide exactly when and where they'll train are far more likely to follow through.</p>
         <div class="days" id="planDays"></div>
         <div class="grid2">
-          <label class="field">Time<input id="planTime" type="time"></label>
+          <label class="field">Time<input id="planAt" type="time"></label>
           <label class="field">Where<input id="planPlace" placeholder="e.g. PureGym"></label>
         </div>
         <p class="plan-line" id="planLine"></p>
@@ -463,6 +467,25 @@
         <label class="field">Coach photo (QK's face)<input id="coachPhoto" type="file" accept="image/*"></label>
         <label class="field">Coach voice<select id="voiceSel"></select></label>
         <button class="ghost" type="button" id="testVoice">Test the voice</button>
+      </div>
+    </details>
+
+    <details class="card" id="meCard">
+      <summary>Make it yours</summary>
+      <div class="stack" style="margin-top:14px">
+        <p class="muted small" style="margin:0">QK fits every session to you. All of this stays on your phone.</p>
+        <div class="grid2">
+          <label class="field">Age<input id="pAge" type="number" inputmode="numeric" min="12" max="99" placeholder="e.g. 32"></label>
+          <label class="field">Lifting experience<select id="pExp"><option value="">Not set</option><option value="new">New to lifting</option><option value="trained">Some experience or more</option></select></label>
+        </div>
+        <div><span class="eyebrow">My gym has</span><p class="muted small" style="margin:2px 0 6px">Nothing ticked means a full gym. QK swaps anything you can't do.</p><div class="chip-wrap" id="eqChips"></div></div>
+        <div><span class="eyebrow">Anything hurting?</span><p class="muted small" style="margin:2px 0 6px">QK keeps loaded moves away from it and adds two gentle rehab exercises. Not a diagnosis: sharp pain, swelling, numbness or pain lasting more than two weeks, see a physio or doctor.</p><div class="chip-wrap" id="painChips"></div></div>
+        <div><span class="eyebrow">Time per training day</span><div class="stack" id="dayMins" style="margin-top:6px"></div></div>
+        <label class="check"><input type="checkbox" id="pCheckin"> Ask how I feel before each workout (3 taps)</label>
+        <label class="check"><input type="checkbox" id="pVoiceCmd"> Hands-free voice commands during workouts</label>
+        <p class="muted small" style="margin:0" id="voiceCmdNote">Say "next", "skip", "done", "heavier", "lighter" or "80 kilos" (Urdu too: agla, bas, bhari, halka). Uses your phone's speech recognition: on most Android phones Google turns the audio into text. Off unless you turn it on.</p>
+        <label class="field">Coaching voice language<select id="pLang"><option value="en">English</option><option value="ur">اردو Urdu (short cues)</option></select></label>
+        <p class="muted small" style="margin:0" id="langNote" hidden></p>
       </div>
     </details>
 
@@ -553,6 +576,7 @@
     </div>
     <label class="check"><input type="checkbox" id="recordChk" checked> Record my set so I can watch it back</label>
     <p class="privacy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span><b>Your video never leaves your phone.</b> QK watches on this device. Nothing is uploaded or saved unless you save it yourself.</span></p>
+    <div class="btn-row setup-extra"><button class="ghost" type="button" id="busyBtn" hidden>Machine taken</button><button class="ghost" type="button" id="painBtn" hidden>This hurts</button><button class="ghost" type="button" id="skipEx" hidden>Skip exercise</button></div>
     <button class="ghost" type="button" id="formTestBtn" hidden>Check my running form (camera)</button>
     <button class="cta" type="button" id="startGuided" hidden><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Start with QK</button>
     <button class="cta" type="button" id="startCam"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M23 7l-7 5 7 5zM1 5h15v14H1z"/></svg>Start camera</button>
