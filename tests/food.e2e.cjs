@@ -227,6 +227,7 @@ const num = s => +String(s).replace(/[^\d]/g, '');
   check('next time it remembers the menu calories', (await sheetKcal()) === 820 && (await p.inputValue('#fsMenuKcal')) === '820');
   await p.click('#foodSheet .grab').catch(() => {}); await p.evaluate(() => { document.querySelector('#foodSheet').hidden = true; });
   await p.fill('#foodSearch', '');
+  check('reminders default to just the essentials', (await p.inputValue('#tNotify')) === 'essential');
   // Diet plan: QK's questionnaire → exact amounts → one tap logs a meal.
   check('diet plan card offers the questionnaire', /Breakfast you like/.test(await p.textContent('#foodPlan')));
   await p.click('#foodPlan [data-pdiet=nobeef]');

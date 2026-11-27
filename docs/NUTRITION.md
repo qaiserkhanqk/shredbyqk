@@ -178,6 +178,26 @@ Clients can say or type where the food came from, and every dish in the sentence
 | "beef burger at Johnny Rockets" (not in the database) | Restaurant-style, with the place's name kept |
 | "ghar ka daal chawal" / "karahi from a dhaba" | Home cooking / dhaba oil levels |
 
+## Signals, not paperwork
+
+The app reads the small signals a coach watches, from what clients already do (`js/signals.js`). Nothing extra to type:
+
+| Signal | Comes from | What changes |
+|---|---|---|
+| Logging | food logs, weigh-ins, sessions, morning cards | A warm "no catching up needed" line after 3 quiet days. A check-in with few logs says it's reading the scale, not the meals |
+| Sleep and stress | the one-tap morning "How do you feel?" card | A stall during a rough week: no cut; keep the plan and protect sleep |
+| Strength | the best lift of each exercise, last 2 weeks vs the 4 before | Losing weight while lifts drop 5%+: a little more food is offered first |
+| Cycle (women, opt-in, one tap a month, stays on the phone) | "Period started today" | A stall in the week before or the first days of a period: nothing changes ("water weight, not fat") |
+
+QK sees logging, sleep, rough mornings and strength on the dashboard. The cycle is never synced.
+
+**Notifications stay few.** Clients choose under Your targets → Reminders from QK:
+- **Just the essentials** (the default): the check-in every two weeks, and QK's plan updates.
+- **A gentle nudge too:** adds at most one reminder a week, only after 3 days without logging food, never on a check-in day. The wording never blames.
+- **Off.**
+
+Whatever they choose, they never get more than one notification a day; QK's plan update beats a check-in, which beats a nudge.
+
 ## QK edits plans on the dashboard
 
 Each client's plan shows on the coach dashboard. QK can do all of this, and every total updates as he types:
