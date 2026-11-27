@@ -1,6 +1,6 @@
 // Browser test of premenstrual patterns and the question budget. Written BEFORE the screens. Synthetic data only.
 // Run: node tests/cycle-ui-premenstrual.cjs   (E2E_BROWSER=chromium|firefox|webkit)
-const { launch } = require('./browser.cjs');
+const { launch, openCycle } = require('./browser.cjs');
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.task': 'application/octet-stream', '.webmanifest': 'application/manifest+json' };
@@ -17,7 +17,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     await c.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, r => r.fulfill({ status: 200, body: '', headers: { 'content-type': 'text/css' } }));
     await c.addInitScript(f => localStorage.setItem('shred_flags_v1', JSON.stringify(f)), flags);
     const p = await c.newPage(); p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
-    await p.goto('https://shred.local/'); await p.click('#welcomeBtn'); await p.click('.tabs [data-tab=body]'); await p.click('[data-go=cycle]'); await p.waitForTimeout(600);
+    await p.goto('https://shred.local/'); await openCycle(p); await p.waitForTimeout(600);
     await p.check('#cyAgree'); await p.click('[data-act=consent]'); await p.waitForTimeout(500);
     return { c, p };
   }
@@ -39,7 +39,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   try {
     { // flag on, with Zara
       const { c, p } = await page({ cycleTracking: true, premenstrualPatterns: true, companion: true });
-      await seed(p); await p.reload(); await p.click('#welcomeBtn'); await p.click('.tabs [data-tab=body]'); await p.click('[data-go=cycle]'); await p.waitForTimeout(900);
+      await seed(p); await p.reload(); await openCycle(p); await p.waitForTimeout(900);
       const card = await text(p, '#cyPremenstrual');
       check('a few days before her period: her own pattern, with the counts', /3 of your last 3 cycles/.test(card) && /cravings/.test(card) && /sleep/.test(card), card.slice(0, 300));
       check('…worded as "may", with other causes named, and no labels or diet advice', /may/.test(card) && /stress/i.test(card) && !/binge|diet|calorie/i.test(card));
@@ -62,7 +62,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     }
     { // flag off: nothing
       const { c, p } = await page({ cycleTracking: true });
-      await seed(p); await p.reload(); await p.click('#welcomeBtn'); await p.click('.tabs [data-tab=body]'); await p.click('[data-go=cycle]'); await p.waitForTimeout(900);
+      await seed(p); await p.reload(); await openCycle(p); await p.waitForTimeout(900);
       check('with the feature off (the default), no premenstrual card', (await p.$('#cyPremenstrual')) === null);
       await c.close();
     }

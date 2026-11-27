@@ -19,30 +19,35 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     await p.goto('https://shred.local/'); await p.waitForTimeout(400); return { c, p };
   }
   const pick = (p, q, v) => p.click(`#aboutYou [data-about=${q}][data-val="${v}"]`);
+  // Merge 2026-11-27: the sign-up is now multi-step (main). Our questions are one optional step right after the name;
+  // "Next" goes on to main's steps, and choosing "calm" as the focus finishes the sign-up at once.
+  const toAbout = async p => { await p.fill('#welcomeName', 'Test'); await p.click('#welcomeBtn'); await p.waitForTimeout(200); };
+  const finish = async (p, wait = 400) => { await p.click('#aboutNext'); await p.click('#ob2 [data-focus=calm]'); await p.waitForTimeout(wait); };
   const visible = (p, sel) => p.isVisible(sel).catch(() => false);
   const flags = p => p.evaluate(() => JSON.parse(localStorage.getItem('shred_flags_v1') || '{}'));
   const screenOn = p => p.evaluate(() => document.querySelector('.screen.on')?.id);
   try {
     { // Man
       const { c, p } = await fresh();
-      check('first launch: "Which best describes you?" is on the welcome screen', await visible(p, '#aboutYou') && /describes you/i.test(await p.textContent('#aboutYou')));
+      await toAbout(p);
+      check('first launch: "Which best describes you?" comes right after the name', await visible(p, '#aboutYou') && /describes you/i.test(await p.textContent('#aboutYou')));
       await pick(p, 'gender', 'man');
       check('man: no age or period question appears', !(await visible(p, '#aboutAge')) && !(await visible(p, '#aboutPeriods')));
-      await p.click('#welcomeBtn'); await p.waitForTimeout(400);
+      await finish(p);
       const f = await flags(p);
       check('man: lands on Today, with no Cycle tab and no cycle tile', (await screenOn(p)) === 'today' && !(await visible(p, '.tabs [data-tab=cycle]')) && (await p.$eval('#cycleTile', e => e.hidden)) && f.cycleTracking !== true, JSON.stringify(f));
       await p.reload(); await p.waitForTimeout(400);
-      check('second launch: the questions are not asked again', !(await visible(p, '#aboutYou')));
+      check('second launch: the questions are not asked again (returning users skip the sign-up)', !(await visible(p, '#aboutYou')) && !(await visible(p, '#welcome')));
       await c.close();
     }
     { // Woman, 18+, yes
       const { c, p } = await fresh();
-      await pick(p, 'gender', 'woman');
+      await toAbout(p); await pick(p, 'gender', 'woman');
       check('woman: asked her age', await visible(p, '#aboutAge') && !(await visible(p, '#aboutPeriods')));
       await pick(p, 'age', '18+');
       check('…then asked whether she would like to track her periods', await visible(p, '#aboutPeriods') && /track your periods/i.test(await p.textContent('#aboutPeriods')));
       await pick(p, 'periods', 'yes');
-      await p.click('#welcomeBtn'); await p.waitForTimeout(900);
+      await finish(p, 900);
       check('yes: she goes straight to her cycle screen, with a Cycle tab in the bottom bar', (await screenOn(p)) === 'cycle' && await visible(p, '.tabs [data-tab=cycle]'));
       const tops = await p.$$eval('.tabs nav button:not([hidden])', bs => bs.map(x => Math.round(x.getBoundingClientRect().top)));
       check('…and the bottom bar stays on one row with five tabs (found in a screenshot)', tops.length === 5 && new Set(tops).size === 1, JSON.stringify(tops));
@@ -61,12 +66,12 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     }
     { // Under 18 (minimum age raised from 13 to 18 by the product owner, 2026-11-27)
       const { c, p } = await fresh();
-      await pick(p, 'gender', 'woman');
+      await toAbout(p); await pick(p, 'gender', 'woman');
       check('the age choices are "Under 18" and "18 or over"', (await p.$$eval('#aboutAge [data-about=age]', bs => bs.map(b => b.dataset.val))).join() === 'under18,18+');
       await pick(p, 'age', 'under18');
       const note = await p.textContent('#aboutNote').catch(() => '');
       check('under 18: no period question, and a kind note (18 and over; a parent or guardian, school nurse or doctor can help)', !(await visible(p, '#aboutPeriods')) && /18/.test(note) && /parent|guardian/i.test(note), note);
-      await p.click('#welcomeBtn'); await p.waitForTimeout(400);
+      await finish(p);
       check('…and period tracking stays off', (await flags(p)).cycleTracking !== true && !(await visible(p, '.tabs [data-tab=cycle]')));
       await p.click('.tabs [data-tab=progress]'); await p.waitForTimeout(300);
       if (!(await p.$eval('#profileCard', d => d.open))) await p.click('#profileCard summary');
@@ -76,7 +81,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     }
     { // Adult and Other
       const { c, p } = await fresh();
-      await pick(p, 'gender', 'woman'); await pick(p, 'age', '18+');
+      await toAbout(p); await pick(p, 'gender', 'woman'); await pick(p, 'age', '18+');
       check('18 or over: asked whether she would like to track her periods', await visible(p, '#aboutPeriods'));
       await pick(p, 'gender', 'other');
       check('other or prefer not to say: asked the age and period questions too', await visible(p, '#aboutAge'));
@@ -84,9 +89,9 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     }
     { // Not right now: pregnant
       const { c, p } = await fresh();
-      await pick(p, 'gender', 'woman'); await pick(p, 'age', '18+'); await pick(p, 'periods', 'notNow');
+      await toAbout(p); await pick(p, 'gender', 'woman'); await pick(p, 'age', '18+'); await pick(p, 'periods', 'notNow');
       check('"Not right now": asked which applies', await visible(p, '#aboutNotNow'));
-      await pick(p, 'notNow', 'pregnant'); await p.click('#welcomeBtn'); await p.waitForTimeout(900);
+      await pick(p, 'notNow', 'pregnant'); await finish(p, 900);
       await p.check('#cyAgree'); await p.click('[data-act=consent]'); await p.waitForTimeout(700);
       check('pregnant: after consent, the pregnancy mode form is open and ready', await visible(p, '#cyPregStart') && await p.$eval('#cySituation', d => d.open));
       check('…and Zara does not ask about her last period', !(await p.$('#cyZaraFirst')));
@@ -94,10 +99,12 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     }
     { // Skipping keeps the app as it was
       const { c, p } = await fresh();
-      await p.click('#welcomeBtn'); await p.waitForTimeout(400);
+      await toAbout(p); await finish(p);
       check('skipping the questions: the app starts on Today as before', (await screenOn(p)) === 'today' && (await flags(p)).cycleTracking !== true);
+      // Merge 2026-11-27: returning users skip the whole sign-up (main), so a skipped step is not asked again at
+      // launch; nothing was saved, and period tracking can be turned on in You > Profile.
       await p.reload(); await p.waitForTimeout(400);
-      check('…and they are offered again next time (nothing was answered)', await visible(p, '#aboutYou'));
+      check('…nothing was saved, and the Profile switch is there to turn it on later', await p.evaluate(() => !JSON.parse(localStorage.getItem('shred_qk_v1') || '{}').profile?.aboutDone) && !!(await p.$('#profileCycle')));
       await c.close();
     }
   } catch (e) { check('run completed', false, e.stack); }

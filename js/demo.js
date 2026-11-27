@@ -36,15 +36,15 @@ export class HipThrustDemo {
     const P = this.P; if (!P) return;
     const s = 2, X = p => p.x * s, Y = p => p.y * s + 10;
     const g = ctx.createRadialGradient(400, 500, 10, 400, 500, 440);
-    g.addColorStop(0, 'rgba(124,108,255,.16)'); g.addColorStop(1, 'rgba(124,108,255,0)');
+    g.addColorStop(0, 'rgba(95,179,157,.16)'); g.addColorStop(1, 'rgba(95,179,157,0)');
     ctx.fillStyle = g; ctx.fillRect(0, 0, DEMO_W, DEMO_H);
-    ctx.strokeStyle = '#1e2638'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, Y({ y: 250 })); ctx.lineTo(DEMO_W, Y({ y: 250 })); ctx.stroke();
-    ctx.fillStyle = '#1a2130'; ctx.beginPath(); ctx.roundRect?.(X({ x: 40 }), Y({ y: 170 }), 160, 160, 16); ctx.fill();
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#262f44';
+    ctx.strokeStyle = '#1A2823'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, Y({ y: 250 })); ctx.lineTo(DEMO_W, Y({ y: 250 })); ctx.stroke();
+    ctx.fillStyle = '#16231F'; ctx.beginPath(); ctx.roundRect?.(X({ x: 40 }), Y({ y: 170 }), 160, 160, 16); ctx.fill();
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#22312B';
     const limb = (pts, w) => { ctx.lineWidth = w * s; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(X(p), Y(p)) : ctx.moveTo(X(p), Y(p))); ctx.stroke(); };
     limb([P.S, P.H], 30); limb([P.H, P.K], 24); limb([P.K, P.A], 18); limb([P.A, P.toe], 10); limb([P.S, P.elbow, P.hand], 12);
-    ctx.fillStyle = '#262f44'; ctx.beginPath(); ctx.arc(X(P.head), Y(P.head), 34, 0, 7); ctx.fill();
-    ctx.strokeStyle = '#3a4460'; ctx.lineWidth = 12; ctx.beginPath(); ctx.arc(X(P.H), Y({ y: P.H.y - 26 }), 52, 0, 7); ctx.stroke();
+    ctx.fillStyle = '#22312B'; ctx.beginPath(); ctx.arc(X(P.head), Y(P.head), 34, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#34463E'; ctx.lineWidth = 12; ctx.beginPath(); ctx.arc(X(P.H), Y({ y: P.H.y - 26 }), 52, 0, 7); ctx.stroke();
   }
 }
 
@@ -71,6 +71,204 @@ function toLandmarks(P) {
   return px;
 }
 
+/* ---------- Squat demo (side-on) ----------
+   Reps 1–2: hips shoot up first out of the bottom. Rep 3 fixed after QK's cue.
+   Reps 5–6: heels lift off the floor. Rep 7 fixed. */
+const SQ_SCRIPT = ['hips', 'hips', 'clean', 'clean', 'heels', 'heels', 'clean', 'clean'];
+const SQ = { ecc: 1.4, pause: 0.2, con: 1.1, hold: 0.9 };
+const FLOOR = 540, rad = d => d * Math.PI / 180;
+
+export class SquatDemo {
+  constructor() { this.t0 = null; this.rep = 0; this.done = false; }
+  frame(now) {
+    if (this.t0 == null) { this.t0 = now; this.phaseStart = now + 600; }
+    const el = (now - this.phaseStart) / 1000, cyc = SQ.ecc + SQ.pause + SQ.con + SQ.hold;
+    const fault = SQ_SCRIPT[Math.min(this.rep, SQ_SCRIPT.length - 1)];
+    let d = 0, rising = false;
+    if (this.rep >= SQ_SCRIPT.length || el < 0) { d = 0; if (this.rep >= SQ_SCRIPT.length) this.done = true; }
+    else if (el < SQ.ecc) d = ease(el / SQ.ecc);
+    else if (el < SQ.ecc + SQ.pause) d = 1;
+    else if (el < SQ.ecc + SQ.pause + SQ.con) { d = 1 - ease((el - SQ.ecc - SQ.pause) / SQ.con); rising = true; }
+    if (el >= cyc && this.rep < SQ_SCRIPT.length) { this.rep++; this.phaseStart = now; }
+    this.P = squatPose(d, rising && fault === 'hips', fault === 'heels' ? d : 0);
+    return toPxLandmarks(this.P);
+  }
+  drawScene(ctx) {
+    const P = this.P; if (!P) return;
+    backdrop(ctx, 380, 420, 'rgba(95,179,157,.16)');
+    floorLine(ctx, FLOOR + 2);
+    body(ctx, P, { torso: 46, thigh: 34, shin: 24 });
+    // barbell on the upper back
+    ctx.fillStyle = '#34463E'; ctx.beginPath(); ctx.arc(P.bar.x, P.bar.y, 46, 0, 7); ctx.fill();
+    ctx.fillStyle = '#4A5D54'; ctx.beginPath(); ctx.arc(P.bar.x, P.bar.y, 10, 0, 7); ctx.fill();
+  }
+}
+
+// Side-on squat pose. B describes the body: segment lengths (px) and how far each segment tilts at
+// full depth, so different bodies (long thighs, tight ankles) can be simulated.
+export const AVG_BODY = { foot: 62, shin: 130, thigh: 136, torso: 150, shinDeg: 30, thighDeg: 84, leanDeg: 38 };
+export function squatPose(d, hipsFirst, heel, B = AVG_BODY, scaled = 0) {
+  const toe = { x: 410, y: FLOOR }, { foot, shin, thigh, torso } = B;
+  const phi = rad(26 * heel); // foot pivots about the toe when the heels lift
+  const he = { x: toe.x - foot * Math.cos(phi), y: FLOOR - foot * Math.sin(phi) };
+  const A = { x: he.x + 14 * Math.cos(phi) + 6 * Math.sin(phi), y: he.y - 22 };
+  const k = scaled ? 1 : d, ts = rad(B.shinDeg * k), tt = rad(B.thighDeg * k);
+  const K = { x: A.x + shin * Math.sin(ts), y: A.y - shin * Math.cos(ts) };
+  const H = { x: K.x - thigh * Math.sin(tt), y: K.y - thigh * Math.cos(tt) };
+  const lean = rad(B.leanDeg * k + (hipsFirst ? 34 * Math.sin(Math.PI * (1 - d)) : 0));
+  const S = { x: H.x + torso * Math.sin(lean), y: H.y - torso * Math.cos(lean) };
+  const head = { x: S.x + 30 * Math.sin(lean) + 10, y: S.y - 34 * Math.cos(lean) - 6 };
+  const bar = { x: S.x - 8 * Math.cos(lean), y: S.y + 4 };
+  const elbow = { x: S.x - 30, y: S.y + 34 }, hand = { x: bar.x + 4, y: bar.y - 2 };
+  return { S, H, K, A, head, toe, heel: he, elbow, hand, bar };
+}
+
+// Side-on pose for the body map: squat depth d, heel rise, shoulder flexion (arm, degrees from the
+// trunk) and a hip hinge h. B: segment lengths and how far each tilts.
+export function sidePose({ d = 0, heel = 0, arm = 0, h = 0 }, B) {
+  const P = squatPose(d, false, heel, { ...B, shinDeg: B.shinDeg * d + 8 * h, thighDeg: B.thighDeg * d + 20 * h, leanDeg: B.leanDeg * d + B.hingeDeg * h }, 1);
+  const v = { x: P.H.x - P.S.x, y: P.H.y - P.S.y }, n = Math.hypot(v.x, v.y); v.x /= n; v.y /= n; // trunk, pointing down
+  const rot = (u, a) => ({ x: u.x * Math.cos(a) + u.y * Math.sin(a), y: -u.x * Math.sin(a) + u.y * Math.cos(a) });
+  const ua = rot(v, rad(arm)), fa = rot(v, rad(arm + (180 - B.elbowStraight)));
+  P.elbow = { x: P.S.x + 70 * ua.x, y: P.S.y + 70 * ua.y }; P.hand = { x: P.elbow.x + 62 * fa.x, y: P.elbow.y + 62 * fa.y };
+  return P;
+}
+
+// Facing-the-camera squat, as 33 pixel landmarks. knees: how far the knees move out (+) or cave in (−)
+// at full depth, in px per side. abd: arms raised out to the side, degrees.
+export function frontSquatLandmarks(d, { knees = 10, abd = 0, cx = DEMO_W / 2 } = {}) {
+  const c = (x, y) => ({ x, y, v: 1 }), px = Array.from({ length: 33 }, () => c(cx, 300));
+  const ankY = FLOOR - 22, kneeY = ankY - 130 + 6 * d, hipY = ankY - 266 + 120 * d, shY = hipY - 150 + 12 * d;
+  const A = rad(abd);
+  const side = (sh, el, wr, hp, kn, an, hl, ft, sg) => {
+    px[sh] = c(cx + sg * 62, shY);
+    if (abd > 0) { px[el] = c(cx + sg * (62 + 70 * Math.sin(A)), shY + 70 * Math.cos(A)); px[wr] = c(cx + sg * (62 + 132 * Math.sin(A)), shY + 132 * Math.cos(A)); }
+    else { px[el] = c(cx + sg * 80, shY + 70 - 40 * d); px[wr] = c(cx + sg * 70, shY + 130 - 90 * d); }
+    px[hp] = c(cx + sg * 38, hipY); px[kn] = c(cx + sg * (44 + knees * d), kneeY); px[an] = c(cx + sg * 46, ankY);
+    px[hl] = c(cx + sg * 44, FLOOR - 4); px[ft] = c(cx + sg * 56, FLOOR);
+  };
+  side(11, 13, 15, 23, 25, 27, 29, 31, -1); side(12, 14, 16, 24, 26, 28, 30, 32, 1);
+  px[0] = c(cx, shY - 60); px[7] = c(cx - 18, shY - 58); px[8] = c(cx + 18, shY - 58);
+  return px;
+}
+
+/* ---------- Body-map demo: the one-minute calibration ----------
+   A lifter with long thighs, tight ankles, tight hamstrings, limited overhead reach and elbows that
+   don't fully straighten. Every step of the real calibration, in order. */
+// [start s, step]. The camera version gives a real person more time per step (BODYMAP_STEPS in app.js).
+export const BODYMAP_DEMO_STEPS = [[0, 'stand'], [3, 'toes'], [6, 'squat'], [18, 'reach'], [22, 'hinge'], [30, 'face'], [33, 'arms'], [37, 'fsquat']];
+export const BODYMAP_SECS = 47;
+export const DEMO_BODY = { foot: 62, shin: 124, thigh: 150, torso: 138, shinDeg: 22, thighDeg: 42, leanDeg: 50, hingeDeg: 62, elbowStraight: 168, armMax: 150, abdMax: 150 };
+export class BodyMapDemo {
+  constructor(B = DEMO_BODY) { this.B = B; this.t0 = null; this.done = false; }
+  frame(now) {
+    if (this.t0 == null) this.t0 = now;
+    const t = (now - this.t0) / 1000, B = this.B, bell = x => Math.sin(Math.PI * Math.min(1, Math.max(0, x))) ** 2;
+    const hold = (x, a, b) => Math.min(1, Math.max(0, (x - a) / 0.8)) * Math.min(1, Math.max(0, (b - x) / 0.8)); // ease in, hold, ease out
+    if (t >= BODYMAP_SECS) this.done = true;
+    if (t < 30) {
+      let q = {};
+      if (t >= 3 && t < 6) q.heel = hold(t, 3, 6) * 1.0;
+      else if (t >= 6 && t < 18) { const d = bell(((t - 6) % 4) / 3.4); q.d = d; q.heel = 0.6 * d; }
+      else if (t >= 18 && t < 22) q.arm = B.armMax * hold(t, 18, 22);
+      else if (t >= 22 && t < 30) q.h = bell(((t - 22) % 4) / 3.4);
+      this.P = sidePose(q, B); this.px = toPxLandmarks(this.P);
+    } else {
+      this.P = null;
+      const abd = t >= 33 && t < 37 ? B.abdMax * hold(t, 33, 37) : 0;
+      const d = t >= 37 ? bell(((t - 37) % 4.5) / 3.8) * (t < 46 ? 1 : 0) : 0;
+      this.px = frontSquatLandmarks(d, { knees: -14, abd });
+    }
+    return this.px;
+  }
+  drawScene(ctx) {
+    backdrop(ctx, 360, 420, 'rgba(159,208,182,.12)'); floorLine(ctx, FLOOR + 2);
+    if (this.P) body(ctx, this.P, { torso: 46, thigh: 34, shin: 24 });
+    else {
+      const p = this.px; ctx.strokeStyle = '#22312B'; ctx.lineCap = 'round';
+      const limb = (ids, w) => { ctx.lineWidth = w; ctx.beginPath(); ids.forEach((i, k) => k ? ctx.lineTo(p[i].x, p[i].y) : ctx.moveTo(p[i].x, p[i].y)); ctx.stroke(); };
+      limb([11, 12, 24, 23, 11], 40); limb([23, 25, 27], 40); limb([24, 26, 28], 40); limb([11, 13, 15], 22); limb([12, 14, 16], 22);
+      ctx.fillStyle = '#22312B'; ctx.beginPath(); ctx.arc(p[0].x, p[0].y, 30, 0, 7); ctx.fill();
+    }
+  }
+}
+
+/* ---------- Bench press demo (side-on, head on the left) ----------
+   Reps 1–2: shoulders roll off the bench at lockout (no scapular retraction).
+   Reps 4–5: feet out in front, no leg drive. Rep 7: hips lift off the bench. */
+const BP_SCRIPT = ['scap', 'scap', 'clean', 'legs', 'legs', 'clean', 'butt', 'clean'];
+const BP = { ecc: 1.5, pause: 0.25, con: 1.0, hold: 0.8 };
+const BENCH_Y = 380;
+
+export class BenchDemo {
+  constructor() { this.t0 = null; this.rep = 0; this.done = false; this.legs = 0; }
+  frame(now) {
+    if (this.t0 == null) { this.t0 = now; this.phaseStart = now + 600; }
+    const el = (now - this.phaseStart) / 1000, cyc = BP.ecc + BP.pause + BP.con + BP.hold;
+    const fault = BP_SCRIPT[Math.min(this.rep, BP_SCRIPT.length - 1)];
+    let lift = 1, press = 0; // lift: 1 = lockout, 0 = bar on chest; press: progress of the press 0..1
+    if (this.rep >= BP_SCRIPT.length || el < 0) { lift = 1; if (this.rep >= BP_SCRIPT.length) this.done = true; }
+    else if (el < BP.ecc) lift = 1 - ease(el / BP.ecc);
+    else if (el < BP.ecc + BP.pause) lift = 0;
+    else if (el < BP.ecc + BP.pause + BP.con) { press = (el - BP.ecc - BP.pause) / BP.con; lift = ease(press); }
+    if (el >= cyc && this.rep < BP_SCRIPT.length) { this.rep++; this.phaseStart = now; }
+    // Feet move between reps, during the lockout hold, like a real lifter resetting.
+    const nextFault = BP_SCRIPT[Math.min(this.rep + (el > BP.ecc + BP.pause + BP.con ? 1 : 0), BP_SCRIPT.length - 1)];
+    this.legs += ((nextFault === 'legs' ? 1 : 0) - this.legs) * 0.08;
+    const shRise = fault === 'scap' && el > BP.ecc + BP.pause ? 30 * lift : 0;
+    const hipRise = fault === 'butt' && press > 0 ? 32 * Math.sin(Math.PI * press) : 0;
+    this.P = benchPose(lift, shRise, hipRise, this.legs);
+    return toPxLandmarks(this.P);
+  }
+  drawScene(ctx) {
+    const P = this.P; if (!P) return;
+    backdrop(ctx, 360, 440, 'rgba(159,208,182,.12)');
+    floorLine(ctx, FLOOR + 2);
+    ctx.fillStyle = '#16231F'; ctx.beginPath(); ctx.roundRect?.(150, BENCH_Y, 330, 26, 10); ctx.fill();
+    ctx.fillRect(200, BENCH_Y + 20, 18, FLOOR - BENCH_Y - 20); ctx.fillRect(420, BENCH_Y + 20, 18, FLOOR - BENCH_Y - 20);
+    body(ctx, P, { torso: 46, thigh: 32, shin: 22 });
+    ctx.fillStyle = '#34463E'; ctx.beginPath(); ctx.arc(P.hand.x, P.hand.y, 52, 0, 7); ctx.fill();
+    ctx.fillStyle = '#4A5D54'; ctx.beginPath(); ctx.arc(P.hand.x, P.hand.y, 11, 0, 7); ctx.fill();
+  }
+}
+
+function benchPose(lift, shRise, hipRise, legs) {
+  const S = { x: 250, y: BENCH_Y - 18 - shRise }, H = { x: 410, y: BENCH_Y - 16 - hipRise };
+  const up = 86, fore = 80, D = 74 + (164 - 74) * lift;
+  const W = { x: S.x + 12, y: S.y - Math.sqrt(Math.max(0, D * D - 144)) };
+  // Two-link IK: elbow on the hip side of the shoulder→wrist line.
+  const dx = W.x - S.x, dy = W.y - S.y, L = Math.hypot(dx, dy), a = Math.acos(Math.min(1, (up * up + L * L - fore * fore) / (2 * up * L)));
+  const base = Math.atan2(dy, dx), E = { x: S.x + up * Math.cos(base + a), y: S.y + up * Math.sin(base + a) };
+  const lerp = (p, q) => ({ x: p.x + (q.x - p.x) * legs, y: p.y + (q.y - p.y) * legs });
+  const K = lerp({ x: 520, y: BENCH_Y + 8 - hipRise * 0.4 }, { x: 540, y: BENCH_Y + 2 - hipRise * 0.4 });
+  const A = lerp({ x: 500, y: FLOOR - 20 }, { x: 665, y: FLOOR - 20 });
+  return { S, H, K, A, head: { x: S.x - 46, y: S.y - 4 }, toe: { x: A.x + 22, y: FLOOR }, heel: { x: A.x - 8, y: FLOOR }, elbow: E, hand: W };
+}
+
+/* ---------- shared drawing ---------- */
+function backdrop(ctx, x, y, col) {
+  const g = ctx.createRadialGradient(x, y, 10, x, y, 440);
+  g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, DEMO_W, DEMO_H);
+}
+function floorLine(ctx, y) { ctx.strokeStyle = '#1A2823'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(DEMO_W, y); ctx.stroke(); }
+function body(ctx, P, w) {
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#22312B';
+  const limb = (pts, lw) => { ctx.lineWidth = lw; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.stroke(); };
+  limb([P.S, P.H], w.torso * 1.4); limb([P.H, P.K], w.thigh * 1.4); limb([P.K, P.A], w.shin * 1.4); limb([P.heel, P.toe], 16); limb([P.S, P.elbow, P.hand], 22);
+  ctx.fillStyle = '#22312B'; ctx.beginPath(); ctx.arc(P.head.x, P.head.y, 30, 0, 7); ctx.fill();
+}
+// Pixel-space pose → 33 MediaPipe-style landmarks (far side hidden, like a real side-on camera).
+function toPxLandmarks(P) {
+  const c = (p, v = 1) => ({ x: p.x, y: p.y, v });
+  const px = Array.from({ length: 33 }, () => c(P.H, 0.1));
+  px[0] = c(P.head); px[7] = c(P.head);
+  px[11] = c(P.S); px[13] = c(P.elbow); px[15] = c(P.hand);
+  px[23] = c(P.H); px[25] = c(P.K); px[27] = c(P.A); px[29] = c(P.heel); px[31] = c(P.toe);
+  for (const [n, f] of [[11, 12], [13, 14], [15, 16], [23, 24], [25, 26], [27, 28], [29, 30], [31, 32], [7, 8]]) px[f] = { ...px[n], v: 0.3 };
+  return px;
+}
+
 // Walking demo (treadmill, side-on) — real landmarks for the gait analyser.
 export class WalkDemo {
   constructor() { this.t0 = null; }
@@ -78,14 +276,14 @@ export class WalkDemo {
   drawScene(ctx) {
     const px = this.px; if (!px) return;
     const g = ctx.createRadialGradient(330, 560, 10, 330, 560, 420);
-    g.addColorStop(0, 'rgba(69,195,255,.14)'); g.addColorStop(1, 'rgba(69,195,255,0)');
+    g.addColorStop(0, 'rgba(159,208,182,.14)'); g.addColorStop(1, 'rgba(159,208,182,0)');
     ctx.fillStyle = g; ctx.fillRect(0, 0, DEMO_W, DEMO_H);
     // treadmill belt
     const beltY = Math.max(px[29].y, px[30].y, px[31].y, px[32].y) + 6;
-    ctx.fillStyle = '#161c2b'; ctx.beginPath(); ctx.roundRect?.(90, beltY, 520, 22, 11); ctx.fill();
-    ctx.strokeStyle = '#262f44'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.fillStyle = '#13201C'; ctx.beginPath(); ctx.roundRect?.(90, beltY, 520, 22, 11); ctx.fill();
+    ctx.strokeStyle = '#22312B'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     const limb = (ids, w) => { ctx.lineWidth = w; ctx.beginPath(); ids.forEach((i, k) => k ? ctx.lineTo(px[i].x, px[i].y) : ctx.moveTo(px[i].x, px[i].y)); ctx.stroke(); };
     limb([12, 14, 16], 20); limb([24, 26, 28, 32], 36); limb([11, 23], 56); limb([23, 25, 27, 31], 40); limb([11, 13, 15], 22);
-    ctx.fillStyle = '#262f44'; ctx.beginPath(); ctx.arc(px[0].x - 6, px[0].y, 30, 0, 7); ctx.fill();
+    ctx.fillStyle = '#22312B'; ctx.beginPath(); ctx.arc(px[0].x - 6, px[0].y, 30, 0, 7); ctx.fill();
   }
 }

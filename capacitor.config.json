@@ -1,0 +1,7 @@
+{
+  "appId": "com.shredbyqk.app",
+  "appName": "Shred by QK",
+  "webDir": "www",
+  "ios": { "contentInset": "never" },
+  "android": { "allowMixedContent": false }
+}

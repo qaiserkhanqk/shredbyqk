@@ -8,7 +8,7 @@
 // iPhones and Android phones still need testing (docs/real-phone-testing.md). Synthetic data only.
 // Run: node tests/mobile-layout.cjs
 const { devices } = require('playwright');
-const { launch } = require('./browser.cjs');
+const { launch, finishSignUp, openCycle } = require('./browser.cjs');
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.task': 'application/octet-stream', '.webmanifest': 'application/manifest+json' };
@@ -70,9 +70,12 @@ function measure() {
     await p.goto('https://shred.local/'); await p.waitForTimeout(400);
     const first = await screen('welcome');
     check(`${phone}: pinch-zoom is not disabled`, first.zoomDisabled === false);
-    await p.tap('#welcomeBtn');
-    for (const tab of ['today', 'train', 'progress', 'body']) { await p.tap(`.tabs [data-tab=${tab}]`); await screen(`${tab} tab`); }
-    await p.tap('.tabs [data-tab=body]'); await p.tap('[data-go=cycle]'); await screen('cycle consent');
+    // Merge 2026-11-27: the first launch is a multi-step sign-up and the tabs are Today, Train, Food, Me (+ Cycle when on);
+    // Body is reached from Today.
+    await finishSignUp(p, { tap: 'tap' });
+    for (const tab of ['today', 'train', 'food', 'progress']) { await p.tap(`.tabs [data-tab=${tab}]`); await screen(`${tab} tab`); }
+    await p.tap('.tabs [data-tab=today]'); await p.tap('#today [data-go=body]'); await screen('body hub');
+    await openCycle(p, { tap: 'tap' }); await screen('cycle consent');
     await p.check('#cyAgree'); await p.tap('[data-act=consent]'); await p.waitForTimeout(400);
     await p.evaluate(async today => {
       const S = await import('/js/cycle/store.js'), M = await import('/js/cycle/model.js'), D = await import('/js/cycle/dates.js');
@@ -86,7 +89,7 @@ function measure() {
         M.setSituation(s, 'perimenopause', true); for (const k of ['hotFlushes', 'focus']) M.setCategory(s, k, true); // midlife card and its symptoms on screen too
       });
     }, dayStr(0));
-    await p.tap('.tabs [data-tab=today]'); await p.tap('.tabs [data-tab=body]'); await p.tap('[data-go=cycle]');
+    await p.tap('.tabs [data-tab=today]'); await openCycle(p, { tap: 'tap' });
     await screen('cycle screen with synthetic history');
     const sum = p.locator('[data-act=summary]:visible').first();
     // The summary button is only shown in some states.

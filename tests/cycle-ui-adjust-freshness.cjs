@@ -2,7 +2,7 @@
 // Uses the app's own demo band and a fixed browser clock: sync on day 0, then view the app 10 days later without new
 // band data, then sync again. Written BEFORE the fix. Synthetic data only.
 // Run: node tests/cycle-ui-adjust-freshness.cjs   (E2E_BROWSER=chromium|firefox|webkit)
-const { launch } = require('./browser.cjs');
+const { launch, openCycle } = require('./browser.cjs');
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.task': 'application/octet-stream', '.webmanifest': 'application/manifest+json' };
@@ -19,7 +19,7 @@ const DAY0 = new Date('2026-05-01T10:00:00'), LATER = new Date('2026-05-11T10:00
   await c.addInitScript(() => localStorage.setItem('shred_flags_v1', JSON.stringify({ cycleTracking: true, temperatureEstimate: true })));
   const p = await c.newPage(); p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
   const text = async sel => ((await p.textContent(sel).catch(() => '')) || '').replace(/\s+/g, ' ');
-  const open = async () => { await p.goto('https://shred.local/'); await p.click('#welcomeBtn', { timeout: 3000 }).catch(() => {}); await p.click('.tabs [data-tab=body]'); await p.click('[data-go=cycle]'); await p.waitForTimeout(700); };
+  const open = async () => { await p.goto('https://shred.local/'); await openCycle(p); await p.waitForTimeout(700); };
   const lastReading = async () => ((await text('#cyAdjusted')).match(/Last usable overnight band reading: ([^.]+)\./) || [])[1] || null;
   try {
     await p.clock.setFixedTime(DAY0);

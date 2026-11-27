@@ -1,6 +1,6 @@
 // Browser tests for the doctor summary and optional LH-test logging. Written BEFORE the UI code.
 // Synthetic data only. Run: node tests/cycle-ui-summary-lh.cjs
-const { launch } = require('./browser.cjs'); // E2E_BROWSER=chromium|firefox|webkit
+const { launch, openCycle } = require('./browser.cjs'); // E2E_BROWSER=chromium|firefox|webkit
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.task': 'application/octet-stream', '.webmanifest': 'application/manifest+json' };
@@ -18,7 +18,7 @@ const has = async (p, sel) => (await p.$(sel)) !== null;
     const offsite = []; c.on('request', r => { if (!r.url().startsWith('https://shred.local/')) offsite.push(r.url()); });
     await c.addInitScript(f => localStorage.setItem('shred_flags_v1', JSON.stringify(f)), flags);
     const p = await c.newPage(); p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
-    const go = async () => { await p.goto('https://shred.local/'); await p.click('#welcomeBtn'); await p.click('.tabs [data-tab=body]'); await p.click('[data-go=cycle]'); await p.waitForTimeout(700); };
+    const go = async () => { await p.goto('https://shred.local/'); await openCycle(p); await p.waitForTimeout(700); };
     await go(); await p.check('#cyAgree'); await p.click('[data-act=consent]'); await p.waitForTimeout(500);
     await p.evaluate(async (d) => { // three synthetic cycles of 30 days, one open period, a few pain logs
       const S = await import('/js/cycle/store.js'), M = await import('/js/cycle/model.js'), D = await import('/js/cycle/dates.js');

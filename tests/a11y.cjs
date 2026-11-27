@@ -2,7 +2,7 @@
 // Needs axe-core:  npm install --no-save axe-core@4.10.2   (or set AXE_PATH to axe.min.js)
 // If axe-core is missing the run FAILS (exit 1) and says so; it never reports a skipped audit as passed.
 // Critical and serious violations fail; moderate and minor ones are listed. Run: node tests/a11y.cjs
-const { launch } = require('./browser.cjs');
+const { launch, openCycle } = require('./browser.cjs');
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.task': 'application/octet-stream', '.webmanifest': 'application/manifest+json' };
@@ -22,7 +22,7 @@ const ALL = { cycleTracking: true, phaseEducation: true, patternInsights: true, 
     await c.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, r => r.fulfill({ status: 200, body: '', headers: { 'content-type': 'text/css' } }));
     await c.addInitScript(f => localStorage.setItem('shred_flags_v1', JSON.stringify(f)), flags);
     const p = await c.newPage(); p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
-    await p.goto('https://shred.local/'); await p.click('#welcomeBtn'); await p.click('.tabs [data-tab=body]'); await p.click('[data-go=cycle]'); await p.waitForTimeout(600);
+    await p.goto('https://shred.local/'); await openCycle(p); await p.waitForTimeout(600);
     return { c, p };
   }
   async function audit(p, label) {

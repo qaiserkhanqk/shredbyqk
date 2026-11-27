@@ -4,3 +4,6 @@ browser-logs/
 # Real-iPhone testing: local certificate authority, keys and run files (never commit)
 tests/ios/.certs/
 tests/ios/.run/
+www/
+test-photos/
+tests/load/tokens.json

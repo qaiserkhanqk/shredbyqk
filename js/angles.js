@@ -44,8 +44,8 @@ export function bestSide(p) {
   const L = [11, 13, 15, 23, 25, 27].reduce((s, i) => s + p[i].v, 0);
   const R = [12, 14, 16, 24, 26, 28].reduce((s, i) => s + p[i].v, 0);
   return L >= R
-    ? { side: 'left', sh: p[11], el: p[13], wr: p[15], hip: p[23], kn: p[25], an: p[27], ear: p[7], ft: p[31], conf: L / 6 }
-    : { side: 'right', sh: p[12], el: p[14], wr: p[16], hip: p[24], kn: p[26], an: p[28], ear: p[8], ft: p[32], conf: R / 6 };
+    ? { side: 'left', sh: p[11], el: p[13], wr: p[15], hip: p[23], kn: p[25], an: p[27], ear: p[7], he: p[29], ft: p[31], conf: L / 6 }
+    : { side: 'right', sh: p[12], el: p[14], wr: p[16], hip: p[24], kn: p[26], an: p[28], ear: p[8], he: p[30], ft: p[32], conf: R / 6 };
 }
 
 // Is the user filmed side-on or facing the camera? Shoulder width vs torso length.

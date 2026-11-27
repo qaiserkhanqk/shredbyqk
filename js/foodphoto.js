@@ -1,0 +1,169 @@
+// Photo → foods, with answers that stay the same from one photo to the next.
+//
+// Why the old ChatGPT feature gave different calories every time: it asked the model for calories,
+// and a language model samples its answer, so the number drifted from photo to photo. Here the model
+// is only allowed to do what vision is good at:
+//   1. name each dish, chosen from OUR catalogue (a fixed list of ids, not free text)
+//   2. count or estimate the portion in household units (rotis, katori, plate, pieces)
+//   3. say what it can see: mostly meat or gravy, oil floating on top, restaurant or home setting
+// The calories are then computed by js/nutrition.js, so the same dish and portion always give the
+// same number. On top of that:
+//   - the server asks the model several times and we keep the consensus (majority dish, median portion)
+//   - results are cached by a hash of the image, so the same photo always returns the same answer
+//   - the user confirms who cooked it, the one thing a camera can't see, and the app remembers it per dish
+import { DISHES, DISH } from './nutrition.js';
+
+export const PHOTO_CONFIG = {
+  // Your server route (see tools/food-vision-server.mjs). Keep the AI key on the server, never in the app.
+  endpoint: '',
+  // Optional live fallback search (FatSecret) on the same server, e.g. 'https://your-server/food-search'.
+  searchEndpoint: '',
+  // One fast answer (~1–2 s); when it's unsure, a stronger model double-checks in the background (see the server).
+  samples: 'fast',
+  maxSide: 640,
+  // Set by the app when the client is signed in: the server can require it (tools/food-vision-server.mjs).
+  getToken: () => null, // smaller uploads faster on mobile data; plenty to count rotis and read a plate
+};
+
+// The catalogue the model must choose from, with what one serving means, so portions come back in our units.
+export const catalogue = () => DISHES.map(d => ({ id: d.id, name: d.name, serving: `1 ${d.serve} ≈ ${d.cooked} g` }));
+
+const median = xs => { const s = [...xs].sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+const mode = xs => { const c = {}; let best = null; for (const x of xs) { c[x] = (c[x] || 0) + 1; if (best === null || c[x] > c[best]) best = x; } return best; };
+const half = v => Math.max(0.5, Math.round(v * 2) / 2);
+
+// samples: [{ items: [{ dish, servings, meat_share, oil, confidence, other_name }], setting }]
+// A dish is kept when at least half the samples saw it. Order follows the first sample that saw it.
+export function consensus(samples) {
+  const ok = (samples || []).filter(s => Array.isArray(s?.items));
+  if (!ok.length) return { items: [], setting: 'unsure', scene: 'plate', agreement: 0 };
+  const need = Math.ceil(ok.length / 2), by = new Map();
+  ok.forEach((s, si) => {
+    const seen = new Set();
+    s.items.forEach((it, ii) => {
+      const id = DISH[it.dish] ? it.dish : 'other:' + String(it.other_name || 'unknown').toLowerCase().trim();
+      if (seen.has(id)) { const g = by.get(id); g.servings[g.servings.length - 1] += +it.servings || 0; return; } // two piles of the same dish
+      seen.add(id);
+      if (!by.has(id)) by.set(id, { id, order: si * 100 + ii, servings: [], meat: [], oil: [], conf: [], alt: [], name: it.other_name });
+      const g = by.get(id);
+      g.servings.push(+it.servings || 1); g.meat.push(it.meat_share || 'na'); g.oil.push(it.oil || 'na'); g.conf.push(+it.confidence || 0.5);
+      if (DISH[it.alternative] && it.alternative !== it.dish) g.alt.push(it.alternative);
+    });
+  });
+  const items = [...by.values()].filter(g => g.servings.length >= need).sort((a, b) => a.order - b.order).map(g => ({
+    dish: g.id.startsWith('other:') ? null : g.id,
+    otherName: g.id.startsWith('other:') ? g.name : null,
+    servings: Math.min(10, half(median(g.servings))),
+    meat: ['less', 'normal', 'more'].includes(mode(g.meat)) ? mode(g.meat) : 'normal',
+    oil: ['less', 'normal', 'oily'].includes(mode(g.oil)) ? mode(g.oil) : 'normal',
+    confidence: g.conf.reduce((a, b) => a + b, 0) / g.conf.length,
+    // The runner-up the model named most often ("naan, or roghni naan?"), or another dish the samples disagreed on.
+    alternative: g.alt.length ? mode(g.alt) : null,
+    agree: g.servings.length / ok.length,
+  }));
+  const setting = mode(ok.map(s => s.setting || 'unsure'));
+  const scene = mode(ok.map(s => s.scene || 'plate'));
+  // How much the samples agreed overall: shown to the user as "QK is sure" vs "please check".
+  const agreement = items.length ? items.reduce((a, i) => a + i.agree, 0) / items.length : 0;
+  return { items, setting, scene, agreement };
+}
+
+// Downscale to JPEG and hash it, so the same photo always maps to the same cache entry.
+export async function prepareImage(file) {
+  const bmp = await createImageBitmap(file);
+  const k = Math.min(1, PHOTO_CONFIG.maxSide / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  const dataUrl = c.toDataURL('image/jpeg', 0.82);
+  const sw = Math.min(256, c.width), sh = Math.round(c.height * sw / c.width), sc = document.createElement('canvas'); sc.width = sw; sc.height = sh;
+  sc.getContext('2d').drawImage(c, 0, 0, sw, sh);
+  const quality = imageQuality(sc.getContext('2d').getImageData(0, 0, sw, sh).data, sw, sh);
+  const bytes = Uint8Array.from(atob(dataUrl.split(',')[1]), ch => ch.charCodeAt(0));
+  const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(b => b.toString(16).padStart(2, '0')).join('');
+  return { dataUrl, hash, quality };
+}
+
+const CACHE_KEY = 'shred_food_photo_v1';
+const readCache = () => { try { return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); } catch { return {}; } };
+function writeCache(hash, result) {
+  const c = readCache(); c[hash] = { at: Date.now(), result };
+  const keys = Object.keys(c).sort((a, b) => c[b].at - c[a].at).slice(0, 40); // keep the newest 40
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify(Object.fromEntries(keys.map(k => [k, c[k]])))); } catch {}
+}
+
+/**
+ * Photo → dishes. ctx: { hint: what the person said ("restaurant karahi"), plateCm: their usual plate,
+ * usual: names of dishes they log most }. All three make the model's job easier and its answers steadier.
+ */
+// When many people snap at once the server says "busy, try in N seconds": wait once (up to 12 s), then give up
+// politely (the app offers voice and search instead), so phones never hammer an overloaded server.
+async function postBusyAware(url, body, { wait = ms => new Promise(r => setTimeout(r, ms)) } = {}) {
+  for (let attempt = 0; ; attempt++) {
+    const token = PHOTO_CONFIG.getToken?.();
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) });
+    if (r.ok) return r;
+    if (r.status === 503 && attempt === 0) { await wait(Math.min(12, +r.headers.get('Retry-After') || 5) * 1000 * (0.8 + Math.random() * 0.4)); continue; }
+    throw new Error(r.status === 503 ? 'busy' : 'server ' + r.status);
+  }
+}
+
+/**
+ * onRefined(result): called later, only if the fast answer was unsure and the double-check came back.
+ */
+export async function recognise(file, ctx = {}, onRefined = null) {
+  if (!PHOTO_CONFIG.endpoint) throw new Error('no-endpoint');
+  const { dataUrl, hash, quality } = await prepareImage(file);
+  const key = hash + '|' + (ctx.hint || '');
+  const hit = readCache()[key];
+  if (hit) return { ...hit.result, cached: true, dataUrl, hash, quality };
+  const r = await postBusyAware(PHOTO_CONFIG.endpoint, { image: dataUrl, samples: PHOTO_CONFIG.samples, hint: ctx.hint || '', plateCm: ctx.plateCm || null, usual: ctx.usual || [] });
+  const body = await r.json(), first = body.samples;
+  const result = consensus(first);
+  writeCache(key, result);
+  if (body.refine && PHOTO_CONFIG.samples === 'fast') {
+    // The quiet second opinion: majority of the fast answer and two from the stronger model.
+    postBusyAware(PHOTO_CONFIG.endpoint, { image: dataUrl, samples: 'refine', hint: ctx.hint || '', plateCm: ctx.plateCm || null, usual: ctx.usual || [] })
+      .then(x => x.json()).then(b => {
+        const better = consensus([...first, ...(b.samples || [])]);
+        writeCache(key, better);
+        onRefined?.({ ...better, refined: true, dataUrl, hash, quality });
+      }).catch(() => {});
+  }
+  return { ...result, cached: false, refining: !!body.refine, dataUrl, hash, quality };
+}
+
+/**
+ * Is the photo usable? Very dark or very blurry photos make the model guess. Returns { dark, blurry }.
+ * pixels: RGBA bytes of a small grey-scaled copy; blur is the variance of the Laplacian (sharp edges = high).
+ */
+export function imageQuality(pixels, w, h) {
+  const g = new Float32Array(w * h);
+  let sum = 0;
+  for (let i = 0; i < w * h; i++) { g[i] = 0.299 * pixels[i * 4] + 0.587 * pixels[i * 4 + 1] + 0.114 * pixels[i * 4 + 2]; sum += g[i]; }
+  const mean = sum / (w * h);
+  let m = 0, m2 = 0, n = 0;
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+    const i = y * w + x, lap = g[i - 1] + g[i + 1] + g[i - w] + g[i + w] - 4 * g[i];
+    m += lap; m2 += lap * lap; n++;
+  }
+  const variance = m2 / n - (m / n) ** 2;
+  return { brightness: Math.round(mean), sharpness: Math.round(variance), dark: mean < 45, blurry: variance < 25 };
+}
+
+/** Words the app's own parser didn't catch ("kadhi chawal ki plate") → dishes from the catalogue, via the server. */
+export async function askText(text) {
+  if (!PHOTO_CONFIG.endpoint || !text.trim()) return [];
+  const r = await postBusyAware(PHOTO_CONFIG.endpoint.replace(/food-vision$/, 'food-text'), { text });
+  return consensus((await r.json()).samples).items.filter(i => i.dish);
+}
+
+/**
+ * Should the app ask "Is all of this yours?" A web-photo test showed the real risk: a naan seller's stack
+ * logged as 15 naans (5,300 kcal), a whole karahi pan for a table as 4 servings. Ask when the model says
+ * the dish is shared, when one item is a big count or volume, or when the plate totals more than a big meal.
+ */
+export function needsShareCheck(scene, items, totalKcal) {
+  if (scene === 'shared') return true;
+  if (totalKcal > 1600) return true;
+  return items.some(i => (i.kind === 'bread' && i.servings > 4) || (['curry', 'rice'].includes(i.kind) && i.servings > 2.5) || i.servings > 6);
+}

@@ -4,7 +4,7 @@
 //   2. nothing she logged appears in the browser console;
 //   3. nothing she logged is readable in localStorage or IndexedDB (the store is encrypted).
 // Run: node tests/privacy-check.cjs   (E2E_BROWSER=chromium|firefox|webkit)
-const { launch } = require('./browser.cjs');
+const { launch, openCycle } = require('./browser.cjs');
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.task': 'application/octet-stream', '.webmanifest': 'application/manifest+json' };
@@ -26,7 +26,7 @@ const ALL = { cycleTracking: true, phaseEducation: true, patternInsights: true, 
   p.on('request', r => { const u = new URL(r.url()); if (/^(data|blob):/.test(r.url()) || u.hostname === 'shred.local') return; (/fonts\.(googleapis|gstatic)\.com$/.test(u.hostname) ? fonts : other).push(u.hostname); });
   const MARK = 'Zephyrine'; // a distinctive companion name, to search for in storage and logs
   try {
-    await p.goto('https://shred.local/'); await p.click('#welcomeBtn'); await p.click('.tabs [data-tab=body]'); await p.click('[data-go=cycle]'); await p.waitForTimeout(600);
+    await p.goto('https://shred.local/'); await openCycle(p); await p.waitForTimeout(600);
     await p.check('#cyAgree'); await p.click('[data-act=consent]'); await p.waitForTimeout(500);
     await p.click('#cySettings summary'); await p.check('[data-cat=pain]'); await p.waitForTimeout(400);
     await p.fill('#cyCompanionName', MARK); await p.click('[data-act=companionName]'); await p.waitForTimeout(500);
@@ -56,7 +56,7 @@ const ALL = { cycleTracking: true, phaseEducation: true, patternInsights: true, 
     });
     const found = secrets.filter(x => stored.includes(x));
     // The storage check only means something if the data really was saved: reload and read it back through the app.
-    await p.reload(); await p.click('#welcomeBtn').catch(() => {}); await p.click('.tabs [data-tab=body]'); await p.click('[data-go=cycle]'); await p.waitForTimeout(800);
+    await p.reload(); await openCycle(p); await p.waitForTimeout(800);
     await p.click('#cySettings summary').catch(() => {}); await p.waitForTimeout(200);
     check('the data was saved (read back after reload: pain, companion name, due date)', (await p.inputValue('[data-sym=pain]')) === 'severe' && (await p.inputValue('#cyCompanionName')) === MARK && (await p.$('#cyPregnancy')) !== null);
     check('3. nothing she logged is readable in browser storage (encrypted at rest)', found.length === 0 && stored.length > 0, `found: ${found.join(', ')}`);

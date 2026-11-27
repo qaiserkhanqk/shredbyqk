@@ -1,7 +1,7 @@
 // Browser test of the "missing links" on the Cycle screen (see tests/cycle-missing-links.test.mjs for the logic):
 // learning stage, band-gap honesty, night disruptors, comfort suggestions with "did it help?", training feel, and the
 // Hume Band placeholder. Synthetic data only. Run: node tests/cycle-ui-missing-links.cjs
-const { launch } = require('./browser.cjs'); // E2E_BROWSER=chromium|firefox|webkit
+const { launch, openCycle } = require('./browser.cjs'); // E2E_BROWSER=chromium|firefox|webkit
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.task': 'application/octet-stream', '.webmanifest': 'application/manifest+json' };
@@ -17,7 +17,7 @@ const check = (name, ok, detail = '') => { count++; if (!ok) fails++; console.lo
     await c.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, r => r.fulfill({ status: 200, body: '', headers: { 'content-type': 'text/css' } }));
     await c.addInitScript(f => localStorage.setItem('shred_flags_v1', JSON.stringify(f)), flags);
     const p = await c.newPage(); p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
-    p.go = async () => { await p.goto('https://shred.local/'); await p.click('#welcomeBtn'); await p.click('.tabs [data-tab=body]'); await p.click('[data-go=cycle]'); await p.waitForTimeout(600); };
+    p.go = async () => { await p.goto('https://shred.local/'); await openCycle(p); await p.waitForTimeout(600); };
     await p.go(); await p.check('#cyAgree'); await p.click('[data-act=consent]'); await p.waitForTimeout(500);
     return { c, p };
   }

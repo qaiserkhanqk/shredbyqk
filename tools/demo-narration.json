@@ -1,0 +1,116 @@
+[
+  {
+    "id": "01",
+    "step": "Today",
+    "caption": "Each morning, one tap on how you feel.",
+    "say": "Assalamu alaikum, I'm QK. Each morning, just tap how you feel."
+  },
+  {
+    "id": "02",
+    "step": "Today",
+    "caption": "Then one clear next step. Today: the workout.",
+    "say": "Then the app shows you one thing: your next step. Today, it's your workout."
+  },
+  {
+    "id": "03",
+    "step": "Train",
+    "caption": "QK shows where to put the phone.",
+    "say": "I'll show you exactly where to put your phone."
+  },
+  {
+    "id": "04",
+    "step": "Live coaching",
+    "caption": "QK watches every rep, counts it and coaches one cue at a time.",
+    "say": "I watch every rep through the camera, count it, and coach you one cue at a time."
+  },
+  {
+    "id": "05",
+    "step": "Live coaching",
+    "caption": "Feet too far forward → QK cues it → the fix is praised.",
+    "say": "Feet too far forward? I'll tell you. Fix it, and I'll tell you that too."
+  },
+  {
+    "id": "06",
+    "step": "Set summary",
+    "caption": "Form score, one thing to fix, and the rest timer starts by itself.",
+    "say": "After every set: your form score, one thing to fix, and your rest timer starts by itself."
+  },
+  {
+    "id": "07",
+    "step": "Train",
+    "caption": "Over 200 exercises when you want something else.",
+    "say": "Want to train something else? There are over two hundred exercises to choose from."
+  },
+  {
+    "id": "08",
+    "step": "Tools",
+    "caption": "Everything else lives under All tools.",
+    "say": "Everything else lives under All tools, so it's there when you need it."
+  },
+  {
+    "id": "09",
+    "step": "Rehab",
+    "caption": "Pain or injury? A safe, step-by-step rehab plan.",
+    "say": "Got pain or an injury? You get a safe, step-by-step rehab plan."
+  },
+  {
+    "id": "10",
+    "step": "Body check",
+    "caption": "Fingertip on the camera: heart rate, HRV and your 7-day trend.",
+    "say": "Put your fingertip on the camera to check your heart rate and recovery, and see your seven-day trend."
+  },
+  {
+    "id": "11",
+    "step": "Sukoon",
+    "caption": "When your mind is racing: Sukoon.",
+    "say": "And when your mind is racing, there's Sukoon."
+  },
+  {
+    "id": "12",
+    "step": "Sukoon",
+    "caption": "One tap: how tense do you feel?",
+    "say": "Tap how tense you feel."
+  },
+  {
+    "id": "13",
+    "step": "Sukoon",
+    "caption": "Breathe slowly with the circle, eyes closed if you like.",
+    "say": "Breathe slowly with the circle. Close your eyes if you like."
+  },
+  {
+    "id": "14",
+    "step": "Sukoon",
+    "caption": "Listen to a short recitation from the Quran.",
+    "say": "Then listen to a short recitation from the Quran."
+  },
+  {
+    "id": "15",
+    "step": "Sukoon",
+    "caption": "Finish with a dua from the Sunnah.",
+    "say": "And finish with a dua from the Sunnah."
+  },
+  {
+    "id": "16",
+    "step": "Sukoon",
+    "caption": "See what really calms you down.",
+    "say": "Over time, you'll see what really calms you down."
+  },
+  {
+    "id": "17",
+    "step": "Me",
+    "caption": "Your progress, all in one place.",
+    "say": "Your progress is all in one place."
+  },
+  {
+    "id": "18",
+    "step": "Me",
+    "caption": "One tap sends QK your week. Text only, never video.",
+    "say": "And with one tap, you send me your week, so I can coach you properly."
+  },
+  {
+    "id": "19",
+    "step": "Shred by QK",
+    "caption": "Your coach in your pocket.",
+    "say": "Shred. Your coach in your pocket. Let's get to work."
+  }
+]

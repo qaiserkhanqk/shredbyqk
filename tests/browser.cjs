@@ -29,4 +29,22 @@ async function launch({ chromiumArgs, firefoxUserPrefs, ...opts } = {}) {
     throw e;
   }
 }
-module.exports = { launch, chosen, NAMES };
+
+/** Merge 2026-11-27: the app's first launch is now a multi-step sign-up (name, an optional "about you" step, a focus
+ *  question...), returning users skip it, and there is no Body tab. This gets past the sign-up if it is showing (name
+ *  "Test", the optional step skipped, "calm" as the focus, which finishes the sign-up at once) and opens the cycle
+ *  screen: the Cycle tab when shown, otherwise Today > Body > Cycle. */
+async function finishSignUp(p, { tap = 'click' } = {}) {
+  if (!(await p.isVisible('#welcome').catch(() => false))) return;
+  if (await p.isVisible('#welcomeName').catch(() => false)) await p.fill('#welcomeName', 'Test');
+  await p[tap]('#welcomeBtn');
+  if (await p.isVisible('#aboutNext').catch(() => false)) await p[tap]('#aboutNext');
+  if (await p.isVisible('#ob2 [data-focus=calm]').catch(() => false)) await p[tap]('#ob2 [data-focus=calm]');
+  await p.waitForTimeout(200);
+}
+async function openCycle(p, { tap = 'click' } = {}) {
+  await finishSignUp(p, { tap });
+  if (await p.isVisible('.tabs [data-tab=cycle]').catch(() => false)) await p[tap]('.tabs [data-tab=cycle]');
+  else { await p[tap]('.tabs [data-tab=today]'); await p[tap]('#today [data-go=body]'); await p[tap]('#body [data-go=cycle]'); }
+}
+module.exports = { launch, chosen, NAMES, finishSignUp, openCycle };

@@ -4,14 +4,54 @@ An AI coaching app with QK's avatar. It watches each client's form through the p
 
 All video is processed **on the phone** (MediaPipe Pose) and nothing is uploaded. This matters for privacy and GDPR, and it means there are no server costs per minute of video.
 
+## Design: one clear next step
+
+The app is built so a new client is never faced with a wall of features:
+- **First run asks three things:** name, what they want help with first (get fitter, recover from pain, feel calmer), and training days.
+- **Today shows one next step**, chosen by `js/today.js`: rehab morning check → recovery day → wind down after training → rehab session → today's workout (lighter if needed) → rest day. One button, one line saying why.
+- **Four tabs:** Today, Train, Food, Me. Rehab, movement tests, posture, Body check, Sukoon and Brain sit under **All tools**, ordered by what the client came for. Calm now and Brain are also one tap from Today.
+- **Brain:** a Brain score (exercise, sleep, calm, drills, learning), Speed Flash (the speed training with long-term evidence, with a first block and boosters), Memory Grid and Colour Clash games, Quran memorisation (listen, fade the words, recite, spaced review, Verse Order game) for 21 short surahs, Ayat al-Kursi and the end of Al-Baqarah, and ten 2-minute lessons with recall questions.
+- After the morning check-in, the feel buttons fold into one line, so the next step is what stands out.
+
 ## Features
-- **84 exercises for every muscle group:** chest, back, shoulders, biceps, triceps, forearms, quads, hamstrings, glutes, calves, core and full body. Search them, or filter by muscle.
-  - **66 have a live camera form check**, built on 20 movement patterns: squat, hinge, lunge, hip thrust, bench and press, push-up, dip, fly, row, vertical pull, curl, triceps extension, raises, calf raise, crunch, leg raise, leg extension, leg curl and plank hold.
+- **487 exercises** (plus 45 rehab exercises): gym, bodyweight and powerlifting, **plyometrics, Olympic lifts, stretching and mobility, cardio, running, HYROX and Pilates**. Filter by training type or muscle group: chest, back, shoulders, biceps, triceps, forearms, quads, hamstrings, glutes, calves, core and full body. Search them, or filter by muscle.
+  - **203 have a live camera form check**, built on 20 movement patterns: squat, hinge, lunge, hip thrust, bench and press, push-up, dip, fly, row, vertical pull, curl, triceps extension, raises, calf raise, crunch, leg raise, leg extension, leg curl and plank hold.
+  - 124 of them come from [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (public domain). Each was hand-matched to a pattern the camera can check. Exercises that would be judged wrongly were left out (alternating and one-arm presses, behind-the-neck pulls, band-and-chain variants). Only names, equipment, muscles and level are used, not the database's form instructions, which contain errors.
+  - **Training types without a camera check get the right kind of coaching:**
+    - explosive rep pacing ("Set… Go!") for jumps, throws and Olympic lifts
+    - slow counted reps for mobility and Pilates
+    - hold timers for stretches
+    - session timers for cardio and runs
+    - work/rest intervals for sprints, rope jumping and drills
+    - a stopwatch for HYROX stations, which compares each time with your last one
+  - **HYROX:** the 1 km run and all 8 stations in race order. Wall balls and sandbag lunges get the camera check. Weights point to hyrox.com, since they depend on your division.
+  - **Pilates:** the 34 classical mat exercises from *Return to Life Through Contrology* (1945) plus chest lift and criss-cross. The push up, leg pull front and shoulder bridge get the camera check, and the neck-loading moves carry a warning.
+  - **Running:** easy, tempo, long, intervals and sprints. Treadmill runs link to the camera running-form check.
   - **18 are voice-coached for tempo** (twists, carries, wrist curls and similar). A phone camera can't judge these reliably, so the app says so instead of showing a fake form score.
+- **Map my body (1 min), applied to every camera exercise.** QK guides you through standing, a toe rise, 3 squats, an overhead reach and 2 hinges side-on, then arms out and 2 squats facing the camera. It measures:
+  - your proportions
+  - how straight your joints go
+  - squat depth, ankle, hamstring and shoulder mobility
+  - knee alignment
+  - your natural posture
+
+  Every camera exercise is then judged against **your** body: lean, depth and rep counting, lockouts, hinge depth, pressing depth, raise and calf-raise height, and body line. The setup screen says exactly what was fitted for that exercise, and findings come with fixes. Technique criteria follow the NSCA (see [SCIENCE.md](SCIENCE.md) §11).
+- **Camera coach (one tap):** the big button at the top of Today opens the camera straight away. Start your exercise and QK recognises it from how your joints move: which joints bend, your posture (standing, bent over, lying, hanging) and where your hands go. That takes about one rep. It then coaches live, and the reps it watched while recognising still count. Switch exercise and it notices, saves the finished set and coaches the new one. If it guesses wrong, tap **Change**. It recognises 20 movements: squat, lunge, Romanian deadlift, calf raise, overhead press, pull-up, row, curl, triceps pushdown, overhead triceps extension, lateral and front raise, push-up, bench and floor press, glute bridge, crunch, leg raise and plank.
+- **"You're moving too much":** each exercise checks the parts that should stay still, against your own position at the start of the rep:
+  - body swinging on curls, raises and triceps
+  - heaving the torso on rows
+  - leaning to one side on overhead presses
+  - feet sliding or weight shifting sideways on squats
+
+  Squats facing the camera now count reps properly: depth is read from how far the hips drop, because a front view can't see the knee bend.
 - **Live form check:**
-  - Joint angles are drawn on the client's body.
+  - **Corrects you mid-rep, like a coach beside you.** Posture faults (knees caving, heels lifting, leaning, hips shooting up, no leg drive) are called out the moment they appear, interrupting whatever QK was saying. A red banner shows what's wrong and the fix, and the skeleton turns red. End-of-rep faults (depth, lockout, shoulders at the top) are cued as soon as the rep finishes. After two full cues QK switches to a short shout ("Knees out!").
+  - Joint angles are drawn on the client's body, with a live depth gauge at the working joint.
+  - **Motion graphics on the body** when QK cues a fault: arrows and targets that move with the joints (knees out, heels down, chest leads, pin shoulders, leg drive, glutes down), then a green check when it's fixed.
+  - Squat faults: knees caving in, hips shooting up first, heels lifting, too much forward lean, depth, lockout.
+  - Bench faults: shoulder blades not pinned (shoulders rolling off the bench), no leg drive, hips lifting off the bench, depth, lockout.
   - Corrections are spoken by the coach, with rep counting.
-  - Tempo, rep-speed loss and reps-in-reserve are tracked, and the set can be recorded and played back.
+  - Tempo, rep-speed loss and reps-in-reserve are tracked. The set is recorded with the skeleton and coaching graphics burned in, and every correction is listed with its time, so you can tap it to jump straight to that moment.
   - Clients can also upload a video they filmed earlier.
 - **Motion tracking.** Live movement trail of the hips or bar, range of motion per rep, partial-rep and bar-path-drift detection.
 - **Gait analysis.** Record 10 seconds of walking or running on the live camera, or upload a video. You get:
@@ -27,6 +67,18 @@ All video is processed **on the phone** (MediaPipe Pose) and nothing is uploaded
 - **Guided two-view posture screen:** front and side photos merged into one report.
 - **Accuracy:** 3 model sizes (precise model for uploads and tests), 60 fps capture for tests, and a recording-quality score that blocks results from bad recordings.
 - **Diagnostics:** export any session (body points only, no video) and replay it on a computer to find bugs. See [TESTING.md](TESTING.md).
+- **Sukoon calm session:** pick a feeling (anxiety, anger, jealousy, backbiting, focus, sleep, love, healing, mind reset), then:
+  - slow breathing with a 6 breaths/min pacer and optional binaural or pulsing tones
+  - a short Quran recitation matched to the goal (tones stop first, so the Quran is heard in silence)
+  - a dua from the Sunnah with its source
+  - tension rated before and after, with your trend
+  - each tone is labelled with its evidence strength, and high distress shows support numbers first
+  - one-tap **Calm now**, tap-a-number ratings, breath sounds and vibration for eyes-closed use, night mode for sleep, and a home-screen shortcut (Android)
+- **Native app (optional):** `native/README.md` wraps Shred as an iPhone/Android app with a native pulse camera (flash on iPhone, higher frame rates).
+- **Body check (phone only, no wearable):** fingertip heart rate in 15 seconds, a 1-minute morning HRV compared with your own normal, and the 3-minute PVT-B alertness test. Today's HRV and alertness feed the readiness card. Sukoon can measure heart rate before and after, and adds a cyclic-sighing breathing style.
+- **Training flow:** Next set restarts the camera in one tap, the rest timer starts by itself, the screen stays on, a miscounted set can be corrected, and weights are logged with last time's figure shown.
+- **Send my week to QK:** a one-tap text summary (days trained, form score, top fault, new best weights). No video.
+- **Back up and restore** your history as a file. The app also asks the browser not to clear its saved data.
 - **Rehab clinic:** 18 injuries and pain conditions:
   - lower back, neck
   - frozen shoulder, rotator cuff, tennis and golfer's elbow
@@ -42,10 +94,39 @@ All video is processed **on the phone** (MediaPipe Pose) and nothing is uploaded
 
   It supports rehab and doesn't diagnose; content must be signed off by a physio before launch.
 - **Cycle tracking (prototype, off by default).** Log periods, spotting and optional symptoms; a transparent next-period range from your own history; explainable personal patterns; optional reminders; encrypted on the device. Not clinically validated, not contraception. See **[CYCLE.md](CYCLE.md)**.
-- **Demo modes.** A simulated athlete (hip thrust) and walker run through the real engine, so you can show clients how it works without a camera.
+- **Demo modes.** Simulated athletes (hip thrust, squat, bench press) and a walker run through the real engine, so you can show clients how it works without a camera.
 - **Body scan.** Shows a posture picture with joint angles and asymmetries, plus fixes, and gives body fat by the US Navy method. Readings from a smart scale or InBody can be logged.
 - **Accountability.** Training plan (implementation intention), plan-aware streak, weekly goal and supportive nudges.
 - **Progress.** Body-fat trend, recurring form faults and session history.
+- **Food tracking built for desi food (Food tab).** 113 Pakistani, Indian, fast-food, café and street-food dishes are worked out from their ingredients, not read from one database row. Examples: karahi, qorma, nihari, haleem, biryani, daal, cholay, roti, paratha, kebabs, samosa, chai.
+  - You answer what you can actually tell: how much (rotis, katori, plate, pieces, with grams), **who cooked it** (home, restaurant, shaadi/dhaba), mostly meat or gravy, and oil on top.
+  - Every estimate shows a likely range and where the calories come from ("Oil: 42 g, 61% of the calories"). The app remembers how each person's food is usually cooked.
+  - **1,014 Indian recipes** from the Indian Nutrient Databank and USDA ingredients are also searchable. Search works with Urdu, Hindi and English names.
+  - **Photo extras:** one-tap "or roghni naan?" correction chips (the model's runner-up), an "Add a note" option that re-reads the photo with the client's words, your usual plate size as a scale, your most-eaten dishes as context, and a warning for dark or blurry photos.
+  - **Snap your meal, one tap:** the photo is logged straight away (also from **Snap meal** on Today), with Undo and tap-to-fix. The AI only names dishes from the app's list and counts portions. Calories are computed, it asks 3 times and keeps the consensus, and results are cached by photo, so the same plate gives the same number. The app asks once who usually cooks your food, then remembers it per dish. Needs `tools/food-vision-server.mjs` with a Gemini (free tier), Claude or OpenAI key. Tested on 60 real web photos: see [docs/PHOTO-TEST.md](docs/PHOTO-TEST.md).
+  - **"Which one?"**: "roti" can be a phulka, a tandoori roti, a naan, a roghni naan, a kulcha, a taftan or a paratha. Breads, rice, daal, salans, kebabs, burgers and drinks come as families, one tap apart.
+  - **Places: 150 restaurants, chains, local favourites and carts in 11 cities, 396 menu items.** Local favourites include Nagina Burger, Kala Khan Nihari, Sadiq Halwa Puri, Hafiz Sohan Halwa and Lehri Sajji. Search is typo-tolerant ("nagina burgr", "cheezius"), takes city names ("peshawar chapli"), and ranks your city first.
+    - International chains, with each chain's published values where they exist. No chain publishes Pakistan values, so these come from another country's menu and are labelled with it (e.g. "McDonald's Singapore").
+    - Pakistani chains: Cheezious, Broadway, Burger Lab, Ranchers, Howdy, Kaybees, OPTP, Hot n Spicy and more.
+    - Famous desi restaurants and cafés.
+    - The street carts every city has.
+    - Search "kfc zinger" or "cheezious crown crust". **Add a place** saves a client's own dhaba or cart; each item is tied to the closest dish.
+    - Checked against 20 published values, QK's recipe models are within 10% (median).
+  - **Say it or type it:** "maine do paratha aur ek cup chai pi", "aadhi plate biryani", "sawa roti", "nagina burger", or in Urdu script. The whole meal becomes one card and one tap to add.
+    - Spelling variants and speech-to-text mistakes are matched by sound (parata = paratha, nahari = nihari, karhai = karahi).
+    - Pairs said as one ("halwa puri", "daal chawal") are split.
+    - Anything left over can go to the AI server.
+    - It's measured on 235 phrases in `tests/phrases/`. A blind set, scored once before any fixes, came out at 85%; all three sets now pass.
+    - Voice keeps the best of the recogniser's guesses, and the Urdu screen switches it to Urdu speech.
+  - **Barcode scanning** for packaged food: label values from Open Food Facts, which stay on the phone afterwards.
+  - **FatSecret live fallback** when the app's own data has little, through the server, so the key stays private and their data isn't copied.
+  - **Weigh to calibrate:** enter the weight of a photo meal. After 3 of a kind, QK corrects that person's photo portions. The accuracy-study CSV export is for QK's validation study.
+  - **Steps** from Apple Health or Health Connect in the native app (typed in on the web). They feed the weekly report and the "How active" check.
+  - **Urdu interface** for the Food screen (one tap, right-to-left).
+  - **Coach dashboard:** each client's food week (days logged, calories and protein against target, weight trend, what QK suggested, latest meals) and the places they added, all synced. Re-run `supabase/schema.sql` to add the food tables.
+  - **Water and weigh-ins:** tap a glass (goal from body weight, +2 on training days); log a weekly weigh-in.
+  - **QK's weekly report:** what went well first, then at most two things to *add* next week (protein, veg and fruit, water, dairy, iron, fish, one easy swap), each with the nutrients it brings and a desi tip. It uses training days, weight trend, and gentler advice during rehab. It also estimates real maintenance calories from the logs and the scale. One tap sends it to QK.
+  - Daily targets from Mifflin-St Jeor, with protein at 1.8–2.0 g/kg. See [docs/NUTRITION.md](docs/NUTRITION.md) for which databases were chosen and why.
 
 The reasoning and references for every rule are in **[SCIENCE.md](SCIENCE.md)**.
 
@@ -82,7 +163,12 @@ This simulates a full hip-thrust set (checks the coach's cueing logic) and a wal
 | `js/pose.js` | Loads the on-device pose model and draws the skeleton |
 | `js/angles.js` | Joint-angle geometry, side and view detection, smoothing |
 | `js/exercises.js` | 20 movement patterns: metrics, fault rules, rep/tempo/velocity engine |
-| `js/library.js` | 84 exercises mapped to patterns, muscles and equipment |
+| `js/library.js` | Gym and rehab exercises mapped to patterns, muscles and equipment |
+| `js/library-more.js` | Plyometrics, Olympic lifts, stretching and cardio from free-exercise-db, generated by `tools/import-categories.py` |
+| `js/library-extra.js` | 124 exercises from free-exercise-db, generated by `tools/import-exercises.py` from a reviewed keep list |
+| `js/detect.js` | Camera coach: recognises the exercise from the movement |
+| `js/bodymap.js` | Map my body: measures proportions and mobility, turns them into personal thresholds |
+| `js/fx.js` | Motion graphics drawn on the body for each cued fault, and the depth gauge |
 | `js/feedback.js` | Motor-learning feedback scheduler: what to say and when to stay quiet |
 | `js/coach.js` | Avatar plus voice: recorded clip, then cloned TTS, then device voice |
 | `js/motion.js` | Movement trails, range of motion per rep, bar-path drift |
@@ -91,3 +177,19 @@ This simulates a full hip-thrust set (checks the coach's cueing logic) and a wal
 | `js/bodyscan.js` | Posture screen and body-fat calculation |
 | `js/store.js` | Local storage (replace with a backend for the coach dashboard) |
 | `js/cycle/*` | Cycle tracking prototype: model, estimate, patterns, reminders, wearables, encrypted store, evaluation harness (see [CYCLE.md](CYCLE.md)) |
+| `js/nutrition.js` | Desi dish models, ingredient values (USDA), estimates with ranges, search, calorie and protein targets |
+| `js/foods-indb.js` | 1,014 Indian recipes from the Indian Nutrient Databank, generated by `tools/import-indb.py` |
+| `js/foodphoto.js` | Plate photo → dishes and portions: image hash cache and consensus of several model answers |
+| `js/food.js` | Food screen: one-tap photo, search, the portion and cooking sheet, places, water, weigh-ins, weekly report |
+| `js/menus.js` | Chains, restaurants and street carts with menus mapped to dish models; clients' own places |
+| `js/weekly.js` | QK's weekly food report: wins, two focus points, nutrient notes, weight trend and real maintenance |
+| `js/foodtext.js` | Typed or spoken meals in English, Roman Urdu and Urdu → dishes and portions |
+| `js/barcode.js` | Barcode scanning and Open Food Facts lookup |
+| `js/fatsecret.js` | FatSecret live fallback search (through the server) |
+| `js/calibrate.js` | Learns each person's photo portion sizes from weighings; accuracy-study export |
+| `js/activity.js` | Steps from the phone's health app; activity level from steps and training |
+| `js/foodsync.js` | Food day rows and weekly summary for the coach dashboard |
+| `js/food-ur.js` | Urdu labels for the Food screen |
+| `js/fuzzy.js` | Sound-alike and typo matching for Roman Urdu food words and place names |
+| `js/places-local.js` | Famous local places in 11 cities, with sources |
+| `tools/food-vision-server.mjs` | Tiny server that keeps the AI key off the phone (Claude or OpenAI) |

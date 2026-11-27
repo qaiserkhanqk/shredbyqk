@@ -1,0 +1,29 @@
+// Athlete exercises: the staples sport-science programmes rely on that the main library didn't have.
+// Same row format as library-extra.js: [id, name, muscles, equipment, pattern, extra].
+// pattern is set only where QK's camera can judge the movement (trap-bar deadlift uses the hinge rules).
+export const ATHLETE = [
+  ['copenhagen', 'Copenhagen Plank', ['Quads', 'Core'], 'Bench', null, { hold: 20, guide: 'Side plank with your top leg on a bench, bottom leg off the floor. Short version: knee on the bench. Builds the groin muscles; 41% fewer groin problems in footballers.' }],
+  ['trapBarDeadlift', 'Trap-Bar Deadlift', ['Glutes', 'Quads', 'Back'], 'Barbell', 'rdl', { setup: 'Side-on to the camera, whole body in frame.', guide: 'Stand in the middle of the bar, hips back, chest up, push the floor away.' }],
+  ['trapBarJump', 'Trap-Bar Jump', ['Quads', 'Glutes', 'Calves'], 'Barbell', null, { kind: 'plyo', coach: 'explosive', reps: 5, guide: 'Light load (20–40% of your deadlift). Dip and jump as high as you can, land soft, reset.' }],
+  ['imtp', 'Isometric Mid-Thigh Pull', ['Glutes', 'Back', 'Quads'], 'Barbell', null, { hold: 5, guide: 'Bar fixed at mid-thigh in a rack. Pull as hard as you can for 3–5 seconds, then rest fully.' }],
+  ['landmineRotation', 'Landmine Rotation', ['Core', 'Shoulders'], 'Barbell', null, { guide: 'Arms long, rotate the bar end from hip to hip, turning through the hips and trunk.' }],
+  ['landminePunch', 'Landmine Punch', ['Shoulders', 'Chest', 'Core'], 'Barbell', null, { coach: 'explosive', reps: 6, guide: 'Staggered stance, drive from the back foot and punch the bar up and out. Fast.' }],
+  ['landminePress', 'Half-Kneeling Landmine Press', ['Shoulders', 'Chest', 'Core'], 'Barbell', null, { guide: 'One knee down, press the bar end up and forward, ribs down.' }],
+  ['suitcaseCarry', 'Suitcase Carry', ['Core', 'Forearms'], 'Dumbbell', null, { coach: 'timer', mins: 1, guide: 'One heavy weight in one hand, walk tall without leaning. Swap hands.' }],
+  ['cableChop', 'Cable Chop', ['Core', 'Shoulders'], 'Cable', null, { guide: 'High to low across your body, turning from the hips, arms long.' }],
+  ['straightArmPulldown', 'Straight-Arm Pulldown', ['Back', 'Triceps'], 'Cable', null, { guide: 'Arms straight, sweep the bar to your thighs, squeeze the lats.' }],
+  ['pronYTW', 'Prone Y-T-W Raise', ['Shoulders', 'Back'], 'Bench', null, { guide: 'Face down on an incline bench, light plates. Raise into a Y, a T, then a W. Slow.' }],
+  ['cossack', 'Cossack Squat', ['Quads', 'Glutes'], 'Bodyweight', null, { guide: 'Wide stance, sit down into one hip, the other leg straight with toes up.' }],
+  ['lateralLunge', 'Lateral Lunge', ['Quads', 'Glutes'], 'Dumbbell', null, { guide: 'Step wide to the side, sit back into that hip, push back to the middle.' }],
+  ['pogoJumps', 'Pogo Jumps', ['Calves'], 'Bodyweight', null, { kind: 'plyo', coach: 'timer', mins: 1, guide: 'Small, fast, stiff-ankled hops on the balls of your feet.' }],
+  ['skaterBounds', 'Skater Bounds', ['Glutes', 'Quads'], 'Bodyweight', null, { kind: 'plyo', coach: 'explosive', reps: 6, guide: 'Leap sideways onto one leg, stick the landing for a second, leap back.' }],
+  ['dropStick', 'Single-Leg Drop and Stick', ['Quads', 'Glutes'], 'Box', null, { kind: 'plyo', coach: 'explosive', reps: 5, guide: 'Step off a low box, land on one leg with the knee over the toes, hold 2 seconds. Trains landing control (ACL and front-leg bracing).' }],
+  ['tibRaise', 'Tibialis Raise', ['Calves'], 'Wall', null, { guide: 'Back against a wall, heels forward, lift your toes up and down.' }],
+  ['tgu', 'Turkish Get-Up', ['Shoulders', 'Core', 'Glutes'], 'Kettlebell', null, { guide: 'Weight locked out overhead the whole way, from lying to standing and back. Slow.' }],
+  ['backExtHold', 'Back-Extension Hold', ['Back', 'Glutes'], 'Hyperextension bench', null, { hold: 30, guide: 'Body straight on the back-extension bench, hold. Back-extensor endurance was lower in injured fast bowlers.' }],
+  ['towelPullUp', 'Towel Pull-Up', ['Back', 'Forearms', 'Biceps'], 'Pull-up bar', null, { guide: 'Two towels over the bar, grip them and pull. Builds grappling grip.' }],
+  ['platePinch', 'Plate Pinch Hold', ['Forearms'], 'Plate', null, { hold: 30, guide: 'Pinch two smooth plates together with your fingers and hold.' }],
+  ['mbShotPut', 'Med-Ball Rotational Shot Put', ['Core', 'Shoulders', 'Chest'], 'Medicine ball', null, { kind: 'plyo', coach: 'explosive', reps: 5, guide: 'Side-on to a wall, load the back hip, rotate and push the ball into the wall.' }],
+  ['bikeIntervals', 'Bike Intervals', ['Quads', 'Glutes'], 'Machine', null, { kind: 'cardio', coach: 'intervals', work: 30, rest: 60, rounds: 8, guide: 'Hard but even efforts. Match the work and rest to your sport.' }],
+  ['turn505', '5-0-5 Turns', ['Quads', 'Glutes', 'Calves'], 'No equipment', null, { kind: 'run', coach: 'intervals', work: 6, rest: 45, rounds: 8, guide: 'Sprint 15 m through a gate, turn on the line, sprint back 5 m. Alternate turning foot.' }],
+];

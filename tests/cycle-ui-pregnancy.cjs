@@ -1,6 +1,6 @@
 // Browser test of pregnancy and postpartum modes (flag pregnancyMode, default OFF). Written BEFORE the UI.
 // Synthetic data only. Run: node tests/cycle-ui-pregnancy.cjs   (E2E_BROWSER=chromium|firefox|webkit)
-const { launch } = require('./browser.cjs');
+const { launch, openCycle } = require('./browser.cjs');
 const { devices } = require('playwright');
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..');
@@ -20,7 +20,7 @@ const plus = n => { const d = new Date(); d.setDate(d.getDate() + n); return iso
     await c.addInitScript(f => localStorage.setItem('shred_flags_v1', JSON.stringify(f)), flags);
     const p = await c.newPage(); p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
     p.on('request', r => { if (/^(data|blob):/.test(r.url())) return; /* in-memory, never leaves the device (WebKit reports them) */ const u = new URL(r.url()); if (u.hostname !== 'shred.local' && !/fonts\.(googleapis|gstatic)\.com$/.test(u.hostname)) requests.push(u.hostname); });
-    await p.goto('https://shred.local/'); await p.click('#welcomeBtn'); await p.click('.tabs [data-tab=body]'); await p.click('[data-go=cycle]'); await p.waitForTimeout(600);
+    await p.goto('https://shred.local/'); await openCycle(p); await p.waitForTimeout(600);
     await p.check('#cyAgree'); await p.click('[data-act=consent]'); await p.waitForTimeout(500);
     return { c, p };
   }

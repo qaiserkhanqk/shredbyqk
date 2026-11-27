@@ -1,7 +1,7 @@
 // Browser regression tests for phone-app input races reported against 21317c5: values must be captured when the user
 // acts, not read from the page later inside a delayed or retried repository transaction. Saves are delayed by holding
 // the same cross-tab Web Lock the app uses. Synthetic data only. Run: node tests/cycle-ui-races.cjs
-const { launch } = require('./browser.cjs'); // E2E_BROWSER=chromium|firefox|webkit
+const { launch, openCycle } = require('./browser.cjs'); // E2E_BROWSER=chromium|firefox|webkit
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.task': 'application/octet-stream', '.webmanifest': 'application/manifest+json' };
@@ -17,7 +17,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const c = await b.newContext({ serviceWorkers: 'block' }); await c.route('https://shred.local/**', serve);
   await c.addInitScript(() => localStorage.setItem('shred_flags_v1', JSON.stringify({ cycleTracking: true })));
   const p = await c.newPage(); p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
-  const go = async pg => { await pg.goto('https://shred.local/'); await pg.click('#welcomeBtn'); await pg.click('.tabs [data-tab=body]'); await pg.click('[data-go=cycle]'); await pg.waitForTimeout(700); };
+  const go = async pg => { await pg.goto('https://shred.local/'); await openCycle(pg); await pg.waitForTimeout(700); };
   await go(p); await p.check('#cyAgree'); await p.click('[data-act=consent]'); await p.waitForTimeout(500);
   const uid = await p.evaluate(() => localStorage.getItem('shred_cycle_uid'));
   await p.evaluate(async () => { const S = await import('/js/cycle/store.js'), M = await import('/js/cycle/model.js');

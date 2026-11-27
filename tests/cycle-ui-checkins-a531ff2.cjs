@@ -1,6 +1,6 @@
 // Browser regression test for the check-in defects reported against a531ff2. Written BEFORE the fix. Synthetic data only.
 // Run: node tests/cycle-ui-checkins-a531ff2.cjs   (E2E_BROWSER=chromium|firefox|webkit)
-const { launch } = require('./browser.cjs');
+const { launch, openCycle } = require('./browser.cjs');
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.task': 'application/octet-stream', '.webmanifest': 'application/manifest+json' };
@@ -17,7 +17,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     await c.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, r => r.fulfill({ status: 200, body: '', headers: { 'content-type': 'text/css' } }));
     await c.addInitScript(f => localStorage.setItem('shred_flags_v1', JSON.stringify(f)), flags);
     const p = await c.newPage(); p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
-    await p.goto('https://shred.local/'); await p.click('#welcomeBtn'); await p.click('.tabs [data-tab=body]'); await p.click('[data-go=cycle]'); await p.waitForTimeout(600);
+    await p.goto('https://shred.local/'); await openCycle(p); await p.waitForTimeout(600);
     await p.check('#cyAgree'); await p.click('[data-act=consent]'); await p.waitForTimeout(500);
     for (const st of starts) { await p.fill('#cyDate', st); await p.click('[data-act=logStart]'); await p.waitForTimeout(350); }
     return { c, p };
