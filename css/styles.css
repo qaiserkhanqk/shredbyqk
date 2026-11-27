@@ -63,7 +63,7 @@ img { max-width: 100%; }
 @keyframes rise { from { transform: translateY(8px); } to { transform: none; } }
 
 .topbar { display: flex; align-items: center; justify-content: space-between; padding: 6px 0 4px; }
-.wordmark { font-family: var(--f-display); font-stretch: 125%; font-weight: 900; font-size: 1.05rem; letter-spacing: .06em; }
+.wordmark { display: flex; align-items: center; font-family: var(--f-display); font-stretch: 125%; font-weight: 900; font-size: 1.05rem; letter-spacing: .06em; }
 .wordmark i { font-style: normal; background: var(--zone); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .wordmark small { font: 600 .7rem var(--f-body); letter-spacing: .04em; color: var(--muted); margin-left: 6px; }
 .iconbtn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; cursor: pointer; padding: 0; }
@@ -1112,3 +1112,4 @@ details.adj[hidden] { display: none; }
 .rd-nav > * { flex: 0 1 48%; }
 .rd-player { position: sticky; bottom: 96px; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-radius: 999px; background: var(--night); color: #ECF1EC; box-shadow: 0 10px 30px -10px rgba(0,0,0,.4); font-size: .88rem; }
 .rd-player .linkbtn { color: #9FD0B6; }
+.wm-mark { width: 26px; height: 26px; margin-right: 7px; flex: none; }

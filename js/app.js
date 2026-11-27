@@ -1612,7 +1612,7 @@ async function checkReminder() {
   const title = `Time to train${S.profile.name ? ', ' + S.profile.name : ''}`;
   try {
     const reg = await navigator.serviceWorker?.getRegistration?.();
-    reg ? reg.showNotification(title, { body, icon: 'icons/icon.svg', tag: 'qk-train' }) : new Notification(title, { body, tag: 'qk-train' });
+    reg ? reg.showNotification(title, { body, icon: 'icons/icon-192.png', tag: 'qk-train' }) : new Notification(title, { body, tag: 'qk-train' });
     (S.prog ||= {}).notifiedOn = new Date().toDateString(); persist();
   } catch {}
 }
