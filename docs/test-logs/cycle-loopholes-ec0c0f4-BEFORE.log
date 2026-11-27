@@ -1,0 +1,14 @@
+ok   control: the forecast has a range
+FAIL Zara checks in on her typical date (15, 15, 35, 15 days)  — null
+ok   control: with 28-day cycles she still checks in before the range
+FAIL it does not fire during the period she has just logged (no end logged: first 7 days)  — 2026-03-30,2026-03-31,2026-04-01
+ok   …but it does fire on her typical date
+ok   control: with 28-day cycles it still fires 2 days before her range
+FAIL an LMP before a period she logged after it is refused, so she can check the date  — {"code":null,"pregnancy":{"dueDate":"2026-11-25","dueSource":"lmp","lmp":"2026-02-18","startedAt":"2026-01-01T00:00:00.000Z"}}
+ok   control: her last logged start as the LMP is accepted
+ok   control: a due date from her midwife is accepted as given
+ok   "Not yet" keeps spotting she logged earlier today
+FAIL …and quiets the question for today
+FAIL "Not yet" with nothing logged today records no bleeding today (her answer)
+FAIL "Spotting only" saves spotting and quiets the question for today  — {"q":true}
+6 FAILED of 13

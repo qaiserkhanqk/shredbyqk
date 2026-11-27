@@ -1,0 +1,72 @@
+// Regression tests for four weak spots found reviewing ec0c0f4 (2026-11-27). Written BEFORE the fix. Synthetic dates
+// only. The estimate formula and the band estimate are not changed by these fixes.
+//   L1. Zara's "period soon" check-in used the same ~4-week guard as the old check-in, so with short or variable
+//       cycles (15, 15, 35, 15) she never checked in around the estimated start.
+//   L2. The "Has your period started?" REMINDER could fire during the period she had just logged (short cycles).
+//   L3. Pregnancy mode accepted a "first day of last period" earlier than a period she had already logged after it.
+//   L4. "Not yet" on the check-in overwrote spotting she had logged earlier that day with "no bleeding", and
+//       "Spotting only" left the question on screen for the rest of the day.
+// Run: node tests/cycle-loopholes-ec0c0f4.test.mjs
+import * as M from '../js/cycle/model.js';
+import * as R from '../js/cycle/reminders.js';
+import { addDays } from '../js/cycle/dates.js';
+import { estimateNext } from '../js/cycle/predict.js';
+import { startPregnancy } from '../js/cycle/pregnancy.js';
+import { companionToday } from '../js/cycle/companion.js';
+import * as C from '../js/cycle/checkins.js';
+
+let fails = 0, count = 0;
+const check = (n, ok, d = '') => { count++; if (!ok) fails++; console.log(`${ok ? 'ok  ' : 'FAIL'} ${n}${!ok && d ? '  — ' + d : ''}`); };
+const run = (label, fn) => { try { fn(); } catch (e) { check(`${label} ran to the end`, false, e.stack.split('\n').slice(0, 2).join(' ')); } };
+const AT = '2026-01-01T00:00:00.000Z', FAR = '2027-12-31', words = v => JSON.stringify(v);
+const err = fn => { try { fn(); return null; } catch (e) { return e.code; } };
+function hist(lens, first = '2026-01-05') {
+  const s = M.blankState('u'); M.giveConsent(s, AT);
+  const starts = [first]; for (const l of lens) starts.push(addDays(starts.at(-1), l));
+  for (const st of starts) M.logPeriodStart(s, st, { today: FAR, at: AT });
+  return { s, starts, last: starts.at(-1) };
+}
+const periodCheckDays = (s, days) => days.filter(d => R.dueNow(s, { today: d, nowMin: 600, estimate: estimateNext(s, d) }).some(x => x.reminder.kind === 'periodCheck'));
+
+run('L1. Zara with short or variable cycles', () => {
+  const { s, last } = hist([15, 15, 35, 15]), t = addDays(last, 15), e = estimateNext(s, t);
+  check('control: the forecast has a range', !!e.rangeStart);
+  check('Zara checks in on her typical date (15, 15, 35, 15 days)', companionToday(s, t, { estimate: e })?.kind === 'periodSoon', words(companionToday(s, t, { estimate: e })));
+  const r = hist([28, 28, 28, 28]), rt = addDays(r.last, 26);
+  check('control: with 28-day cycles she still checks in before the range', companionToday(r.s, rt, { estimate: estimateNext(r.s, rt) })?.kind === 'periodSoon');
+});
+
+run('L2. "Has your period started?" reminder', () => {
+  const { s, last } = hist([15, 15, 35, 15]); s.consent.reminders = true;
+  R.addReminder(s, { kind: 'periodCheck', time: '09:00', offsetDays: 2 }, { at: AT });
+  const early = periodCheckDays(s, [1, 2, 3, 4, 5, 6].map(n => addDays(last, n)));
+  check('it does not fire during the period she has just logged (no end logged: first 7 days)', early.length === 0, early.join(','));
+  const e = estimateNext(s, addDays(last, 15));
+  check('…but it does fire on her typical date', periodCheckDays(s, [e.typicalDate]).length === 1);
+  const r = hist([28, 28, 28, 28]); r.s.consent.reminders = true; R.addReminder(r.s, { kind: 'periodCheck', time: '09:00', offsetDays: 2 }, { at: AT });
+  const re = estimateNext(r.s, addDays(r.last, 1));
+  check('control: with 28-day cycles it still fires 2 days before her range', periodCheckDays(r.s, [addDays(re.rangeStart, -2)]).length === 1);
+});
+
+run('L3. Pregnancy: first day of last period', () => {
+  const { s, last } = hist([28, 28, 28]), t = addDays(last, 10);
+  const code = err(() => startPregnancy(s, { lmp: addDays(last, -40), today: t, at: AT }));
+  check('an LMP before a period she logged after it is refused, so she can check the date', code === 'LMP_BEFORE_LOGGED_PERIOD' && !s.pregnancy, words({ code, pregnancy: s.pregnancy }));
+  const ok = hist([28, 28, 28]);
+  check('control: her last logged start as the LMP is accepted', err(() => startPregnancy(ok.s, { lmp: ok.last, today: addDays(ok.last, 10), at: AT })) === null && !!ok.s.pregnancy);
+  const due = hist([28, 28, 28]);
+  check('control: a due date from her midwife is accepted as given', err(() => startPregnancy(due.s, { dueDate: addDays(due.last, 250), today: addDays(due.last, 30), at: AT })) === null);
+});
+
+run('L4. "Not yet" and "Spotting only"', () => {
+  const { s, last } = hist([28, 28, 28, 28]), t = addDays(last, 27);
+  M.logDay(s, t, { bleeding: 'spotting' }, { today: t, at: AT });
+  C.answerNotYet?.(s, t);
+  check('"Not yet" keeps spotting she logged earlier today', s.days[t]?.bleeding === 'spotting', words(s.days[t]));
+  check('…and quiets the question for today', C.periodCheckIn(s, t) === null);
+  const n = hist([28, 28, 28, 28]); C.answerNotYet?.(n.s, t);
+  check('"Not yet" with nothing logged today records no bleeding today (her answer)', n.s.days[t]?.bleeding === 'none', words(n.s.days[t]));
+  const sp = hist([28, 28, 28, 28]); C.answerSpotting?.(sp.s, t);
+  check('"Spotting only" saves spotting and quiets the question for today', sp.s.days[t]?.bleeding === 'spotting' && C.periodCheckIn(sp.s, t) === null, words({ day: sp.s.days[t], q: !!C.periodCheckIn(sp.s, t) }));
+});
+console.log(fails ? `${fails} FAILED of ${count}` : `ALL PASS (${count})`); process.exit(fails ? 1 : 0);
