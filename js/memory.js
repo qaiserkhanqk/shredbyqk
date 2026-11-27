@@ -2,6 +2,8 @@
 // "How's the knee?" a few days later. Pure function over the saved state, unit tested.
 // One follow-up at a time, each shown (and said) once; answering or dismissing it marks it done.
 import { e1rm } from './progression.js';
+import { mindDue, poorDays } from './mind.js';
+import { liveFitAge } from './fitnessage.js';
 
 const DAY = 864e5, WEEK = 7 * DAY;
 const dayStart = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
@@ -86,7 +88,40 @@ export function followUps(S, { now = Date.now(), lib = {}, program = null } = {}
     add({ id: `goal:${S.program.start}:${q}`, kind: 'goal', title: `Still training for the same thing${name}?`, text: `It's been ${q * 3} months on ${program?.name || 'your program'}. Goals change: QK can switch you to something new in one tap.`,
       say: 'Quick check. Is your goal still the same?', actions: [{ label: 'Same goal', act: 'ok' }, { label: 'Change it', act: 'programs' }] });
   }
-  const order = ['pain', 'rough', 'missed', 'ramadan', 'travel', 'finished', 'pr', 'goal', 'skip', 'time', 'milestone'];
+  // 11. Fitness Age: retest monthly; first test offered after two weeks of training.
+  const FA = S.fitage || [];
+  if (FA.length && now - FA[FA.length - 1].at >= 30 * DAY) {
+    const l = FA[FA.length - 1];
+    add({ id: `fitage:${l.at}`, kind: 'fitage', title: 'Time to retest your Fitness Age', text: `Last month it was ${l.fitnessAge}. A month of training is enough to move it. Takes two minutes.`,
+      say: 'It has been a month. Let\'s see if your fitness age has dropped.', actions: [{ label: 'Retest now', act: 'fitage' }, { label: 'Later', act: 'ok' }] });
+  } else if (!FA.length && real.length && now - first >= 14 * DAY && p.age) {
+    add({ id: 'fitage:first', kind: 'fitage', title: 'Want to know your Fitness Age?', text: 'How old your body really is, from the HUNT fitness research. You need your waist size and a resting heart rate.',
+      say: 'Want to find out your fitness age? It takes two minutes.', actions: [{ label: 'Find out', act: 'fitage' }, { label: 'Not now', act: 'ok' }] });
+  }
+  // 12. Training stopped: the Fitness Age they earned is slipping (the HUNT activity term drops after 14 days).
+  const live = liveFitAge(FA, S.sessions || [], now);
+  if (live?.lapsed && live.fitnessAge > live.was) {
+    const lastDay = new Date(now - live.daysOff * DAY).toDateString();
+    add({ id: `fitup:${lastDay}`, kind: 'fitup', title: `Your Fitness Age has gone up to ${live.fitnessAge}`, text: `It was ${live.was} while you were training. ${live.daysOff} days off and it's slipping${name}. One session this week starts bringing it back.`,
+      say: `Your fitness age has gone up to ${live.fitnessAge}. One session this week starts bringing it back.`, actions: [{ label: 'Train today', act: 'ok' }, { label: 'See Fitness Age', act: 'fitage' }] });
+  }
+  // 13. Mind: a few nights of poor sleep or high stress → ask how they're really doing; then QK's answer.
+  const mr = S.mindReply;
+  if (mr && now - mr.at < 18 * 3600e3) add({ id: `mindr:${mr.at}`, kind: 'mindReply', title: mr.title, text: mr.text,
+    actions: mr.support ? [{ label: 'Let QK know', act: 'mindshare' }, { label: 'Find a helpline', act: 'helpline' }, { label: 'Thanks', act: 'ok' }] : [{ label: 'Thanks, QK', act: 'ok' }] });
+  else if (mindDue(S, now)) {
+    const n = poorDays(S, now);
+    add({ id: `mind:${new Date(now).toDateString()}`, kind: 'mind', title: `How are you doing, honestly${name}?`, text: `Sleep or stress has been rough on ${n} of the last 4 days. Not just your body: how are you feeling in yourself?`,
+      say: 'Quick one. How are you doing, honestly?', actions: [{ label: "I'm good", act: 'mind:good' }, { label: 'A bit low', act: 'mind:low' }, { label: 'Struggling', act: 'mind:struggling' }] });
+  }
+  // 14. Monthly winner.
+  for (const w of S.won || []) {
+    const m = new Date(w.month).toLocaleDateString(undefined, { month: 'long' });
+    add({ id: `won:${w.month}`, kind: 'won', title: `${['', '🥇 You came 1st', '🥈 You came 2nd', '🥉 You came 3rd'][w.place]} in ${m}!`, text: w.prize ? `Your prize: ${w.prize}. QK will be in touch.` : 'Top 3 on the monthly leaderboard. Proud of you.',
+      say: `Congratulations! You finished number ${w.place} on the leaderboard in ${m}.`, actions: [{ label: 'Yes!', act: 'ok' }] });
+    break;
+  }
+  const order = ['mindReply', 'won', 'pain', 'mind', 'rough', 'missed', 'fitup', 'ramadan', 'travel', 'finished', 'pr', 'goal', 'skip', 'time', 'fitage', 'milestone'];
   return out.sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
 }
 

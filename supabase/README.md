@@ -62,3 +62,15 @@ app still reminds them whenever it's open, and the calendar reminder works every
 
 These rules live in the database, so they hold even if someone edits the app. `npm run test:db` checks them
 against a real Postgres. `node tests/cloud-e2e.cjs` checks the full client → coach → message loop.
+
+## 7. Leaderboard, prizes and broadcasts (re-run the schema)
+Re-run `supabase/schema.sql`. It keeps your data and adds:
+- the `scores` and `rewards` tables
+- the `leaderboard()` and `my_prizes()` functions
+- `title` and `pushed_at` on messages
+- a few profile columns: `last_train`, `nickname`, `board_hidden`, `prizes`, `lapse_sent`
+
+After that:
+- **Leaderboard.** Clients' apps send their weekly score when they sync. Ranking happens in the database, among the clients of the same coach. The board only ever shows a board name (nickname, else first name + initial, or "Anonymous") and points, never health details.
+- **Prizes.** On the dashboard, under Leaderboard, set the three prizes. At the end of the month, open "This month" and press **Record** on the top 3. Their app celebrates.
+- **Broadcasts.** On the dashboard, under "Send to everyone", pick a template or write your own message, choose who gets it, and press Send. The app shows it the next time it opens. With step 6 set up, the push job (now hourly) also sends it as a phone notification.

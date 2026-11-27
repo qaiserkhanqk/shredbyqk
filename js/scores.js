@@ -5,13 +5,14 @@
 // Colours: 75+ green "Strong" · 50–74 amber "Building" · under 50 red "Needs attention".
 // Red always comes with one concrete fix, so it pushes in a good way rather than shaming.
 //
-// Fitness age is an ESTIMATE, not a medical test: the HUNT Fitness Study's non-exercise VO2max model (Nes et al.,
-// Med Sci Sports Exerc 2011) from age, sex, waist, resting heart rate and training habits, compared with the
-// average fitness of each age. Fitter than average for your age → a younger fitness age.
+// Fitness age: one calculation for the whole app, in fitnessage.js (HUNT Study fitness model with every coefficient
+// as printed, compared with the HUNT 3 healthy averages by age; sources in SCIENCE.md "Fitness Age"). When the
+// client has done the Fitness Age test, the card shows that result (re-scored if they've stopped training).
 import * as N from './nutrition.js';
 import { weekReport, dayKey } from './weekly.js';
 import { readiness } from './load.js';
 import { strength } from './signals.js';
+import * as FA from './fitnessage.js';
 
 const DAY = 864e5;
 const clamp = (v, a = 0, b = 100) => Math.max(a, Math.min(b, v));
@@ -99,19 +100,19 @@ export function fitnessInputs(S, now = Date.now()) {
   return { age: +S.profile?.age || null, sex: S.profile?.sex === 'female' ? 'female' : 'male', waist: waist ? +waist : null, rhr, perWeek };
 }
 
-/** Fitness age (estimate). Returns { age, vo2, actualAge } or { missing: [...] }. */
-export function fitnessAge({ age, sex, waist, rhr, perWeek = 0, minutes = 45 }) {
+/** Fitness age from the card's inputs. Returns { age, vo2, actualAge, diff } or { missing: [...] }.
+ *  Active = meets the 150-minute guideline (training days a week × session minutes). */
+export function fitnessAge({ age, sex, waist, rhr, perWeek = 0, minutes = 50 }) {
   const missing = [!age && 'age', !waist && 'waist', !rhr && 'resting heart rate'].filter(Boolean);
   if (missing.length) return { missing };
-  // HUNT physical-activity index = frequency × duration × intensity (hard training = 5).
-  const f = perWeek < 1 ? 0 : perWeek < 2 ? 1 : perWeek < 4 ? 2.5 : 5, d = minutes < 15 ? 0.1 : minutes < 30 ? 0.38 : minutes <= 60 ? 0.75 : 1;
-  const pa = f * d * 5;
-  const vo2 = sex === 'female' ? 74.74 - 0.247 * age - 0.259 * waist - 0.114 * rhr + 0.198 * pa
-    : 100.27 - 0.296 * age - 0.369 * waist - 0.155 * rhr + 0.226 * pa;
-  // Average VO2max by age (approximate HUNT reference): the age whose average matches yours is your fitness age.
-  const [a0, slope] = sex === 'female' ? [49.5, 0.27] : [61, 0.35];
-  const fa = clamp(r0((a0 - vo2) / slope), 18, 90);
-  return { age: fa, vo2: r0(vo2 * 10) / 10, actualAge: age, diff: fa - age };
+  const r = FA.fitnessAge({ sex, age, waistCm: waist, rhr, active: perWeek * minutes >= 150 });
+  if (!r) return { missing: ['waist', 'resting heart rate'] }; // outside realistic ranges: ask them to re-measure
+  return { age: r.fitnessAge, vo2: r.vo2, actualAge: r0(age), diff: r.diff };
+}
+/** The latest Fitness Age test, if there is one from the last 60 days (re-scored if training stopped). */
+function tested(S, now) {
+  const live = FA.liveFitAge(S.fitage || [], S.sessions || [], now);
+  return live && now - live.at < 60 * DAY ? { age: live.fitnessAge, vo2: live.vo2, actualAge: live.age, diff: live.fitnessAge - live.age, tested: true, lapsed: live.lapsed } : null;
 }
 
 /** Everything for the Today card and the coach. */
@@ -123,7 +124,7 @@ export function allScores(S, now = Date.now()) {
   const weakest = have.sort((a, b) => a[1].score - b[1].score)[0];
   const health = out(healthVal, have.length >= 2 ? `From your ${have.map(([k]) => k).join(', ')} scores.` : 'Two of the scores below unlock your health score.',
     weakest ? weakest[1].fix : 'Log your meals and answer the morning card for a few days.', { weakest: weakest?.[0] || null });
-  const fit = fitnessAge(fitnessInputs(S, now));
+  const fit = tested(S, now) || fitnessAge(fitnessInputs(S, now));
   return { health, nutrition, recovery, activity, workout, fitness: fit };
 }
 

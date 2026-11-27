@@ -53,5 +53,13 @@ check('goal check after 3 months', followUps(base({ program: { id: 'massMonster'
 check('feel: two "too hard" → one set fewer; two "too easy" → one more; mixed → nothing', sessionFeel([{ at: NOW - 3 * DAY, rating: 'hard' }, { at: NOW - DAY, rating: 'hard' }], { now: NOW })?.setDelta === -1 && sessionFeel([{ at: NOW - 3 * DAY, rating: 'easy' }, { at: NOW - DAY, rating: 'easy' }], { now: NOW })?.setDelta === 1 && sessionFeel([{ at: NOW - 3 * DAY, rating: 'hard' }, { at: NOW - DAY, rating: 'right' }], { now: NOW }) === null);
 check('returning after pain: 14 days', returningAreas({ painCleared: { knee: NOW - 5 * DAY, back: NOW - 20 * DAY } }, NOW).join() === 'knee');
 
+// Fitness Age: offered after two weeks of training, then a monthly retest.
+{
+  const sess = [{ at: NOW - 20 * DAY, ex: 'squat', reps: 8 }];
+  check('fitness age: offered after 2 weeks of training when age is known', kinds(base({ profile: { name: 'Ali', age: 34 }, sessions: sess })).includes('fitage'));
+  check('fitness age: not offered without an age', !kinds(base({ sessions: sess })).includes('fitage'));
+  check('fitness age: retest due a month after the last test', kinds(base({ sessions: sess, fitage: [{ at: NOW - 31 * DAY, fitnessAge: 30 }] })).includes('fitage'));
+  check('fitness age: no retest after 10 days', !kinds(base({ sessions: sess, fitage: [{ at: NOW - 10 * DAY, fitnessAge: 30 }] })).includes('fitage'));
+}
 if (fail) { console.log(`${fail} FAILED`); process.exit(1); }
 console.log('memory: all pass');

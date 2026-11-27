@@ -482,3 +482,102 @@ doi:10.1123/ijspp.2022-0268), so QK suggests training after iftar.
   sessions), a finished program, and a 3-monthly "same goal?" check.
 - **The coach sees what to know:** sore areas, rough days this week, travel and Ramadan, as labels and
   counts only.
+
+## Brain (`js/brain.js`, `js/brainui.js`)
+
+**What protects the brain most is already in the app.** The 2024 Lancet Commission links 14 modifiable risk factors (inactivity, hearing and vision loss, high blood pressure and LDL, diabetes, smoking, depression, isolation and others) to about 45% of dementia cases (a theoretical maximum that assumes the links are causal). In a one-year trial, aerobic exercise grew the hippocampus by about 2% while the stretching group lost about 1.4% (Erickson et al., PNAS 2011); pooled trials suggest exercise mainly prevents shrinkage. In US POINTER (JAMA, 2025), a structured, coached lifestyle programme improved cognition more than a self-guided one.
+
+**Speed Flash** is modelled on the speed-of-processing ("useful field of view") training in the ACTIVE trial: a centre target (car or truck) and an edge target (a star in one of 8 places) flash together, then a mask; both answers must be right. A 2-down/1-up staircase (×0.8 per step) adjusts the flash time and settles near 71% correct; triangles are added as distractors once the flash is under 120 ms. Threshold = mean of the last 6 reversals; level 0–100 on a log scale from 500 ms to 17 ms (one frame). In ACTIVE's 20-year follow-up (Coe et al., 2026), speed training **with boosters** was linked to about 25% fewer dementia diagnoses (40% vs 49%); without boosters, and for memory or reasoning training, there was no significant effect. Diagnoses came from Medicare claims, and the training software was commercial (now BrainHQ). So the app runs a first block of 10 sessions, then a 4-session booster every 3 months (ACTIVE gave boosters at about 1 and 3 years; the shorter gap here is our choice, to keep the skill). Speed Flash is our own version, not the study's software, and makes no protection claim.
+
+**Memory Grid** (a Corsi-style spatial span) and **Colour Clash** (Stroop) are games. A review of over 130 studies found little evidence that brain games improve anything beyond the trained task (Simons et al., Psychological Science in the Public Interest, 2016), and the FTC fined Lumosity $2 million in 2016 for claiming otherwise. The app says this plainly.
+
+**Quran memory** uses spaced review (Leitner boxes: 0, 1, 3, 7, 14, 30, 60, 120 days; "couldn't" → box 1, "with mistakes" → same box, "from memory" → next box; memorised after reaching box 4). Spaced retrieval is among the most reliable findings in learning research, and matches the tradition of muraja'ah. Practice fades the verse in steps (all words → the last third hidden → two-thirds → first-letter cues only), then the user recites, checks against the text and audio, and marks themselves. Self-marking can't check tajweed: the app suggests reciting to a teacher. Arabic text: Tanzil Uthmani via api.alquran.cloud (fetched by `tools/fetch-quran-hifz.mjs`, Basmala removed from verse 1 except Al-Fatiha); English: Saheeh International; audio: EveryAyah / Quran.com, the same reciters as Sukoon.
+
+**Brain score** (0–100, last 7 days) rewards the habits with evidence, not game points: Move 30% (training days, 3 = full), Sleep 20% (7–9.5 h average = full; left out if fewer than 2 mornings logged), Calm 15% (3 Sukoon sessions), Speed & games 20% (3 Speed Flash sessions; other games count half), Learn & remember 15% (3 days with a Quran review or lesson). It shows the lowest pillar's fix. It appears only after the first brain activity.
+
+## Fitness Age
+
+**What it is.** Your estimated aerobic fitness (VO2peak, mL/kg/min), shown as the age whose healthy average matches it. Code: `js/fitnessage.js` (maths, tested in `tests/fitnessage.test.mjs`) and `js/fitage-ui.js` (screen).
+
+**Step 1: estimated fitness.** The HUNT Study non-exercise model (Nauman et al. 2017), with coefficients exactly as printed in three open-access papers: Frontiers in Behavioral Neuroscience 2019 (doi:10.3389/fnbeh.2019.00053), JAHA 2019 (doi:10.1161/JAHA.118.010293) and Scientific Reports 2025 (doi:10.1038/s41598-025-29410-7).
+
+- Men: 105.91 − 0.334·age − 0.402·waist(cm) − 0.144·resting HR + 3.102·PA (goodness of fit 0.58, SEE 5.88)
+- Women: 78.00 − 0.297·age − 0.270·waist(cm) − 0.110·resting HR + 2.674·PA (goodness of fit 0.52, SEE 5.37)
+- PA = 1 if the person meets 150 min moderate or 75 min vigorous activity a week, else 0.
+
+We use this version rather than the 2011 version with a graded activity index because every term is fully specified in print. Activity is pre-filled from the training log: average training days over the last full weeks (at least 2) × session length (the time cap, else 50 min) ≥ 150. The client can override it with one tap. Resting HR is the lowest camera reading in the last 30 days, or a fresh one.
+
+**Step 2: Fitness Age.** The mean VO2max of 4,631 healthy HUNT 3 adults by sex and decade (Aspenes et al. 2011, PLOS ONE, doi:10.1371/journal.pone.0064319, Table 2):
+
+| Age | Men | Women |
+|---|---|---|
+| 20–29 | 54.4 | 43.0 |
+| 30–39 | 49.1 | 40.0 |
+| 40–49 | 47.2 | 38.4 |
+| 50–59 | 42.6 | 34.4 |
+| 60–69 | 39.2 | 31.1 |
+| 70+ | 35.3 | 28.3 |
+
+Each group mean sits at its mid-age (25, 35, … 75). We interpolate linearly between points and carry the end slopes beyond them. Fitness Age is the age at which this curve equals your estimate, rounded and kept between 18 and 90. The same paper reports VO2max falling about 3.5 mL/kg/min per decade in both sexes. "% of average" is your estimate divided by the curve at your real age.
+
+**Why it matters.** Estimated fitness from this model predicts mortality: each 1 MET (3.5 mL/kg/min) higher goes with about 15% lower all-cause mortality in men (Nes et al. 2014, doi:10.1249/MSS.0000000000000219).
+
+**What would make you younger.** The model is re-run with one change at a time, and a change shows only if it is worth at least a year:
+
+- meeting the activity guideline
+- 5 cm off the waist (only above the WHO raised-risk cut-offs: 94 cm men, 80 cm women)
+- 5 bpm lower resting HR (only above 60)
+
+**Extra checks.** Optional, and not part of the number:
+
+- Push-ups in one go: men doing over 40 had 96% fewer cardiovascular events over 10 years than those doing 10 or fewer (Yang et al. 2019, doi:10.1001/jamanetworkopen.2018.8341). The study was in men, so this check is shown only to men.
+- Sit-and-rise score, 0–10: each point is linked to 21% lower mortality, and 8–10 is the lowest-risk group (Brito et al. 2012, doi:10.1177/2047487312471759).
+- Resting HR: each 10 bpm higher goes with about 9% higher all-cause mortality (Zhang et al. 2016, doi:10.1503/cmaj.150535).
+
+**Follow-up.** The first test is offered after two weeks of training (when age is known). After that, a retest reminder comes every 30 days through QK remembers. The trend line appears from the second test. The coach sees the latest Fitness Age as a chip.
+
+## When training stops: Fitness Age goes up (`js/fitnessage.js` liveFitAge, `tools/push-checkins.mjs` lapseMsg)
+The HUNT model has an activity term: meeting the 150/75-minute guideline adds 3.102 mL/kg/min for men and 2.674 for women (see Fitness Age above). After 14 days with no training or classes, the app re-scores the latest test with that term switched off.
+
+Fourteen days means one busy week never counts against anyone. This is the model's own term, not an extra detraining guess. The result moves by the size of that term, usually 2–4 years.
+
+- **On the phone:** a "QK remembers" card says "Your Fitness Age has gone up to X (from Y)", and the Fitness Age screen shows the new number with the reason.
+- **When the app stays closed:** the server gets the "if they stop" age (`care.fitAge.ifStopped`) and the last training day. The daily push job then sends "Your Fitness Age went up to X" at most every 14 days, within the one-notification-a-day budget, and never to people who turned notifications off.
+
+## Mind check (`js/mind.js`)
+- **When QK asks:** on 2 or more of the last 4 days, the morning check showed sleep quality or stress at 5+ on the Hooper 1–7 scale (or the "rough" one-tap answer), or the training check said "slept badly". QK then asks "How are you doing, honestly?" At most every 5 days.
+- **The answer is built from their own numbers:** training days in the last 2–4 weeks, resting heart rate against their own last month, Fitness Age and calm sessions. Only things that are true and going well are mentioned. If nothing is logged, it gives a plain, kind line.
+- **"A bit low":** today's session is made lighter, and QK suggests a 10-minute calm session before bed.
+- **"Struggling":** QK says how they feel matters more than any number. It asks them to talk to a person today (friend, family, doctor) and to call their local emergency number if they ever feel unsafe. It offers a helpline finder (findahelpline.com) and "Let QK know".
+- **"Let QK know"** shares only "Asked for support" with the coach, for a week, never the answers or numbers.
+- QK does not diagnose and never claims to replace a person.
+
+## Leaderboard (`js/leaderboard.js`, server: `leaderboard()` in supabase/schema.sql)
+A health score out of 100 for each week (Monday to Sunday). The month board averages them, so nobody drops to zero on Monday. It is built to be fair at any age: Fitness Age counts against your own age, recovery against your own scale, and most points come from showing up and checking in.
+
+| Part | Points | How |
+|---|---|---|
+| Training | 35 | training days ÷ planned days (capped) |
+| Fitness Age | 20 | 10 years younger than your age = 20, 10 older = 0; a test older than 45 days scores 0 (retest monthly) |
+| Recovery | 15 | morning check fatigue/soreness (Hooper 1–7, 1 best), × days checked in ÷ 5 |
+| Sleep | 15 | morning check sleep quality, same scaling |
+| Stress & mind | 15 | morning check stress, same scaling, +2 per calm session |
+
+The app shows the five parts and the top ways to earn more this week.
+
+- **Ranking:** done on the server, among one coach's clients. It returns the top 50 plus your own row, so someone in 70th place sees "#70".
+- **Board name:** nickname, else first name + last initial, or "Anonymous" if hidden. Scores' health details are never visible to other clients.
+- **Month:** average points a week, counted from each person's first week on the board (see below).
+- **Trust:** scores are computed on the phone. The coach sees each client's real training on the dashboard to sanity-check the top 3 before recording prizes.
+
+## Broadcasts (`js/coach-extra.js`, `js/dash.js` audienceOf, `tools/push-checkins.mjs` broadcastJobs)
+- **Delivery:** the coach writes one message, which is stored as one `messages` row per client (kind `broadcast`, with a title). The app says it and shows it at the next sync. The push job, now hourly for broadcasts only, sends it as a phone notification and stamps `pushed_at`.
+- **{name}** is filled with each client's first name.
+- **Audiences:** everyone, not trained in 7+ days, trained this week, or this week's top 10.
+- **Notifications off:** clients who turned notifications off still see it in the app.
+- **Templates:** ready-made ones in QK's voice (Roman Urdu and English), e.g. "Dr. Doom aa gaya lekin tum gym nahi aaye, {name}?".
+
+**Month board is the main board (the prizes), and it never drops to zero.**
+- **The score** is the average points a week over the month's weeks so far (weeks that start on a Monday in that month). It counts from each person's first week on the board, and weeks skipped after that count as 0. A steady trainer isn't overtaken by one big week, and someone who joins on the 15th can still win.
+- **"Points to pass" line:** under your score, e.g. "7 points to pass #2. One training day gets you there". One training day is worth 35 ÷ planned days. People see a small, reachable next step instead of the distance to #1.
+- **The weekly race** restarts every Monday as a fresh chance. Its #1 is the MVP, and the coach can shout them out with one tap. Monthly points are never reset on Monday.

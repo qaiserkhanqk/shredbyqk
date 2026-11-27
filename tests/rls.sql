@@ -100,6 +100,8 @@ set role authenticated;
 insert into public.coach_plans (client_id, coach_id, plan, note) values ('00000000-0000-0000-0000-00000000000a', auth.uid(), '{"meals":[]}', 'from Z');
 select pg_temp.check('new coach can save a plan', (select note from public.coach_plans) = 'from Z');
 reset role;
+-- Back to coach Q for the leaderboard checks below.
+update public.profiles set coach_id = (select id from public.profiles where invite_code = 'QKTEST') where id = '00000000-0000-0000-0000-00000000000a';
 
 -- Invite codes can't be brute-forced: wrong codes return null and the 11th wrong try in an hour is refused.
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
@@ -111,6 +113,51 @@ exception when others then perform pg_temp.check('11th try in an hour is refused
 select pg_temp.check('client can''t read or clear the attempt log', (select count(*) from public.join_attempts) = 0);
 reset role;
 select pg_temp.check('anonymous visitors see nothing', not has_table_privilege('anon', 'public.sessions', 'select'));
+
+-- Leaderboard: client C also joins Q. Scores are shared as rank + board name + score only.
+insert into auth.users (id, email, raw_user_meta_data) values ('00000000-0000-0000-0000-00000000000d', 'c@x.com', '{"name": "Sara Ahmed"}');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000d');
+set role authenticated;
+select public.join_coach('QKTEST');
+insert into public.scores (client_id, week, score, parts) values (auth.uid(), '2026-11-23', 81, '{"sleep": 3}');
+do $$ begin insert into public.scores (client_id, week, score) values ('00000000-0000-0000-0000-00000000000a', '2026-11-23', 1); perform pg_temp.check('client cannot post a score for someone else', false);
+exception when others then perform pg_temp.check('client cannot post a score for someone else', true); end $$;
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+set role authenticated;
+insert into public.scores (client_id, week, score, parts) values (auth.uid(), '2026-11-23', 64, '{"sleep": 9}');
+insert into public.scores (client_id, week, score) values (auth.uid(), '2026-11-30', 70);
+update public.profiles set nickname = 'Beast Mode' where id = auth.uid();
+select pg_temp.check('board: both clients ranked, highest first', (select string_agg(rank || ':' || name || ':' || score, ',' order by rank) from public.leaderboard('2026-11-23')) = '1:Sara A.:81,2:Beast Mode:64');
+select pg_temp.check('board: my own row is marked', (select rank from public.leaderboard('2026-11-23') where me) = 2);
+select pg_temp.check('board: month = average points a week since joining (64 + 70 over 2 weeks = 67), counted from their first week', (select score from public.leaderboard('2026-11-30', 1) where me) = 67);
+select pg_temp.check('board: a week that hasn''t happened yet doesn''t count', (select score from public.leaderboard('2026-11-23', 1) where me) = 64);
+select pg_temp.check('board: other clients'' health details stay private', (select count(*) from public.scores where client_id <> auth.uid()) = 0);
+update public.profiles set board_hidden = true where id = auth.uid();
+select pg_temp.check('board: hidden shows as Anonymous', (select name from public.leaderboard('2026-11-23') where me) = 'Anonymous');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+set role authenticated;
+select pg_temp.check('board: someone outside the coach''s community sees nothing', (select count(*) from public.leaderboard('2026-11-23')) = 0);
+reset role;
+-- Coach Q: sees the board, sets prizes, records a winner, broadcasts.
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000c1');
+set role authenticated;
+select pg_temp.check('coach sees their community''s board', (select count(*) from public.leaderboard('2026-11-23')) = 2);
+update public.profiles set prizes = '{"1": "Free month", "2": "Shaker", "3": "Shoutout"}' where id = auth.uid();
+insert into public.rewards (client_id, coach_id, month, place, prize) values ('00000000-0000-0000-0000-00000000000d', auth.uid(), '2026-11-01', 1, 'Free month');
+do $$ begin insert into public.rewards (client_id, coach_id, month, place) values ('00000000-0000-0000-0000-00000000000b', auth.uid(), '2026-11-01', 2); perform pg_temp.check('coach cannot reward someone else''s client', false);
+exception when others then perform pg_temp.check('coach cannot reward someone else''s client', true); end $$;
+insert into public.messages (coach_id, client_id, kind, title, body) values (auth.uid(), '00000000-0000-0000-0000-00000000000d', 'broadcast', 'Dr. Doom aa gaya', 'Lekin tum gym nahi aaye');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000d');
+set role authenticated;
+select pg_temp.check('client sees the coach''s prizes', (select public.my_prizes()->>'1') = 'Free month');
+select pg_temp.check('winner sees their reward', (select place from public.rewards) = 1);
+select pg_temp.check('client receives the broadcast', (select title from public.messages where kind = 'broadcast') = 'Dr. Doom aa gaya');
+do $$ begin insert into public.rewards (client_id, coach_id, month, place) values (auth.uid(), '00000000-0000-0000-0000-0000000000c1', '2026-12-01', 1); perform pg_temp.check('client cannot award themselves a prize', false);
+exception when others then perform pg_temp.check('client cannot award themselves a prize', true); end $$;
+reset role;
 
 select (case when ok then 'ok   ' else 'FAIL ' end) || name from pg_temp.results;
 select case when bool_and(ok) then 'rls: all pass' else 'rls: FAILED' end from pg_temp.results;
