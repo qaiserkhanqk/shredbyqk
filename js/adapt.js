@@ -9,6 +9,7 @@
 // Changes are small (100–150 kcal, 1,500–2,000 steps) and never go below the safety floor in targets().
 // During rehab it never suggests eating less.
 import { weightTrend, dayKey } from './weekly.js';
+import * as N from './nutrition.js';
 
 const DAY = 864e5;
 export const CHECKIN_DAYS = 14;
@@ -34,7 +35,7 @@ export function daysToCheckin(weights, adapt = {}, now = Date.now()) {
 /** The step goal now: the one chosen at a check-in, or what they already walk (at least 6,000). */
 export function stepGoal(adapt = {}, avgSteps = 0) {
   if (adapt.stepGoal) return adapt.stepGoal;
-  return Math.max(6000, Math.ceil((avgSteps || 0) / 500) * 500);
+  return Math.max(8000, Math.ceil((avgSteps || 0) / 500) * 500); // 8,000 a day until a check-in sets one (same as the Activity score)
 }
 
 /**
@@ -51,19 +52,23 @@ export function evaluate(o) {
   if (!trend || trend.spanDays < 10) return { kind: 'more', title: 'Thanks for weighing in', message: 'QK needs about two weeks of weigh-ins to see a trend through the day-to-day ups and downs (water, salt, a big dinner). Weigh in once or twice a week and QK will check in again.', change: null, choices: [] };
 
   const kg = trend.perWeek * 2, pct = trend.perWeek / trend.latest * 100;
+  // More than 2% of body weight a week is almost always a typo (or pounds typed as kg), not the body: no advice on it.
+  if (Math.abs(pct) > 2) return { kind: 'check', change: { kg: r1(kg), days: 14 }, title: 'One weigh-in looks off',
+    message: 'Your weigh-ins jump more than a body really changes in two weeks, so one of them is probably a typo (or pounds typed as kg). If it was the last one, delete it here; then weigh in again tomorrow morning.', choices: [{ id: 'undo', label: 'Delete my last weigh-in' }, { id: 'keep', label: 'It\'s right, keep it' }] };
   const change = { kg: r1(kg), days: 14 };
   const said = kg <= -0.05 ? `You're down ${r1(-kg)} kg over the last two weeks` : kg >= 0.05 ? `You're up ${r1(kg)} kg over the last two weeks` : 'Your weight has held steady over the last two weeks';
   const lower = d => {
     if (o.rehab && d < 0) return null;
     return o.target && d < 0 && o.target.kcal + d < (o.target.floor || 1200) ? null : { id: 'kcal', label: `Eat ${Math.abs(d)} kcal ${d < 0 ? 'less' : 'more'} a day`, delta: d };
   };
-  const moreSteps = add => ({ id: 'steps', label: `Walk ${fmt(add)} more steps a day (goal ${fmt(Math.min(15000, steps + add))})`, steps: Math.min(15000, steps + add) });
+  // No step increase past 15,000 a day, and none during rehab (the physio sets activity then).
+  const moreSteps = add => o.rehab || steps >= 15000 ? null : ({ id: 'steps', label: `Walk ${fmt(Math.min(15000, steps + add) - steps)} more steps a day (goal ${fmt(Math.min(15000, steps + add))})`, steps: Math.min(15000, steps + add) });
   const pick = (...xs) => xs.filter(Boolean);
   // The small signals (js/signals.js) come first: they explain a fortnight better than the scale alone.
   const sig = o.signals || {}, cyc = sig.cycle, well = sig.wellbeing, str = sig.strength, eng = sig.engagement;
   const flat = pct > -0.15;
-  if (goal === 'lose' && flat && cyc?.inWindow) return { kind: 'cycle', change, title: 'Your period week',
-    message: `${said}. In the days before and at the start of a period the body holds 1–2 kg of water, which hides fat loss. Nothing to change: weigh in again next week and the real trend shows.`,
+  if (cyc?.inWindow && (goal === 'lose' ? flat : pct > 0)) return { kind: 'cycle', change, title: 'Your period week',
+    message: `${said}. In the days before and at the start of a period the body holds 1–2 kg of water${goal === 'lose' ? ', which hides fat loss' : ''}. Nothing to change: weigh in again next week and the real trend shows.`,
     choices: [{ id: 'keep', label: 'Keep everything as it is' }] };
   if (goal === 'lose' && flat && well?.poor) return { kind: 'rough-week', change, title: 'A tough week',
     message: `${said}. ${well.sleepH != null && well.sleepH < 6 ? `You slept about ${well.sleepH} hours a night` : 'Your mornings felt rough'} this week. Poor sleep and stress hold water and raise hunger, so the scale stalls even when you're doing well. Keep your food the same and protect your sleep; QK checks again in two weeks.`,
@@ -74,6 +79,9 @@ export function evaluate(o) {
   const fewLogs = eng && eng.foodDays14 < 4 ? ` (You logged food on ${eng.foodDays14} of the last 14 days, so QK is reading the scale more than your meals. A photo a day makes this sharper.)` : '';
 
   if (goal === 'lose') {
+    if (pct > 0.25) return { kind: 'gaining', change, title: 'The scale went up',
+      message: `${said}. On a cut that usually means some meals aren't in the log (chai, a few bites, weekend dinners, oil in shared salan) or extra water from salty food. Log every meal for one week so QK can see the full picture, or take a small step now.${fewLogs}`,
+      choices: pick({ id: 'keep', label: 'Log every meal this week, then check again' }, lower(-150), moreSteps(2000)) };
     if (pct > -0.15) return { kind: 'stalled', change, title: 'Your weight has paused',
       message: `${said}. That's normal: your body gets used to a routine, and water and salt can hide fat loss for a while. The kindest next step is a little more movement. Your food can stay the same.${fewLogs}`,
       choices: pick(moreSteps(2000), lower(-150), { id: 'keep', label: 'Give it two more weeks as it is' }, o.female ? { id: 'period', label: 'It\'s my period week', why: 'cycle' } : null) };
@@ -102,7 +110,14 @@ export function evaluate(o) {
 /** Apply the client's choice. Mutates profile (kcalAdjust) and adapt (stepGoal, lastAt, history). */
 export function applyChoice({ profile, adapt, decision, choiceId, weight, now = Date.now() }) {
   const c = (decision.choices || []).find(x => x.id === choiceId) || { id: 'keep' };
-  if (c.delta) profile.kcalAdjust = Math.max(-600, Math.min(600, (+profile.kcalAdjust || 0) + c.delta));
+  if (c.delta) {
+    const before = N.targets(profile), m = N.maintenance(profile);
+    if (before && m) {
+      // The adjustment that puts the target exactly `delta` from where it is now, even if it sat on the safety floor.
+      const goalF = { lose: -0.2, maintain: 0, gain: 0.1 }[N.dietGoal(profile)];
+      profile.kcalAdjust = Math.round(Math.max(-600, Math.min(600, before.kcal + c.delta - m.tdee * (1 + goalF))));
+    } else profile.kcalAdjust = Math.max(-600, Math.min(600, (+profile.kcalAdjust || 0) + c.delta));
+  }
   if (c.steps) adapt.stepGoal = c.steps;
   adapt.lastAt = now;
   (adapt.history ||= []).push({ at: now, day: dayKey(now), kind: decision.kind, choice: c.id, delta: c.delta || 0, stepGoal: adapt.stepGoal || null, kg: weight ?? null });

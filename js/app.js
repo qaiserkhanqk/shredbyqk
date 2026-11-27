@@ -48,6 +48,8 @@ import { nextStep } from './today.js';
 import { initFood, renderFood } from './food.js';
 import { enablePush } from './push.js';
 import { renderScores } from './scoreview.js';
+import { sanitizePlan } from './dietplan.js';
+import { PHOTO_CONFIG } from './foodphoto.js';
 import { landmarksFrom, analyse, render, navyBodyFat, bfCategory, stanceProblem } from './bodyscan.js';
 
 const $ = s => document.querySelector(s);
@@ -1299,7 +1301,7 @@ $('#calcBf').onclick = () => {
   if (!p.heightCm) { $('#bfOut').innerHTML = '<p class="muted small">Add your height under Today → Profile &amp; coach first.</p>'; return; }
   const bf = navyBodyFat({ sex: p.sex, heightCm: p.heightCm, neckCm: v('#bNeck'), waistCm: v('#bWaist'), hipCm: v('#bHip') });
   if (Number.isNaN(bf)) { $('#bfOut').innerHTML = `<p class="muted small">Check your neck and waist${p.sex === 'female' ? ' and hip' : ''} measurements.</p>`; return; }
-  const wt = v('#bWeight'), lean = wt ? wt * (1 - bf / 100) : null;
+  const wRaw = v('#bWeight'), wt = wRaw > 25 && wRaw < 350 ? wRaw : null, lean = wt ? wt * (1 - bf / 100) : null; // a typo here would feed the weight trend
   S.scans.push({ at: Date.now(), bf, weight: wt || null, lean, water: v('#bWater') || null, muscle: v('#bMuscle') || null, waistCm: v('#bWaist') || null }); persist(); // waist also feeds fitness age
   const prev = S.scans.filter(s => s.bf).slice(-2, -1)[0];
   const off = 176 * (1 - Math.min(40, bf) / 40);
@@ -1686,6 +1688,7 @@ $('#rsheetBody').addEventListener('click', e => {
 // Off unless the server is configured (js/cloud-config.js). Everything works offline; sync catches up later.
 const cloud = cloudOn() ? new Cloud({ url: CLOUD.url, anonKey: CLOUD.anonKey, session: S.cloud?.session || null, onSession: s => { (S.cloud ||= {}).session = s; persist(); } }) : null;
 let syncing = false;
+PHOTO_CONFIG.getToken = () => cloud?.session?.access_token || null; // lets the photo server check it's a real client
 async function syncNow() {
   if (!cloud?.signedIn || !S.cloud?.coach || syncing || !navigator.onLine) return;
   syncing = true;
@@ -1712,7 +1715,8 @@ function renderCoachLink() {
 }
 function applyCoachPlan(plan, note, at) {
   if (!plan || !at || (S.food?.coachPlanAt && S.food.coachPlanAt >= at)) return false;
-  (S.food ||= { log: [], prefs: {}, style: 'home' }).plan = { ...plan, byCoach: true, note: note || '', editedAt: at };
+  const clean = sanitizePlan(plan); if (!clean) return false; // rebuilt from known foods only
+  (S.food ||= { log: [], prefs: {}, style: 'home' }).plan = { ...clean, byCoach: true, note: String(note || '').slice(0, 300), editedAt: at };
   S.food.coachPlanAt = at; persist(); renderFood(); return true;
 }
 // Demo (no server yet): messages sent to "this phone" from the dashboard demo are read out here.
@@ -1727,8 +1731,8 @@ if (cloud) {
   $('#clSend').onclick = async () => { const e = $('#clEmail').value.trim(); if (!e) return; try { await cloud.sendCode(e); $('#clStep2').hidden = false; toast('Code sent. Check your email.'); } catch (err) { toast(err.message); } };
   $('#clVerify').onclick = async () => { try { await cloud.verify($('#clEmail').value, $('#clCode').value); renderCoachLink(); } catch (err) { toast(err.message); } };
   $('#clJoin').onclick = async () => {
-    try { const name = await cloud.joinCoach($('#clInvite').value.trim()); (S.cloud ||= {}).coach = name || 'your coach'; persist(); renderCoachLink(); if (globalThis.Notification?.permission === 'granted') enablePush(cloud).catch(() => {}); toast(`Connected to ${S.cloud.coach} ✓`); say(`You're connected to ${S.cloud.coach}. They'll see your training and cheer you on.`, { priority: 'high' }); await cloud.opened(); syncNow(); }
-    catch (err) { toast(/No coach/.test(err.message) ? 'That invite code didn\'t match. Check it with your coach.' : err.message); }
+    try { const name = await cloud.joinCoach($('#clInvite').value.trim()); if (!name) throw new Error('No coach with that code'); (S.cloud ||= {}).coach = name; persist(); renderCoachLink(); if (globalThis.Notification?.permission === 'granted') enablePush(cloud).catch(() => {}); toast(`Connected to ${S.cloud.coach} ✓`); say(`You're connected to ${S.cloud.coach}. They'll see your training and cheer you on.`, { priority: 'high' }); await cloud.opened(); syncNow(); }
+    catch (err) { toast(/No coach/.test(err.message) ? 'That invite code didn\'t match. Check it with your coach.' : /Too many/.test(err.message) ? 'Too many tries. Check the code with your coach and try again in an hour.' : err.message); }
   };
   $('#clOut').onclick = () => { cloud.signOut(); S.cloud = {}; persist(); renderCoachLink(); };
   renderCoachLink();

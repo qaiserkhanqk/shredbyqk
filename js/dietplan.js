@@ -249,12 +249,15 @@ export function makePlan(a, T, seed = 0) {
     const kind = kindOf(name), target = Object.fromEntries(KEYS.map(k => [k, T[k] * share]));
     const tpls = TEMPLATES[kind];
     const options = [], seen = new Set();
-    // Lunch and dinner take turns through the proteins so they don't repeat.
+    // Lunch and dinner take turns through the proteins so they don't repeat. If nothing the client ticked fits this
+    // meal (e.g. they avoid gluten and only ticked paratha and roti), try again with everything they're allowed to eat.
     const turns = kind === 'main' ? 3 : 2;
+    for (const aa of [a, { ...a, likes: { ...a.likes, [kind]: LIKES[kind] } }]) {
+    if (options.length) break;
     for (let t = 0; t < turns && options.length < 3; t++) {
       for (let k = 0; k < tpls.length && options.length < 3; k++) {
         const tpl = tpls[(k + seed + (kind === 'main' ? mainTurn : mi)) % tpls.length];
-        const items = fill(tpl, kind, a, t + seed + mi);
+        const items = fill(tpl, kind, aa, t + seed + mi);
         if (!items) continue;
         const sig = items.map(i => i.id).sort().join('+');
         if (seen.has(sig)) continue;
@@ -269,13 +272,20 @@ export function makePlan(a, T, seed = 0) {
         });
       }
     }
+    }
     // The closest fit leads; the others stay as swaps of about the same size.
     options.sort((x, y) => x.error - y.error);
+    // A swap that can't get within 15% of the meal (e.g. one whole tikka piece in a small cutting lunch) is dropped
+    // when there are better ones: every option of a meal should be about the same size.
+    const off = o => Math.abs(o.total.kcal - target.kcal) / Math.max(target.kcal, 1);
+    for (let i = options.length - 1; i > 0; i--) if (off(options[i]) > 0.15) options.splice(i, 1);
     if (kind === 'main') mainTurn += 2;
     return { name, share, target, options };
   });
   const day = meals.reduce((s, m) => { const o = m.options[0]; if (o) for (const k of KEYS) s[k] += o.total[k]; return s; }, { kcal: 0, protein: 0, carbs: 0, fat: 0 });
-  return { at: Date.now(), seed, answers: a, target: { kcal: T.kcal, protein: T.protein, carbs: T.carbs, fat: T.fat }, meals, day };
+  // Honest about a plan that can't reach the target with what the client eats (shown in the app and to QK).
+  const short = day.kcal < T.kcal * 0.9 ? 'kcal' : day.protein < T.protein * 0.85 ? 'protein' : null;
+  return { at: Date.now(), seed, answers: a, target: { kcal: T.kcal, protein: T.protein, carbs: T.carbs, fat: T.fat }, meals, day, short };
 }
 
 /** How close the plan is to the targets, in percent: { kcal: -2, protein: +1, … }. */
@@ -306,3 +316,19 @@ export function retotal(plan) {
 }
 /** Foods QK can add on the dashboard, alphabetical. */
 export const FOOD_CHOICES = Object.values(FOODS).map(f => ({ id: f.id, name: f.name, unit: f.unit, step: f.step })).sort((a, b) => a.name.localeCompare(b.name));
+
+/** A plan from somewhere we don't control (a client's profile, a coach's JSON): rebuilt from known foods only.
+ *  Unknown food ids and non-numeric amounts are dropped, names come from FOODS, totals are recomputed. */
+export function sanitizePlan(plan) {
+  if (!plan || !Array.isArray(plan.meals)) return null;
+  const num = v => Number.isFinite(v) ? v : 0;
+  const meals = plan.meals.slice(0, 6).map(m => ({
+    name: String(m?.name ?? '').slice(0, 40), share: num(m?.share),
+    target: Object.fromEntries(KEYS.map(k => [k, num(m?.target?.[k])])),
+    options: (Array.isArray(m?.options) ? m.options : []).slice(0, 3).map(o => ({ title: String(o?.title ?? '').slice(0, 60),
+      items: (Array.isArray(o?.items) ? o.items : []).filter(it => FOODS[it?.id] && Number.isFinite(it.amount) && it.amount > 0 && it.amount <= 2000).slice(0, 12)
+        .map(it => ({ id: it.id, amount: it.amount, name: (/^Extra: /.test(it.name || '') ? 'Extra: ' : '') + FOODS[it.id].name })) })),
+  }));
+  const t = plan.target || {};
+  return { ...retotal({ meals }), target: Object.fromEntries(KEYS.map(k => [k, num(t[k])])), seed: num(plan.seed), at: num(plan.at), answers: plan.answers && typeof plan.answers === 'object' ? plan.answers : undefined };
+}

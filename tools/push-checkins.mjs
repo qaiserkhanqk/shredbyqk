@@ -31,7 +31,8 @@ export function plan({ profiles, subs, plans, day }) {
     offer(c.client_id, 'plan', { title: 'QK updated your diet plan', body: c.note || 'Open Food to see your new amounts.', url: './?tab=food', tag: 'qk-plan' });
   for (const p of profiles) {
     if (p.notify === 'off') continue;
-    const checkin = p.next_checkin && p.next_checkin <= day;
+    // Once per due date: a client who stopped opening the app isn't reminded every day forever.
+    const checkin = p.next_checkin && p.next_checkin <= day && !(byClient.get(p.id) || []).every(s => s.last_checkin_for === p.next_checkin);
     if (checkin) offer(p.id, 'checkin', { title: `Check-in day${first(p.id) ? ', ' + first(p.id) : ''}`, body: 'Weigh yourself before breakfast and enter it in Food. QK will read your two weeks and suggest your next step.', url: './?tab=food', tag: 'qk-checkin' });
     const quiet = p.last_food ? Math.floor((Date.parse(day) - Date.parse(p.last_food)) / 864e5) : null;
     const lastNudge = (byClient.get(p.id) || []).map(s => s.last_nudge).filter(Boolean).sort().pop();
@@ -40,8 +41,8 @@ export function plan({ profiles, subs, plans, day }) {
   }
   const out = [];
   for (const [id, w] of want) {
-    if (P.get(id)?.notify === 'off' && w.kind !== 'plan') continue;
-    for (const s of byClient.get(id) || []) if (s.last_sent !== day) out.push({ sub: s, kind: w.kind, client: id, msg: w.msg });
+    if (P.get(id)?.notify === 'off') continue; // Off means off, plan updates included
+    for (const s of byClient.get(id) || []) if (s.last_sent !== day) out.push({ sub: s, kind: w.kind, client: id, msg: w.msg, due: P.get(id)?.next_checkin || null });
   }
   return out;
 }
@@ -63,9 +64,10 @@ async function main() {
   for (const j of jobs) {
     const st = await send(j.sub, j.msg, vapid).catch(e => { console.warn(e.message); return 0; });
     if (st === 404 || st === 410) { gone++; await fetch(`${base}/rest/v1/push_subs?endpoint=eq.${encodeURIComponent(j.sub.endpoint)}`, { method: 'DELETE', headers: H }); continue; }
-    if (st >= 200 && st < 300) { sent++; await patch(`/rest/v1/push_subs?endpoint=eq.${encodeURIComponent(j.sub.endpoint)}`, { last_sent: day, ...(j.kind === 'nudge' ? { last_nudge: day } : {}) }); }
+    if (st >= 200 && st < 300) { sent++; j.ok = true; await patch(`/rest/v1/push_subs?endpoint=eq.${encodeURIComponent(j.sub.endpoint)}`, { last_sent: day, ...(j.kind === 'nudge' ? { last_nudge: day } : {}), ...(j.kind === 'checkin' ? { last_checkin_for: j.due } : {}) }); }
   }
-  for (const c of new Set(jobs.filter(j => j.kind === 'plan').map(j => j.client))) await patch(`/rest/v1/coach_plans?client_id=eq.${c}`, { notified_at: new Date().toISOString() });
+  // A plan update counts as notified only if it reached at least one of the client's phones.
+  for (const c of new Set(jobs.filter(j => j.kind === 'plan' && j.ok).map(j => j.client))) await patch(`/rest/v1/coach_plans?client_id=eq.${c}`, { notified_at: new Date().toISOString() });
   console.log(`${day}: ${sent} sent, ${gone} phones unsubscribed, ${jobs.length - sent - gone} failed.`);
 }
 if (import.meta.url === `file://${process.argv[1]}`) main().catch(e => { console.error(e); process.exit(1); });

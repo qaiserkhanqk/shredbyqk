@@ -7,7 +7,7 @@
 
 import { foodDayRows, foodWeekSummary, placeRows } from './foodsync.js';
 import { careSummary } from './dash.js';
-import { allWeights, daysToCheckin } from './adapt.js';
+import { allWeights, daysToCheckin, checkinDue } from './adapt.js';
 import { notifyLevel } from './signals.js';
 import { allScores, scoreSummary } from './scores.js';
 
@@ -119,6 +119,7 @@ export async function pushAll(cloud, S, mark = {}) {
 
 /** The date of the next two-weekly check-in, as YYYY-MM-DD (today when it's due). */
 export function nextCheckin(S, now = Date.now()) {
-  const d = new Date(now + daysToCheckin(allWeights(S), S.food?.adapt || {}, now) * 864e5);
+  const ws = allWeights(S), A = S.food?.adapt || {};
+  const d = new Date(now + (checkinDue(ws, A, now) ? 0 : daysToCheckin(ws, A, now)) * 864e5);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }

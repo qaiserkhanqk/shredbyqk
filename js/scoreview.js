@@ -35,8 +35,10 @@ export function renderScores(el, S, now = Date.now()) {
 }
 
 /** One line for the coach: chips coloured by band. */
-export function scoreChips(sc) {
-  if (!sc) return '–';
+export function scoreChips(raw) {
+  if (!raw || typeof raw !== 'object') return '–';
+  const num = v => Number.isFinite(v) ? Math.round(v) : null;
+  const sc = Object.fromEntries(['health', 'nutrition', 'recovery', 'activity', 'workout', 'fitnessAge', 'age'].map(k => [k, num(raw[k])]));
   const c = v => v == null ? 'none' : v >= 75 ? 'good' : v >= 50 ? 'mid' : 'low';
   const chip = (label, v) => `<span class="sc-chip ${c(v)}">${label} ${v ?? '–'}</span>`;
   return [chip('Health', sc.health), chip('Nutrition', sc.nutrition), chip('Recovery', sc.recovery), chip('Activity', sc.activity), chip('Workout', sc.workout),

@@ -188,6 +188,7 @@ create table if not exists public.push_subs (
   last_nudge date
 );
 alter table public.push_subs add column if not exists last_nudge date;
+alter table public.push_subs add column if not exists last_checkin_for date; -- the due date we last reminded about (once per check-in)
 alter table public.push_subs enable row level security;
 drop policy if exists "own push" on public.push_subs;
 create policy "own push" on public.push_subs for all using (client_id = auth.uid()) with check (client_id = auth.uid());
@@ -203,23 +204,33 @@ create table if not exists public.coach_plans (
 );
 alter table public.coach_plans enable row level security;
 drop policy if exists "coach writes plans" on public.coach_plans;
-create policy "coach writes plans" on public.coach_plans for all using (coach_id = auth.uid() and public.is_my_client(client_id)) with check (coach_id = auth.uid() and public.is_my_client(client_id));
+create policy "coach writes plans" on public.coach_plans for all using (public.is_my_client(client_id)) with check (coach_id = auth.uid() and public.is_my_client(client_id));
 drop policy if exists "client reads own plan" on public.coach_plans;
 create policy "client reads own plan" on public.coach_plans for select using (client_id = auth.uid());
 
 -- Joining a coach: a client calls this with the coach's invite code. Returns the coach's name.
+-- Wrong guesses are counted (10 an hour per account) so invite codes can't be brute-forced. A wrong code returns
+-- null instead of raising: an exception would roll back the attempt we just recorded.
+create table if not exists public.join_attempts (uid uuid not null, at timestamptz not null default now());
+create index if not exists join_attempts_uid_at on public.join_attempts (uid, at);
+alter table public.join_attempts enable row level security;  -- no policies: only join_coach() writes here
 create or replace function public.join_coach(code text) returns text
 language plpgsql security definer set search_path = public as $$
-declare c public.profiles;
+declare c public.profiles; tries int;
 begin
+  select count(*) into tries from public.join_attempts where uid = auth.uid() and at > now() - interval '1 hour';
+  if tries >= 10 then raise exception 'Too many tries. Check the code with your coach and try again in an hour.'; end if;
   select * into c from public.profiles where invite_code = upper(trim(code)) and role = 'coach';
-  if c.id is null then raise exception 'No coach with that code'; end if;
+  if c.id is null then insert into public.join_attempts (uid) values (auth.uid()); return null; end if;
+  -- A new coach starts fresh: the previous coach's plan for this client is removed.
+  delete from public.coach_plans where client_id = auth.uid() and coach_id <> c.id;
   update public.profiles set coach_id = c.id where id = auth.uid();
   return c.name;
 end $$;
 grant execute on function public.join_coach(text) to authenticated;
 
 -- Becoming a coach: run ONCE for your own account after you've signed in on the dashboard, replacing the email:
---   update public.profiles set role = 'coach', invite_code = 'QK' || upper(substr(md5(random()::text), 1, 4))
+--   update public.profiles set role = 'coach', invite_code = 'QK' || upper(substr(md5(random()::text || clock_timestamp()::text), 1, 8))
 --   where id = (select id from auth.users where email = 'you@example.com');
--- (Roles are never set from the app, so nobody can make themselves a coach.)
+-- (Roles are never set from the app, so nobody can make themselves a coach.) Codes are 10 characters (4 billion
+-- possibilities); if yours is an older 6-character one, run the line above again to get a longer one.

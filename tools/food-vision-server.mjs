@@ -34,7 +34,18 @@
 // It answers through a strict JSON schema whose dish field is an enum of the app's catalogue, it is
 // asked `samples` times in parallel, and the app keeps the consensus. Answers are cached by image hash.
 import http from 'node:http';
+import crypto from 'node:crypto';
 import { parseFatSecret } from '../js/fatsecret.js';
+import { catalogue as appCatalogue } from '../js/foodphoto.js';
+
+// The dish list comes from the app's own code, never from the request: a caller can't add dishes, inject text into
+// the prompt through dish names, or poison the shared cache. Its version is part of every cache key.
+const CATALOGUE = appCatalogue(), IDS = CATALOGUE.map(c => c.id);
+const CAT_VERSION = crypto.createHash('sha1').update(JSON.stringify(CATALOGUE)).digest('hex').slice(0, 10);
+// Sign-in check (recommended for production): with SUPABASE_URL and SUPABASE_ANON_KEY set, every photo or text request
+// must carry the client's Supabase sign-in token, so only your clients can spend your AI budget.
+const AUTH_URL = process.env.SUPABASE_URL?.replace(/\/$/, ''), AUTH_KEY = process.env.SUPABASE_ANON_KEY;
+const RATE = +process.env.RATE_PER_MIN || 20; // requests per minute per signed-in client (or per network address)
 
 const PORT = +process.env.PORT || 8787;
 const ORIGIN = process.env.ALLOW_ORIGIN || '*';
@@ -48,7 +59,7 @@ const FAST = process.env.FAST_MODEL ?? (PROVIDER === 'gemini' ? 'gemini-3.1-flas
 const CONCURRENCY = +process.env.AI_CONCURRENCY || 16, MAX_QUEUE = +process.env.MAX_QUEUE || 300;
 // $ per million tokens (input, cached input, output) for the /health estimate; set to your plan's prices.
 const PRICE = { in: +process.env.PRICE_IN || 1.5, cached: +process.env.PRICE_CACHED || 0.15, out: +process.env.PRICE_OUT || 7.5 };
-const cache = new Map(); // hash → samples
+const cache = new Map(); // version|image hash|note|mode → samples
 
 const RULES = `For each separate food:
 - dish: pick the closest id from the catalogue below. Use "other" only if nothing is close, and then name it in other_name.
@@ -259,7 +270,7 @@ export function checkAnswer(a, ids) {
   if (!a || !Array.isArray(a.items)) return a;
   const set = new Set(ids), norm = x => String(x || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
   const fix = (x, none) => set.has(x) ? x : set.has(norm(x)) ? norm(x) : none;
-  return { ...a, items: a.items.map(i => { const d = fix(i.dish, null); return { ...i, dish: d || 'other', other_name: d ? i.other_name : (i.other_name || String(i.dish || '')), alternative: fix(i.alternative, 'none') }; }) };
+  return { ...a, items: a.items.slice(0, 12).map(i => { const d = fix(i.dish, null); return { ...i, servings: Math.min(10, Math.max(0.25, +i.servings || 1)), confidence: Math.min(1, Math.max(0, +i.confidence || 0)), dish: d || 'other', other_name: d ? i.other_name : (i.other_name || String(i.dish || '')), alternative: fix(i.alternative, 'none') }; }) };
 }
 
 /** Is one answer clear enough to stop at one call? (Each dish named with confidence, no runner-up.) */
@@ -290,14 +301,23 @@ async function ask(job, samples) {
 }
 const remember = (key, v) => { cache.set(key, v); if (cache.size > 500) cache.delete(cache.keys().next().value); return v; };
 
-async function recognise({ image, hash, samples = 'auto', catalogue, hint = '', plateCm = null, usual = [] }) {
-  const key = hash && `${hash}|${hint}|${samples}`; // the same photo with a different note is a different question
+const MODES = new Set(['fast', 'refine', 'auto']);
+async function recognise({ image, samples = 'auto', hint = '', plateCm = null, usual = [] }) {
+  samples = MODES.has(samples) ? samples : 'auto';
+  hint = typeof hint === 'string' ? hint.slice(0, 200) : '';
+  plateCm = Number.isFinite(+plateCm) && +plateCm >= 15 && +plateCm <= 40 ? +plateCm : null;
+  usual = Array.isArray(usual) ? usual.filter(u => typeof u === 'string').slice(0, 15).map(u => u.slice(0, 40)) : [];
+  const catalogue = CATALOGUE;
+  const hash = crypto.createHash('sha256').update(image).digest('hex'); // ours, not the caller's
+  const key = `${CAT_VERSION}|${hash}|${hint}|${samples}`; // the same photo with a different note is a different question
   if (key && cache.has(key)) return cache.get(key);
   const out = await ask({ image, stat: STATIC_PHOTO(catalogue), text: PHOTO_CONTEXT({ hint, plateCm, usual }), ids: catalogue.map(c => c.id), hashOf: hash || image }, samples);
   return key ? remember(key, out) : out;
 }
-async function understand({ text, catalogue }) {
-  const key = 'text|' + text.toLowerCase().trim();
+async function understand({ text }) {
+  const catalogue = CATALOGUE;
+  text = String(text).slice(0, 300);
+  const key = `${CAT_VERSION}|text|` + text.toLowerCase().trim();
   if (cache.has(key)) return cache.get(key);
   return remember(key, await ask({ stat: STATIC_TEXT(catalogue), text: TEXT_CONTEXT(text), ids: catalogue.map(c => c.id), hashOf: text }, 1));
 }
@@ -327,7 +347,7 @@ async function fatsecretSearch(q) {
 let served = 0, failed = 0, busy = 0, pending = 0;
 export const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', ORIGIN);
-  res.setHeader('Access-Control-Allow-Headers', 'content-type');
+  res.setHeader('Access-Control-Allow-Headers', 'content-type, authorization');
   if (req.method === 'OPTIONS') return res.end();
   if (req.method === 'GET' && req.url.startsWith('/health')) {
     res.setHeader('content-type', 'application/json');
@@ -348,21 +368,55 @@ export const server = http.createServer(async (req, res) => {
 });
 async function handle(req, res) {
   let body = '';
-  for await (const chunk of req) { body += chunk; if (body.length > 6e6) { res.statusCode = 413; return res.end(); } }
+  // A 640 px photo is ~100 KB; anything over 1.5 MB is not a meal photo from the app.
+  for await (const chunk of req) { body += chunk; if (body.length > 1.5e6) { res.statusCode = 413; return res.end('{"error":"too big"}'); } }
+  const who = await caller(req);
+  if (who === false) { res.statusCode = 401; return res.end('{"error":"sign in"}'); }
+  if (!allow(who || req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress)) { res.statusCode = 429; res.setHeader('Retry-After', '30'); return res.end('{"error":"busy"}'); }
   try {
-    const q = JSON.parse(body);
-    if (!Array.isArray(q.catalogue)) throw new Error('bad request');
+    let q; try { q = JSON.parse(body); } catch { throw new Error('bad request'); }
+    if (!q || typeof q !== 'object') throw new Error('bad request');
     let samples;
-    if (req.url.startsWith('/food-text')) { if (!q.text) throw new Error('bad request'); samples = await understand(q); }
-    else { if (!/^data:image\//.test(q.image || '')) throw new Error('bad request'); samples = await recognise(q); }
+    if (req.url.startsWith('/food-text')) { if (typeof q.text !== 'string' || !q.text.trim()) throw new Error('bad request'); samples = await understand(q); }
+    else { if (typeof q.image !== 'string' || !/^data:image\/(jpeg|png|webp);base64,/.test(q.image)) throw new Error('bad request'); samples = await recognise(q); }
     res.setHeader('content-type', 'application/json');
     res.end(JSON.stringify(Array.isArray(samples) ? { samples } : samples)); served++;
   } catch (e) {
     console.error(e.message); failed++;
     const limited = e.status === 429 || e.status === 503;
-    res.statusCode = limited ? 503 : 502; if (limited) res.setHeader('Retry-After', '10');
-    res.end(JSON.stringify({ error: limited ? 'busy' : e.message }));
+    res.statusCode = limited ? 503 : e.message === 'bad request' ? 400 : 502; if (limited) res.setHeader('Retry-After', '10');
+    // Never echo internal or provider error text to the caller.
+    res.end(JSON.stringify({ error: limited ? 'busy' : e.message === 'bad request' ? 'bad request' : 'failed' }));
   }
 }
 if (import.meta.url === `file://${process.argv[1]}`)
   server.listen(PORT, () => console.log(PROVIDER ? `Food vision on :${PORT} using ${PROVIDER} ${MODEL}${FALLBACK ? ` (fallback ${FALLBACK})` : ''}, ${CONCURRENCY} at a time` : 'Set GEMINI_API_KEY, ANTHROPIC_API_KEY or OPENAI_API_KEY (or FOOD_AI=mock) first.'));
+
+/* ---------- Who is asking, and how often ---------- */
+const seen = new Map(); // token hash → { id, until }
+/** The signed-in client's id, null when sign-in isn't required, or false when it's required and missing/invalid. */
+async function caller(req) {
+  if (!AUTH_URL || !AUTH_KEY) return null;
+  const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  if (!token) return false;
+  const k = crypto.createHash('sha256').update(token).digest('hex'), hit = seen.get(k);
+  if (hit && hit.until > Date.now()) return hit.id;
+  try {
+    const r = await fetch(`${AUTH_URL}/auth/v1/user`, { headers: { apikey: AUTH_KEY, authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(5000) });
+    if (!r.ok) return false;
+    const id = (await r.json())?.id; if (!id) return false;
+    seen.set(k, { id, until: Date.now() + 10 * 60e3 }); if (seen.size > 20000) seen.delete(seen.keys().next().value);
+    return id;
+  } catch { return false; }
+}
+// A sliding one-minute window per client (or address). Phones on the same mobile network share an address, so the
+// per-address limit is 10x looser than the per-client one.
+const hits = new Map();
+export function allow(who, now = Date.now(), perMin = RATE) {
+  const limit = /^[0-9a-f-]{36}$/.test(String(who)) ? perMin : perMin * 10;
+  const list = (hits.get(who) || []).filter(t => t > now - 60e3);
+  if (list.length >= limit) { hits.set(who, list); return false; }
+  list.push(now); hits.set(who, list);
+  if (hits.size > 50000) hits.delete(hits.keys().next().value);
+  return true;
+}
