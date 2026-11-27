@@ -13,6 +13,7 @@ import { scaleFromPlate, scaleFromHeight, assessQuality, measuredFps } from './m
 import { CONDITIONS, COND, AREAS, GENERAL_FLAGS, flagAdvice, triage, painLight, evaluatePhase, psfsScore, checkinDays, needsReview, consult, carePlan, dose,
   screenQueue, screenConditionFor, screenFindings, screenAdjust, affectedSide, screenCriteria, clinicianSetup, verifyPin, applyClinician, advanceBlock, canAdvance, reportData, reportText, REPORT_DISCLAIMER } from './rehab.js';
 import { ROM_TESTS, runRomTest } from './rom.js';
+import { mountBody, focusFor } from './bodyviz.js';
 import { readiness, recommendToday, sessionLoad, weekStats, loadSpike, dayKey } from './load.js';
 import { cueList, saveClip, getClip, deleteClip, listClipIds, startRecording, exportClips } from './studio.js';
 import { SessionRecorder, ErrorLog, downloadJSON, APP_VERSION } from './diagnostics.js';
@@ -54,6 +55,27 @@ function mountOrbs() {
   $('#liveOrb .orb').onclick = () => { if (fb) { const l = fb.onRequest(); say(l.text, l); } };
 }
 
+/* ---------- Particle body (hero visual) ---------- */
+// One canvas per stage. Mounted the first time its screen is visible, so the figure assembles while the
+// person is looking; after that it only updates which joint glows.
+const BODIES = {};
+function showBody(id, opts = {}) {
+  const c = document.getElementById(id);
+  if (!c || !c.offsetParent) return;
+  if (BODIES[id]) BODIES[id].update(opts); else BODIES[id] = mountBody(c, opts);
+}
+// The joint of the running rehab programme, if any, glows on Today and Body too.
+function rehabFocus() {
+  const p = S.rehab?.active, c = p && COND[p.cond];
+  return c ? { focus: focusFor(c.area, p.injured), intensity: 0.75 } : { focus: null };
+}
+const chip = (label, value, extra = '') => `<span class="float-chip ${extra}"><small>${esc(label)}</small><b>${value}</b></span>`;
+function renderHub() {
+  const p = S.rehab?.active, c = p && COND[p.cond];
+  $('#hubLabel').textContent = c ? `${c.name}: phase ${p.phase + 1} of ${c.phases.length}.` : '';
+  showBody('hubBody', rehabFocus());
+}
+
 /* ---------- Navigation ---------- */
 function tab(id) {
   $$('.screen').forEach(s => s.classList.toggle('on', s.id === id));
@@ -62,6 +84,7 @@ function tab(id) {
   if (id === 'today') renderToday();
   if (id === 'progress') { renderProgress(); renderLoad(); renderToday(); $('#youName').textContent = S.profile.name || 'You'; }
   if (id === 'rehab') renderRehab();
+  if (id === 'body') renderHub();
   if (id === 'cycle') renderCycle();
   if (id === 'scan') $('#hipWrap').hidden = S.profile.sex === 'male';
   window.scrollTo(0, 0);
@@ -129,6 +152,12 @@ function renderToday() {
   $('#lgForm').textContent = fs == null ? '–' : fs + '%';
   $('#lgFormL').textContent = fs == null ? 'form score after your first set' : 'form score';
   $('#lgStreak').textContent = `${st} day${st === 1 ? '' : 's'}`;
+  $('#heroNum').innerHTML = `${wk}<small>/${goal}</small>`;
+  $('#heroLabel').textContent = wk >= goal ? 'sessions this week. Goal hit.' : 'sessions this week';
+  const rp = S.rehab?.active, rc = rp && COND[rp.cond];
+  $('#todayChips').innerHTML = chip('Streak', `${st} day${st === 1 ? '' : 's'}`) + chip('Form score', fs == null ? '–' : fs + '%')
+    + (rc ? `<button type="button" class="float-chip ember" data-go="rehab"><small>Rehab</small><b>Phase ${rp.phase + 1}/${rc.phases.length}</b></button>` : '');
+  showBody('todayBody', rehabFocus());
   $('#weekTitle').textContent = wk >= goal ? 'Goal hit' : wk ? 'On track' : 'Let\'s start';
   $('#ringsSvg').setAttribute('aria-label', `Sessions ${wk} of ${goal}, form score ${fs ?? 'not yet measured'}, plan kept ${st} days`);
 
@@ -913,6 +942,9 @@ function renderRehab() {
   $('#rehabStart').hidden = !!p; $('#rehabActive').hidden = !p;
   $('#rehabTitle').textContent = p ? condOf(p).name : 'Start a rehab programme';
   if (p) return renderRehabDashboard();
+  $('#rehabNum').hidden = true; $('#rehabChips').innerHTML = ''; $('#rehabStage').classList.add('no-chips');
+  $('#rehabNumLabel').textContent = 'Tap where it hurts. If you don\'t know what it is, the camera movement check measures it.';
+  showBody('rehabBody', { focus: focusFor(rehabArea, null), intensity: 0.55 });
   $('#areaChips').innerHTML = AREAS.map(a => `<button type="button" class="mchip ${a === rehabArea ? 'on' : ''}" data-area="${a}">${a}</button>`).join('');
   const q = screenQueue(rehabArea), secs = q.reduce((s, x) => s + ROM_TESTS[x.test].secs, 0);
   const named = CONDITIONS.filter(c => c.area === rehabArea && !c.general);
@@ -1091,6 +1123,20 @@ function showPlan(c, info, a, findings = [], baseline = [], adj = { gentle: fals
   };
 }
 
+function rehabHero(p, c) {
+  const inj = p.injured, tests = [...new Set([...(p.findings || []).filter(f => f.goal).map(f => f.test), ...c.tests])];
+  for (const id of tests) {
+    const d = ROM_TESTS[id]; if (!d || d.unit !== '°') continue;
+    for (const t of [...p.tests].reverse().filter(x => x.test === id)) {
+      const v = inj ? (t[inj] ?? (t.side === inj ? t.value : null)) : (t.value ?? t.L ?? t.R);
+      if (v != null) return { num: `${Math.round(v)}°`, label: `${inj ? sideWord(inj)[0].toUpperCase() + sideWord(inj).slice(1) + ' ' : ''}${d.name.toLowerCase()}, latest camera estimate`, ember: false };
+    }
+  }
+  const day = checkinDays(p.checkins).slice(-1)[0];
+  if (day) return { num: `${day.during}<small>/10</small>`, label: 'worst pain during your last session', ember: day.during > limitOf(p) };
+  return { num: `${p.phase + 1}<small>/${c.phases.length}</small>`, label: `phase: ${c.phases[p.phase].name}`, ember: false };
+}
+
 // 5. Your programme: exercises, check-ins, phase checks, measurements, weekly check-ins and the log.
 function renderRehabDashboard() {
   const p = plan(), c = condOf(p), ph = c.phases[p.phase], ev = evaluatePhase(c, p.phase, p), block = advanceBlock(p);
@@ -1101,6 +1147,13 @@ function renderRehabDashboard() {
   const testRow = id => { const d = ROM_TESTS[id], t = latest(id); const v = t ? (t.value != null ? `${t.value}${d.unit === '°' ? '°' : ' ' + d.unit}${t.side ? ` (${sideWord(t.side)})` : ''}` : `L ${t.L ?? '–'} · R ${t.R ?? '–'}`) : 'not tested'; return `<div class="row"><div><b class="small">${esc(d.name)}</b><br><span class="muted small">${esc(v)} · typical ${esc(d.norm)}</span></div><button type="button" class="ghost" data-romtest="${id}">Test</button></div>`; };
   const painSeries = checkinDays(p.checkins).slice(-12).map(k => k.during), psfsSeries = p.psfs.map(x => x.score);
   const level = p.consult ? LEVEL_NAME[p.consult.irritability] : (p.doseLevel === 'gentle' ? 'Gentle start' : 'Standard start');
+  const hero = rehabHero(p, c);
+  $('#rehabStage').classList.remove('no-chips');
+  $('#rehabNum').hidden = false; $('#rehabNum').innerHTML = hero.num; $('#rehabNum').classList.toggle('ember', hero.ember);
+  $('#rehabNumLabel').textContent = hero.label;
+  $('#rehabChips').innerHTML = chip('Phase', `${p.phase + 1} of ${c.phases.length}`) + chip('Pain limit', `${limitOf(p)}/10`)
+    + chip('Next check-in', due ? 'Today' : fmtDate(nextReassess(p)), due ? 'ember' : '');
+  showBody('rehabBody', { focus: focusFor(c.area, p.injured), intensity: hero.ember ? 1 : 0.8 });
   const status = p.diagnosed ? (p.confirmedBy ? `Marked confirmed by ${esc(p.confirmedBy)} (clinician mode)` : 'Diagnosed') : c.general || p.screened ? 'From your movement check' : 'Not confirmed';
   $('#rehabActive').innerHTML = `
     ${review ? `<div class="alert urgent"><b>Get your plan reviewed by a physio</b><span class="small">Your last 2 sessions were flare-ups. Ease off to the exercises that don't flare it, and ask a physiotherapist to review the plan before you progress. If anything new or worrying appears, repeat the safety check.</span><button class="ghost" type="button" id="reviewAgain">Repeat the safety check</button></div>` : ''}
@@ -1109,8 +1162,7 @@ function renderRehabDashboard() {
     <div class="card stack patient-file">
       <div class="card-head" style="margin:0"><div><span class="eyebrow">Your programme · phase ${p.phase + 1} of ${c.phases.length}${p.postOp ? ' · after surgery: follow your physio\'s plan' : ''}</span><h2 class="display h2">${esc(ph.name)}</h2><span class="muted small">${esc(ph.goal)}</span></div></div>
       <div class="phase-track">${c.phases.map((_, i) => `<i class="${i < p.phase ? 'done' : i === p.phase ? 'now' : ''}"></i>`).join('')}</div>
-      <div class="file-facts"><span><small>Level</small>${esc(level)}</span><span><small>Pain limit</small>${limitOf(p)}/10</span><span><small>Sessions</small>${p.sessionsPerWeek || 3}/week</span><span><small>Next check-in</small>${due ? 'today' : fmtDate(nextReassess(p))}</span></div>
-      <span class="muted small">${status}${p.requireApproval ? ' · your clinician approves phase changes' : ''}</span>
+      <span class="muted small">${esc(level)}, ${p.sessionsPerWeek || 3} sessions a week. ${status}.${p.requireApproval ? ' Your clinician approves phase changes.' : ''}</span>
       <div class="btn-row"><button class="ghost" type="button" id="shareReport">Share report</button><button class="ghost" type="button" id="clinicianBtn">Clinician mode</button></div>
     </div>
     <div class="card"><span class="eyebrow">Today's exercises</span>

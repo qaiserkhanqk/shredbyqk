@@ -11,7 +11,7 @@
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -32,12 +32,16 @@
 
   <!-- TODAY -->
   <section class="screen on" id="today">
-    <div class="hero">
-      <span class="orb-slot" data-size="84" id="heroOrb"></span>
-      <div><span class="eyebrow" id="dateLine"></span><h1 class="display h1" id="hello">Welcome.</h1></div>
+    <div class="stage-hero" id="todayStage">
+      <canvas class="body-canvas" id="todayBody" aria-hidden="true"></canvas>
+      <div class="stage-copy">
+        <span class="eyebrow" id="dateLine"></span><h1 class="display h1" id="hello">Welcome.</h1>
+        <div class="hero-num" id="heroNum">0</div><span class="hero-label" id="heroLabel">sessions this week</span>
+      </div>
+      <div class="float-chips" id="todayChips"></div>
     </div>
     <div class="bubble">
-      <div class="who"><span class="eyebrow">QK</span><button class="linkbtn" id="listenBtn" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Listen</button></div>
+      <div class="who"><span class="bubble-who"><span class="orb-slot" data-size="36" id="heroOrb"></span><span class="eyebrow">QK</span></span><button class="linkbtn" id="listenBtn" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Listen</button></div>
       <span id="nudge"></span>
     </div>
 
@@ -76,7 +80,10 @@
 
   <!-- BODY hub -->
   <section class="screen" id="body">
-    <div class="page-head"><div><span class="eyebrow">Body</span><h1 class="display h1">What do you need?</h1></div></div>
+    <div class="stage-hero stage-sm" id="hubStage">
+      <canvas class="body-canvas" id="hubBody" aria-hidden="true"></canvas>
+      <div class="stage-copy"><span class="eyebrow">Body</span><h1 class="display h1">What do you need?</h1><span class="hero-label" id="hubLabel"></span></div>
+    </div>
     <button type="button" class="tile" data-go="rehab"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.5-9-9.5C1.6 7.6 4.2 4 7.8 4c1.8 0 3.2 1 4.2 2.4C13 5 14.4 4 16.2 4 19.8 4 22.4 7.6 21 11.5 19 16.5 12 21 12 21z"/><path d="M9 12h6M12 9v6"/></svg></span><span><b>Fix a pain or injury</b><span>Back, shoulder, knee, ankle and more. A safe, step-by-step plan.</span></span></button>
     <button type="button" class="tile" data-go="gait"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round"><path d="M8 4c2 0 3 2 3 4s-1 5-3 5-3-3-3-5 1-4 3-4zM16 9c2 0 3 2 3 4s-1 4-3 4-3-2-3-4 1-4 3-4z"/></svg></span><span><b>Test how you move</b><span>Walking and running, jump height, knee control.</span></span></button>
     <button type="button" class="tile" data-go="scan"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="12" r="3"/></svg></span><span><b>Posture &amp; body fat</b><span>A photo check of how you stand, plus body fat.</span></span></button>
@@ -193,7 +200,12 @@
   <!-- REHAB PROGRAMMES -->
   <section class="screen" id="rehab">
     <button type="button" class="back" data-back>‹ Body</button>
-    <div class="page-head"><div><span class="eyebrow">Shred Rehab</span><h1 class="display h1" id="rehabTitle">Start a rehab programme</h1></div></div>
+    <div class="stage-hero" id="rehabStage">
+      <canvas class="body-canvas" id="rehabBody" aria-hidden="true"></canvas>
+      <div class="stage-copy"><span class="eyebrow">Shred Rehab</span><h1 class="display h1" id="rehabTitle">Start a rehab programme</h1>
+        <div class="hero-num" id="rehabNum" hidden></div><span class="hero-label" id="rehabNumLabel"></span></div>
+      <div class="float-chips" id="rehabChips"></div>
+    </div>
     <div id="rehabStart" class="stack">
       <div class="card stack">
         <p style="margin:0">A step-by-step exercise programme for common aches and injuries, with safety checks and weekly check-ins.</p>
