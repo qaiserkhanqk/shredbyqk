@@ -59,7 +59,7 @@ export function initBrain(c) {
   document.addEventListener('click', e => {
     const a = e.target.closest('[data-brain]'); if (!a) return;
     const [act, arg] = a.dataset.brain.split(':');
-    ({ speed: startSpeed, grid: startGrid, clash: startClash, order: () => startOrder(arg), lesson: () => openLesson(arg), recall: () => openRecall(arg),
+    ({ speed: startSpeed, grid: startGrid, clash: startClash, lights: startLights, batak: startBatak, track: startTrack, order: () => startOrder(arg), lesson: () => openLesson(arg), recall: () => openRecall(arg),
       review: startReview, learn: () => startLearn(arg), set: () => { openSet = arg; ctx.go('quran'); }, sets: () => { openSet = null; renderQuran(); },
       listen: () => listenSet(arg), play: () => { const [sid, n] = arg.split('-'); const set = setById(sid); playAyah(set.s, +n); },
       next: () => doNext(), games: () => $('#brainGames')?.scrollIntoView({ behavior: 'smooth' }), quran: () => { openSet = null; ctx.go('quran'); } }[act] || (() => {}))();
@@ -84,7 +84,9 @@ export async function renderBrain() {
   const learning = Q ? Q.sets.map(s => ({ s, p: B.setProgress(s, b.quran) })).filter(x => x.p.started) : [];
   const pill = k => { const v = sc.pillars[k]; return `<div class="bs-pill"><span>${B.PILLAR_NAMES[k]}</span><span class="bs-bar"><i style="width:${v ?? 0}%"></i></span><b class="num">${v ?? '–'}</b></div>`; };
   const dots = prog.of ? `<div class="bs-dots" aria-label="${prog.done} of ${prog.of} sessions">${Array.from({ length: prog.of }, (_, i) => `<i class="${i < prog.done ? 'on' : ''}"></i>`).join('')}</div>` : '';
-  const gameBest = { speed: lastSpeed ? `Level ${lastSpeed.level}` : 'New', grid: best.grid ? `Best ${best.grid}` : 'New', clash: best.clash != null ? `Best ${best.clash}` : 'New', order: best.order != null ? `Best ${best.order}` : 'New' };
+  const lastTrack = [...b.games].filter(g => g.game === 'track').sort((x, y) => y.at - x.at)[0];
+  const gameBest = { lights: best.lights != null ? `Best ${b.games.filter(g => g.game === 'lights' && g.best).reduce((m, g) => Math.min(m, g.best), 9999)} ms` : 'New', batak: best.batak != null ? `Best ${best.batak} hits` : 'New', track: best.track != null ? `Level ${lastTrack.score} · best ${best.track}` : 'New', speed: lastSpeed ? `Level ${lastSpeed.level}` : 'New', grid: best.grid ? `Best ${best.grid}` : 'New', clash: best.clash != null ? `Best ${best.clash}` : 'New', order: best.order != null ? `Best ${best.order}` : 'New' };
+  const card = g => `<button type="button" class="game-card g-${g.id}" data-brain="${g.id}"><span class="game-ic">${GAME_IC[g.id]}</span><b>${esc(g.name)}</b><span class="small">${esc(g.sub)}</span><span class="game-best">${esc(gameBest[g.id])}${g.proven ? ' · <em>evidence</em>' : ''}</span></button>`;
   el.innerHTML = `
     <div class="card brain-score ${bd.id}">
       <div class="bs-top">${ring(sc.score, bd.id)}<div><span class="eyebrow">Brain score · last 7 days</span><b class="bs-band">${esc(sc.score == null ? 'Not started' : bd.label)}</b><p class="small muted" style="margin:4px 0 0">${esc(sc.fix)}</p></div></div>
@@ -102,8 +104,10 @@ export async function renderBrain() {
       ${dots}
       <p class="small muted" style="margin:0">${prog.phase === 'maintain' ? `Block done. Your next booster starts ${new Date(prog.nextAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}. Play any time for fun.` : prog.phase === 'block' ? `${prog.done} of 10 sessions. Aim for 2–3 a week. In the ACTIVE trial, the protection came with booster sessions, so you'll get a short booster every 3 months.` : `${prog.done} of 4 booster sessions. Boosters are what made speed training protective in ACTIVE.`}</p>
     </div>
-    <div id="brainGames"><div class="card-head" style="padding:0 4px"><b>Games</b><span class="muted small">tap to play</span></div>
-      <div class="game-grid">${B.GAMES.map(g => `<button type="button" class="game-card g-${g.id}" data-brain="${g.id}"><span class="game-ic">${GAME_IC[g.id]}</span><b>${esc(g.name)}</b><span class="small">${esc(g.sub)}</span><span class="game-best">${esc(gameBest[g.id])}${g.proven ? ' · <em>evidence</em>' : ''}</span></button>`).join('')}</div></div>
+    <div id="brainGames"><div class="card-head" style="padding:0 4px"><b>Brain games</b><span class="muted small">tap to play</span></div>
+      <div class="game-grid">${B.GAMES.filter(g => !g.reflex).map(g => card(g)).join('')}</div></div>
+    <div id="reflexGames"><div class="card-head" style="padding:0 4px"><b>Reflex games</b><span class="muted small">how F1 drivers train</span></div>
+      <div class="game-grid">${B.GAMES.filter(g => g.reflex).map(g => card(g)).join('')}</div></div>
     <button type="button" class="tile quran-tile" data-brain="quran"><span class="tile-ic quran-ic">${QURAN_IC}</span><span><b>Quran memory</b><span>${due ? `<strong>${due} verse${due === 1 ? '' : 's'} to review today.</strong> ` : ''}${learning.length ? `Learning ${learning.length} surah${learning.length === 1 ? '' : 's'}, ${learning.reduce((a, x) => a + x.p.memorised, 0)} verses memorised.` : 'Learn short surahs and Ayat al-Kursi: listen, fade the words, recite, review.'}</span></span></button>
     <button type="button" class="tile" data-go="calm"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></span><span><b>Calm: Sukoon</b><span>Slow breathing, a recitation and a dua. Stress is what steals your focus.</span></span></button>
     ${lq.recall.length ? `<div class="card stack recall"><span class="eyebrow">Quick recall</span><p style="margin:0">Remember <b>${esc(lq.recall[0].title.toLowerCase())}</b>? Answering from memory makes it stick.</p><button class="ghost" type="button" data-brain="recall:${lq.recall[0].id}">Answer one question</button></div>` : ''}
@@ -113,6 +117,7 @@ export async function renderBrain() {
       <p style="margin:0"><b>Strongest:</b> regular exercise, good sleep, treating hearing loss, blood pressure and cholesterol, not smoking, and staying social. The Lancet Commission (2024) links 14 such factors to about 45% of dementia cases.</p>
       <p style="margin:0"><b>Speed Flash:</b> modelled on the speed training in the ACTIVE trial, where 10 sessions plus boosters were linked to about 25% fewer dementia diagnoses 20 years later. Speed Flash is our own version, not the study's software.</p>
       <p style="margin:0"><b>Memory Grid and Colour Clash:</b> fun focus and memory games. Like most brain games, they mainly make you better at the game.</p>
+      <p style="margin:0"><b>Reflex games:</b> F1 drivers train on light boards like the Batak, react to start lights, and some use object-tracking drills like NeuroTracker. Reaction drills make you faster at reaction drills; studies of object tracking in athletes are mixed. Play them for fun and focus, not as a promise.</p>
       <p style="margin:0"><b>Quran memory:</b> uses spaced review, the most reliable way to remember anything long-term, and the way huffaz have always worked.</p>
       <p style="margin:0">None of this diagnoses or treats any condition. If you're worried about your memory, see a doctor.</p>
     </div></details>`;
@@ -128,6 +133,9 @@ function doNext() {
 }
 
 const GAME_IC = {
+  lights: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="8" width="20" height="8" rx="4"/><circle cx="7" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="17" cy="12" r="1.8" fill="currentColor"/></svg>',
+  batak: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="12" cy="4.5" r="1"/><circle cx="19.5" cy="12" r="1"/><circle cx="12" cy="19.5" r="1"/><circle cx="4.5" cy="12" r="1"/></svg>',
+  track: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="7" r="2.5" fill="currentColor"/><circle cx="17" cy="6" r="2.5"/><circle cx="9" cy="17" r="2.5"/><circle cx="18" cy="16" r="2.5" fill="currentColor"/><path d="M8 9l6 5" stroke-dasharray="2 2"/></svg>',
   speed: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg>',
   grid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5" fill="currentColor"/><rect x="3" y="14" width="7" height="7" rx="1.5" fill="currentColor"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
   clash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="9" r="5"/><circle cx="16" cy="9" r="5"/><circle cx="12" cy="16" r="5"/></svg>',
@@ -290,6 +298,118 @@ function startClash() {
       <div class="btn-row"><button class="ghost" type="button" id="ccAgain">Play again</button><button class="cta" type="button" id="ccFin">Done</button></div></div>`);
     $('#ccAgain').onclick = startClash; $('#ccFin').onclick = closeOverlay;
   }
+}
+
+
+/* ---------- Lights Out (F1 start) ---------- */
+function startLights() {
+  let alive = true, results = [], state = 'idle', outAt = 0, timers = [];
+  overlayCleanup = () => { alive = false; timers.forEach(clearTimeout); };
+  openOverlay('Lights Out', `<p style="margin:0" id="loMsg">Five red lights come on, one a second. When they <b>all go out</b>, tap as fast as you can. Tap before that and it's a jump start.</p>
+    <div class="lo-gantry" id="loG">${'<div class="lo-pod"><i></i><i></i></div>'.repeat(5)}</div>
+    <button type="button" class="lo-pad" id="loPad">Tap here</button>
+    <div class="lo-times" id="loTimes"></div>
+    <div id="loEnd"></div>`);
+  const pods = [...$('#loG').children], pad = $('#loPad'), msg = $('#loMsg');
+  const set = n => pods.forEach((p, i) => p.classList.toggle('on', i < n));
+  const later = (fn, ms) => timers.push(setTimeout(() => alive && fn(), ms));
+  const drawTimes = () => { $('#loTimes').innerHTML = results.map((r, i) => `<span class="${r == null ? 'jump' : ''}">${i + 1}. ${r == null ? 'Jump start' : `${(r / 1000).toFixed(3)} s`}</span>`).join(''); $('#bpClock').textContent = `Start ${Math.min(results.length + 1, B.LIGHTS.starts)} of ${B.LIGHTS.starts}`; };
+  function go() {
+    state = 'lights'; set(0); pad.textContent = 'Wait for lights out…'; pad.classList.remove('ready');
+    for (let n = 1; n <= 5; n++) later(() => set(n), n * B.LIGHTS.gap);
+    later(() => { set(0); state = 'out'; outAt = performance.now(); }, 5 * B.LIGHTS.gap + B.lightsHold());
+  }
+  pad.addEventListener('pointerdown', () => {
+    if (state === 'idle') { msg.textContent = 'Eyes on the lights. Tap when they go out.'; return go(); }
+    if (state === 'lights') { timers.forEach(clearTimeout); timers = []; set(0); results.push(null); state = 'wait'; pad.textContent = 'Jump start! Tap for the next start'; navigator.vibrate?.([30, 40, 30]); drawTimes(); return next(); }
+    if (state === 'out') {
+      const rt = Math.round(performance.now() - outAt); results.push(rt < B.LIGHTS.minHuman ? null : rt); state = 'wait';
+      pad.textContent = rt < B.LIGHTS.minHuman ? 'Too quick to be real: jump start' : `${(rt / 1000).toFixed(3)} s`; navigator.vibrate?.(15); drawTimes(); return next();
+    }
+    if (state === 'wait' && results.length < B.LIGHTS.starts) go();
+  });
+  function next() {
+    if (results.length < B.LIGHTS.starts) { later(() => { if (state === 'wait') pad.textContent += ' · tap for the next start'; }, 400); return; }
+    state = 'done';
+    const s = B.lightsScore(results), b = brain(), prev = b.games.filter(g => g.game === 'lights' && g.best).reduce((m, g) => Math.min(m, g.best), Infinity);
+    b.games.push({ game: 'lights', at: Date.now(), score: s.score, best: s.best, avg: s.avg, jumps: s.jumps }); ctx.persist();
+    $('#loEnd').innerHTML = `<div class="stack"><h2 class="display h2" style="margin:0">${esc(s.label)}</h2>
+      <div class="kv">${s.avg != null ? `<span>Average</span><span class="num">${(s.avg / 1000).toFixed(3)} s</span><span>Best</span><span class="num">${(s.best / 1000).toFixed(3)} s</span>` : ''}<span>Jump starts</span><span class="num">${s.jumps}</span></div>
+      <p class="muted small" style="margin:0">F1 drivers react in about 0.2 s, measured by the car. A phone screen and touch add their own delay, so beat your own best on this phone.${s.best && s.best < prev ? ' <b>New personal best!</b>' : ''}</p>
+      <div class="btn-row"><button class="ghost" type="button" id="loAgain">Race again</button><button class="cta" type="button" id="loFin">Done</button></div></div>`;
+    $('#loAgain').onclick = startLights; $('#loFin').onclick = closeOverlay;
+    pad.hidden = true;
+  }
+  drawTimes(); $('#bpClock').textContent = '';
+}
+
+/* ---------- Reaction Wall (Batak) ---------- */
+function startBatak() {
+  let alive = true, lit = -1, hits = 0, misses = 0, end = 0;
+  overlayCleanup = () => { alive = false; };
+  const pos = Array.from({ length: B.BATAK.lights }, (_, i) => { const a = i * 2 * Math.PI / B.BATAK.lights - Math.PI / 2; return { x: 50 + 42 * Math.cos(a), y: 50 + 42 * Math.sin(a) }; });
+  openOverlay('Reaction Wall', `<p style="margin:0" id="bkMsg">A light comes on somewhere on the ring. Hit it, and the next one lights up. 30 seconds: how many can you hit?</p>
+    <div class="bk-ring" id="bkRing">${pos.map((p, i) => `<button type="button" class="bk-l" data-l="${i}" style="left:${p.x}%;top:${p.y}%" aria-label="Light ${i + 1}"></button>`).join('')}<div class="bk-score"><b class="num" id="bkHits">0</b><span>hits</span></div></div>
+    <button class="cta" type="button" id="bkGo">Start</button><div id="bkEnd"></div>`);
+  const ls = [...$('#bkRing').querySelectorAll('.bk-l')];
+  const light = () => { if (lit >= 0) ls[lit].classList.remove('on'); lit = B.batakNext(lit); ls[lit].classList.add('on'); };
+  $('#bkRing').addEventListener('pointerdown', e => {
+    const t = e.target.closest('[data-l]'); if (!t || !end) return;
+    if (+t.dataset.l === lit) { hits++; $('#bkHits').textContent = hits; t.classList.add('hit'); setTimeout(() => t.classList.remove('hit'), 160); light(); }
+    else { misses++; t.classList.add('miss'); setTimeout(() => t.classList.remove('miss'), 200); }
+  });
+  const tick = () => { if (!alive) return; const left = Math.max(0, end - performance.now()); $('#bpClock').textContent = `${Math.ceil(left / 1000)} s`; if (left <= 0) return finish(); setTimeout(tick, 100); };
+  $('#bkGo').onclick = () => { $('#bkGo').hidden = true; $('#bkMsg').textContent = 'Go!'; end = performance.now() + (globalThis.__shredBatakSeconds || B.BATAK.seconds) * 1000; light(); tick(); };
+  function finish() {
+    end = 0; if (lit >= 0) ls[lit].classList.remove('on');
+    const b = brain(), prev = B.bests(b.games).batak;
+    b.games.push({ game: 'batak', at: Date.now(), score: hits, misses }); ctx.persist();
+    $('#bkEnd').innerHTML = `<div class="stack"><h2 class="display h2" style="margin:0">${hits} hits</h2>
+      <p class="muted small" style="margin:0">${misses ? `${misses} wrong taps. ` : ''}${prev != null && hits > prev ? 'New personal best! ' : prev != null ? `Your best is ${prev}. ` : ''}That's ${(hits / B.BATAK.seconds).toFixed(1)} a second. Drivers use this kind of board to sharpen hand–eye speed and peripheral vision.</p>
+      <div class="btn-row"><button class="ghost" type="button" id="bkAgain">Play again</button><button class="cta" type="button" id="bkFin">Done</button></div></div>`;
+    $('#bkAgain').onclick = startBatak; $('#bkFin').onclick = closeOverlay;
+  }
+}
+
+/* ---------- Tracker (multiple-object tracking) ---------- */
+function startTrack() {
+  const b = brain(), last = [...b.games].filter(g => g.game === 'track').sort((x, y) => y.at - x.at)[0];
+  let alive = true, speed = last ? Math.max(B.TRACK.min, last.speed / B.TRACK.step) : B.TRACK.startSpeed, round = 0, bestSpeed = 0, perfectRounds = 0;
+  const ROUNDS = globalThis.__shredTrackRounds || B.TRACK.rounds, SECS = globalThis.__shredTrackSeconds || B.TRACK.seconds;
+  overlayCleanup = () => { alive = false; };
+  openOverlay('Tracker', `<p style="margin:0" id="tkMsg">3 balls flash green. Then they all look the same and move around. Keep your eyes on the 3, then tap them when they stop.</p>
+    <div class="tk-box" id="tkBox"></div><button class="cta" type="button" id="tkGo">Start</button><div id="tkEnd"></div>`);
+  const box = $('#tkBox'), msg = $('#tkMsg');
+  async function playRound() {
+    round++; $('#bpClock').textContent = `Round ${round} of ${ROUNDS}`;
+    const balls = B.trackSetup();
+    box.innerHTML = balls.map((x, i) => `<button type="button" class="tk-b ${x.target ? 'tgt' : ''}" data-b="${i}"></button>`).join('');
+    const els = [...box.children];
+    const draw = () => balls.forEach((x, i) => { els[i].style.left = `${x.x * 100}%`; els[i].style.top = `${x.y * 100}%`; });
+    draw(); msg.textContent = 'Remember the green balls…'; box.classList.remove('pick');
+    await wait(1800); if (!alive) return;
+    els.forEach(e => e.classList.remove('tgt')); msg.textContent = 'Follow them…';
+    let t = performance.now(); const stop = t + SECS * 1000;
+    while (alive && performance.now() < stop) { await frame(); const n = performance.now(); B.trackStep(balls, Math.min(0.05, (n - t) / 1000), speed); t = n; draw(); }
+    if (!alive) return;
+    msg.textContent = `Tap the ${B.TRACK.targets} you followed.`; box.classList.add('pick');
+    const picked = await new Promise(res => { const got = new Set(); box.onclick = e => { const el = e.target.closest('[data-b]'); if (!el || got.has(+el.dataset.b)) return; got.add(+el.dataset.b); el.classList.add('picked'); if (got.size === B.TRACK.targets) { box.onclick = null; res([...got]); } }; });
+    const right = picked.filter(i => balls[i].target).length, perfect = right === B.TRACK.targets;
+    balls.forEach((x, i) => { if (x.target) els[i].classList.add('truth'); if (picked.includes(i) && !x.target) els[i].classList.add('wrongpick'); });
+    msg.textContent = perfect ? 'All 3! Faster next round.' : `${right} of 3. A bit slower next round.`;
+    navigator.vibrate?.(perfect ? 15 : [20, 40, 20]);
+    if (perfect) { perfectRounds++; bestSpeed = Math.max(bestSpeed, speed); }
+    speed = B.trackNext(speed, perfect);
+    await wait(1300);
+    if (round < ROUNDS) return playRound();
+    const level = B.trackLevel(bestSpeed || B.TRACK.min), prev = B.bests(brain().games).track;
+    brain().games.push({ game: 'track', at: Date.now(), score: level, speed: bestSpeed || speed, perfect: perfectRounds }); ctx.persist();
+    $('#tkEnd').innerHTML = `<div class="stack"><h2 class="display h2" style="margin:0">Tracking level ${level}</h2>
+      <p class="muted small" style="margin:0">${perfectRounds} of ${ROUNDS} rounds perfect. ${prev != null && level > prev ? 'New personal best! ' : ''}This trains holding attention on several moving things at once, like reading traffic or a game.</p>
+      <div class="btn-row"><button class="ghost" type="button" id="tkAgain">Play again</button><button class="cta" type="button" id="tkFin">Done</button></div></div>`;
+    $('#tkAgain').onclick = startTrack; $('#tkFin').onclick = closeOverlay;
+  }
+  $('#tkGo').onclick = () => { $('#tkGo').hidden = true; playRound(); };
 }
 
 /* ---------- Verse Order (Quran game) ---------- */
