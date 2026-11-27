@@ -173,12 +173,13 @@ export const DISHES = [
   D('khichdi', 'Khichdi', 'khichri', 'rice', 'katori', 250, null, [['rice', 40], ['moong', 25], ['spices', 2]], F('ghee', 6, 10, 14)),
 
   // Breads — one piece.
-  D('roti', 'Roti / chapati', 'chapati phulka roti chapatti روٹی', 'bread', 'roti', 44, null, [['atta', 30]], NOFAT, { topping: ['ghee', 5, 'Ghee or butter on top'], sizes: true }),
+  // A Pakistani home roti is about 80 g cooked and ~200 kcal (QK's standard); a thin phulka is its own dish below.
+  D('roti', 'Roti / chapati', 'chapati roti chapatti روٹی', 'bread', 'roti', 80, null, [['atta', 59]], NOFAT, { topping: ['ghee', 5, 'Ghee or butter on top'], sizes: true }),
   D('tandoori_roti', 'Tandoori roti', 'tandoor roti naan roti', 'bread', 'roti', 80, null, [['atta', 55]], NOFAT, { topping: ['butter', 6, 'Butter on top'] }),
   D('naan', 'Naan', 'plain naan butter naan khamiri', 'bread', 'naan', 100, null, [['maida', 80], ['dahi', 8], ['milk', 10], ['sugar', 2]], F('oil', 4, 5, 6), { topping: ['butter', 8, 'Butter naan'] }),
-  D('paratha', 'Plain paratha', 'paratha parantha lachha paratha پراٹھا', 'bread', 'paratha', 70, null, [['atta', 45]], F('ghee', 8, 15, 20), { sizes: true }),
-  D('aloo_paratha', 'Aloo paratha', 'aloo parantha potato paratha', 'bread', 'paratha', 125, null, [['atta', 45], ['potato', 60], ['onion', 5], ['spices', 2]], F('ghee', 10, 18, 24)),
-  D('anda_paratha', 'Anda paratha', 'egg paratha', 'bread', 'paratha', 115, ['egg', 50], [['atta', 45]], F('ghee', 12, 20, 24)),
+  D('paratha', 'Plain paratha', 'paratha parantha پراٹھا', 'bread', 'paratha', 100, null, [['atta', 60]], F('ghee', 10, 15, 20), { sizes: true }),
+  D('aloo_paratha', 'Aloo paratha', 'aloo parantha potato paratha', 'bread', 'paratha', 150, null, [['atta', 60], ['potato', 70], ['onion', 5], ['spices', 2]], F('ghee', 12, 18, 24)),
+  D('anda_paratha', 'Anda paratha', 'egg paratha', 'bread', 'paratha', 140, ['egg', 50], [['atta', 60]], F('ghee', 12, 20, 24)),
   D('puri', 'Puri', 'poori', 'fried', 'puri', 28, null, [['atta', 20]], F('oil', 5, 7, 8)),
   D('makki_roti', 'Makki ki roti', 'makai roti corn roti', 'bread', 'roti', 65, null, [['makki', 45]], NOFAT, { topping: ['butter', 8, 'Makhan on top'] }),
   D('roghni_naan', 'Roghni naan', 'roghni naan roghani sesame naan', 'bread', 'naan', 125, null, [['maida', 90], ['milk', 15], ['dahi', 10], ['egg', 5], ['sugar', 3], ['sesame', 3]], F('ghee', 8, 10, 12)),
@@ -192,7 +193,9 @@ export const DISHES = [
   D('bread_slice', 'Bread (slice)', 'double roti toast slice', 'bread', 'slice', 28, null, [['bread', 28]], NOFAT, { topping: ['butter', 5, 'Butter or margarine'] }),
 
   // BBQ and kebabs.
-  D('chicken_tikka', 'Chicken tikka / tandoori (leg piece)', 'tikka tandoori chicken leg piece bbq', 'bbq', 'piece', 120, ['chicken', 160], [['dahi', 15], ['spices', 4]], F('oil', 3, 6, 8)),
+  // A BBQ tikka is a quarter chicken: leg piece (thigh + drumstick) or chest piece (breast, the bigger one).
+  D('chicken_tikka', 'Chicken tikka (leg piece)', 'tikka tandoori chicken leg piece ran bbq', 'bbq', 'piece', 130, ['chicken', 180], [['dahi', 20], ['spices', 5]], F('oil', 5, 10, 14)),
+  D('chicken_tikka_chest', 'Chicken tikka (chest piece)', 'chest piece breast tikka seena tikka', 'bbq', 'piece', 155, ['chickenBreast', 220], [['dahi', 20], ['spices', 5]], F('oil', 5, 10, 14)),
   D('chicken_boti', 'Chicken boti (one seekh)', 'boti malai boti', 'bbq', 'seekh', 100, ['chicken', 130], [['dahi', 10], ['spices', 3]], F('oil', 4, 7, 9)),
   D('sajji', 'Sajji (chicken, quarter)', 'sajji chicken sajji roast', 'bbq', 'quarter', 200, ['chickenSkin', 220], [['spices', 3]], F('oil', 3, 4, 5)),
   D('lamb_sajji', 'Lamb sajji / namkeen tikka', 'lamb sajji namkeen tikka charsi tikka dumba', 'bbq', 'portion', 175, ['mutton', 250], [['spices', 2]], F('ghee', 10, 15, 20)),
@@ -359,7 +362,8 @@ fam('Rice', ['plain_rice', 'zeera_rice', 'matar_pulao', 'chicken_pulao', 'beef_p
 fam('Daal', ['daal_masoor', 'daal_moong', 'daal_chana', 'daal_mash', 'daal_makhani', 'rajma', 'cholay']);
 fam('Chicken salan', ['chicken_karahi', 'chicken_handi', 'chicken_qorma', 'chicken_salan', 'chicken_jalfrezi', 'butter_chicken']);
 fam('Mutton and beef', ['mutton_karahi', 'mutton_qorma', 'aloo_gosht', 'palak_gosht', 'nihari', 'haleem', 'qeema', 'qeema_matar']);
-fam('Kebab and BBQ', ['seekh_kebab', 'chapli_kebab', 'shami_kebab', 'chicken_tikka', 'chicken_boti']);
+fam('Kebab', ['seekh_kebab', 'chapli_kebab', 'shami_kebab']);
+fam('Chicken tikka', ['chicken_tikka', 'chicken_tikka_chest', 'chicken_boti']);
 fam('Pizza and pasta', ['pizza_slice', 'cheesy_pizza_slice', 'creamy_pasta', 'lasagna', 'chow_mein']);
 fam('Burger', ['zinger_burger', 'mighty_zinger', 'beef_burger', 'chicken_burger', 'anda_shami_burger', 'bun_kebab']);
 fam('Fried chicken', ['fried_chicken', 'broast', 'nuggets', 'wings']);

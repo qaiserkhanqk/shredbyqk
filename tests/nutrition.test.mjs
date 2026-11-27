@@ -62,7 +62,8 @@ check('same inputs → same answer (deterministic)', kcal('haleem', { style: 're
 // Plausibility against well-known reference values.
 check('1 cup boiled rice ≈ 205 kcal (USDA)', Math.abs(kcal('plain_rice', {}) - 205) < 15, Math.round(kcal('plain_rice', {})) + '');
 check('1 boiled egg ≈ 72 kcal', Math.abs(kcal('boiled_egg', {}) - 72) < 5);
-check('medium roti 90–120 kcal', kcal('roti', {}) > 90 && kcal('roti', {}) < 120);
+check('medium roti (80 g, QK\'s standard) ≈ 200 kcal', Math.abs(kcal('roti', {}) - 200) < 15, Math.round(kcal('roti', {})) + '');
+check('chest-piece tikka has more than a leg piece', kcal('chicken_tikka_chest', {}) > kcal('chicken_tikka', {}));
 
 // 4. Search finds desi names and puts the desi models first.
 const top = q => N.search(q)[0];
