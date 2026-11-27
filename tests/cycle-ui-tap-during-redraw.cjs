@@ -40,6 +40,22 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     const got = await starts(A);
     check('a tap in progress while another tab saves is not lost (both periods are saved)', JSON.stringify(got) === JSON.stringify([day(-40), day(-10)]), JSON.stringify(got));
     check('…and after the tap, this tab shows the other tab\'s save too', /\(\d+ \w+\)/.test(await A.textContent('#cyEstimate').catch(() => '')) && (await A.$$('#cyHistory [data-pid]')).length === 2, `${(await A.$$('#cyHistory [data-pid]')).length} periods shown`);
+    // Variant (the one seen in Firefox): the other tab's save is heard just BEFORE the press, and this tab's re-read of
+    // storage finishes DURING the press. Made deterministic by slowing this tab's decryption by 600 ms.
+    await A.evaluate(() => { const orig = SubtleCrypto.prototype.decrypt; SubtleCrypto.prototype.decrypt = function (...a) { return new Promise(r => setTimeout(r, 600)).then(() => orig.apply(this, a)); };
+      window.__heard = 0; const ch = new BroadcastChannel('shred-cycle'); ch.onmessage = () => { window.__heard++; }; });
+    await A.fill('#cyDate', day(-70));
+    await A.$eval('[data-act=logStart]', e => e.scrollIntoView({ block: 'center' }));
+    const box2 = await (await A.$('[data-act=logStart]')).boundingBox();
+    await A.mouse.move(box2.x + box2.width / 2, box2.y + box2.height / 2);
+    await B.fill('#cyDate', day(-100)); await B.click('[data-act=logStart]');
+    await A.waitForFunction(() => window.__heard > 0, null, { timeout: 5000 });
+    await A.mouse.down(); // just after this tab heard about the other save, while it is still re-reading
+    await A.waitForTimeout(1200); // the re-read finishes during the press
+    await A.mouse.up();
+    await A.waitForTimeout(1500);
+    const got2 = await starts(A);
+    check('a tap that starts while this tab is still re-reading the other tab\'s save is not lost', JSON.stringify(got2) === JSON.stringify([day(-100), day(-70), day(-40), day(-10)]), JSON.stringify(got2));
   } catch (e) { check('run completed', false, e.stack); }
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();
