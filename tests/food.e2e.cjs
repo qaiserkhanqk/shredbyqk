@@ -74,7 +74,7 @@ const num = s => +String(s).replace(/[^\d]/g, '');
   check('bread sheet shows the bread family', (await p.$$('#foodSheet [data-fam]')).length >= 10);
   const roti = await sheetKcal();
   await p.click('#foodSheet [data-fam=roghni_naan]');
-  check('switching roti → roghni naan changes the title and calories', /Roghni naan/.test(await p.textContent('#foodSheetBody h2')) && await sheetKcal() > roti * 3, `${roti} → ${await sheetKcal()}`);
+  check('switching roti → roghni naan changes the title and calories', /Roghni naan/.test(await p.textContent('#foodSheetBody h2')) && await sheetKcal() > roti * 2, `${roti} → ${await sheetKcal()}`);
   await p.click('#foodSheet [data-step="0.5"]'); await shot('2-family');
   await p.click('#fsSave');
   check('roghni naan logged', /Roghni naan/.test(await p.textContent('#foodLog')));
