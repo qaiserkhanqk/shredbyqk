@@ -31,5 +31,12 @@ check('callout: rest says what is next', callout({ kind: 'rest' }, { move: 'burp
 check('callout: EMOM minute', callout({ kind: 'emom', round: 3, reps: 12, move: 'pushUps' }) === 'Minute 3. 12 push-ups. Go!');
 check('best finisher score', bestScore([{ class: 'a', score: 5 }, { class: 'a', score: 7 }, { class: 'b', score: 9 }], 'a') === 7 && bestScore([], 'a') === 0);
 
+// Sore spots: hands-on-floor moves swapped for wrist/elbow/shoulder; lunges and jumps for knee/hip.
+{
+  const { moveFor } = await import('../js/classes.js');
+  check('pain: wrist → push-ups become squat pulses, plank becomes flutter kicks', moveFor('pushUps', { pain: ['wrist'] }) === 'pulseSquats' && moveFor('plank', { pain: ['shoulder'] }) === 'flutterKicks');
+  check('pain: knee → no lunges or jumps', moveFor('lunges', { pain: ['knee'] }) === 'bridges' && moveFor('jacks', { pain: ['knee'] }) !== 'jacks');
+  check('no pain → unchanged', moveFor('pushUps') === 'pushUps');
+}
 if (fail) { console.log(`${fail} FAILED`); process.exit(1); }
 console.log('classes: all pass');

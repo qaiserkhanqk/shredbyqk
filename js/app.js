@@ -178,7 +178,15 @@ function adjustKg(id, kg, cls) {
   if (cap) { k = cap.kg; notes.push(cap.note); }
   return { kg: k, changed: Math.abs(k - kg) > 0.01, note: notes.join(' ') };
 }
-const dayItems = () => { let raw = dayItemsRaw(); if (!raw) return null; raw = personal.readyItems(raw, todayAdjust(), LIB); const cap = capToday(); return cap ? warm.fitTo(raw, cap, warmCount(raw)).items : raw; };
+// Fit a day into the time allowed: first pair the extras into supersets (similar results, about half the time),
+// then trim accessory sets if it still doesn't fit. Main lifts are never cut.
+function fitToday(items, cap) {
+  if (!cap || warm.dayMinutes(items, warmCount(items)) <= cap) return { items, cut: [], paired: 0 };
+  const paired = personal.pairUp(items, LIB), np = paired.filter((it, i) => it[5] && it[5] !== items[i][5]).length / 2;
+  const f = warm.fitTo(paired, cap, warmCount(paired));
+  return { items: f.items, cut: f.cut, paired: np };
+}
+const dayItems = () => { let raw = dayItemsRaw(); if (!raw) return null; raw = personal.readyItems(raw, todayAdjust(), LIB); return fitToday(raw, capToday()).items; };
 const todayItems = () => { const items = dayItems(); return items ? items.map(it => [it[0], `${it[1]}×${it[2]}`]) : TODAY_DEFAULT; };
 const todayName = () => { const p = activeProgram(), d = programDay(); return p && d ? `${p.name}: ${d.day.name}` : 'Glute Builder'; };
 const ICONS = {
@@ -1331,7 +1339,15 @@ function showRx(k) {
   const item = LIB[k], cls = prog.liftClass(item); curRx = null;
   $('#rxEditWrap').hidden = true;
   $('#swapBtn').hidden = !inPlan(k);
-  if (!cls) { $('#rxBox').hidden = !inPlan(k); if (inPlan(k)) { $('#rxLine').textContent = LIB[k].name; $('#rxWhy').textContent = 'Part of your program. Not for you? Swap it.'; $('#rxEyebrow').textContent = 'In your program'; $('#rxPlates').hidden = true; $('#rxEdit').hidden = true; } return; }
+  if (!cls) {
+    const it = (dayItems() || []).find(x => x[0] === k), sec = it && /^(\d+)\s*s$/.exec(String(it[2]));
+    const bw = it && personal.bwTarget(S.sessions, k, sec ? { sets: it[1], secs: +sec[1] } : programScheme(k));
+    $('#rxBox').hidden = !inPlan(k) && !bw;
+    $('#rxPlates').hidden = true; $('#rxEdit').hidden = true; $('#rxWarm').hidden = true;
+    if (bw) { $('#rxEyebrow').textContent = 'QK\'s target today'; $('#rxLine').textContent = bw.line; $('#rxWhy').textContent = bw.why; }
+    else if (inPlan(k)) { $('#rxLine').textContent = LIB[k].name; $('#rxWhy').textContent = 'Part of your program. Not for you? Swap it.'; $('#rxEyebrow').textContent = 'In your program'; }
+    return;
+  }
   $('#rxEdit').hidden = false;
   const r = rxFor(k); curRx = r;
   $('#rxBox').hidden = false; $('#rxBox').classList.toggle('lightwk', r?.action === 'light');
@@ -1355,6 +1371,10 @@ $('#rxSave').onclick = () => {
 // After a set: what QK will ask for next time, and why.
 function showNext() {
   const item = LIB[exKey], box = $('#sNext');
+  // First day on a weighted exercise: ask how many more reps were left, and set the next set from it.
+  const firstDay = lastSet?.kg && prog.liftClass(item) && !S.sessions.some(s => s.ex === exKey && s.kg && new Date(s.at).toDateString() !== new Date().toDateString());
+  $('#rirBox').hidden = !firstDay || !!lastSet.rir || lastSet.rir === 0;
+  $$('#rirSeg button').forEach(b => b.classList.remove('on')); $('#rirNote').textContent = 'QK sets your next set from your answer.';
   if (!lastSet?.kg || !prog.liftClass(item)) { box.hidden = true; return; }
   const r = prog.nextFor(item, S.sessions, { unit: unit(), scheme: programScheme(exKey), micro: !!S.profile.micro });
   if (!r) { box.hidden = true; return; }
@@ -1418,9 +1438,10 @@ function renderPlan(rows) {
     $('#planMins').textContent = cap ? `About ${mins} min (trimmed from ${full})` : `About ${mins} min`;
     $('#planTime').querySelectorAll('[data-cap]').forEach(b => { b.classList.toggle('on', +b.dataset.cap === cap); b.hidden = +b.dataset.cap >= full && +b.dataset.cap !== cap; });
     // One line per exercise: if it was cut down and then skipped, just say skipped.
-    const cut = cap ? Object.values(Object.fromEntries(warm.fitTo(raw, cap, warmCount(raw)).cut.map(c => [c.id, c]))) : [];
-    $('#planCut').hidden = !cut.length;
-    $('#planCut').textContent = cut.length ? 'QK trimmed: ' + cut.map(c => c.to ? `${LIB[c.id]?.name} ${c.from}→${c.to} sets` : `skipped ${LIB[c.id]?.name}`).join(', ') + '. Main lifts stay.' : '';
+    const ft = fitToday(personal.readyItems(raw, todayAdjust(), LIB), cap), cut = Object.values(Object.fromEntries(ft.cut.map(c => [c.id, c])));
+    const pairTxt = ft.paired ? `QK paired ${ft.paired * 2} extras into supersets to save time. ` : '';
+    $('#planCut').hidden = !cut.length && !ft.paired;
+    $('#planCut').textContent = pairTxt + (cut.length ? 'Trimmed: ' + cut.map(c => c.to ? `${LIB[c.id]?.name} ${c.from}→${c.to} sets` : `skipped ${LIB[c.id]?.name}`).join(', ') + '. Main lifts stay.' : ft.paired ? 'Same sets, less waiting.' : '');
   }
   $('#planRows').innerHTML = lifts.map(r => `<button type="button" class="plan-row ${r.change}" data-train="${r.id}"><b>${lab[r.id] ? `<span class="ss">${lab[r.id]}</span> ` : ''}${esc(r.name)}</b><span class="tgt">${esc(r.line)}</span><span class="why">${esc(r.why)}</span><span class="chg">${esc(r.tag || '')}</span>${platesFor(r)}</button>`).join('');
 }
@@ -1635,7 +1656,7 @@ $('#newsOk').onclick = () => { if (S.program?.news) { S.program.news.seen = true
 $('#swapBtn').onclick = () => {
   const k = exKey, plan = activeProgram()?.plan; if (!plan) return;
   const exclude = plan.flatMap(d => d.items.map(it => it[0]));
-  const opts = refresh.alternatives(k, LIB, { avoid: S.prefs?.avoid || [], exclude });
+  const opts = refresh.alternatives(k, LIB, { avoid: avoidList(), exclude, n: 16 }).filter(id => personal.canDo(LIB, id, personal.equipNow(S.profile)) && !personal.hurts(LIB, id, S.profile.pain || [])).slice(0, 6);
   if (!opts.length) return toast('No close alternatives for this one.');
   $('#setup').hidden = true;
   openSheet(`<div><span class="eyebrow">Swap exercise</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Instead of ${esc(LIB[k].name)}</h2></div>
@@ -1729,7 +1750,7 @@ function renderClasses() {
 }
 function showClass(id) {
   const c = classes.byId(id); if (!c) return;
-  const t = classes.timeline(c), best = classes.bestScore(S.classes || [], id);
+  const t = classes.timeline(c, { pain: S.profile.pain || [] }), best = classes.bestScore(S.classes || [], id);
   const blocks = c.blocks.map(b => `<div class="prog-day"><h3>${esc(b.name)} <span class="muted small">· ${b.type === 'intervals' ? `${b.rounds} rounds, ${b.work} s on / ${b.rest} s off` : b.type === 'tabata' ? '8 × 20 s on / 10 s off' : b.type === 'emom' ? `${b.minutes} minutes, every minute` : `${b.secs / 60} minutes, as many rounds as possible`}</span></h3>
     <ol>${(b.moves || []).map(m => { const [id2, reps] = Array.isArray(m) ? m : [m]; return `<li>${esc(classes.MOVES[id2].name)}${reps ? ` <span>${reps} reps</span>` : ''}</li>`; }).join('')}</ol></div>`).join('');
   openSheet(`<div><span class="eyebrow">QK class · ${classes.minutes(c)} min · ${esc(c.level)}</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.4rem">${esc(c.name)}</h2></div>
@@ -1753,7 +1774,7 @@ $('#rsheetBody').addEventListener('click', e => { const b = e.target.closest('[d
 
 let cls = null;
 function startClass(id, { quiet = false, then = null } = {}) {
-  const c = typeof id === 'string' ? classes.byId(id) || routineById(id) : id, { segs, total } = classes.timeline(c, { quiet: quiet || c.quiet });
+  const c = typeof id === 'string' ? classes.byId(id) || routineById(id) : id, { segs, total } = classes.timeline(c, { quiet: quiet || c.quiet || !!sorePounding(), pain: S.profile.pain || [] });
   cls = { c, segs, total, i: -1, left: 0, done: 0, paused: false, score: 0, t0: Date.now(), last: Date.now(), timer: null, then };
   $('#classPlayer').hidden = false; keepAwake(true);
   say(c.routine ? `${c.name}. ${Math.round(total / 60)} minutes. Follow my voice.` : `${c.name}. ${Math.round(total / 60)} minutes. Let's warm up.`, { id: 'class_start', priority: 'now' });
@@ -2775,7 +2796,7 @@ window.__qkVoice = handleVoice;
 /* ---------- QK remembers: one follow-up at a time, said once ---------- */
 function renderMemory() {
   const box = $('#memCard'); if (!box) return;
-  const f = memory.followUps(S, { lib: LIB })[0];
+  const f = memory.followUps(S, { lib: LIB, program: activeProgram() })[0];
   box.hidden = !f; if (!f) return;
   box.dataset.id = f.id;
   box.innerHTML = `<span class="eyebrow">QK remembers</span><b>${esc(f.title)}</b><p class="muted small" style="margin:0">${esc(f.text)}</p><div class="btn-row">${f.actions.map(a => `<button type="button" class="${a === f.actions[0] ? 'cta' : 'ghost'}" data-mem="${esc(a.act)}">${esc(a.label)}</button>`).join('')}</div>`;
@@ -2803,6 +2824,10 @@ document.addEventListener('click', e => {
   } else if (kind === 'rough') {
     if (a === 'tired') { S.checkin = { day: todayKey(), a: { sleep: 'bad', sore: 'some', energy: 'ok' }, r: personal.readiness({ sleep: 'bad', sore: 'some', energy: 'ok' }) }; toast('OK. Today is a little lighter.'); }
     else say('Good to hear. Let\'s get after it.', { priority: 'high' });
+  } else if (kind === 'time') {
+    S.plan.time = `${a}:${v}`; toast(`Reminder moved to ${a}:${v}. Re-add it to your calendar from Training days to update it there.`); bindPlan();
+  } else if (kind === 'programs') {
+    tab('train');
   } else if (kind === 'skip' && v === 'swap') {
     const P = (S.prefs ||= {}); P.avoid = [...new Set([...(P.avoid || []), a])]; toast(`Swapped for good: no more ${LIB[a]?.name}.`);
   }
@@ -2827,3 +2852,16 @@ $('#rsheetBody').addEventListener('click', e => {
 // Classes follow the client: no jumping with a sore knee or hip; no dumbbell classes without dumbbells.
 function sorePounding() { const a = (S.profile.pain || []).find(x => x === 'knee' || x === 'hip'); return a ? personal.PAIN[a].label.toLowerCase() : ''; }
 function classOk(c) { const eq = personal.equipNow(S.profile); return !(c.equipment === 'dumbbells' && eq && eq.length && !eq.includes('dumbbells')); }
+
+// First time on an exercise: "How many more reps could you have done?" sets the next set's weight.
+$('#rirSeg').onclick = e => {
+  const b = e.target.closest('[data-rir]'); if (!b || !lastSet?.kg) return;
+  const rir = +b.dataset.rir, item = LIB[exKey], cls = prog.liftClass(item), sc = programScheme(exKey), target = sc ? sc.lo : 8;
+  lastSet.rir = rir;
+  const kg = prog.roundLoad(personal.rirKg(lastSet.kg, lastSet.reps, rir, target, { beginner: S.profile.experience === 'new' }), cls, unit(), !!S.profile.micro);
+  const P = (S.prog ||= {}); P.override ||= {}; P.override[exKey] = { kg, at: Date.now() }; persist();
+  $$('#rirSeg button').forEach(x => x.classList.toggle('on', x === b));
+  const same = Math.abs(kg - lastSet.kg) < 0.01;
+  $('#rirNote').textContent = same ? `Spot on. Stay at ${prog.fmtW(kg, unit())} for the next set.` : `Next set: ${prog.fmtW(kg, unit())} for ${target} reps. QK takes it from there.`;
+  say(same ? 'Spot on. Same weight next set.' : `Next set, ${prog.fmtW(kg, unit()).replace('kg', 'kilos').replace('lb', 'pounds')}.`, { priority: 'high' });
+};

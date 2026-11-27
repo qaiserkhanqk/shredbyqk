@@ -12,7 +12,7 @@ const AREA = { shoulder: 'shoulder', knee: 'knee', back: 'lower back', elbow: 'e
  * @param S saved state; @param o { now, lib }
  * @returns [{ id, kind, title, text, say, actions: [{ label, act }] }] most important first
  */
-export function followUps(S, { now = Date.now(), lib = {} } = {}) {
+export function followUps(S, { now = Date.now(), lib = {}, program = null } = {}) {
   const done = S.memory?.done || {}, out = [], add = f => { if (!done[f.id]) out.push(f); };
   const name = S.profile?.name ? `, ${S.profile.name}` : '';
   const p = S.profile || {};
@@ -63,7 +63,30 @@ export function followUps(S, { now = Date.now(), lib = {} } = {}) {
     const days = new Set(real.map(s => dayStart(s.at))).size, clean = real.reduce((a, s) => a + (s.good || 0), 0);
     add({ id: 'month1', kind: 'milestone', title: 'One month with QK', text: `${days} training days and ${clean} clean reps since ${fmtDay(first)}. Proud of you.`, say: `One month together. ${days} training days. Proud of you.`, actions: [{ label: 'Thanks, QK', act: 'ok' }] });
   }
-  const order = ['pain', 'rough', 'missed', 'ramadan', 'travel', 'pr', 'skip', 'milestone'];
+  // 8. Reminders at the wrong time: they usually train 1.5+ hours from the planned time (8+ sessions in 4 weeks).
+  const recentDays = {};
+  for (const s of real) if (now - s.at < 4 * WEEK) { const k = dayStart(s.at); recentDays[k] = Math.min(recentDays[k] ?? Infinity, s.at); }
+  const starts = Object.values(recentDays).map(t => { const d = new Date(t); return d.getHours() + d.getMinutes() / 60; }).sort((a, b) => a - b);
+  if (S.plan?.time && starts.length >= 8) {
+    const med = starts[Math.floor(starts.length / 2)], [h, m] = S.plan.time.split(':').map(Number), planned = h + (m || 0) / 60;
+    if (Math.abs(med - planned) >= 1.5) {
+      const r = Math.round(med * 2) / 2, hh = Math.floor(r), mm = r % 1 ? '30' : '00', t = `${String(hh).padStart(2, '0')}:${mm}`;
+      const say12 = `${hh % 12 || 12}${mm === '30' ? ':30' : ''} ${hh < 12 ? 'am' : 'pm'}`;
+      add({ id: `time:${t}`, kind: 'time', time: t, title: `You usually train around ${say12}`, text: `Your reminder is set for ${S.plan.time}. Move it to ${t} so it lands when you actually train?`,
+        say: `I've noticed you usually train around ${say12}. Want me to move your reminder?`, actions: [{ label: `Move to ${t}`, act: `time:${t}` }, { label: 'Keep it', act: 'ok' }] });
+    }
+  }
+  // 9. A program's planned weeks are done: celebrate, then keep going or switch.
+  if (program && S.program?.start && now - S.program.start >= (program.weeks || 99) * WEEK)
+    add({ id: `finished:${S.program.id}:${S.program.start}`, kind: 'finished', title: `You finished ${program.name}!`, text: `${program.weeks} weeks done. Keep going with a fresh month of the same, or try something new?`,
+      say: `You finished ${program.name}. ${program.weeks} weeks. Amazing work.`, actions: [{ label: 'Keep going', act: 'ok' }, { label: 'See programs', act: 'programs' }] });
+  // 10. Every 3 months: still the same goal?
+  if (S.program?.start && now - S.program.start >= 90 * DAY) {
+    const q = Math.floor((now - S.program.start) / (90 * DAY));
+    add({ id: `goal:${S.program.start}:${q}`, kind: 'goal', title: `Still training for the same thing${name}?`, text: `It's been ${q * 3} months on ${program?.name || 'your program'}. Goals change: QK can switch you to something new in one tap.`,
+      say: 'Quick check. Is your goal still the same?', actions: [{ label: 'Same goal', act: 'ok' }, { label: 'Change it', act: 'programs' }] });
+  }
+  const order = ['pain', 'rough', 'missed', 'ramadan', 'travel', 'finished', 'pr', 'goal', 'skip', 'time', 'milestone'];
   return out.sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
 }
 

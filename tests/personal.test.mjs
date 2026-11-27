@@ -123,6 +123,22 @@ const tv = P.personalDay(byId('massMonster').plan[0].items, LIB, { have: P.equip
 check('travel: no equipment → bodyweight-only session', tv.items.every(it => P.canDo(LIB, it[0], ['none'])), tv.items.map(it => it[0]).join(' '));
 check('Ramadan: on until its end date; one set fewer, 45-minute sessions', P.ramadanOn({ ramadan: { until: NOW + DAY } }, NOW) && !P.ramadanOn({ ramadan: { until: NOW - DAY } }, NOW) && P.RAMADAN.setDelta === -1 && P.RAMADAN.maxMinutes === 45);
 
+// 16. Bodyweight and timed exercises progress
+const pu = days => days.flatMap(([d, reps]) => [0, 1, 2].map(i => ({ ex: 'pushUp', at: NOW - d * DAY + i * 6e4, reps })));
+check('bodyweight: hit 12 on every set (target 8-12) → 14 next time', P.bwTarget(pu([[2, 12]]), 'pushUp', { sets: 3, lo: 8, hi: 12 }, { now: NOW })?.reps === 14);
+check('bodyweight: missed the target → same target', P.bwTarget(pu([[2, 9]]), 'pushUp', { sets: 3, lo: 8, hi: 12 }, { now: NOW })?.reps === 12);
+check('bodyweight: 25+ reps → slower tempo instead of more reps', /3 seconds/.test(P.bwTarget(pu([[2, 26]]), 'pushUp', { sets: 3, lo: 8, hi: 12 }, { now: NOW })?.why || ''));
+check('holds: 30 s held every set → 35 s; capped at 90 s with a harder version', P.bwTarget([{ ex: 'plank', at: NOW - DAY, secs: 31 }], 'plank', { sets: 3, secs: 30 }, { now: NOW })?.secs === 36 && P.bwTarget([{ ex: 'plank', at: NOW - DAY, secs: 95 }], 'plank', { sets: 3, secs: 30 }, { now: NOW })?.secs === 90);
+check('bodyweight: never done → no target (program reps)', P.bwTarget([], 'pushUp', { sets: 3, lo: 8, hi: 12 }, { now: NOW }) === null);
+// 17. Reps in reserve on the first day
+check('first time: 40 kg × 10 with 5+ left → next set heavier (8 reps target)', P.rirKg(40, 10, 6, 8) > 45);
+check('first time: 40 kg × 10 to failure, target 10 → lighter (10 with 2 left needs less); target 8 → same 40 kg', P.rirKg(40, 10, 0, 10) < 40 && Math.abs(P.rirKg(40, 10, 0, 8) - 40) < 0.01);
+check('first time: a beginner never jumps more than 10%', P.rirKg(40, 10, 6, 8, { beginner: true }) <= 44);
+// 18. Supersets before cutting
+const pp1 = byId('powerPump').plan[0].items, paired = P.pairUp(pp1, LIB);
+const letters = paired.map(it => it[5] || '-').join('');
+check('pairing: extras paired with different muscles; main lifts and existing supersets untouched', paired.slice(0, 3).every(it => !it[5]) && paired.filter(it => it[5] && !pp1.find(x => x[0] === it[0])[5]).length >= 2 && paired.every((it, i) => it[1] === pp1[i][1]), letters);
+check('pairing: saves time, same sets', dayMinutes(paired, 9) < dayMinutes(pp1, 9) && paired.reduce((a, it) => a + it[1], 0) === pp1.reduce((a, it) => a + it[1], 0));
 // 10. Urdu cues: short lines only; a form tip is never dropped
 const { toUrdu } = await import('../js/coach-ur.js');
 check('urdu: counts, sets, rest, switch sides', toUrdu('seven') === 'سات' && toUrdu('Set 2 of 4.') === 'سیٹ دو، کل چار میں سے۔' && toUrdu('Rest. Next up: Squat.') === 'آرام کریں۔' && toUrdu('Switch sides.') === 'سائیڈ بدلیں۔');

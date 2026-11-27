@@ -466,3 +466,19 @@ doi:10.1123/ijspp.2022-0268), so QK suggests training after iftar.
   are hidden without dumbbells.
 - **"How was today's workout?":** two "too hard" answers in a row mean one set fewer on the extras; two
   "too easy" answers add one.
+
+### More gaps closed
+- **Supersets before cutting:** when a session doesn't fit the time allowed, QK first pairs extras for
+  different muscles into supersets, then trims sets. Supersets give similar adaptations in about half the time
+  (Mang et al. 2025, doi:10.1519/JSC.0000000000005246).
+- **First time on a weighted exercise:** QK asks how many more reps were left and sets the next set's weight
+  aiming for about 2 in reserve. Trained lifters judge this to within about one rep (Refalo et al. 2024,
+  doi:10.1519/JSC.0000000000004653). Beginners never get more than a 10% jump from one answer.
+- **Bodyweight and holds progress:** +2 reps or +5 seconds when every set hit the target. At 25 reps or 90
+  seconds, the exercise is made harder with a slower tempo instead.
+- **Sore spots in classes and drills:** hands-on-floor moves are swapped for wrist, elbow or shoulder pain;
+  lunges and jumps for knee or hip pain. The Swap button follows equipment and pain too.
+- **Follow-ups:** reminders that don't match when the client actually trains (1.5+ hours off over 8+
+  sessions), a finished program, and a 3-monthly "same goal?" check.
+- **The coach sees what to know:** sore areas, rough days this week, travel and Ramadan, as labels and
+  counts only.

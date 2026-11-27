@@ -60,6 +60,9 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('demo set: bar speed card shown (hip thrust is horizontal → asks for plate calibration)', await p.isVisible('#vbtCard') && /Calibrate|plate/.test(await p.textContent('#vbtNote')));
   check('summary: rest timer starts by itself', (await p.textContent('#restBtn')) === 'Pause');
   check('summary: weight pre-filled from the setup', (await p.inputValue('#setKg')) === '80');
+  check('first time on a lift: "How many more reps could you have done?"', await p.isVisible('#rirBox'));
+  await p.click('#rirSeg [data-rir="3.5"]'); await p.waitForTimeout(100);
+  check('first time: the answer sets the next set\'s weight', /Next set: \d+(\.\d+)? (kg|lb)/.test(await p.textContent('#rirNote')), await p.textContent('#rirNote'));
   await p.click('#repPlus');
   check('summary: rep count can be corrected', (await p.textContent('#sReps')) === '11' && /left out of your form score/.test(await p.textContent('#sCompare')));
   await p.click('#doneBtn');
@@ -342,7 +345,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check("programs: day 1 is today's workout", /Barbell Bench Press[\s\S]*4×4-6/.test(await p.textContent('#todayList')));
   check('workout length: Today shows how long the workout takes', /About \d+ min/.test(await p.textContent('#planMins')), await p.textContent('#planMins'));
   await p.click('#planTime [data-cap="30"]'); await p.waitForTimeout(200);
-  check('short on time: 30 minutes trims accessories, keeps main lifts', /trimmed from/.test(await p.textContent('#planMins')) && /Main lifts stay/.test(await p.textContent('#planCut')) && /Barbell Bench Press/.test(await p.textContent('#todayList')), await p.textContent('#planCut'));
+  check('short on time: 30 minutes pairs extras into supersets first, then trims; main lifts kept', /supersets/.test(await p.textContent('#planCut')) && /trimmed from/.test(await p.textContent('#planMins')) && /Main lifts stay/.test(await p.textContent('#planCut')) && /Barbell Bench Press/.test(await p.textContent('#todayList')), await p.textContent('#planCut'));
   await p.click('#planTime [data-cap="30"]'); await p.waitForTimeout(150);
   check("QK's plan: today's lifts are listed with what to do", await p.isVisible('#qkPlan') && /Power & Pump · month 1 · week 1 of 4/.test(await p.textContent('#planEyebrow')) && /Barbell Bench Press/.test(await p.textContent('#planRows')), await p.textContent('#qkPlan'));
   await go('train'); await tap('[data-prog=powerPump]'); await p.click('[data-progstop]'); await p.waitForTimeout(200);
@@ -509,6 +512,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   // Coach dashboard demo: this phone's training is the first client.
   await p.goto('https://shred.local/coach.html'); await p.waitForTimeout(700);
   check('dashboard demo: your own training is the first client, with sample clients', /\(this phone\)/.test(await p.textContent('.cd-row')) && (await p.$$('.cd-row')).length >= 7, (await p.textContent('.cd-row')).replace(/\s+/g, ' '));
+  check('dashboard: the coach sees what to know (Bilal: sore knee, rough days)', /Sore: knee/.test(await p.textContent('#cdList')) && /2 rough days/.test(await p.textContent('#cdList')));
 
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();

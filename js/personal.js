@@ -320,3 +320,52 @@ export function equipNow(profile = {}, { now = Date.now() } = {}) {
 // and trimming volume ~22% during Ramadan improved strength and power (Rebaï et al. 2014, doi:10.1055/s-0033-1353216).
 export const ramadanOn = (profile = {}, now = Date.now()) => !!profile.ramadan && now < profile.ramadan.until;
 export const RAMADAN = { load: 1, setDelta: -1, maxMinutes: 45, note: 'Ramadan mode: sessions up to 45 minutes and one set fewer on the extras. Train after iftar if you can: strength gains were better fed than fasted.' };
+
+// ---------- 15. Bodyweight and timed exercises progress too ----------
+/**
+ * Push-ups, pull-ups, planks: no weight to add, so QK adds reps (or seconds), then a slower tempo.
+ * Looks at the last day the exercise was done: every set at or past the target → +2 reps / +5 s.
+ * @param scheme { sets, lo, hi } for reps, or { secs } for holds
+ * @returns null or { reps?, secs?, line, why }
+ */
+export function bwTarget(sessions = [], id, scheme, { now = Date.now() } = {}) {
+  const sets = sessions.filter(s => s.ex === id && !s.demo && s.at < dayStart(now)), last = sets.length ? dayStart(Math.max(...sets.map(s => s.at))) : null;
+  if (!last || !scheme) return null;
+  const day = sets.filter(s => dayStart(s.at) === last), n = scheme.sets || day.length;
+  if (scheme.secs) {
+    const held = Math.min(...day.map(s => s.secs || 0)); if (!held) return null;
+    if (held >= 90) return { secs: 90, line: `${n} × 90 s, slower and stricter`, why: 'You hold 90 seconds easily. Make it harder: squeeze everything, or lift one foot.' };
+    const secs = held >= scheme.secs ? Math.min(90, held + 5) : scheme.secs;
+    return { secs, line: `${n} × ${secs} s`, why: held >= scheme.secs ? `Last time you held ${held} s every set. 5 more seconds today.` : `Aim for ${secs} s every set.` };
+  }
+  const reps = Math.min(...day.map(s => s.reps || 0)); if (!reps) return null;
+  const top = Math.max(scheme.hi || reps, reps);
+  if (reps >= 25) return { reps: 25, line: `${n} × 25, 3 seconds down`, why: '25+ reps a set: time to make each rep harder. Lower for 3 seconds and pause at the bottom.' };
+  const target = reps >= (scheme.hi || reps) ? Math.min(25, reps + 2) : scheme.hi || reps;
+  return { reps: target, line: `${n} × ${target}`, why: reps >= (scheme.hi || reps) ? `Last time you got ${reps} on every set. 2 more today.` : `Aim for ${target} on every set.` };
+}
+
+// ---------- 16. First time on an exercise: "how many more could you have done?" ----------
+// Trained lifters judge reps in reserve to within about one rep (Refalo et al. 2024, doi:10.1519/JSC.0000000000004653);
+// beginners less so, so QK never raises a beginner's weight by more than 10% from one answer.
+/** Weight for `target` reps with ~2 in reserve, from a set of `reps` at `kg` with `rir` left. */
+export function rirKg(kg, reps, rir, target, { beginner = false } = {}) {
+  const e1 = kg * (1 + (reps + rir) / 30), next = e1 / (1 + (target + 2) / 30);
+  return beginner ? Math.min(next, kg * 1.1) : next;
+}
+
+// ---------- 17. Short on time: superset before cutting ----------
+// Supersets give similar results to straight sets in about half the time (Mang et al. 2025, doi:10.1519/JSC.0000000000005246).
+/** Pair neighbouring accessories that train different muscles into supersets (letters after any existing ones). */
+export function pairUp(items, lib) {
+  const used = new Set(items.map(it => it[5]).filter(Boolean)), out = items.map(it => it.slice());
+  let L = 'ABCDEFGH'.split('').filter(l => !used.has(l));
+  for (let i = 0; i < out.length - 1; i++) {
+    const a = out[i], b = out[i + 1];
+    if (a[5] || b[5] || isMain(lib, out, i) || isMain(lib, out, i + 1) || isRehab(a) || isRehab(b) || primary(lib, a[0]) === primary(lib, b[0]) || !L.length) continue;
+    const l = L.shift();
+    for (const x of [a, b]) { while (x.length < 5) x.push(x.length === 4 ? '' : undefined); x[5] = l; }
+    a[3] = 15; i++; // first of the pair: just a short walk to the next exercise
+  }
+  return out;
+}

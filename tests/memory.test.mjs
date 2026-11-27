@@ -41,6 +41,14 @@ check('travel ended → welcome back; Ramadan ended → Eid Mubarak', kinds(base
 check('one month with QK', kinds(base({ sessions: [{ ex: 'squat', at: NOW - 31 * DAY, reps: 5, good: 5 }, { ex: 'squat', at: NOW - DAY, reps: 5, good: 4 }] })).includes('milestone'));
 check('order: pain first', kinds({ ...painS(4), checkinLog: [{ at: NOW - DAY, level: 'rest' }] })[0] === 'pain');
 
+// Usual training time, finished program, goal check.
+const eve = Array.from({ length: 9 }, (_, i) => { const d = new Date(NOW - (i + 1) * 2 * DAY); d.setHours(19, 10, 0, 0); return { ex: 'squat', at: d.getTime(), reps: 5 }; });
+const tf = followUps(base({ plan: { time: '17:00', days: [1, 3, 5] }, sessions: eve }), { now: NOW, lib: LIB }).find(f => f.kind === 'time');
+check('time: trains ~7 pm, reminder 5 pm → offers to move it to 19:00', tf?.time === '19:00' && /7 pm/.test(tf.title), JSON.stringify(tf));
+check('time: reminder already right → no', !followUps(base({ plan: { time: '19:00' }, sessions: eve }), { now: NOW, lib: LIB }).some(f => f.kind === 'time'));
+const prg = { name: 'Mass Monster', weeks: 10 };
+check('finished: 10 weeks on Mass Monster → celebrate, keep going or switch', followUps(base({ program: { id: 'massMonster', start: NOW - 71 * DAY } }), { now: NOW, lib: LIB, program: prg }).some(f => f.kind === 'finished' && /You finished Mass Monster/.test(f.title)));
+check('goal check after 3 months', followUps(base({ program: { id: 'massMonster', start: NOW - 91 * DAY } }), { now: NOW, lib: LIB, program: prg }).some(f => f.kind === 'goal'));
 // How was it?
 check('feel: two "too hard" → one set fewer; two "too easy" → one more; mixed → nothing', sessionFeel([{ at: NOW - 3 * DAY, rating: 'hard' }, { at: NOW - DAY, rating: 'hard' }], { now: NOW })?.setDelta === -1 && sessionFeel([{ at: NOW - 3 * DAY, rating: 'easy' }, { at: NOW - DAY, rating: 'easy' }], { now: NOW })?.setDelta === 1 && sessionFeel([{ at: NOW - 3 * DAY, rating: 'hard' }, { at: NOW - DAY, rating: 'right' }], { now: NOW }) === null);
 check('returning after pain: 14 days', returningAreas({ painCleared: { knee: NOW - 5 * DAY, back: NOW - 20 * DAY } }, NOW).join() === 'knee');
