@@ -18,6 +18,7 @@ import { SessionRecorder, ErrorLog, downloadJSON, APP_VERSION } from './diagnost
 import { LIBRARY, LIB, MUSCLES, exFor } from './library.js';
 import { HipThrustDemo, WalkDemo, DEMO_W, DEMO_H } from './demo.js';
 import { landmarksFrom, analyse, render, navyBodyFat, bfCategory, stanceProblem } from './bodyscan.js';
+import { personalise, GENDERS, AGES, PERIODS, NOT_NOW } from './onboarding.js';
 import { initCycle, renderCycle } from './cycle/ui.js';
 import { readFlags, setFlag } from './cycle/flags.js';
 
@@ -56,7 +57,7 @@ function mountOrbs() {
 /* ---------- Navigation ---------- */
 function tab(id) {
   $$('.screen').forEach(s => s.classList.toggle('on', s.id === id));
-  const tabFor = ['gait', 'scan', 'rehab', 'cycle'].includes(id) ? 'body' : id;
+  const tabFor = id === 'cycle' && !$('#cycleTabBtn').hidden ? 'cycle' : ['gait', 'scan', 'rehab', 'cycle'].includes(id) ? 'body' : id;
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tabFor));
   if (id === 'today') renderToday();
   if (id === 'progress') { renderProgress(); renderLoad(); renderToday(); $('#youName').textContent = S.profile.name || 'You'; }
@@ -1171,17 +1172,55 @@ $('#studioExport').onclick = async () => { const data = await exportClips(); if 
 /* ---------- Cycle tracking (prototype, off by default) ----------
    Lives in its own encrypted store (js/cycle/store.js). Nothing from it goes into S, the coach voice,
    session exports or the error log. */
-function applyCycleFlag() { const on = readFlags().cycleTracking; $('#cycleTile').hidden = !on; $('#flagCycle').checked = on; }
+function applyCycleFlag() { const on = readFlags().cycleTracking; $('#cycleTile').hidden = !on; $('#cycleTabBtn').hidden = !on; $('#cycle .back').hidden = on; /* it has its own tab when on */ $('#flagCycle').checked = on; $('#profileCycle').checked = on; }
 $('#flagCycle').onchange = e => { setFlag('cycleTracking', e.target.checked); applyCycleFlag(); };
+$('#profileCycle').onchange = e => { setFlag('cycleTracking', e.target.checked); applyCycleFlag(); };
+
+/* ---------- Personalised sign-up (js/onboarding.js; product owner's flow, 2026-11-27) ----------
+   Asked once, on the welcome screen. A man never sees period tracking; a woman (or "Other or prefer not to say") aged
+   13 or over is asked whether she would like to track her periods. Skipping changes nothing and asks again next time.
+   The period answer only sets the switches; it is not kept in the profile. */
+const about = {};
+const chips = (q, set) => `<div class="chips-wrap" role="group">${Object.entries(set).map(([v, l]) => `<button type="button" class="mchip ${about[q] === v ? 'on' : ''}" data-about="${q}" data-val="${v}" aria-pressed="${about[q] === v}">${l}</button>`).join('')}</div>`;
+function renderAbout() {
+  const r = personalise(about);
+  $('#aboutYou').innerHTML = `<div class="about-q"><b>Which best describes you?</b><span class="muted small">Optional. It lets the app show you only what's relevant.</span>${chips('gender', GENDERS)}</div>
+    <div class="about-q" id="aboutAge" ${r.ask.age ? '' : 'hidden'}><b>How old are you?</b>${chips('age', AGES)}</div>
+    <div class="about-q" id="aboutPeriods" ${r.ask.periods ? '' : 'hidden'}><b>Would you like to track your periods?</b>${chips('periods', PERIODS)}</div>
+    <div class="about-q" id="aboutNotNow" ${r.ask.notNow ? '' : 'hidden'}><b>Which applies to you?</b>${chips('notNow', NOT_NOW)}</div>
+    <p class="note" id="aboutNote" ${r.note ? '' : 'hidden'}>${esc(r.note || '')}</p>
+    <p class="note">Your answers stay on this phone. You can change this any time in You &gt; Profile.</p>`;
+}
+$('#aboutYou').onclick = e => {
+  const b = e.target.closest('[data-about]'); if (!b) return;
+  const q = b.dataset.about; about[q] = b.dataset.val;
+  for (const k of ({ gender: ['age', 'periods', 'notNow'], age: ['periods', 'notNow'], periods: ['notNow'] })[q] || []) delete about[k]; // later answers depend on this one
+  renderAbout();
+};
+/** Applies her answers when she taps Start. Returns where to go, or null if she skipped or left a question open. */
+function applyAbout() {
+  if (S.profile.aboutDone || !about.gender) return null;
+  const r = personalise(about);
+  if ((r.ask.age && !about.age) || (r.ask.periods && !about.periods) || (r.ask.notNow && !about.notNow)) return null; // not finished: ask again next time
+  for (const [k, v] of Object.entries(r.flags)) setFlag(k, v);
+  S.profile.gender = about.gender; S.profile.ageBand = about.age || null; S.profile.aboutDone = true;
+  if (r.sex) { S.profile.sex = r.sex; $('#pSex').value = r.sex; }
+  persist(); applyCycleFlag();
+  try { if (r.intent) localStorage.setItem('shred_onboard_intent', r.intent); } catch {}
+  return r.route;
+}
 initCycle({ root: $('#cycleRoot'), toast });
 
 /* ---------- Boot ---------- */
 applyCycleFlag(); mountOrbs(); bindPlan(); bindProfile(); renderTrain(); renderToday(); applyMute(); renderTestHistory();
 if (S.profile.name) $('#welcomeNameWrap').hidden = true;
+if (!S.profile.aboutDone) { $('#aboutYou').hidden = false; renderAbout(); }
 $('#welcomeBtn').onclick = () => {
   const nm = $('#welcomeName').value.trim();
   if (nm && !S.profile.name) { S.profile.name = nm; $('#pName').value = nm; persist(); renderToday(); }
+  const route = applyAbout();
   $('#welcome').hidden = true;
+  if (route === 'cycle') tab('cycle');
   say(`${greeting(S.profile.name)} ${nudgeLine()}`, { id: 'greet', priority: 'high' });
   getVideoLandmarker().catch(() => {}); // warm the model up in the background
 };

@@ -16,6 +16,7 @@ import { companionToday, answerCheckIn, dismissCompanion, setCompanionName, comp
 import { adjustedEstimate, cardLines } from './adjust.js';
 import { periodCheckIn, answerPeriodCheckIn, missedLogQuestion, answerMissedLog, gapReview, confirmGap, dismissGapReview, answerNotYet, answerSpotting } from './checkins.js';
 import * as PG from './pregnancy.js';
+import { ZARA_WELCOME } from '../onboarding.js';
 import { midlifeObservations, SOURCES as MIDLIFE_SOURCES, INTRO as MIDLIFE_INTRO } from './midlife.js';
 import { comfortSuggestions, pendingComfortQuestions, logComfortTry, answerComfort, deleteComfort, ANSWERS, REVIEW_STATUS } from './comfort.js';
 
@@ -106,12 +107,12 @@ export async function renderCycle() {
 
 function render() {
   const s = repo.read(), { today, nowMin } = now(), f = flags();
-  if (!M.hasConsent(s)) { root.innerHTML = consentHTML(); return; }
+  if (!M.hasConsent(s)) { root.innerHTML = consentHTML(f); return; }
   const open = [...root.querySelectorAll('details[id][open]')].map(d => d.id); // keep sections the user opened
   const unsaved = unsavedInputs(); // a redraw (e.g. another tab saved) must never change what the person typed
   const est = estimateNext(s, today);
   const tempShift = f.temperatureResearch && est.lastStart ? retrospectiveShift(s, est.lastStart, addDays(today, 1)) : null;
-  root.innerHTML = [banner(), f.companion ? companionHTML(s, today, est, f) : '', f.pregnancyMode ? pregnancyCardsHTML(s, today) : '', summaryMonths ? summaryHTML(s, today) : '', promptsHTML(s, est, today), dueHTML(s, est, today, nowMin), estimateHTML(s, est), f.temperatureEstimate ? adjustHTML(s, today) : '', learningHTML(s, today), f.midlifeMode && s.situation?.perimenopause ? midlifeHTML(s, today) : '', logHTML(s, today), f.comfortSuggestions ? comfortHTML(s, today) : '', f.patternInsights ? insightHTML(s, today) : '',
+  root.innerHTML = [banner(), f.companion ? zaraFirstHTML(s, today) : '', f.companion ? companionHTML(s, today, est, f) : '', f.pregnancyMode ? pregnancyCardsHTML(s, today) : '', summaryMonths ? summaryHTML(s, today) : '', promptsHTML(s, est, today), dueHTML(s, est, today, nowMin), estimateHTML(s, est), f.temperatureEstimate ? adjustHTML(s, today) : '', learningHTML(s, today), f.midlifeMode && s.situation?.perimenopause ? midlifeHTML(s, today) : '', logHTML(s, today), f.comfortSuggestions ? comfortHTML(s, today) : '', f.patternInsights ? insightHTML(s, today) : '',
     f.phaseEducation ? phaseHTML(s, today, tempShift, est) : '', historyHTML(s), f.patternInsights ? patternsHTML(s, today, f) : '', remindersHTML(s, est, today, nowMin),
     wearableHTML(s, today, f, tempShift), situationHTML(s, f), settingsHTML(s, f)].join('');
   for (const id of open) { const d = root.querySelector('#' + id); if (d) d.open = true; }
@@ -141,7 +142,7 @@ function showCheckDateNote() {
 
 /* Unsaved form input survives redraws (defect found by the simultaneous-save browser test on this fix: a redraw
    triggered by another tab reset the date field to today, so the person's click saved today instead of their date). */
-const FORM = '#cyDate, #cyCheckDate, #cyUnwell, #cyTravel, #cyAlcohol, #cyLateNight, #cyRoomTemp, #cyRemKind, #cyRemTime, #cyLh, #cySumMonths, [data-sym]';
+const FORM = '#cyDate, #cyCheckDate, #cyZaraLast, #cyZaraBefore, #cyUnwell, #cyTravel, #cyAlcohol, #cyLateNight, #cyRoomTemp, #cyRemKind, #cyRemTime, #cyLh, #cySumMonths, [data-sym]';
 const inputKey = el => el.id || `sym:${el.dataset.sym}`;
 function unsavedInputs() {
   const out = {};
@@ -159,8 +160,11 @@ function restoreInputs(saved) {
 /* ---------- Sections ---------- */
 const banner = () => `<p class="cy-banner">Prototype. Estimates are not clinically validated. Use demo data, not real client data.</p>`;
 
-function consentHTML() {
-  return `${banner()}<div class="card stack" id="cyConsent">
+/* What she chose at sign-up when it was "Not right now" (js/onboarding.js): opens that mode after consent. */
+const onboardIntent = () => { try { return localStorage.getItem('shred_onboard_intent'); } catch { return null; } };
+function consentHTML(f = {}) {
+  const hello = f.companion ? `<div class="card stack" id="cyZaraHello"><span class="eyebrow">Your cycle companion</span><p>${esc(ZARA_WELCOME)}</p><p class="muted small">First, please read how your cycle data is kept.</p></div>` : '';
+  return `${banner()}${hello}<div class="card stack" id="cyConsent">
   <span class="eyebrow">Before you start</span><h2 class="display h2">Cycle tracking</h2>
   <ul class="issues">
     <li><b>What we keep:</b> the period dates you log, spotting, and only the symptom categories you switch on, one by one.</li>
@@ -171,6 +175,19 @@ function consentHTML() {
   </ul>
   <label class="check"><input type="checkbox" id="cyAgree"> I understand and want to start</label>
   <button class="cta" type="button" data-act="consent">Agree and start</button></div>`;
+}
+
+/* Zara's first question after sign-up: when did her last period start (and the one before, if she remembers)?
+   Only what she enters is saved. Not shown in pregnancy or after a birth, or once she has logged a period. */
+function zaraFirstHTML(s, today) {
+  const intent = onboardIntent();
+  if (s.periods.length || s.situation?.pregnant || s.pregnancy || s.postpartum || (s.pregnancies || []).length || intent === 'pregnant' || intent === 'postpartum' || s.promptsDismissed?.zaraFirst) return '';
+  const name = esc(companionName(s));
+  return `<div class="card stack" id="cyZaraFirst"><span class="eyebrow">${name}</span><b>Let's get started. When did your last period start?</b>
+    <label class="field">First day of your last period<input type="date" id="cyZaraLast" max="${today}"></label>
+    <label class="field">And the one before, if you remember (optional)<input type="date" id="cyZaraBefore" max="${today}"></label>
+    <p class="muted small">Only the dates you enter are saved. With two dates, you get a first, rough estimate straight away.</p>
+    <div class="btn-row"><button class="cta" type="button" data-act="zaraFirstSave">Save</button><button class="ghost" type="button" data-act="zaraFirstSkip">I'll log it later</button></div></div>`;
 }
 
 function promptsHTML(s, est, today) {
@@ -470,7 +487,20 @@ async function onClick(e) {
   const endFor = ds.id && root.querySelector(`#endFor-${CSS.escape(ds.id)}`) ? val(`#endFor-${CSS.escape(ds.id)}`) : undefined;
   const dayForm = a === 'saveDay' ? daySnapshot() : null, remKind = val('#cyRemKind'), remTime = val('#cyRemTime'), sumMonths = val('#cySumMonths');
   const run = {
-    consent: () => { if (!root.querySelector('#cyAgree')?.checked) return toast('Tick the box to agree first.'); act(s => M.giveConsent(s), 'Cycle tracking is on'); },
+    consent: async () => {
+      if (!root.querySelector('#cyAgree')?.checked) return toast('Tick the box to agree first.');
+      await act(s => M.giveConsent(s), 'Cycle tracking is on');
+      // "Not right now" at sign-up: open the mode she chose, ready to fill in (she still fills it in herself).
+      const intent = onboardIntent(), sit = root.querySelector('#cySituation');
+      if (sit && ['pregnant', 'postpartum', 'menopause'].includes(intent)) { sit.open = true; (root.querySelector('#cyPregStart') || sit).scrollIntoView?.({ block: 'center' }); }
+    },
+    zaraFirstSave: () => {
+      const last = root.querySelector('#cyZaraLast')?.value, before = root.querySelector('#cyZaraBefore')?.value; // read now (finding 2b)
+      if (!last) return toast('Pick the day your last period started.');
+      return act((s, t) => { if (before && before >= last) throw new M.CycleError('INVALID_DATE');
+        if (before) M.logPeriodStart(s, before, { today: t, source: 'companion' }); M.logPeriodStart(s, last, { today: t, source: 'companion' }); }, 'Saved. Thank you.');
+    },
+    zaraFirstSkip: () => act((s, t) => M.dismissPrompt(s, 'zaraFirst', t), 'No problem. Log your next period when it starts.'),
     logStart: () => act((s, t) => M.logPeriodStart(s, date(), { today: t }), 'Period start saved'),
     logStartToday: () => act((s, t) => M.logPeriodStart(s, t, { today: t }), 'Period start saved'),
     logStartOn: () => act((s, t) => answerPeriodCheckIn(s, t, ds.date), 'Period start saved'),

@@ -44,6 +44,9 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
       await pick(p, 'periods', 'yes');
       await p.click('#welcomeBtn'); await p.waitForTimeout(900);
       check('yes: she goes straight to her cycle screen, with a Cycle tab in the bottom bar', (await screenOn(p)) === 'cycle' && await visible(p, '.tabs [data-tab=cycle]'));
+      const tops = await p.$$eval('.tabs nav button:not([hidden])', bs => bs.map(x => Math.round(x.getBoundingClientRect().top)));
+      check('…and the bottom bar stays on one row with five tabs (found in a screenshot)', tops.length === 5 && new Set(tops).size === 1, JSON.stringify(tops));
+      check('…and the cycle screen has no "Body" back link when it has its own tab', !(await visible(p, '#cycle .back')));
       const hello = await p.textContent('#cyZaraHello').catch(() => '');
       check('Zara introduces herself on screen as her cycle companion (not clinical)', /Zara/.test(hello) && /companion/i.test(hello) && !/clinic/i.test(hello), hello);
       check('…and the consent terms are still there, unchanged', await visible(p, '#cyAgree') && /not clinically validated/i.test(await p.textContent('#cyConsent')));

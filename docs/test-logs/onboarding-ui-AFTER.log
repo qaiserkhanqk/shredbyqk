@@ -1,0 +1,84 @@
+# chromium
+browser: chromium 153.0.8010.12
+ok   first launch: "Which best describes you?" is on the welcome screen
+ok   man: no age or period question appears
+ok   man: lands on Today, with no Cycle tab and no cycle tile
+ok   second launch: the questions are not asked again
+ok   woman: asked her age
+ok   …then asked whether she would like to track her periods
+ok   yes: she goes straight to her cycle screen, with a Cycle tab in the bottom bar
+ok   …and the bottom bar stays on one row with five tabs (found in a screenshot)
+ok   …and the cycle screen has no "Body" back link when it has its own tab
+ok   Zara introduces herself on screen as her cycle companion (not clinical)
+ok   …and the consent terms are still there, unchanged
+ok   after consent, Zara asks when her last period started
+ok   …saving both dates gives her a first, early estimate, and Zara's question goes away
+ok   the period answer is not stored in the main app data (only her profile answers are)
+ok   nothing about periods was put in a notification
+ok   under 13: no period question, and a note says it is for 13 and over
+ok   …and period tracking stays off
+ok   13–17: asked whether she would like to track her periods
+ok   other or prefer not to say: asked the age and period questions too
+ok   "Not right now": asked which applies
+ok   pregnant: after consent, the pregnancy mode form is open and ready
+ok   …and Zara does not ask about her last period
+ok   skipping the questions: the app starts on Today as before
+ok   …and they are offered again next time (nothing was answered)
+ok   no JavaScript errors
+ALL PASS (25)
+# webkit
+browser: webkit 26.6
+ok   first launch: "Which best describes you?" is on the welcome screen
+ok   man: no age or period question appears
+ok   man: lands on Today, with no Cycle tab and no cycle tile
+ok   second launch: the questions are not asked again
+ok   woman: asked her age
+ok   …then asked whether she would like to track her periods
+ok   yes: she goes straight to her cycle screen, with a Cycle tab in the bottom bar
+ok   …and the bottom bar stays on one row with five tabs (found in a screenshot)
+ok   …and the cycle screen has no "Body" back link when it has its own tab
+ok   Zara introduces herself on screen as her cycle companion (not clinical)
+ok   …and the consent terms are still there, unchanged
+ok   after consent, Zara asks when her last period started
+ok   …saving both dates gives her a first, early estimate, and Zara's question goes away
+ok   the period answer is not stored in the main app data (only her profile answers are)
+ok   nothing about periods was put in a notification
+ok   under 13: no period question, and a note says it is for 13 and over
+ok   …and period tracking stays off
+ok   13–17: asked whether she would like to track her periods
+ok   other or prefer not to say: asked the age and period questions too
+ok   "Not right now": asked which applies
+ok   pregnant: after consent, the pregnancy mode form is open and ready
+ok   …and Zara does not ask about her last period
+ok   skipping the questions: the app starts on Today as before
+ok   …and they are offered again next time (nothing was answered)
+ok   no JavaScript errors
+ALL PASS (25)
+# firefox
+browser: firefox 155.0
+ok   first launch: "Which best describes you?" is on the welcome screen
+ok   man: no age or period question appears
+ok   man: lands on Today, with no Cycle tab and no cycle tile
+ok   second launch: the questions are not asked again
+ok   woman: asked her age
+ok   …then asked whether she would like to track her periods
+ok   yes: she goes straight to her cycle screen, with a Cycle tab in the bottom bar
+ok   …and the bottom bar stays on one row with five tabs (found in a screenshot)
+ok   …and the cycle screen has no "Body" back link when it has its own tab
+ok   Zara introduces herself on screen as her cycle companion (not clinical)
+ok   …and the consent terms are still there, unchanged
+ok   after consent, Zara asks when her last period started
+ok   …saving both dates gives her a first, early estimate, and Zara's question goes away
+ok   the period answer is not stored in the main app data (only her profile answers are)
+ok   nothing about periods was put in a notification
+ok   under 13: no period question, and a note says it is for 13 and over
+ok   …and period tracking stays off
+ok   13–17: asked whether she would like to track her periods
+ok   other or prefer not to say: asked the age and period questions too
+ok   "Not right now": asked which applies
+ok   pregnant: after consent, the pregnancy mode form is open and ready
+ok   …and Zara does not ask about her last period
+ok   skipping the questions: the app starts on Today as before
+ok   …and they are offered again next time (nothing was answered)
+ok   no JavaScript errors
+ALL PASS (25)

@@ -84,6 +84,22 @@ Flags live in `localStorage['shred_flags_v1']` because they are not health data.
 - **Optional symptoms.** Pain, energy, mood, cravings and sleep are each off until switched on, and each has a one-line explanation. Turning one off stops collection and asks whether to delete past entries. Mood is self-reported only; nothing is inferred from sensors.
 - **History.** You can see and edit periods, cycle lengths (marked as used or not used), and day logs per cycle, including the current one.
 
+## Personalised sign-up (`js/onboarding.js`, product owner's flow, 2026-11-27)
+- **On first launch, the welcome screen asks "Which best describes you?"** Woman / Man / Other or prefer not to say. It is optional; skipping changes nothing and the question is offered again next time.
+- **Man:** no further questions. Period tracking, the Cycle tab, cycle reminders and Zara stay off. The switch is still in You > Profile; it is never shown to him on screen.
+- **Woman, or Other or prefer not to say:** "How old are you?" (Under 13 / 13 to 17 / 18 or over).
+  - **Under 13:** period tracking is never turned on, and a note says it is for ages 13 and over (product owner's decision).
+  - **13 and over:** "Would you like to track your periods?"
+- **Her answers to "Would you like to track your periods?":**
+  - **Yes:** period tracking and Zara are turned on by her answer, and she goes straight to her cycle screen. A **Cycle** tab appears in the bottom bar.
+  - **Not right now, then pregnant, recently gave birth or menopause:** that mode is turned on, and after consent its form opens ready for her to fill in.
+  - **No, or just not now:** nothing is turned on. She is told she can turn it on in You > Profile.
+- **Zara introduces herself on screen** as "your cycle companion": never as clinical or medical, and never in a notification. The consent terms are shown, unchanged, before anything is stored.
+- **Zara's first question, after consent:** "When did your last period start?", plus the one before if she remembers. Only the dates she enters are saved, and two dates give her a first, early estimate.
+- **Privacy:** gender and age band are kept in the app's profile on the phone, and "Woman"/"Man" also pre-fills the body-fat formula's sex. The period answer is never stored with the profile; it only sets the switches. Nothing is uploaded.
+- **Tests:** `tests/onboarding.test.mjs` (21) and `tests/onboarding-ui.cjs` (25, Chromium, WebKit and Firefox). They were written first; the failing runs are in `docs/test-logs/`.
+- **Not yet decided:** teen-specific wording for ages 13 to 17 (same screens for now; clinician review pending).
+
 ## Period-start check-ins (`js/cycle/checkins.js`, always on with cycle tracking)
 - **Why:** logging quality decides accuracy. On the real Marquette data, recording starts 1–3 days late (the day she remembered, not the real day) raised the dates-only error:
 

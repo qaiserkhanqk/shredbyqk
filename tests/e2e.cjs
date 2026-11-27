@@ -38,7 +38,9 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('welcome: asks for a first name', await p.isVisible('#welcomeName'));
   await p.fill('#welcomeName', 'Sara'); await p.click('#welcomeBtn');
   check('today: greets by name', /Sara/.test(await p.textContent('#hello')));
-  check('navigation: 4 tabs', (await p.$$('.tabs button')).length === 4);
+  // 2026-11-27: the bottom bar also holds a Cycle tab, hidden unless she chose to track her periods (personalised sign-up),
+  // so this counts the visible tabs, and checks the Cycle tab stays hidden for this user.
+  check('navigation: 4 tabs', (await p.$$('.tabs button:not([hidden])')).length === 4 && await p.$eval('.tabs [data-tab=cycle]', b => b.hidden));
 
   // Profile height enables height-scaled bar speed.
   await go('progress'); await tap('#profileCard summary'); await p.fill('#pHeight', '178'); await p.press('#pHeight', 'Tab'); await go('today');

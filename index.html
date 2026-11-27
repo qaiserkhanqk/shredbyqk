@@ -281,6 +281,7 @@
           <label class="field">Sex (body-fat formula)<select id="pSex"><option value="male">Male</option><option value="female">Female</option></select></label>
           <label class="field">Height (cm)<input id="pHeight" type="number" inputmode="decimal"></label>
         </div>
+        <label class="check"><input type="checkbox" id="profileCycle"> Period and cycle tracking (prototype)</label>
         <label class="field">Coach photo (QK's face)<input id="coachPhoto" type="file" accept="image/*"></label>
         <label class="field">Coach voice<select id="voiceSel"></select></label>
         <button class="ghost" type="button" id="testVoice">Test the voice</button>
@@ -321,6 +322,7 @@
     <button type="button" class="on" data-tab="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg>Today</button>
     <button type="button" data-tab="train"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11"/></svg>Train</button>
     <button type="button" data-tab="body"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.5-9-9.5C1.6 7.6 4.2 4 7.8 4c1.8 0 3.2 1 4.2 2.4C13 5 14.4 4 16.2 4 19.8 4 22.4 7.6 21 11.5 19 16.5 12 21 12 21z"/></svg>Body</button>
+    <button type="button" data-tab="cycle" id="cycleTabBtn" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16"/></svg>Cycle</button>
     <button type="button" data-tab="progress"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>You</button>
   </nav>
 </div>
@@ -422,6 +424,7 @@
   <h1 class="big"><i>SHRED</i></h1>
   <p>Your coach in your pocket. QK watches your form, counts your reps and talks you through every set.</p>
   <label class="field" id="welcomeNameWrap" style="width:100%;max-width:320px;text-align:left">What should QK call you?<input id="welcomeName" placeholder="Your first name" autocomplete="given-name"></label>
+  <div class="about" id="aboutYou" hidden></div>
   <button class="cta" type="button" id="welcomeBtn">Start</button>
   <p class="note">Camera footage is analysed on your phone and never uploaded.</p>
 </div>

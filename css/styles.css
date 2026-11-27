@@ -261,7 +261,7 @@ details[open] > summary::after { content: "–"; }
 .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; justify-content: center;
   padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
   background: linear-gradient(to top, var(--ink) 55%, transparent); }
-.tabs nav { width: 100%; max-width: 420px; display: grid; grid-template-columns: repeat(4, 1fr); background: rgba(18,23,34,.9); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+.tabs nav { width: 100%; max-width: 420px; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); background: rgba(18,23,34,.9); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
   border: 1px solid var(--line); border-radius: 22px; padding: 6px; }
 .tabs button { border: 0; background: none; border-radius: 16px; padding: 8px 0 6px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--muted); font-size: .66rem; font-weight: 650; }
 .tabs button svg { width: 21px; height: 21px; }
@@ -273,6 +273,10 @@ details[open] > summary::after { content: "–"; }
   display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 18px;
   padding: calc(24px + env(safe-area-inset-top, 0px)) max(24px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(24px, env(safe-area-inset-left, 0px)); }
 .welcome .orb { --s: 132px; }
+.welcome { overflow-y: auto; justify-content: safe center; }
+.about { width: 100%; max-width: 340px; text-align: left; display: flex; flex-direction: column; gap: 12px; }
+.about-q { display: flex; flex-direction: column; gap: 8px; }
+.about-q .chips-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
 .welcome .big { font-family: var(--f-display); font-stretch: 125%; font-weight: 900; font-size: 3rem; letter-spacing: .04em; line-height: 1; margin: 0; }
 .welcome .big i { font-style: normal; background: var(--zone); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .welcome p { max-width: 340px; color: var(--muted); margin: 0; }
