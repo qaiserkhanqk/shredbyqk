@@ -1,0 +1,21 @@
+ok   control: the forecast has a range
+ok   Zara checks in on her typical date (15, 15, 35, 15 days)
+ok   control: with 28-day cycles she still checks in before the range
+ok   it does not fire during the period she has just logged (no end logged: first 7 days)
+ok   …but it does fire on her typical date
+ok   control: with 28-day cycles it still fires 2 days before her range
+ok   an LMP before a period she logged after it is refused, so she can check the date
+ok   control: her last logged start as the LMP is accepted
+ok   control: a due date from her midwife is accepted as given
+ok   "Not yet" keeps spotting she logged earlier today
+ok   …and quiets the question for today
+ok   "Not yet" with nothing logged today records no bleeding today (her answer)
+ok   "Spotting only" saves spotting and quiets the question for today
+FAIL the months of a pregnancy are not counted as "12 months without a period"  — {"from":"2025-03-02","months":13,"twelveMonths":true,"text":"It has been 13 months since your last logged period. Looking back, 12 months without a period is how menopause is defined (STRAW+10). Any bleeding from now on, even spotting, should be checked by a doctor."}
+FAIL …and the text says it counts from the end of the pregnancy  — It has been 13 months since your last logged period. Looking back, 12 months without a period is how menopause is defined (STRAW+10). Any bleeding from now on, even spotting, should be checked by a doctor.
+FAIL …so spotting after the birth does not raise the "bleeding after 12 months" alert  — ["You logged bleeding after 12 months or more without a period. Please see a doctor to have this checked."]
+FAIL a gap that contains a pregnancy is not described as a long gap without periods  — {"gap":{"found":true,"longestDays":424,"text":"You had 424 days without a logged period (after 2 Mar, until 1 May). Menopause researchers describe gaps of 60 days or more in the later part of the transition (STRAW+10). If you may have missed logging a period, mark it in your history."},"lengths":[28,28,425]}
+FAIL while marked as recently given birth or breastfeeding, a long time without periods is not compared with the 12-month definition  — {"from":"2025-03-02","months":23,"twelveMonths":true,"text":"It has been 23 months since your last logged period. Looking back, 12 months without a period is how menopause is defined (STRAW+10). Any bleeding from now on, even spotting, should be checked by a doctor."}
+ok   control: without a pregnancy, 13 months without a period is still described
+ok   control: …and spotting after it still raises the alert
+5 FAILED of 20

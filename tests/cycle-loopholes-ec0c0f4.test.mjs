@@ -6,12 +6,15 @@
 //   L3. Pregnancy mode accepted a "first day of last period" earlier than a period she had already logged after it.
 //   L4. "Not yet" on the check-in overwrote spotting she had logged earlier that day with "no bleeding", and
 //       "Spotting only" left the question on screen for the rest of the day.
+//   L5. Perimenopause mode counted the months of a pregnancy (and after the birth) as "months without a period":
+//       "12 months without a period is how menopause is defined", and any spotting raised "see a doctor".
 // Run: node tests/cycle-loopholes-ec0c0f4.test.mjs
 import * as M from '../js/cycle/model.js';
 import * as R from '../js/cycle/reminders.js';
 import { addDays } from '../js/cycle/dates.js';
 import { estimateNext } from '../js/cycle/predict.js';
-import { startPregnancy } from '../js/cycle/pregnancy.js';
+import { startPregnancy, endPregnancy } from '../js/cycle/pregnancy.js';
+import { midlifeObservations } from '../js/cycle/midlife.js';
 import { companionToday } from '../js/cycle/companion.js';
 import * as C from '../js/cycle/checkins.js';
 
@@ -68,5 +71,29 @@ run('L4. "Not yet" and "Spotting only"', () => {
   check('"Not yet" with nothing logged today records no bleeding today (her answer)', n.s.days[t]?.bleeding === 'none', words(n.s.days[t]));
   const sp = hist([28, 28, 28, 28]); C.answerSpotting?.(sp.s, t);
   check('"Spotting only" saves spotting and quiets the question for today', sp.s.days[t]?.bleeding === 'spotting' && C.periodCheckIn(sp.s, t) === null, words({ day: sp.s.days[t], q: !!C.periodCheckIn(sp.s, t) }));
+});
+run('L5. Perimenopause mode after a pregnancy', () => {
+  const mk = ({ pregnancy = true, postpartum = false } = {}) => {
+    const { s } = hist([28, 28], '2025-01-05'); // last logged period 2 Mar 2025
+    if (pregnancy) { startPregnancy(s, { lmp: '2025-03-02', today: '2025-04-10', at: AT }); endPregnancy(s, { outcome: 'birth', date: '2025-12-01', today: '2025-12-01', at: AT }); }
+    if (!postpartum) M.setSituation(s, 'postpartum', false, { at: AT });
+    M.setSituation(s, 'perimenopause', true, { at: AT });
+    return s;
+  };
+  const t = '2026-04-10'; // 13 months after her last period; 4 months after the birth
+  const p = mk(), o = midlifeObservations(p, t);
+  check('the months of a pregnancy are not counted as "12 months without a period"', o?.sinceLastPeriod?.twelveMonths === false && !/how menopause is defined/.test(o?.sinceLastPeriod?.text || ''), words(o?.sinceLastPeriod));
+  check('…and the text says it counts from the end of the pregnancy', /pregnan/i.test(o?.sinceLastPeriod?.text || ''), o?.sinceLastPeriod?.text);
+  M.logDay(p, t, { bleeding: 'spotting' }, { today: t, at: AT });
+  check('…so spotting after the birth does not raise the "bleeding after 12 months" alert', midlifeObservations(p, t)?.alerts.length === 0 && midlifeObservations(p, t)?.bleedingAfterTwelveMonths === false, words(midlifeObservations(p, t)?.alerts));
+  const g = mk(); M.logPeriodStart(g, '2026-05-01', { today: FAR, at: AT });
+  const og = midlifeObservations(g, '2026-05-10');
+  check('a gap that contains a pregnancy is not described as a long gap without periods', og?.longGap?.found === false && !og?.variability?.lengths.some(l => l > 60), words({ gap: og?.longGap, lengths: og?.variability?.lengths }));
+  const b = mk({ postpartum: true }), ob = midlifeObservations(b, '2027-02-10'); // 14 months after the birth, still marked postpartum/breastfeeding
+  check('while marked as recently given birth or breastfeeding, a long time without periods is not compared with the 12-month definition', ob?.sinceLastPeriod?.twelveMonths === false, words(ob?.sinceLastPeriod));
+  const c = mk({ pregnancy: false }), oc = midlifeObservations(c, t);
+  check('control: without a pregnancy, 13 months without a period is still described', oc?.sinceLastPeriod?.twelveMonths === true && /how menopause is defined/.test(oc.sinceLastPeriod.text));
+  M.logDay(c, t, { bleeding: 'spotting' }, { today: t, at: AT });
+  check('control: …and spotting after it still raises the alert', midlifeObservations(c, t)?.alerts.length === 1);
 });
 console.log(fails ? `${fails} FAILED of ${count}` : `ALL PASS (${count})`); process.exit(fails ? 1 : 0);
