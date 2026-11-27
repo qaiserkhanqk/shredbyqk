@@ -23,15 +23,35 @@ The real limit is the AI provider's rate limit (requests per minute), not our co
 - **`GET /health`:** queue, calls, tokens (including cached tokens) and an estimated cost per photo. Point an uptime monitor at it.
 - **Practice mode:** `FOOD_AI=mock` gives instant made-up answers with no key and no cost, for load tests and development.
 
+## Photos in 1–2 seconds
+
+What the app sends is `samples: "fast"`:
+- **One call to `FAST_MODEL`** (Gemini Flash-Lite) with thinking off. The client sees the result straight away.
+- **A quiet double-check, only if that answer is unsure.** The app asks again in the background (two calls to the main model). If anything changes, the log updates itself with "QK double-checked your plate". If the client has already edited the entries, their edit wins.
+- **Smaller photos (640 px)**, so they upload fast on mobile data.
+
+Measured with real Gemini (free tier, Nov 2026, 3 test photos per setting):
+
+| Setting | Time per photo | Dishes right |
+|---|---|---|
+| Flash-Lite, thinking left on | 1.8–13 s | 2 of 3 |
+| **Flash-Lite, thinking off** | **1.3–2.3 s** | **3 of 3** |
+| Through the full fast path | 2.4–4.7 s | 3 of 3 |
+
+The free tier gets the lowest priority and its speed varies a lot (larger Flash models took 24–160 s there). A paid key should be faster and steadier, but confirm it with the small real-AI test in step 5 below.
+
+**A bug this test caught:** Gemini rejected the response format once the dish list passed 200 entries ("too much branching"). The dish list now lives in the prompt only, and the server maps every answer back to a real dish (`checkAnswer`).
+
 ## Load test results (practice mode, Nov 2026)
 
-The tests ran on one small server process. Each AI call waited 3 s (±30%) to mimic Gemini's real response time, with `AI_CONCURRENCY=400`. Run with `tools/loadtest.mjs`.
+The tests ran on one small server process. Each AI call waited 3 s (±30%) to mimic Gemini (1.5 s for the fast path), with `AI_CONCURRENCY=400`. Run with `tools/loadtest.mjs`.
 
 | Scenario | Photos | Errors | Typical wait | Slowest 5% |
 |---|---|---|---|---|
 | 500 people, a photo every ~20 s | 775 | 0 | 3.6 s | 7.3 s |
 | 5,000 people all snapping within the same minute | 5,000 | 0 | 3.7 s | 18 s |
 | 5,000 people snapping every ~45 s for 4 minutes (extreme: almost 20,000 photos) | 19,945 | 0 | 16 s | 32 s |
+| **Fast path:** 5,000 people all snapping within the same minute (1.5 s simulated AI) | 5,000 | 0 | **1.5 s** | **1.9 s** |
 
 What this shows:
 - **The server did not crash or drop a request**, even at 20× a realistic load. Memory stayed flat.

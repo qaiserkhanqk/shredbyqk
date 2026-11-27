@@ -47,6 +47,7 @@ import { vitalNotes } from './hr.js';
 import { nextStep } from './today.js';
 import { initFood, renderFood } from './food.js';
 import { enablePush } from './push.js';
+import { renderScores } from './scoreview.js';
 import { landmarksFrom, analyse, render, navyBodyFat, bfCategory, stanceProblem } from './bodyscan.js';
 
 const $ = s => document.querySelector(s);
@@ -228,6 +229,7 @@ function setRing(id, frac) {
 }
 
 function renderToday() {
+  renderScores($('#scoreCard'), S);
   renderMemory();
   if (typeof renderRehabToday === 'function' && S.rehab) renderRehabToday();
   if (S.readiness) renderReady(); else renderNext(null);
@@ -1298,7 +1300,7 @@ $('#calcBf').onclick = () => {
   const bf = navyBodyFat({ sex: p.sex, heightCm: p.heightCm, neckCm: v('#bNeck'), waistCm: v('#bWaist'), hipCm: v('#bHip') });
   if (Number.isNaN(bf)) { $('#bfOut').innerHTML = `<p class="muted small">Check your neck and waist${p.sex === 'female' ? ' and hip' : ''} measurements.</p>`; return; }
   const wt = v('#bWeight'), lean = wt ? wt * (1 - bf / 100) : null;
-  S.scans.push({ at: Date.now(), bf, weight: wt || null, lean, water: v('#bWater') || null, muscle: v('#bMuscle') || null }); persist();
+  S.scans.push({ at: Date.now(), bf, weight: wt || null, lean, water: v('#bWater') || null, muscle: v('#bMuscle') || null, waistCm: v('#bWaist') || null }); persist(); // waist also feeds fitness age
   const prev = S.scans.filter(s => s.bf).slice(-2, -1)[0];
   const off = 176 * (1 - Math.min(40, bf) / 40);
   $('#bfOut').innerHTML = `<div class="gauge"><svg viewBox="0 0 132 80" role="img" aria-label="Body fat ${bf.toFixed(1)} percent"><path d="M10 72a56 56 0 0 1 112 0" fill="none" style="stroke:var(--surface-2)" stroke-width="12" stroke-linecap="round"/><path d="M10 72a56 56 0 0 1 112 0" fill="none" stroke="url(#zoneStroke)" stroke-width="12" stroke-linecap="round" stroke-dasharray="176" stroke-dashoffset="${off}"/><text x="66" y="62" text-anchor="middle" style="fill:var(--text)" font-family="Archivo, sans-serif" font-weight="800" font-size="24">${bf.toFixed(1)}%</text><text x="66" y="76" text-anchor="middle" style="fill:var(--muted)" font-family="Figtree, sans-serif" font-size="9">body fat</text></svg>

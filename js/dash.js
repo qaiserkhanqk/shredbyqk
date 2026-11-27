@@ -4,6 +4,7 @@
 //   slipping  – opens the app but is behind this week's training days, or form dropped 10+ points
 //   on track  – everything else
 import { lifetimeClean, progress as rewardProgress } from './rewards.js';
+import { allScores, scoreSummary } from './scores.js';
 import { e1rm } from './progression.js';
 import { foodCard, foodDayRows, foodWeekSummary } from './foodsync.js';
 
@@ -134,5 +135,6 @@ export function localClient(S, now = Date.now()) {
   profile.food_week = foodWeekSummary(S, now);
   profile.care = careSummary(S, now);
   profile.diet_plan = S.food?.plan || null;
+  profile.scores = scoreSummary(allScores(S, now));
   return { profile, sets, opens, checks: (S.checkins || []).map(c => ({ ...c, client_id: LOCAL_ID })), food: foodDayRows(LOCAL_ID, S, now) };
 }
