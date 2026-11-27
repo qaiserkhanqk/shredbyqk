@@ -848,3 +848,5 @@ button.row.food-hit { padding: 11px 0; }
 .ready-note.easy { border-left-color: var(--warn); }
 .ready-note.rest { border-left-color: var(--bad); }
 #rescueNews p { margin: 4px 0 0; }
+
+.cycle-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }

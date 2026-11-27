@@ -17,6 +17,7 @@ import { portionFactor, factors, studyCSV, studySummary } from './calibrate.js';
 import { canSyncSteps, syncSteps } from './activity.js';
 import { searchFatSecret } from './fatsecret.js';
 import { t as tr, setLang, getLang, translate } from './food-ur.js';
+import { readSignals, engagement, cycle, notifyLevel } from './signals.js';
 import { allWeights, checkinDue, daysToCheckin, evaluate, applyChoice, weighInIcs, weightSeries, RANGES, stepGoal } from './adapt.js';
 import { makePlan, planGap, DIETS, AVOID, LIKES, LIKE_LABELS, DEFAULT_ANSWERS } from './dietplan.js';
 
@@ -104,7 +105,7 @@ export function initFood(c) {
   const pl = $('#tPlate'); pl.value = F().plateCm || ''; pl.onchange = () => { F().plateCm = pl.value; ctx.persist(); };
   const ct = $('#tCity'); ct.value = F().city || ''; ct.onchange = () => { F().city = ct.value; ctx.persist(); };
   if (p.trainDays == null && ctx.S.plan?.days?.length) p.trainDays = ctx.S.plan.days.length; // from the training plan picked at sign-up
-  for (const [id, key] of [['#tWeight', 'weightKg'], ['#tAge', 'age'], ['#tGoal', 'dietGoal'], ['#tJob', 'job'], ['#tTrain', 'trainDays']]) {
+  for (const [id, key] of [['#tWeight', 'weightKg'], ['#tAge', 'age'], ['#tGoal', 'dietGoal'], ['#tJob', 'job'], ['#tTrain', 'trainDays'], ['#tNotify', 'notify']]) {
     const el = $(id); el.value = key === 'dietGoal' ? N.dietGoal(p) : p[key] ?? el.value;
     el.onchange = () => { p[key] = el.value; ctx.persist(); renderFood(); };
   }
@@ -135,7 +136,8 @@ export function renderFood() {
     <div class="water steps"><div><span class="eyebrow">${tr('Steps today')}</span><span class="muted small">${tr(canSyncSteps() ? 'From your phone’s health app' : 'From your phone’s health app or watch')}</span></div>
       ${canSyncSteps() ? `<div class="water-btns"><b class="num">${fmt(F().steps[dayKey(Date.now())] || 0)}</b><button type="button" class="ghost" id="stepsSync">Sync</button></div>`
         : `<input id="stepsToday" type="number" inputmode="numeric" placeholder="e.g. 6500" value="${F().steps[dayKey(Date.now())] || ''}" aria-label="Steps today">`}</div>
-    ${t ? '' : '<p class="muted small" style="margin:0">Add your weight and age under <b>Your targets</b> to see how much to eat.</p>'}`;
+    ${t ? '' : '<p class="muted small" style="margin:0">Add your weight and age under <b>Your targets</b> to see how much to eat.</p>'}
+    ${welcomeBack()}`;
   const cal = factors(F().log), sum = studySummary(F().log);
   $('#calInfo').innerHTML = sum ? `<span class="eyebrow">Your portions</span>
     <p class="muted small" style="margin:4px 0 8px">${sum.n} weighed photo meal${sum.n > 1 ? 's' : ''}; photo portions were off by ${sum.medianPortionError}% (median). ${Object.entries(cal).filter(([, v]) => v.factor !== 1).map(([k, v]) => `QK now adjusts your ${k} photos ×${v.factor.toFixed(2)}.`).join(' ') || 'Weigh 3 of a kind and QK starts adjusting.'}</p>
@@ -659,7 +661,8 @@ const avgStepsNow = () => { const v = Object.entries(F().steps).filter(([k]) => 
 const adaptState = () => (F().adapt ||= {});
 function currentDecision() {
   const p = ctx.S.profile;
-  return evaluate({ weights: allWeights(ctx.S), goal: N.dietGoal(p), target: N.targets(p), adapt: adaptState(), avgSteps: avgStepsNow(), rehab: !!ctx.rehab?.() });
+  return evaluate({ weights: allWeights(ctx.S), goal: N.dietGoal(p), target: N.targets(p), adapt: adaptState(), avgSteps: avgStepsNow(), rehab: !!ctx.rehab?.(),
+    signals: readSignals(ctx.S), female: p.sex === 'female' && !!F().cycleOn });
 }
 function chartSVG(ser) {
   const W = 320, H = 140, P = 8, pts = ser.pts;
@@ -692,9 +695,20 @@ function renderWeight() {
       : ws.length ? '<p class="muted small" style="margin:0">Your graph starts with your second weigh-in.</p>' : ''}
     <div class="weigh"><label class="field">Weigh-in (kg)<input id="wkKg" type="number" inputmode="decimal" step="0.1" placeholder="${last ? last.kg : 'e.g. 72.5'}"></label><button type="button" class="ghost" id="wkSave">Save</button></div>
     <p class="muted small" style="margin:0">${due ? '' : `Next check-in in ${daysToCheckin(ws, A)} day${daysToCheckin(ws, A) === 1 ? '' : 's'}. `}Step goal: <b>${fmt(stepGoal(A, avgStepsNow()))}</b> a day${t?.adjust ? ` · calories ${t.adjust > 0 ? '+' : '−'}${Math.abs(t.adjust)} from your check-ins` : ''}.
-      <button type="button" class="linkbtn" id="wkCal">Add check-in reminders to my calendar</button></p>`;
+      <button type="button" class="linkbtn" id="wkCal">Add check-in reminders to my calendar</button></p>
+    ${cycleHTML()}`;
+}
+// Opt-in, one tap a month, and it stays on this phone (never sent to the server or the coach).
+function cycleHTML() {
+  if (ctx.S.profile.sex !== 'female') return '';
+  if (!F().cycleOn) return '<p class="muted small" style="margin:0"><button type="button" class="linkbtn" id="cyOn">Track my period for weigh-ins</button> · water weight before a period can look like a stall; QK won\'t cut calories that week. Stays on your phone.</p>';
+  const c = cycle(ctx.S);
+  return `<div class="row cycle-row"><span class="muted small">${c?.inWindow ? 'Period week: weigh-ins can run 1–2 kg high. QK won\'t change anything this week.' : c?.known && c.nextIn > 0 ? `Next period in about ${c.nextIn} days.` : 'Tap when your period starts.'}</span>
+    <button type="button" class="ghost" id="cyStart">Period started today</button></div>`;
 }
 function onWeightClick(e) {
+  if (e.target.closest('#cyOn')) { F().cycleOn = true; ctx.persist(); return renderWeight(); }
+  if (e.target.closest('#cyStart')) { (F().periods ||= []).push(Date.now()); ctx.persist(); ctx.toast('Noted. Only on your phone.'); return renderWeight(); }
   const r = e.target.closest('[data-range]'); if (r) { wRange = r.dataset.range; return renderWeight(); }
   if (e.target.closest('#wkSave')) {
     const kg = +$('#wkKg').value;
@@ -705,6 +719,8 @@ function onWeightClick(e) {
   }
   const c = e.target.closest('[data-choice]');
   if (c && decision) {
+    const why = c.dataset.choice === 'period';
+    if (why && !(F().periods || []).some(t => t > Date.now() - 10 * 864e5)) (F().periods ||= []).push(Date.now());
     const ws = allWeights(ctx.S), chosen = applyChoice({ profile: ctx.S.profile, adapt: adaptState(), decision, choiceId: c.dataset.choice, weight: ws[ws.length - 1]?.kg });
     decision = null; ctx.persist();
     ctx.toast(chosen.delta ? `New target: ${fmt(N.targets(ctx.S.profile).kcal)} kcal a day` : chosen.steps ? `New step goal: ${fmt(chosen.steps)} a day` : 'Got it. Same plan for two more weeks.');
@@ -719,7 +735,7 @@ function onWeightClick(e) {
 }
 // While the app is open on a check-in day, a notification (once a day) if they turned notifications on.
 async function checkinNotice() {
-  if (!ctx.S.profile.remind || !('Notification' in window) || Notification.permission !== 'granted') return;
+  if (!ctx.S.profile.remind || notifyLevel(ctx.S) === 'off' || !('Notification' in window) || Notification.permission !== 'granted') return;
   const A = adaptState(), today = new Date().toDateString();
   if (!checkinDue(allWeights(ctx.S), A) || A.notifiedOn === today || new Date().getHours() < 7) return;
   const title = 'Check-in day with QK', body = 'Weigh yourself before breakfast and enter it in Food. QK will read your two weeks and suggest your next step.';
@@ -728,4 +744,11 @@ async function checkinNotice() {
     reg ? reg.showNotification(title, { body, icon: 'icons/icon.svg', tag: 'qk-checkin' }) : new Notification(title, { body, tag: 'qk-checkin' });
     A.notifiedOn = today; ctx.persist();
   } catch {}
+}
+
+// After a few quiet days, a warm line in the app (never a guilt trip, never a notification by itself).
+function welcomeBack() {
+  const e = engagement(ctx.S);
+  if (e.daysSinceFood == null || e.daysSinceFood < 3 || N.dayTotals(F().log).items.length) return '';
+  return `<p class="qk-line" style="margin:0"><span class="eyebrow">QK</span> Good to see you${ctx.S.profile.name ? ', ' + esc(ctx.S.profile.name.split(' ')[0]) : ''}. No catching up needed: just snap your next meal and we carry on from today.</p>`;
 }

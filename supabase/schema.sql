@@ -174,14 +174,18 @@ grant update (read_at) on public.messages to authenticated;
 -- (tools/push-checkins.mjs, run by .github/workflows/push.yml) reminds clients whose check-in is due.
 alter table public.profiles add column if not exists next_checkin date;   -- set by the client's app
 alter table public.profiles add column if not exists diet_plan jsonb;     -- the client's current diet plan
+alter table public.profiles add column if not exists notify text;         -- essential | normal | off (the client chooses)
+alter table public.profiles add column if not exists last_food date;      -- last day they logged food (for the weekly nudge)
 create table if not exists public.push_subs (
   endpoint text primary key,
   client_id uuid not null references public.profiles (id) on delete cascade,
   p256dh text not null,
   auth text not null,
   created_at timestamptz not null default now(),
-  last_sent date
+  last_sent date,
+  last_nudge date
 );
+alter table public.push_subs add column if not exists last_nudge date;
 alter table public.push_subs enable row level security;
 drop policy if exists "own push" on public.push_subs;
 create policy "own push" on public.push_subs for all using (client_id = auth.uid()) with check (client_id = auth.uid());

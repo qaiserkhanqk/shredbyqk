@@ -7,6 +7,7 @@
 
 import { foodDayRows, foodWeekSummary, placeRows } from './foodsync.js';
 import { allWeights, daysToCheckin } from './adapt.js';
+import { notifyLevel } from './signals.js';
 
 export class Cloud {
   /** @param o { url, anonKey, fetch, session: { access_token, refresh_token, expires_at, user } | null, onSession } */
@@ -97,7 +98,8 @@ export async function pushAll(cloud, S, mark = {}) {
   } catch (e) { console.warn('food sync skipped:', e.message); }
   // The next check-in date (for reminders while the app is closed) and the full diet plan (for QK to edit).
   // Servers set up before these columns existed just skip them.
-  const extra = { next_checkin: nextCheckin(S), diet_plan: S.food?.plan || null };
+  const lastFood = Math.max(0, ...(S.food?.log || []).map(e => e.at));
+  const extra = { next_checkin: nextCheckin(S), diet_plan: S.food?.plan || null, notify: notifyLevel(S), last_food: lastFood ? new Date(lastFood).toISOString().slice(0, 10) : null };
   try { await cloud.updateMe(extra); } catch (e) { console.warn('check-in/plan sync skipped:', e.message); }
   await cloud.updateMe({
     ...(food ? { food_week: food } : {}),

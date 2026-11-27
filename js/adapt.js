@@ -39,7 +39,7 @@ export function stepGoal(adapt = {}, avgSteps = 0) {
 
 /**
  * Read the last two to three weeks and decide what to offer.
- * o: { weights, goal: 'lose'|'maintain'|'gain', target (from targets()), adapt, avgSteps, rehab, now }
+ * o: { weights, goal: 'lose'|'maintain'|'gain', target (from targets()), adapt, avgSteps, rehab, now, signals (js/signals.js), female }
  * Returns { kind, title, message, change: { kg, days } | null, choices: [{ id, label, delta?, steps? }] }.
  */
 export function evaluate(o) {
@@ -59,11 +59,24 @@ export function evaluate(o) {
   };
   const moreSteps = add => ({ id: 'steps', label: `Walk ${fmt(add)} more steps a day (goal ${fmt(Math.min(15000, steps + add))})`, steps: Math.min(15000, steps + add) });
   const pick = (...xs) => xs.filter(Boolean);
+  // The small signals (js/signals.js) come first: they explain a fortnight better than the scale alone.
+  const sig = o.signals || {}, cyc = sig.cycle, well = sig.wellbeing, str = sig.strength, eng = sig.engagement;
+  const flat = pct > -0.15;
+  if (goal === 'lose' && flat && cyc?.inWindow) return { kind: 'cycle', change, title: 'Your period week',
+    message: `${said}. In the days before and at the start of a period the body holds 1–2 kg of water, which hides fat loss. Nothing to change: weigh in again next week and the real trend shows.`,
+    choices: [{ id: 'keep', label: 'Keep everything as it is' }] };
+  if (goal === 'lose' && flat && well?.poor) return { kind: 'rough-week', change, title: 'A tough week',
+    message: `${said}. ${well.sleepH != null && well.sleepH < 6 ? `You slept about ${well.sleepH} hours a night` : 'Your mornings felt rough'} this week. Poor sleep and stress hold water and raise hunger, so the scale stalls even when you're doing well. Keep your food the same and protect your sleep; QK checks again in two weeks.`,
+    choices: pick({ id: 'keep', label: 'Keep everything as it is' }, moreSteps(1000)) };
+  if (goal === 'lose' && !flat && str?.change != null && str.change <= -5) return { kind: 'strength-drop', change, title: 'Your lifts are dipping',
+    message: `${said}, but your strength is down about ${Math.abs(str.change)}% over the same weeks. That's a sign the cut is a bit steep. A little more food keeps the muscle you're working for.`,
+    choices: pick(lower(100), { id: 'keep', label: 'Keep everything as it is' }) };
+  const fewLogs = eng && eng.foodDays14 < 4 ? ` (You logged food on ${eng.foodDays14} of the last 14 days, so QK is reading the scale more than your meals. A photo a day makes this sharper.)` : '';
 
   if (goal === 'lose') {
     if (pct > -0.15) return { kind: 'stalled', change, title: 'Your weight has paused',
-      message: `${said}. That's normal: your body gets used to a routine, and water and salt can hide fat loss for a while. The kindest next step is a little more movement. Your food can stay the same.`,
-      choices: pick(moreSteps(2000), lower(-150), { id: 'keep', label: 'Give it two more weeks as it is' }) };
+      message: `${said}. That's normal: your body gets used to a routine, and water and salt can hide fat loss for a while. The kindest next step is a little more movement. Your food can stay the same.${fewLogs}`,
+      choices: pick(moreSteps(2000), lower(-150), { id: 'keep', label: 'Give it two more weeks as it is' }, o.female ? { id: 'period', label: 'It\'s my period week', why: 'cycle' } : null) };
     if (pct < -1) return { kind: 'fast', change, title: 'You\'re losing quickly',
       message: `${said}, more than 1% of your weight a week. Going this fast can cost muscle and energy. A little more food keeps the progress and protects your training.`,
       choices: pick(lower(150), keep) };
