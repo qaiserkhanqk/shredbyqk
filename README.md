@@ -27,19 +27,23 @@ All video is processed **on the phone** (MediaPipe Pose) and nothing is uploaded
 - **Guided two-view posture screen:** front and side photos merged into one report.
 - **Accuracy:** 3 model sizes (precise model for uploads and tests), 60 fps capture for tests, and a recording-quality score that blocks results from bad recordings.
 - **Diagnostics:** export any session (body points only, no video) and replay it on a computer to find bugs. See [TESTING.md](TESTING.md).
-- **Rehab clinic:** 18 injuries and pain conditions:
+- **Rehab programmes:** 18 named injuries and pain conditions, plus camera movement-check programmes for the knee, shoulder, ankle and hip:
   - lower back, neck
   - frozen shoulder, rotator cuff, tennis and golfer's elbow
   - hip, knee osteoarthritis, kneecap pain, jumper's knee, ACL, PCL, meniscus
   - hamstring, Achilles, ankle sprain, heel pain, shin splints
 
-  It runs like a clinic visit: safety check → assessment → written care plan → treatment with weekly reassessments. Each condition has:
+  Flow: safety check → questions about the pain → (if the person doesn't know what's wrong) a camera movement check that measures and compares sides, never naming a condition → a written plan → exercises with check-ins. Each programme has:
   - a red-flag safety screen with emergency guidance for the person's region (UAE 998, UK 999, US 911)
   - an assessment that grades how easily the pain flares (irritability) and sets the starting dose, pain limit and sessions a week
   - phased programmes passed on measured criteria: the injured side's own results, 3 separate days with next-morning checks, and for ACL at least 9 months since surgery or injury
   - pain traffic lights, with a physio review advised and progression paused after 2 flare-ups in a row
   - camera measurements (range of motion, hop test with left/right symmetry, calf-raise and sit-to-stand counts)
-  - weekly reassessments (warning signs rechecked, function re-rated) and running clinic notes
+  - weekly check-ins (warning signs rechecked, function re-rated) and a programme log
+  - clinician mode: a physio unlocks it on the patient's phone with their own PIN to confirm a diagnosis, set the phase, dose and pain limit, and require approval for phase changes; every change is logged under their name
+  - a shareable progress report (text or PDF) for the physio
+
+  Wording rule: never call it a clinic, care plan, treatment or patient file (UAE health-facility advertising and medical-device risk; compliance review 2026-11-27).
 
   It supports rehab and doesn't diagnose; content must be signed off by a physio before launch.
 - **Cycle tracking (prototype, off by default).** Log periods, spotting and optional symptoms; a transparent next-period range from your own history; explainable personal patterns; optional reminders; encrypted on the device. Not clinically validated, not contraception. See **[CYCLE.md](CYCLE.md)**.

@@ -46,6 +46,21 @@ await section('Findings: measured, not diagnosed', () => {
   check('affected side is the side with the deficits', R.affectedSide(f) === 'L' && R.affectedSide(sh) === 'R' && R.affectedSide(even) === null);
 });
 
+await section("Movements the person can't do", () => {
+  const res = [{ test: 'kneeFlexion', side: 'L', skipped: true, reason: 'pain' }, { test: 'kneeFlexion', side: 'R', value: 138 }, { test: 'chairStand30', skipped: true, reason: 'cant' }];
+  const f = R.screenFindings(res);
+  const pain = f.find(x => x.test === 'kneeFlexion' && x.skipped), cant = f.find(x => x.test === 'chairStand30' && x.skipped);
+  check('a test skipped as too painful is a finding on that side', pain && pain.side === 'L' && /too painful/i.test(pain.text) && /left/i.test(pain.text), pain?.text);
+  check("a test the person couldn't do is a finding", cant && /couldn't/i.test(cant.text), cant?.text);
+  check('skipped tests name no condition', f.every(x => !DIAGNOSIS.test(x.text)));
+  const adj = R.screenAdjust(res);
+  check("anything skipped → gentle start, with the reason", adj.gentle && adj.reasons.length >= 1);
+  check('2 tests not done → physio assessment advised', adj.physioAdvised);
+  check('one test too painful → physio assessment advised', R.screenAdjust([res[0], res[1]]).physioAdvised);
+  check("one test the person couldn't get into position for → gentle, no physio flag", R.screenAdjust([res[1], res[2]]).gentle && !R.screenAdjust([res[1], res[2]]).physioAdvised);
+  check('everything done → no change', !R.screenAdjust([res[1]]).gentle && !R.screenAdjust([res[1]]).physioAdvised);
+});
+
 await section('Goals from findings gate the programme', () => {
   const c = COND[R.screenConditionFor('Knee')], f = R.screenFindings([{ test: 'kneeFlexion', side: 'L', value: 105 }, { test: 'kneeFlexion', side: 'R', value: 138 }]);
   const plan = { startedAt: now - 10 * wk, phaseStartedAt: now - 6 * wk, injured: 'L', checkins: goodDays(), psfs: [{ at: now, score: 8 }], tests: [], kneeTests: [], extraCriteria: R.screenCriteria(f) };
@@ -82,6 +97,8 @@ await section('Clinician actions', () => {
   check('clinician can set the phase with a reason', p.phase === 2 && p.notes.some(n => /Strong single-leg control/.test(n.text)));
   R.applyClinician(p, { type: 'dose', doseLevel: 'gentle', painLimit: 14 }, who, now);
   check('dose and pain limit set, pain limit kept within 0–10', p.doseLevel === 'gentle' && p.painLimit === 10);
+  R.applyClinician(p, { type: 'dates', surgeryAt: now - 40 * wk }, who, now);
+  check('clinician can record a surgery date (needed for the ACL 9-month goal)', p.surgeryAt === now - 40 * wk && p.notes.some(n => /surgery/.test(n.text)));
   R.applyClinician(p, { type: 'requireApproval', on: true }, who, now);
   const allMet = { allMet: true };
   check('with approval required, the patient cannot move on alone', !R.canAdvance(p, allMet) && R.canAdvance({ ...p, requireApproval: false }, allMet));
@@ -91,6 +108,7 @@ await section('Self-picked conditions stay in phase 1', () => {
   const allMet = { allMet: true };
   check('a named condition picked without a diagnosis cannot leave phase 1', !R.canAdvance({ cond: 'pfp', phase: 0, diagnosed: false }, allMet) && /phase 1/.test(R.advanceBlock({ cond: 'pfp', phase: 0, diagnosed: false })));
   check('diagnosed → can move on', R.canAdvance({ cond: 'pfp', phase: 0, diagnosed: true }, allMet));
+  check('movement check with a painful test → held in phase 1 until assessed', !R.canAdvance({ cond: 'kneeCheck', phase: 0, physioAdvised: true }, allMet) && R.canAdvance({ cond: 'kneeCheck', phase: 0, physioAdvised: true, diagnosed: true }, allMet));
   check('movement-check programme and non-specific back pain are not capped', R.canAdvance({ cond: 'kneeCheck', phase: 0 }, allMet) && R.canAdvance({ cond: 'lbp', phase: 0 }, allMet));
 });
 

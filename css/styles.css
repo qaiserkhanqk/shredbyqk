@@ -421,3 +421,22 @@ label.field input, label.field select { min-width: 0; max-width: 100%; }
 .too-old { position: relative; z-index: 100; margin: 12px; padding: 14px 16px; border-radius: 12px; background: #fff3cd; color: #3d2e00; font: 600 16px/1.45 system-ui, sans-serif; }
 .cy-alert { margin: 0; padding: 10px 12px; border: 2px solid var(--bad); border-radius: var(--r-sm); }
 .cy-companion { border-color: var(--z1); }
+
+/* Rehab: movement check, clinician mode, report */
+.screen-card { border-color: rgba(69,195,255,.45); background: linear-gradient(135deg, rgba(69,195,255,.08), transparent), var(--surface); }
+.findings { margin: 4px 0 0; padding-left: 0; list-style: none; display: grid; gap: 6px; }
+.findings .pill { margin-right: 4px; }
+.cl-block { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-md); }
+.cl-block select, .cl-block input, .cl-block textarea { background: var(--surface-2); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 10px; font: inherit; }
+.report-preview { border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px; background: var(--surface-2); max-height: 50vh; overflow: auto; }
+.report h3 { margin: 0; font-size: 1.05rem; } .report h4 { margin: 12px 0 4px; font-size: .9rem; }
+.report p, .report li { font-size: .85rem; } .report ul { margin: 0; padding-left: 18px; }
+.rp { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.rp th, .rp td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+#reportPrint { display: none; }
+@media print {
+  body.printing-report > *:not(#reportPrint) { display: none !important; }
+  body.printing-report #reportPrint { display: block !important; color: #000; background: #fff; padding: 16px; }
+  body.printing-report #reportPrint .muted { color: #444; }
+  body.printing-report .rp th, body.printing-report .rp td { border-color: #ccc; }
+}

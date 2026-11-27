@@ -10,7 +10,8 @@ import { analyseJumps, jumpReadiness } from './jump.js';
 import { analyseSingleLegSquat } from './kneetest.js';
 import { BarTracker, estimate1RM, velocityZone } from './vbt.js';
 import { scaleFromPlate, scaleFromHeight, assessQuality, measuredFps } from './measure.js';
-import { CONDITIONS, COND, AREAS, GENERAL_FLAGS, flagAdvice, triage, painLight, evaluatePhase, psfsScore, checkinDays, needsReview, consult, carePlan, dose } from './rehab.js';
+import { CONDITIONS, COND, AREAS, GENERAL_FLAGS, flagAdvice, triage, painLight, evaluatePhase, psfsScore, checkinDays, needsReview, consult, carePlan, dose,
+  screenQueue, screenConditionFor, screenFindings, screenAdjust, affectedSide, screenCriteria, clinicianSetup, verifyPin, applyClinician, advanceBlock, canAdvance, reportData, reportText, REPORT_DISCLAIMER } from './rehab.js';
 import { ROM_TESTS, runRomTest } from './rom.js';
 import { readiness, recommendToday, sessionLoad, weekStats, loadSpike, dayKey } from './load.js';
 import { cueList, saveClip, getClip, deleteClip, listClipIds, startRecording, exportClips } from './studio.js';
@@ -870,11 +871,14 @@ $('#precisionSel').onchange = e => { try { e.target.value ? localStorage.setItem
 $('#exportSession').onclick = () => { if (!recorder2.meta.kind) return toast('No session recorded yet.'); downloadJSON(`shred-session-${Date.now()}.json`, recorder2.toJSON()); };
 $('#exportErrors').onclick = () => downloadJSON(`shred-errors-${Date.now()}.json`, { app: APP_VERSION, ua: navigator.userAgent, errors: ErrorLog.read() });
 
-/* ---------- Rehab clinic ---------- */
-// The rehab area works like a clinic visit: reception (pick the problem) → safety check → assessment
-// (how irritable the pain is, goals, time available) → a written care plan → treatment, with daily
-// check-ins, weekly reassessments and a running file of clinic notes. The app prepares the plan from the
-// person's answers and the cited guidelines; it is not a clinician and says so.
+/* ---------- Rehab ---------- */
+// Step-by-step rehab exercise programmes, two ways in:
+//   - a camera movement check for people who don't know what's wrong: it measures how the joint moves,
+//     compares sides and builds goals from that. It never names a condition.
+//   - a named programme for people a physio or doctor has already diagnosed.
+// A physio can unlock clinician mode on this phone (their own PIN) to confirm a diagnosis and set phases,
+// doses and approval. Otherwise no clinician is involved, and the wording says so: no "clinic", "care plan"
+// or "treatment" (compliance review, 2026-11-27).
 S.rehab ||= { active: null, history: [] };
 let rehabArea = 'Knee';
 const plan = () => S.rehab.active;
@@ -888,35 +892,57 @@ const fmtDate = at => new Date(at).toLocaleDateString(undefined, { day: 'numeric
 const LEVEL_NAME = { high: 'Gentle start', moderate: 'Standard start', low: 'Standard start' };
 const REASSESS_MS = 7 * 864e5;
 const nextReassess = p => (p.lastReassessAt || p.startedAt) + REASSESS_MS;
+const sideWord = s => (s === 'L' ? 'left' : s === 'R' ? 'right' : '');
 // A choice row: buttons with data-v, one pre-selected. Read back with choiceOf().
 const choice = (id, label, opts, on) => `<div class="field"><span>${label}</span><div class="mode-switch ${opts.length === 3 ? 'three' : ''}" role="group" aria-label="${esc(label)}" id="${id}">${opts.map(([v, t]) => `<button type="button" data-v="${v}" class="${v === on ? 'on' : ''}" aria-pressed="${v === on}">${t}</button>`).join('')}</div></div>`;
 const bindChoices = root => root.querySelectorAll('.mode-switch[id]').forEach(g => g.addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (!b) return; g.querySelectorAll('[data-v]').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }); }));
 const choiceOf = id => $(`#${id} .on`)?.dataset.v;
+function slider(id, label, v = 0) { return `<label class="field slider">${label} <span class="val" id="${id}v">${v}</span><input type="range" min="0" max="10" value="${v}" id="${id}"></label>`; }
+function bindSliders(ids) { ids.forEach(id => $('#' + id).oninput = e => $('#' + id + 'v').textContent = e.target.value); }
+// One tap fills an activity instead of typing it.
+const ACT_HINTS = {
+  Knee: ['Stairs', 'Squatting', 'Running', 'Kneeling', 'Walking'], Shoulder: ['Reaching overhead', 'Getting dressed', 'Lying on that side', 'Lifting', 'Throwing'],
+  'Lower back': ['Bending', 'Sitting for long', 'Lifting', 'Getting out of bed', 'Walking'], Neck: ['Looking over my shoulder', 'Desk work', 'Sleeping', 'Driving'],
+  Elbow: ['Gripping', 'Carrying a bag', 'Typing', 'Racket sport'], Hip: ['Stairs', 'Walking', 'Lying on that side', 'Getting out of a car', 'Running'],
+  Thigh: ['Sprinting', 'Bending to the floor', 'Kicking', 'Running'], 'Ankle & foot': ['First steps in the morning', 'Walking', 'Running', 'Stairs', 'Jumping'],
+  Shin: ['Running', 'Walking far', 'Jumping'],
+};
 
 function renderRehab() {
-  const p = plan();
+  const p = plan(), ik = S.rehab.intake;
   $('#rehabStart').hidden = !!p; $('#rehabActive').hidden = !p;
-  $('#rehabTitle').textContent = p ? condOf(p).name : 'Book your first assessment';
-  if (!p) {
-    $('#areaChips').innerHTML = AREAS.map(a => `<button type="button" class="mchip ${a === rehabArea ? 'on' : ''}" data-area="${a}">${a}</button>`).join('');
-    $('#condList').innerHTML = CONDITIONS.filter(c => c.area === rehabArea).map(c => `<button type="button" class="cond" data-cond="${c.id}"><b>${esc(c.name)}</b><span>${esc(c.about)}</span>
-      <span class="tags"><span class="pill">${c.phases.length} phases</span>${c.tests.length ? `<span class="pill cam">${c.tests.length} camera test${c.tests.length > 1 ? 's' : ''}</span>` : ''}${c.postOp ? '<span class="pill voice">Physio-led after surgery</span>' : ''}</span></button>`).join('');
-    return;
-  }
-  renderRehabDashboard();
+  $('#rehabTitle').textContent = p ? condOf(p).name : 'Start a rehab programme';
+  if (p) return renderRehabDashboard();
+  $('#areaChips').innerHTML = AREAS.map(a => `<button type="button" class="mchip ${a === rehabArea ? 'on' : ''}" data-area="${a}">${a}</button>`).join('');
+  const q = screenQueue(rehabArea), secs = q.reduce((s, x) => s + ROM_TESTS[x.test].secs, 0);
+  const named = CONDITIONS.filter(c => c.area === rehabArea && !c.general);
+  $('#condList').innerHTML = `
+    ${ik ? `<button type="button" class="card rehab-today" data-resume><span class="eyebrow" style="color:var(--z1)">In progress</span><b>Continue your movement check</b><span class="muted small">${ik.idx} of ${ik.queue.length} done.</span></button>` : ''}
+    ${q.length ? `<button type="button" class="cond screen-card" data-screen="${esc(rehabArea)}"><span class="eyebrow" style="color:var(--z1)">Not sure what it is?</span><b>Camera movement check</b>
+        <span>${q.length} short movements, about ${secs} seconds of recording. The app measures how it moves, compares left and right, and builds your programme around what it finds. It doesn't diagnose.</span>
+        <span class="tags"><span class="pill cam">${q.length} camera tests</span><span class="pill">No typing needed</span></span></button>`
+      : '<p class="muted small" style="margin:0">There\'s no camera movement check for this area yet. Choose your diagnosis below, or see a physio first.</p>'}
+    ${named.length ? `<span class="eyebrow">Already diagnosed by a physio or doctor?</span>` : ''}
+    ${named.map(c => `<button type="button" class="cond" data-cond="${c.id}"><b>${esc(c.name)}</b><span>${esc(c.about)}</span>
+      <span class="tags"><span class="pill">${c.phases.length} phases</span>${c.tests.length ? `<span class="pill cam">${c.tests.length} camera test${c.tests.length > 1 ? 's' : ''}</span>` : ''}${c.postOp ? '<span class="pill voice">After surgery: follow your physio</span>' : ''}</span></button>`).join('')}`;
 }
 $('#areaChips').onclick = e => { const b = e.target.closest('[data-area]'); if (b) { rehabArea = b.dataset.area; renderRehab(); } };
-$('#condList').onclick = e => { const b = e.target.closest('[data-cond]'); if (b) openSafety(COND[b.dataset.cond]); };
+$('#condList').onclick = e => {
+  if (e.target.closest('[data-resume]')) return openScreenRunner();
+  const s = e.target.closest('[data-screen]');
+  if (s) { S.rehab.intake = null; return openSafety(COND[screenConditionFor(s.dataset.screen)], { screen: true, area: s.dataset.screen }); }
+  const b = e.target.closest('[data-cond]'); if (b) openSafety(COND[b.dataset.cond], { area: COND[b.dataset.cond].area });
+};
 
 // 1. Safety screen: every question must be answered.
-function openSafety(c) {
-  const qs = [...c.flags, ...GENERAL_FLAGS];
+function openSafety(c, opts = {}) {
+  const qs = [...c.flags, ...GENERAL_FLAGS], total = opts.screen ? 4 : 3;
   const structural = ['acl', 'pcl', 'meniscus'].includes(c.id);
-  openSheet(`<div><span class="eyebrow">Step 1 of 3 · safety check</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">${esc(c.name)}</h2>
-    <p class="muted small" style="margin:6px 0 0">Answer honestly. These questions pick up problems that need a doctor, not exercise.</p></div>
+  openSheet(`<div><span class="eyebrow">Step 1 of ${total} · safety check</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">${esc(opts.screen ? `${opts.area} pain` : c.name)}</h2>
+    <p class="muted small" style="margin:6px 0 0">These questions check for some warning signs that need a doctor, not exercise. They can't rule everything out.</p></div>
     <div id="flagList">${qs.map((f, i) => `<div class="flag-q" data-i="${i}"><span>${esc(f.q)}</span><span class="yn"><button type="button" class="yes" data-v="1">Yes</button><button type="button" class="no" data-v="0">No</button></span></div>`).join('')}
-    <div class="flag-q" data-i="dx"><span>Has a physio or doctor diagnosed this problem?</span><span class="yn"><button type="button" class="yes" data-v="1">Yes</button><button type="button" class="no" data-v="0">No</button></span></div>
-    ${c.postOp ? `<div class="flag-q" data-i="op"><span>Have you had surgery for this?</span><span class="yn"><button type="button" class="yes" data-v="1">Yes</button><button type="button" class="no" data-v="0">No</button></span></div>` : ''}</div>
+    ${opts.screen ? '' : `<div class="flag-q" data-i="dx"><span>Has a physio or doctor diagnosed this problem?</span><span class="yn"><button type="button" class="yes" data-v="1">Yes</button><button type="button" class="no" data-v="0">No</button></span></div>`}
+    ${c.postOp && !opts.screen ? `<div class="flag-q" data-i="op"><span>Have you had surgery for this?</span><span class="yn"><button type="button" class="yes" data-v="1">Yes</button><button type="button" class="no" data-v="0">No</button></span></div>` : ''}</div>
     <button class="cta" type="button" id="safetyGo">Continue</button><p class="note" id="safetyMsg"></p>`);
   const ans = {};
   $('#flagList').onclick = e => {
@@ -925,13 +951,13 @@ function openSafety(c) {
     row.querySelectorAll('[data-v]').forEach(x => x.classList.toggle('on', x === b));
   };
   $('#safetyGo').onclick = () => {
-    const need = [...qs.map((_, i) => String(i)), 'dx', ...(c.postOp ? ['op'] : [])];
+    const need = [...qs.map((_, i) => String(i)), ...(opts.screen ? [] : ['dx']), ...(c.postOp && !opts.screen ? ['op'] : [])];
     if (need.some(k => ans[k] === undefined)) { $('#safetyMsg').textContent = 'Please answer every question.'; return; }
-    const level = triage(qs.map((f, i) => ({ yes: ans[i], level: f.level, unchecked: f.unchecked })), { diagnosed: ans.dx });
+    const level = triage(qs.map((f, i) => ({ yes: ans[i], level: f.level, unchecked: f.unchecked })), { diagnosed: !!ans.dx });
     const hit = qs.filter((f, i) => ans[i] && f.level === level && !(ans.dx && (f.unchecked || f.level === 'assess')));
     if (level) return showStop(level, hit);
-    if (!ans.dx && structural) return showStop('assess', [{ q: 'This injury needs a confirmed diagnosis (often a scan) before rehab, because the right programme depends on what\'s damaged.' }]);
-    openAssessment(c, { diagnosed: ans.dx, postOp: !!ans.op });
+    if (!opts.screen && !ans.dx && structural) return showStop('assess', [{ q: 'This injury needs a confirmed diagnosis (often a scan) before rehab, because the right programme depends on what\'s damaged.' }]);
+    openAssessment(c, { diagnosed: !!ans.dx, postOp: !!ans.op, screen: !!opts.screen, area: opts.area || c.area });
   };
 }
 
@@ -946,50 +972,101 @@ function showStop(level, hits) {
   $('#stopOk').onclick = closeSheet;
 }
 
-// 2. Assessment: the questions a physio asks at a first appointment.
+// 2. About your pain: decides how hard to start.
 function openAssessment(c, info) {
-  const limb = !['lbp', 'neck'].includes(c.id);
-  openSheet(`<div><span class="eyebrow">Step 2 of 3 · assessment</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Tell us about the pain</h2>
+  const limb = !['Lower back', 'Neck'].includes(info.area), total = info.screen ? 4 : 3, hints = ACT_HINTS[info.area] || [];
+  openSheet(`<div><span class="eyebrow">Step 2 of ${total} · about your pain</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Tell us about the pain</h2>
     <p class="muted small" style="margin:6px 0 0">These answers decide how hard you start. 0 = no pain, 10 = worst imaginable.</p></div>
     ${slider('aRest', 'Pain right now, at rest', 2)}${slider('aWorst', 'Worst pain in the last week', 5)}
     ${choice('aSettle', 'After an activity that hurts, the pain settles…', [['minutes', 'Within minutes'], ['hours', 'Within hours'], ['nextDay', 'Lasts to the next day']], 'hours')}
     ${choice('aNight', 'Does it wake you at night?', [['0', 'No'], ['1', 'Yes']], '0')}
     ${choice('aDur', 'How long have you had it?', [['acute', 'Under 6 weeks'], ['subacute', '6 weeks–3 months'], ['persistent', 'Over 3 months']], 'subacute')}
     ${c.needsDate ? `<label class="field">Date of surgery (or injury, if no surgery)<input type="date" id="aDate" max="${new Date().toISOString().slice(0, 10)}"></label>` : ''}
-    ${limb ? choice('sideSel', 'Which side?', [['L', 'Left'], ['R', 'Right'], ['', 'Both / n/a']], '') : ''}
+    ${limb ? choice('sideSel', 'Which side hurts?', [['L', 'Left'], ['R', 'Right'], ['', 'Both / not sure']], '') : ''}
     ${choice('aGoal', 'What do you want to get back to?', [['daily', 'Everyday life'], ['gym', 'Gym training'], ['sport', 'My sport']], 'daily')}
     ${slider('aDays', 'Days a week you can do your rehab', 3).replace('max="10"', 'max="7"').replace('min="0"', 'min="1"')}
-    <span class="eyebrow">What can't you do?</span>
-    <p class="muted small" style="margin:0">Up to 3 everyday activities this problem makes hard. 0 = can't do it, 10 = as well as before.</p>
+    <span class="eyebrow">What does it stop you doing?</span>
+    <p class="muted small" style="margin:0">Tap or type up to 3 activities, then rate each: 0 = can't do it, 10 = as well as before.</p>
+    ${hints.length ? `<div class="chips-scroll" id="actHints">${hints.map(h => `<button type="button" class="mchip" data-hint="${esc(h)}">${esc(h)}</button>`).join('')}</div>` : ''}
     ${[0, 1, 2].map(i => `<div class="grid2"><label class="field">Activity ${i + 1}<input id="act${i}" placeholder="${['e.g. Walking upstairs', 'e.g. Running 5 km', 'e.g. Squatting to lift'][i]}"></label>
       <label class="field slider">Ability <span class="val" id="actv${i}">5</span><input type="range" min="0" max="10" value="5" id="actr${i}"></label></div>`).join('')}
     ${slider('um', 'Pain or stiffness first thing in the morning (usual)', 2)}
     ${info.postOp ? '<div class="alert assess"><b>After surgery</b><span class="small">Follow your surgeon\'s and physio\'s protocol first: their timelines and restrictions override this programme. Use Shred to track your measurements and do the exercises they approve.</span></div>' : ''}
-    ${!info.diagnosed ? '<div class="alert assess"><b>Not yet diagnosed</b><span class="small">Book a physio assessment to confirm what this is. Start phase 1 gently meanwhile, and stop if anything gets worse.</span></div>' : ''}
-    <button class="cta" type="button" id="seePlan">See my care plan</button><p class="note" id="assessMsg"></p>`);
+    ${!info.screen && !info.diagnosed ? '<div class="alert assess"><b>Not confirmed yet</b><span class="small">You picked this condition yourself, so it may not be the right match. A physio or doctor can confirm it. If you start meanwhile, you stay in phase 1, and stop if anything gets worse. The camera movement check is the other option: it doesn\'t need a diagnosis.</span></div>' : ''}
+    <button class="cta" type="button" id="seePlan">${info.screen ? 'Next: movement check' : 'See my plan'}</button><p class="note" id="assessMsg"></p>`);
   bindChoices($('#rsheetBody'));
   bindSliders(['aRest', 'aWorst', 'aDays', 'um']);
   [0, 1, 2].forEach(i => $('#actr' + i).oninput = e => $('#actv' + i).textContent = e.target.value);
+  $('#actHints') && ($('#actHints').onclick = e => {
+    const b = e.target.closest('[data-hint]'); if (!b) return;
+    const empty = [0, 1, 2].map(i => $('#act' + i)).find(x => !x.value.trim());
+    if (empty && ![0, 1, 2].some(i => $('#act' + i).value === b.dataset.hint)) { empty.value = b.dataset.hint; b.classList.add('on'); }
+  });
   $('#seePlan').onclick = () => {
     const dateVal = c.needsDate ? $('#aDate').value : '';
     if (c.needsDate && !dateVal) { $('#assessMsg').textContent = 'Add the date of your surgery or injury. Return to sport is timed from it.'; return; }
     const answers = { restPain: +$('#aRest').value, worstPain: +$('#aWorst').value, settle: choiceOf('aSettle'), nightPain: choiceOf('aNight') === '1',
       duration: choiceOf('aDur'), goal: choiceOf('aGoal'), daysAvailable: +$('#aDays').value };
     const acts = [0, 1, 2].map(i => ({ name: $('#act' + i).value.trim(), v: +$('#actr' + i).value })).filter(a => a.name);
-    showCarePlan(c, info, { answers, acts, side: limb ? choiceOf('sideSel') || null : null, dateAt: dateVal ? new Date(dateVal + 'T12:00').getTime() : null, usualMorning: +$('#um').value });
+    const a = { answers, acts, side: limb ? choiceOf('sideSel') || null : null, dateAt: dateVal ? new Date(dateVal + 'T12:00').getTime() : null, usualMorning: +$('#um').value };
+    if (!info.screen) return showPlan(c, info, a);
+    S.rehab.intake = { cond: c.id, info, a, queue: screenQueue(info.area), idx: 0, results: [], startedAt: Date.now() };
+    persist(); openScreenRunner();
   };
 }
 
-// 3. Care plan: what the clinic hands over before treatment starts.
-function showCarePlan(c, info, a) {
-  const con = consult(a.answers), cp = carePlan(c, con), ph = c.phases[0];
-  openSheet(`<div><span class="eyebrow">Step 3 of 3 · your care plan</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">${esc(c.name)}</h2>
-    <p class="muted small" style="margin:6px 0 0">Prepared by Shred from your answers and the guidelines below. It isn't a diagnosis.</p></div>
+// 3. Movement check: a short guided series of camera tests, one after another.
+function openScreenRunner(msg = '') {
+  const ik = S.rehab.intake; if (!ik) return;
+  if (ik.idx >= ik.queue.length) return finishScreen();
+  const step = ik.queue[ik.idx], d = ROM_TESTS[step.test];
+  openSheet(`<div><span class="eyebrow">Step 3 of 4 · movement check · ${ik.idx + 1} of ${ik.queue.length}</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">${esc(d.name)}${step.side ? ` · ${sideWord(step.side)}` : ''}</h2></div>
+    <div class="phase-track">${ik.queue.map((_, i) => `<i class="${i < ik.idx ? 'done' : i === ik.idx ? 'now' : ''}"></i>`).join('')}</div>
+    ${msg ? `<p class="note" style="color:var(--warn);margin:0">${esc(msg)}</p>` : ''}
+    <ol class="steps"><li>${esc(d.how)}</li>${step.side && d.view === 'side' ? `<li>Turn so your ${sideWord(step.side)} side is nearest the camera.</li>` : ''}<li>Recording lasts ${d.secs} seconds after a countdown. Only move as far as is comfortable: a small movement still counts, and it gets measured.</li></ol>
+    <button class="cta" type="button" id="scrGo">Start camera</button>
+    <label class="ghost">Upload a video instead<input type="file" id="scrFile" accept="video/*" hidden></label>
+    <span class="eyebrow">Can't do this one?</span>
+    <div class="btn-row"><button class="ghost" type="button" id="scrPain">Too painful</button><button class="ghost" type="button" id="scrCant">Can't get into position</button></div>
+    <p class="muted small" style="margin:0">Camera angles are estimates, not clinical measurements.</p>`);
+  const go = (source, file) => {
+    closeSheet();
+    TEST.rom = { secs: d.secs, label: d.name, minFps: 20, view: d.view, intro: () => d.how, romId: step.test, side: step.side, intake: true };
+    startLive(source === 'file' ? { mode: 'rom', source: 'file', file } : { mode: 'rom', source: 'camera' });
+  };
+  $('#scrGo').onclick = () => go('camera');
+  $('#scrFile').onchange = e => { const f = e.target.files[0]; if (f) go('file', f); };
+  // Not being able to do a movement is recorded as a result: it changes how the programme starts.
+  const skip = reason => { ik.results.push({ at: Date.now(), test: step.test, side: step.side, skipped: true, reason }); ik.idx++; persist(); openScreenRunner(); };
+  $('#scrPain').onclick = () => skip('pain');
+  $('#scrCant').onclick = () => skip('cant');
+}
+
+function finishScreen() {
+  const ik = S.rehab.intake, done = ik.results.filter(x => !x.skipped);
+  showPlan(COND[ik.cond], ik.info, ik.a, screenFindings(ik.results), done, screenAdjust(ik.results));
+}
+
+// 4. The plan, before the programme starts.
+function showPlan(c, info, a, findings = [], baseline = [], adj = { gentle: false, physioAdvised: false, reasons: [] }) {
+  let con = consult(a.answers);
+  // Movements the person couldn't do mean a gentle start, whatever the pain answers said.
+  if (adj.gentle && con.irritability !== 'high') con = { ...con, irritability: 'high', reasons: [...adj.reasons] };
+  else if (adj.gentle) con = { ...con, reasons: [...con.reasons, ...adj.reasons] };
+  const cp = carePlan(c, con), ph = c.phases[0], total = info.screen ? 4 : 3;
+  const goals = findings.filter(f => f.criterion), side = a.side || affectedSide(findings) || null;
+  openSheet(`<div><span class="eyebrow">Step ${total} of ${total} · your plan</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">${esc(c.name)}</h2>
+    <p class="muted small" style="margin:6px 0 0">Made by the app from your answers${info.screen ? ' and measurements' : ''} and the sources below. It isn't a diagnosis, and no clinician has checked it.</p></div>
+    ${info.screen ? `<div class="careplan"><span class="eyebrow">What the camera measured</span>
+      ${findings.length ? `<ul class="findings">${findings.map(f => `<li class="small">${f.criterion ? '<span class="pill cam">Goal</span> ' : ''}${esc(f.text)}</li>`).join('')}</ul>` : '<p class="small" style="margin:0">Nothing was measured. You can retest from your programme.</p>'}
+      ${baseline.length && !goals.length ? '<p class="small" style="margin:0">Movement looked even between sides and within typical ranges, so the programme focuses on pain and strength.</p>' : ''}
+      ${goals.length ? `<p class="small muted" style="margin:0">Each goal must be reached before the last phase. You'll retest with the camera as you go.</p>` : ''}</div>` : ''}
+    ${adj.physioAdvised ? '<div class="alert urgent"><b>See a physio before going further</b><span class="small">Some movements were too painful or couldn\'t be done. Start phase 1 gently if you like, but the programme stays in phase 1 until a physio has assessed you. Your report shows them exactly what happened.</span></div>' : ''}
     <div class="careplan">
       <div class="cp-row"><span>Starting level</span><b><span class="pill ${con.irritability === 'high' ? 'voice' : 'cam'}">${LEVEL_NAME[con.irritability]}</span></b></div>
       <div class="cp-row"><span>Pain limit during exercise</span><b>${cp.painLimit}/10</b></div>
       <div class="cp-row"><span>Sessions</span><b>${cp.sessionsPerWeek} a week</b></div>
-      <div class="cp-row"><span>Reassessment</span><b>every ${cp.reassessEveryDays} days</b></div>
+      <div class="cp-row"><span>Check-ins</span><b>after each session, and weekly</b></div>
       <p class="small" style="margin:6px 0 0">${esc(cp.summary)}</p>
       <ul class="small muted" style="margin:0;padding-left:18px">${cp.reasons.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
       <p class="small" style="margin:0">${esc(cp.goal)} ${esc(cp.expect)}</p>
@@ -997,64 +1074,74 @@ function showCarePlan(c, info, a) {
     </div>
     <span class="eyebrow">Phase 1 · ${esc(ph.name)}</span>
     <div class="list">${ph.exercises.map(([id, d]) => `<div class="row"><b class="small">${esc(LIB[id].name)}</b><span class="muted small">${esc(dose(d, cp.doseLevel))}</span></div>`).join('')}</div>
-    <details><summary class="small">The evidence behind this plan</summary><p class="muted small">${esc(c.evidence)}</p></details>
-    <button class="cta" type="button" id="startPlan">Start treatment</button>`);
+    <details><summary class="small">The sources behind this programme</summary><p class="muted small">${esc(c.evidence)}</p></details>
+    <button class="cta" type="button" id="startPlan">Start programme</button>`);
   $('#startPlan').onclick = () => {
     const now = Date.now();
-    S.rehab.active = { cond: c.id, startedAt: now, phase: 0, phaseStartedAt: now, injured: a.side, postOp: info.postOp, diagnosed: info.diagnosed,
+    S.rehab.active = { cond: c.id, startedAt: now, phase: 0, phaseStartedAt: now, injured: side, postOp: info.postOp, diagnosed: info.diagnosed,
       acts: a.acts.map(x => x.name), psfs: a.acts.length ? [{ at: now, score: psfsScore(a.acts.map(x => x.v)), ratings: a.acts.map(x => x.v) }] : [],
-      usualMorning: a.usualMorning, checkins: [], tests: [], kneeTests: [], notes: [],
+      usualMorning: a.usualMorning, checkins: [], tests: baseline.map(t => ({ ...t })), kneeTests: [], notes: [],
       consult: con, painLimit: cp.painLimit, doseLevel: cp.doseLevel, sessionsPerWeek: cp.sessionsPerWeek, lastReassessAt: now,
+      screened: !!info.screen, findings: findings.map(f => ({ test: f.test, text: f.text, goal: !!f.criterion })), extraCriteria: screenCriteria(findings), physioAdvised: !!adj.physioAdvised,
       ...(a.dateAt ? (info.postOp ? { surgeryAt: a.dateAt } : { injuryAt: a.dateAt }) : {}) };
-    note(S.rehab.active, `First assessment: ${LEVEL_NAME[con.irritability].toLowerCase()}, pain limit ${cp.painLimit}/10, ${cp.sessionsPerWeek} sessions a week. Phase 1 started.`);
+    note(S.rehab.active, `Start: ${LEVEL_NAME[con.irritability].toLowerCase()}, pain limit ${cp.painLimit}/10, ${cp.sessionsPerWeek} sessions a week.${info.screen ? ` Movement check: ${baseline.length} measurement${baseline.length === 1 ? '' : 's'}, ${goals.length} goal${goals.length === 1 ? '' : 's'}.` : ''} Phase 1 started.`);
+    S.rehab.intake = null;
     persist(); closeSheet(); renderRehab(); renderToday();
-    say(`Your ${c.name.toLowerCase()} care plan is ready. Phase one: ${ph.name}. Do today's exercises, then check in so I can adjust your load.`, { id: 'rehab_start', priority: 'high' });
+    say(`Your plan is ready. Phase one: ${ph.name}. Do today's exercises, then check in so the app can adjust your load.`, { id: 'rehab_start', priority: 'high' });
   };
 }
 
-// 4. The patient file: treatment, check-ins, criteria, measurements, reassessments and notes.
+// 5. Your programme: exercises, check-ins, phase checks, measurements, weekly check-ins and the log.
 function renderRehabDashboard() {
-  const p = plan(), c = condOf(p), ph = c.phases[p.phase], ev = evaluatePhase(c, p.phase, p);
+  const p = plan(), c = condOf(p), ph = c.phases[p.phase], ev = evaluatePhase(c, p.phase, p), block = advanceBlock(p);
   const last = p.checkins.slice(-1)[0], lightInfo = last ? painLight({ ...last, usualMorning: p.usualMorning }, limitOf(p)) : null;
   const pending = p.checkins.find(k => k.nextMorning == null && Date.now() - k.at > 8 * 3600e3 && Date.now() - k.at < 48 * 3600e3);
   const review = needsReview(c, p), due = Date.now() >= nextReassess(p);
   const latest = id => [...p.tests].reverse().find(t => t.test === id);
-  const testRow = id => { const d = ROM_TESTS[id], t = latest(id); const v = t ? (t.value != null ? `${t.value}${d.unit === '°' ? '°' : ' ' + d.unit}${t.side ? ` (${t.side === 'L' ? 'left' : 'right'})` : ''}` : `L ${t.L ?? '–'} · R ${t.R ?? '–'}`) : 'not tested'; return `<div class="row"><div><b class="small">${esc(d.name)}</b><br><span class="muted small">${esc(v)} · typical ${esc(d.norm)}</span></div><button type="button" class="ghost" data-romtest="${id}">Test</button></div>`; };
+  const testRow = id => { const d = ROM_TESTS[id], t = latest(id); const v = t ? (t.value != null ? `${t.value}${d.unit === '°' ? '°' : ' ' + d.unit}${t.side ? ` (${sideWord(t.side)})` : ''}` : `L ${t.L ?? '–'} · R ${t.R ?? '–'}`) : 'not tested'; return `<div class="row"><div><b class="small">${esc(d.name)}</b><br><span class="muted small">${esc(v)} · typical ${esc(d.norm)}</span></div><button type="button" class="ghost" data-romtest="${id}">Test</button></div>`; };
   const painSeries = checkinDays(p.checkins).slice(-12).map(k => k.during), psfsSeries = p.psfs.map(x => x.score);
-  const level = p.consult ? LEVEL_NAME[p.consult.irritability] : 'Standard start';
+  const level = p.consult ? LEVEL_NAME[p.consult.irritability] : (p.doseLevel === 'gentle' ? 'Gentle start' : 'Standard start');
+  const status = p.diagnosed ? (p.confirmedBy ? `Confirmed by ${esc(p.confirmedBy)}` : 'Diagnosed') : c.general ? 'From your movement check' : 'Not confirmed';
   $('#rehabActive').innerHTML = `
-    ${review ? `<div class="alert urgent"><b>Get your plan reviewed by a physio</b><span class="small">Your last 2 sessions were flare-ups. Ease off to the exercises that don't flare it, and book a physiotherapist to review the plan before you progress. If anything new or worrying appears, use the safety check again.</span><button class="ghost" type="button" id="reviewAgain">Repeat the safety check</button></div>` : ''}
-    ${pending ? `<button type="button" class="card rehab-today" id="morningBtn"><span class="eyebrow" style="color:var(--warn)">Quick check</span><b>How does it feel this morning?</b><span class="muted small">This tells QK whether yesterday's load was right. Phase checks only count days with a morning answer.</span></button>` : ''}
-    ${due ? `<button type="button" class="card rehab-today" id="reassessBtn"><span class="eyebrow" style="color:var(--z1)">Appointment due</span><b>Weekly reassessment</b><span class="muted small">A 1-minute safety recheck and your activity ratings.</span></button>` : ''}
+    ${review ? `<div class="alert urgent"><b>Get your plan reviewed by a physio</b><span class="small">Your last 2 sessions were flare-ups. Ease off to the exercises that don't flare it, and ask a physiotherapist to review the plan before you progress. If anything new or worrying appears, repeat the safety check.</span><button class="ghost" type="button" id="reviewAgain">Repeat the safety check</button></div>` : ''}
+    ${pending ? `<button type="button" class="card rehab-today" id="morningBtn"><span class="eyebrow" style="color:var(--warn)">Quick check</span><b>How does it feel this morning?</b><span class="muted small">This tells the app whether yesterday's load was right. Phase checks only count days with a morning answer.</span></button>` : ''}
+    ${due ? `<button type="button" class="card rehab-today" id="reassessBtn"><span class="eyebrow" style="color:var(--z1)">Check-in due</span><b>Weekly check-in</b><span class="muted small">A 1-minute warning-sign recheck and your activity ratings.</span></button>` : ''}
     <div class="card stack patient-file">
-      <div class="card-head" style="margin:0"><div><span class="eyebrow">Patient file · phase ${p.phase + 1} of ${c.phases.length}${p.postOp ? ' · after surgery: physio-led' : ''}</span><h2 class="display h2">${esc(ph.name)}</h2><span class="muted small">${esc(ph.goal)}</span></div></div>
+      <div class="card-head" style="margin:0"><div><span class="eyebrow">Your programme · phase ${p.phase + 1} of ${c.phases.length}${p.postOp ? ' · after surgery: follow your physio\'s plan' : ''}</span><h2 class="display h2">${esc(ph.name)}</h2><span class="muted small">${esc(ph.goal)}</span></div></div>
       <div class="phase-track">${c.phases.map((_, i) => `<i class="${i < p.phase ? 'done' : i === p.phase ? 'now' : ''}"></i>`).join('')}</div>
-      <div class="file-facts"><span><small>Level</small>${esc(level)}</span><span><small>Pain limit</small>${limitOf(p)}/10</span><span><small>Sessions</small>${p.sessionsPerWeek || 3}/week</span><span><small>Next review</small>${due ? 'today' : fmtDate(nextReassess(p))}</span></div>
+      <div class="file-facts"><span><small>Level</small>${esc(level)}</span><span><small>Pain limit</small>${limitOf(p)}/10</span><span><small>Sessions</small>${p.sessionsPerWeek || 3}/week</span><span><small>Next check-in</small>${due ? 'today' : fmtDate(nextReassess(p))}</span></div>
+      <span class="muted small">${status}${p.requireApproval ? ' · your clinician approves phase changes' : ''}</span>
+      <div class="btn-row"><button class="ghost" type="button" id="shareReport">Share report</button><button class="ghost" type="button" id="clinicianBtn">Clinician mode</button></div>
     </div>
-    <div class="card"><span class="eyebrow">Today's treatment</span>
-      <div style="margin-top:4px">${ph.exercises.map(([id, d]) => { const x = LIB[id]; return `<button type="button" class="ex-row" data-train="${id}" style="width:100%;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;cursor:pointer;padding-inline:0"><span class="pic">${icon(iconKey(id))}</span><div><b>${esc(x.name)}</b><span class="tag" style="${x.pattern ? '' : 'color:var(--z3)'}">${x.pattern ? 'QK checks your form' : 'QK coaches your tempo'}</span></div><span class="sets">${esc(dose(d, p.doseLevel))}</span></button>`; }).join('')}</div>
+    <div class="card"><span class="eyebrow">Today's exercises</span>
+      <div style="margin-top:4px">${ph.exercises.map(([id, d]) => { const x = LIB[id]; return `<button type="button" class="ex-row" data-train="${id}" style="width:100%;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;cursor:pointer;padding-inline:0"><span class="pic">${icon(iconKey(id))}</span><div><b>${esc(x.name)}</b><span class="tag" style="${x.pattern ? '' : 'color:var(--z3)'}">${x.pattern ? 'Form check on' : 'Tempo coaching on'}</span></div><span class="sets">${esc(dose(d, p.doseLevel))}</span></button>`; }).join('')}</div>
       <div class="stack" style="margin-top:12px"><button class="cta" type="button" id="checkinRehab">${p.checkins.some(k => dayKey(k.at) === dayKey(Date.now())) ? 'Update today\'s check-in' : 'Check in after today\'s session'}</button></div>
       ${lightInfo ? `<p style="margin:12px 0 0"><span class="light ${lightInfo.light}">${lightInfo.light === 'green' ? 'On track' : lightInfo.light === 'amber' ? 'Hold the load' : 'Ease off'}</span><br><span class="muted small">${esc(lightInfo.advice)}</span></p>` : ''}
     </div>
     <div class="card"><span class="eyebrow">To move to the next phase</span>
       <div style="margin-top:8px">${ev.items.map(i => `<div class="crit ${i.met ? 'met' : ''}"><span class="tick">${i.met ? '✓' : ''}</span><span>${esc(i.label)}<small>${esc(i.detail || '')}</small></span></div>`).join('')}</div>
-      ${ev.allMet && p.phase < c.phases.length - 1 ? `<button class="cta" type="button" id="nextPhase" style="margin-top:10px">Move to phase ${p.phase + 2}</button>` : ''}
-      ${ev.allMet && p.phase === c.phases.length - 1 ? `<div class="alert assess" style="margin-top:10px"><b>All criteria met</b><span class="small">You've completed the programme. Keep the strength work going 2× a week to help stop it coming back.</span></div>` : ''}
+      ${block && p.phase < c.phases.length - 1 ? `<p class="muted small" style="margin:10px 0 0">${esc(block)}</p>` : ''}
+      ${canAdvance(p, ev) && p.phase < c.phases.length - 1 ? `<button class="cta" type="button" id="nextPhase" style="margin-top:10px">Move to phase ${p.phase + 2}</button>` : ''}
+      ${ev.allMet && p.phase === c.phases.length - 1 ? `<div class="alert assess" style="margin-top:10px"><b>All checks met</b><span class="small">You've completed the programme. Keep the strength work going 2× a week.</span></div>` : ''}
     </div>
     ${c.tests.length || ph.criteria.some(k => k.type === 'kneeTest') ? `<div class="card"><span class="eyebrow">Your measurements</span><div class="list" style="margin-top:6px">${c.tests.map(testRow).join('')}
-      ${ph.criteria.some(k => k.type === 'kneeTest') ? `<div class="row"><div><b class="small">Single-leg squat knee test</b><br><span class="muted small">${p.kneeTests.length ? `L ${p.kneeTests.slice(-1)[0].L ?? '–'}° · R ${p.kneeTests.slice(-1)[0].R ?? '–'}°` : 'not tested'}</span></div><button type="button" class="ghost" id="goKneeTest">Test</button></div>` : ''}</div></div>` : ''}
-    <div class="card stack"><div class="card-head" style="margin:0"><div><span class="eyebrow">Daily activities</span><div class="num" style="font-size:1.8rem;margin-top:4px">${psfsSeries.length ? psfsSeries[psfsSeries.length - 1] + '/10' : '–'}</div></div><button type="button" class="ghost" id="rerate">Reassess</button></div>
-      ${psfsSeries.length >= 2 ? lineChart(psfsSeries, { min: 0, max: 10, labels: p.psfs.map(x => fmtDate(x.at)) }) : '<span class="muted small">Your weekly reassessment re-rates these, so you can see progress.</span>'}
+      ${ph.criteria.some(k => k.type === 'kneeTest') ? `<div class="row"><div><b class="small">Single-leg squat knee test</b><br><span class="muted small">${p.kneeTests.length ? `L ${p.kneeTests.slice(-1)[0].L ?? '–'}° · R ${p.kneeTests.slice(-1)[0].R ?? '–'}°` : 'not tested'}</span></div><button type="button" class="ghost" id="goKneeTest">Test</button></div>` : ''}</div>
+      <p class="muted small" style="margin:8px 0 0">Camera angles are estimates, not clinical measurements.</p></div>` : ''}
+    ${p.findings?.length ? `<details class="card"><summary>Movement check at the start</summary><ul class="findings">${p.findings.map(f => `<li class="small">${f.goal ? '<span class="pill cam">Goal</span> ' : ''}${esc(f.text)}</li>`).join('')}</ul></details>` : ''}
+    <div class="card stack"><div class="card-head" style="margin:0"><div><span class="eyebrow">Daily activities</span><div class="num" style="font-size:1.8rem;margin-top:4px">${psfsSeries.length ? psfsSeries[psfsSeries.length - 1] + '/10' : '–'}</div></div><button type="button" class="ghost" id="rerate">Re-rate</button></div>
+      ${psfsSeries.length >= 2 ? lineChart(psfsSeries, { min: 0, max: 10, labels: p.psfs.map(x => fmtDate(x.at)) }) : '<span class="muted small">Your weekly check-in re-rates these, so you can see progress.</span>'}
       ${painSeries.length >= 2 ? `<span class="eyebrow">Pain during exercise (worst each day)</span>${lineChart(painSeries, { min: 0, max: 10, labels: painSeries.map((_, i) => String(i + 1)) })}` : ''}</div>
-    <details class="card"><summary>Clinic notes (${(p.notes || []).length})</summary><div class="notes">${[...(p.notes || [])].reverse().map(n => `<div class="note-row"><small>${fmtDate(n.at)}</small><span class="small">${esc(n.text)}</span></div>`).join('') || '<span class="muted small">No notes yet.</span>'}</div></details>
+    <details class="card"><summary>Programme log (${(p.notes || []).length})</summary><div class="notes">${[...(p.notes || [])].reverse().map(n => `<div class="note-row"><small>${fmtDate(n.at)}</small><span class="small">${esc(n.text)}</span></div>`).join('') || '<span class="muted small">Nothing logged yet.</span>'}</div></details>
     <details class="card"><summary>About ${esc(c.name.toLowerCase())}</summary><p class="small" style="margin:10px 0 0">${esc(c.about)}</p><p class="muted small">${esc(c.evidence)}</p>
       <p class="muted small">Pain rule: up to ${limitOf(p)}/10 during exercise is OK if it settles by the next morning.</p></details>
     <div class="btn-row">${p.phase > 0 ? '<button class="ghost" type="button" id="prevPhase">Step back a phase</button>' : ''}<button class="ghost" type="button" id="endPlan">End programme</button></div>
-    <p class="muted small" style="margin:0">Shred supports rehabilitation; it doesn't diagnose or replace your physiotherapist or doctor. If symptoms get worse, or a warning sign appears, stop and get checked.</p>`;
+    <p class="muted small" style="margin:0">Shred supports rehab exercise. It doesn't diagnose or treat, and no clinician reviews your answers unless one uses clinician mode with you. If symptoms get worse, or a warning sign appears, stop and get checked.</p>`;
   $('#checkinRehab').onclick = openCheckin;
   $('#morningBtn') && ($('#morningBtn').onclick = () => openMorning(pending));
   $('#reassessBtn') && ($('#reassessBtn').onclick = openReassess);
-  $('#reviewAgain') && ($('#reviewAgain').onclick = () => openSafety(c));
+  $('#reviewAgain') && ($('#reviewAgain').onclick = () => openSafety(c, { area: c.area, screen: !!c.general }));
+  $('#shareReport').onclick = openReport;
+  $('#clinicianBtn').onclick = openClinician;
   $('#nextPhase') && ($('#nextPhase').onclick = () => { p.phase++; p.phaseStartedAt = Date.now(); note(p, `Passed phase ${p.phase} checks. Moved to phase ${p.phase + 1}: ${c.phases[p.phase].name}.`); persist(); renderRehab(); say(`Great work. Phase ${p.phase + 1}: ${c.phases[p.phase].name}.`, { id: 'phase_' + Date.now(), priority: 'high' }); });
   $('#prevPhase') && ($('#prevPhase').onclick = () => { p.phase--; p.phaseStartedAt = Date.now(); note(p, `Stepped back to phase ${p.phase + 1}.`); persist(); renderRehab(); toast('Stepped back a phase. That\'s a normal part of rehab.'); });
   $('#endPlan').onclick = () => openSheet(`<b id="rsheetTitle">End this programme?</b><p class="muted small" style="margin:0">Your results are kept in your history.</p><div class="btn-row"><button class="ghost" type="button" id="endNo">Keep going</button><button class="stop" type="button" id="endYes">End programme</button></div>`) || ($('#endNo').onclick = closeSheet, $('#endYes').onclick = () => { S.rehab.history.push({ ...p, endedAt: Date.now() }); S.rehab.active = null; persist(); closeSheet(); renderRehab(); renderToday(); });
@@ -1062,9 +1149,6 @@ function renderRehabDashboard() {
   $('#goKneeTest') && ($('#goKneeTest').onclick = () => { tab('gait'); $('[data-test=sls]').click(); });
   $$('#rehabActive [data-romtest]').forEach(b => b.onclick = () => startRomTest(b.dataset.romtest));
 }
-
-function slider(id, label, v = 0) { return `<label class="field slider">${label} <span class="val" id="${id}v">${v}</span><input type="range" min="0" max="10" value="${v}" id="${id}"></label>`; }
-function bindSliders(ids) { ids.forEach(id => $('#' + id).oninput = e => $('#' + id + 'v').textContent = e.target.value); }
 
 // One check-in per day: a second one updates today's record (the evaluator also keeps the worst of the day).
 function openCheckin() {
@@ -1083,7 +1167,7 @@ function openCheckin() {
     if (l.light === 'red') note(p, `Flare-up: pain ${k.during}/10 during exercise.`);
     if (needsReview(c, p)) note(p, 'Second flare-up in a row: physio review advised, progression paused.');
     persist(); closeSheet(); renderRehab();
-    say(l.light === 'green' ? 'Good session. Pain stayed in your safe zone. I\'ll check how it feels tomorrow morning.' : l.light === 'amber' ? 'A little over your limit. Keep the same load next time and we\'ll see how it settles.' : 'That was too much today. Next session, ease off: fewer sets or a smaller range.', { id: 'ck_' + Date.now(), priority: 'high' });
+    say(l.light === 'green' ? 'Good session. Pain stayed within your limit. I\'ll check how it feels tomorrow morning.' : l.light === 'amber' ? 'A little over your limit. Keep the same load next time and we\'ll see how it settles.' : 'That was too much today. Next session, ease off: fewer sets or a smaller range.', { id: 'ck_' + Date.now(), priority: 'high' });
   };
 }
 function openMorning(k) {
@@ -1095,33 +1179,132 @@ function openMorning(k) {
     const l = painLight({ ...k, usualMorning: p.usualMorning }, limitOf(p));
     if (l.light === 'red') note(p, `Worse the next morning (${k.nextMorning}/10 against a usual ${p.usualMorning}/10).`);
     persist(); closeSheet(); renderRehab();
-    say(l.light === 'red' ? 'It\'s more irritated than usual this morning, so we\'ll go lighter today.' : 'It settled well. Yesterday\'s load was right.', { id: 'mn_' + Date.now(), priority: 'high' });
+    say(l.light === 'red' ? 'It\'s more irritated than usual this morning, so we\'ll go lighter today.' : 'It settled well. Yesterday\'s load looks about right.', { id: 'mn_' + Date.now(), priority: 'high' });
   };
 }
 
-// Weekly reassessment: recheck the warning signs that can appear during rehab, then re-rate activities.
+// Weekly check-in: recheck the warning signs that can appear during rehab, then re-rate activities.
 function openReassess() {
   const p = plan(), c = condOf(p), acts = p.acts.length ? p.acts : ['Your main activity'];
   const flags = [...c.flags, ...GENERAL_FLAGS].filter(f => !f.unchecked);
-  openSheet(`<div><span class="eyebrow">Weekly reassessment</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">How are things now?</h2>
+  openSheet(`<div><span class="eyebrow">Weekly check-in</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">How are things now?</h2>
     <p class="muted small" style="margin:6px 0 0">Since your last check, has any of this started?</p></div>
     <div id="flagList">${flags.map((f, i) => `<div class="flag-q" data-i="${i}"><span>${esc(f.q)}</span><span class="yn"><button type="button" class="yes" data-v="1">Yes</button><button type="button" class="no on" data-v="0">No</button></span></div>`).join('')}</div>
     <span class="eyebrow">Rate your activities</span><p class="muted small" style="margin:0">0 = can't do it, 10 = as well as before.</p>
-    ${acts.map((a, i) => slider('rr' + i, esc(a), p.psfs.slice(-1)[0]?.ratings?.[i] ?? 5)).join('')}<button class="cta" type="button" id="saveRr">Save reassessment</button>`);
+    ${acts.map((a, i) => slider('rr' + i, esc(a), p.psfs.slice(-1)[0]?.ratings?.[i] ?? 5)).join('')}<button class="cta" type="button" id="saveRr">Save check-in</button>`);
   const yes = new Set();
   $('#flagList').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; const row = b.closest('.flag-q'), i = +row.dataset.i; b.dataset.v === '1' ? yes.add(i) : yes.delete(i); row.querySelectorAll('[data-v]').forEach(x => x.classList.toggle('on', x === b)); };
   bindSliders(acts.map((_, i) => 'rr' + i));
   $('#saveRr').onclick = () => {
     const level = triage(flags.map((f, i) => ({ yes: yes.has(i), level: f.level })));
     p.lastReassessAt = Date.now();
-    if (level) { note(p, `Reassessment: warning sign reported (${level}). Programme paused until checked.`); persist(); renderRehab(); return showStop(level, flags.filter((f, i) => yes.has(i) && f.level === level)); }
+    if (level) { note(p, `Weekly check-in: warning sign reported (${level}). Programme paused until checked.`); persist(); renderRehab(); return showStop(level, flags.filter((f, i) => yes.has(i) && f.level === level)); }
     const r = acts.map((_, i) => +$('#rr' + i).value); p.psfs.push({ at: Date.now(), score: psfsScore(r), ratings: r });
-    note(p, `Reassessment: no warning signs; daily activities ${psfsScore(r)}/10.`);
+    note(p, `Weekly check-in: no warning signs; daily activities ${psfsScore(r)}/10.`);
     persist(); closeSheet(); renderRehab();
   };
 }
 
-// 5. Camera measurement tests. For a one-sided injury, the person states which side is being tested,
+// 6. Clinician mode: the physio's own PIN, on this phone, at a visit. Every change is logged under their name.
+function openClinician() {
+  const rec = S.rehab.clinician;
+  if (!rec) {
+    openSheet(`<div><span class="eyebrow">Clinician mode</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Set up clinician access</h2>
+      <p class="muted small" style="margin:6px 0 0">For the physiotherapist or doctor treating you, at a visit. They choose the PIN, not you. Every change they make is logged under their name and shown on your report.</p></div>
+      <label class="field">Clinician's name<input id="cName" autocomplete="off"></label>
+      <label class="field">Profession<select id="cRole"><option>Physiotherapist</option><option>Doctor</option><option>Other clinician</option></select></label>
+      <label class="field">Licence number (optional)<input id="cLic" autocomplete="off"></label>
+      <label class="field">PIN (4–8 digits)<input id="cPin" type="password" inputmode="numeric" autocomplete="off"></label>
+      <label class="field">PIN again<input id="cPin2" type="password" inputmode="numeric" autocomplete="off"></label>
+      <button class="cta" type="button" id="cSave">Save and open</button><p class="note" id="cMsg"></p>`);
+    $('#cSave').onclick = async () => {
+      if ($('#cPin').value !== $('#cPin2').value) { $('#cMsg').textContent = 'The PINs don\'t match.'; return; }
+      try {
+        const r = await clinicianSetup({ name: $('#cName').value, role: $('#cRole').value, licence: $('#cLic').value, pin: $('#cPin').value });
+        S.rehab.clinician = r;
+        if (plan()) note(plan(), `Clinician access set up for ${r.name} (${r.role}${r.licence ? `, licence ${r.licence}` : ''}).`);
+        persist(); openClinicianPanel(r);
+      } catch (e) { $('#cMsg').textContent = e.message; }
+    };
+    return;
+  }
+  openSheet(`<div><span class="eyebrow">Clinician mode</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">${esc(rec.name)}</h2><p class="muted small" style="margin:6px 0 0">${esc(rec.role)}${rec.licence ? ` · licence ${esc(rec.licence)}` : ''}</p></div>
+    <label class="field">PIN<input id="cPin" type="password" inputmode="numeric" autocomplete="off"></label>
+    <button class="cta" type="button" id="cOpen">Open</button><p class="note" id="cMsg"></p>
+    <button class="linkbtn" type="button" id="cReset">Different clinician, or forgot the PIN? Reset access</button>`);
+  $('#cOpen').onclick = async () => {
+    const r = await verifyPin(rec, $('#cPin').value); persist();
+    if (r.ok) return openClinicianPanel(rec);
+    $('#cMsg').textContent = r.lockedFor ? `Too many wrong PINs. Try again in ${Math.ceil(r.lockedFor / 60e3)} minutes.` : `Wrong PIN. ${r.triesLeft} ${r.triesLeft === 1 ? 'try' : 'tries'} left.`;
+  };
+  $('#cReset').onclick = () => {
+    openSheet(`<b id="rsheetTitle">Reset clinician access?</b><p class="muted small" style="margin:0">The clinician will need to set it up again. The reset is recorded in your programme log and on your report.</p><div class="btn-row"><button class="ghost" type="button" id="crNo">Cancel</button><button class="stop" type="button" id="crYes">Reset</button></div>`);
+    $('#crNo').onclick = openClinician;
+    $('#crYes').onclick = () => { S.rehab.clinician = null; if (plan()) note(plan(), 'Clinician access was reset on this phone.'); persist(); renderRehab(); openClinician(); };
+  };
+}
+
+function openClinicianPanel(rec, msg = '') {
+  const p = plan();
+  if (!p) { openSheet(`<p id="rsheetTitle" class="small">Clinician access is set up for ${esc(rec.name)}. Start a programme first, then open clinician mode from it.</p><button class="cta" type="button" id="clDone">Close</button>`); $('#clDone').onclick = closeSheet; return; }
+  const c = condOf(p), who = { name: rec.name, role: rec.role };
+  const opts = CONDITIONS.filter(x => !x.general).map(x => `<option value="${x.id}" ${x.id === p.cond ? 'selected' : ''}>${esc(x.area)} · ${esc(x.name)}</option>`).join('');
+  openSheet(`<div><span class="eyebrow">Clinician mode · ${esc(rec.name)}</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">${esc(c.name)}</h2>
+      <p class="muted small" style="margin:6px 0 0">Phase ${p.phase + 1} of ${c.phases.length} · ${p.diagnosed ? (p.confirmedBy ? `confirmed by ${esc(p.confirmedBy)}` : 'patient reports a diagnosis') : 'not confirmed'}${p.injured ? ` · ${sideWord(p.injured)} side` : ''}. Changes are logged under your name.</p></div>
+    ${msg ? `<p class="note" style="margin:0;color:var(--good)">${esc(msg)}</p>` : ''}
+    <div class="cl-block"><b class="small">Confirm the diagnosis</b><select id="clCond" aria-label="Diagnosis">${c.general ? `<option value="" selected>Choose…</option>` : ''}${opts}</select><button class="ghost" type="button" id="clDx">Confirm and switch programme</button></div>
+    ${c.needsDate ? `<div class="cl-block"><b class="small">Surgery or injury date</b>${choice('clDateKind', 'Date of', [['surgery', 'Surgery'], ['injury', 'Injury']], p.surgeryAt != null || p.postOp ? 'surgery' : 'injury')}<input type="date" id="clDate" aria-label="Date" max="${new Date().toISOString().slice(0, 10)}"><button class="ghost" type="button" id="clDateSave">Save date</button></div>` : ''}
+    <div class="cl-block"><b class="small">Set the phase</b><select id="clPhase" aria-label="Phase">${c.phases.map((ph, i) => `<option value="${i}" ${i === p.phase ? 'selected' : ''}>Phase ${i + 1}: ${esc(ph.name)}</option>`).join('')}</select><input id="clReason" placeholder="Reason (required)" aria-label="Reason"><button class="ghost" type="button" id="clPh">Set phase</button></div>
+    <div class="cl-block"><b class="small">Dose and pain limit</b>${choice('clDose', 'Dose', [['gentle', 'Gentle'], ['standard', 'Standard']], p.doseLevel || 'standard')}<label class="field">Pain limit during exercise (0–10)<input id="clLimit" type="number" min="0" max="10" value="${limitOf(p)}"></label><button class="ghost" type="button" id="clDoseSave">Save dose</button></div>
+    <div class="cl-block">${choice('clAppr', 'Phase changes', [['0', 'Patient moves on when checks are met'], ['1', 'Need my approval']], p.requireApproval ? '1' : '0')}<button class="ghost" type="button" id="clApprSave">Save</button></div>
+    <div class="cl-block"><b class="small">Note</b><textarea id="clNote" rows="3" aria-label="Note"></textarea><button class="ghost" type="button" id="clNoteSave">Add note</button></div>
+    <p class="note" id="clMsg"></p>
+    <button class="cta" type="button" id="clDone">Close clinician mode</button>`);
+  bindChoices($('#rsheetBody'));
+  const act = (a, done) => { try { applyClinician(p, a, who); persist(); renderRehab(); openClinicianPanel(rec, done); } catch (e) { $('#clMsg').textContent = e.message; } };
+  $('#clDx').onclick = () => { const v = $('#clCond').value; if (!v) { $('#clMsg').textContent = 'Choose a diagnosis first.'; return; } act({ type: 'diagnose', cond: v }, 'Diagnosis confirmed. Programme switched to phase 1.'); };
+  $('#clDateSave') && ($('#clDateSave').onclick = () => { const v = $('#clDate').value; if (!v) { $('#clMsg').textContent = 'Pick a date.'; return; } const at = new Date(v + 'T12:00').getTime(); act(choiceOf('clDateKind') === 'surgery' ? { type: 'dates', surgeryAt: at } : { type: 'dates', injuryAt: at }, 'Date saved.'); });
+  $('#clPh').onclick = () => act({ type: 'setPhase', phase: +$('#clPhase').value, reason: $('#clReason').value }, 'Phase set.');
+  $('#clDoseSave').onclick = () => act({ type: 'dose', doseLevel: choiceOf('clDose'), painLimit: +$('#clLimit').value }, 'Dose saved.');
+  $('#clApprSave').onclick = () => act({ type: 'requireApproval', on: choiceOf('clAppr') === '1' }, 'Saved.');
+  $('#clNoteSave').onclick = () => act({ type: 'note', text: $('#clNote').value }, 'Note added.');
+  $('#clDone').onclick = closeSheet;
+}
+
+// 7. Report to share with a physio before or at a visit.
+const rpDate = at => new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+function reportHtml(d) {
+  const status = d.diagnosed ? (d.confirmedBy ? `confirmed by ${esc(d.confirmedBy)}` : 'patient reports a diagnosis') : d.general ? 'from the movement check, no diagnosis' : 'picked by the patient, not confirmed';
+  return `<div class="report"><h3>Rehab progress report${d.name ? ` · ${esc(d.name)}` : ''}</h3><p class="small muted">${rpDate(d.generatedAt)}</p>
+    <table class="rp"><tr><th>Programme</th><td>${esc(d.condition)} (${status})</td></tr>
+      <tr><th>Phase</th><td>${d.phase} of ${d.phases}: ${esc(d.phaseName)}</td></tr>
+      <tr><th>Started</th><td>${rpDate(d.startedAt)}${d.surgeryAt ? ` · surgery ${rpDate(d.surgeryAt)}` : d.injuryAt ? ` · injury ${rpDate(d.injuryAt)}` : ''}</td></tr>
+      <tr><th>Side</th><td>${d.injured ? sideWord(d.injured) : 'both / not a limb'}</td></tr>
+      <tr><th>Pain limit</th><td>${d.painLimit}/10 · ${d.doseLevel} dose${d.requireApproval ? ' · phase changes need clinician approval' : ''}</td></tr></table>
+    ${d.findings.length ? `<h4>Movement check at the start</h4><ul>${d.findings.map(f => `<li>${esc(f.text)}</li>`).join('')}</ul>` : ''}
+    ${d.measurements.length ? `<h4>Measurements</h4><table class="rp"><tr><th>Test</th><th>First</th><th>Latest</th><th>Other side</th><th>% of other</th></tr>${d.measurements.map(m => `<tr><td>${esc(m.name)}${m.side ? ` (${sideWord(m.side)})` : ''}</td><td>${m.first}${esc(m.unit)}</td><td>${m.latest}${esc(m.unit)}</td><td>${m.other ?? '–'}${m.other != null ? esc(m.unit) : ''}</td><td>${m.lsi != null ? m.lsi + '%' : '–'}</td></tr>`).join('')}</table>` : ''}
+    ${d.painDays.length ? `<h4>Pain during exercise, last ${d.painDays.length} session days</h4><p>${d.painDays.map(x => x.during).join(' · ')} (0–10) · flare-ups so far: ${d.flareUps}</p>` : ''}
+    ${d.psfs ? `<h4>Daily activities (0–10)</h4><p>${d.psfs.first} → ${d.psfs.latest}${d.psfs.activities.length ? ` · ${esc(d.psfs.activities.join(', '))}` : ''}</p>` : ''}
+    ${d.notes.length ? `<h4>Programme log</h4><ul>${d.notes.map(n => `<li>${rpDate(n.at)}: ${esc(n.text)}</li>`).join('')}</ul>` : ''}
+    <p class="small muted">${esc(REPORT_DISCLAIMER)}</p></div>`;
+}
+function openReport() {
+  const d = reportData(plan(), S.profile), text = reportText(d), html = reportHtml(d);
+  $('#reportPrint').innerHTML = html;
+  openSheet(`<div><span class="eyebrow">Share with your physio</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Progress report</h2>
+    <p class="muted small" style="margin:6px 0 0">Send it before a visit, or show it on your phone. It holds your name, injury and results, so only share it with people you choose.</p></div>
+    <div class="report-preview">${html}</div>
+    <div class="btn-row"><button class="cta" type="button" id="rpShare">Share as text</button><button class="ghost" type="button" id="rpPrint">Print or save as PDF</button></div><p class="note" id="rpMsg"></p>`);
+  $('#rpShare').onclick = async () => {
+    try {
+      if (navigator.share) await navigator.share({ title: 'Rehab progress report', text });
+      else { await navigator.clipboard.writeText(text); $('#rpMsg').textContent = 'Copied. Paste it into a message to your physio.'; }
+    } catch (e) { if (e.name !== 'AbortError') $('#rpMsg').textContent = 'Sharing didn\'t work on this device. Use Print or save as PDF.'; }
+  };
+  $('#rpPrint').onclick = () => { document.body.classList.add('printing-report'); window.print(); setTimeout(() => document.body.classList.remove('printing-report'), 1000); };
+}
+
+// 8. Camera measurement tests. For a one-sided injury, the person states which side is being tested,
 // because only the injured side's results can pass a phase check.
 function startRomTest(id) {
   const d = ROM_TESTS[id], p = plan();
@@ -1136,7 +1319,8 @@ function startRomTest(id) {
     <ol class="steps"><li>${esc(d.how)}</li><li>Recording lasts ${d.secs} seconds and starts after a countdown.</li>${d.view === 'side' && askSide ? '<li>Put the side you are testing nearest the camera.</li>' : ''}</ol>
     ${askSide ? choice('romSide', 'Which side are you testing?', [['L', `Left${p?.injured === 'L' ? ' (injured)' : ''}`], ['R', `Right${p?.injured === 'R' ? ' (injured)' : ''}`]], side) : ''}
     <button class="cta" type="button" data-side="go">Start</button>
-    <label class="ghost">Upload a video instead<input type="file" id="romFile" accept="video/*" hidden></label>`);
+    <label class="ghost">Upload a video instead<input type="file" id="romFile" accept="video/*" hidden></label>
+    <p class="muted small" style="margin:0">Camera angles are estimates, not clinical measurements.</p>`);
   bindChoices($('#rsheetBody'));
   const readSide = () => { if (askSide) side = choiceOf('romSide') || side; };
   $('#rsheetBody [data-side]').onclick = () => { readSide(); go('camera'); };
@@ -1148,10 +1332,34 @@ async function finishRom(frames, q) {
   const mPerPx = scaleFromHeight(frames.slice(0, 20), (S.profile.heightCm || 0) / 100);
   const r = await runRomTest(cfg.romId, frames, { mPerPx });
   tab('rehab');
-  if (q.score < 40 || !r.ok) { const msg = q.score < 40 ? 'Recording quality was too low: ' + (q.issues[0] || 'check the camera view.') : r.issues[0]; toast(msg); say(msg, { id: 'rom_fail_' + Date.now(), priority: 'high' }); return; }
+  const bad = q.score < 40 || !r.ok;
+  const msg = bad ? (q.score < 40 ? 'Recording quality was too low: ' + (q.issues[0] || 'check the camera view.') : r.issues[0]) : '';
+  // During the movement check, results go into the check, and the next test follows.
+  if (cfg.intake && S.rehab.intake) {
+    if (bad) { say('The camera couldn\'t measure that one.', { id: 'rom_fail_' + Date.now(), priority: 'high' }); return openScreenRunner(`The camera couldn't measure that: ${msg} If the camera was the problem, start it again. If the movement itself was too hard, tell us below: that's useful too.`); }
+    const ik = S.rehab.intake;
+    ik.results.push({ at: Date.now(), test: cfg.romId, side: cfg.side || r.side || null, value: r.value, L: r.L, R: r.R, quality: q.score });
+    ik.idx++; persist();
+    say(`${d.name}: done.`, { id: 'rom_' + Date.now(), priority: 'high' });
+    return openScreenRunner();
+  }
+  if (bad) {
+    say('The camera couldn\'t measure that one.', { id: 'rom_fail_' + Date.now(), priority: 'high' });
+    if (!p) return toast(msg);
+    openSheet(`<div><span class="eyebrow">Measurement</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">${esc(d.name)}: not measured</h2>
+      <p class="muted small" style="margin:6px 0 0">${esc(msg)}</p></div>
+      <p class="small" style="margin:0">Was it the camera, or the movement?</p>
+      <button class="cta" type="button" id="rfAgain">Camera: try again</button>
+      <div class="btn-row"><button class="ghost" type="button" id="rfPain">Too painful</button><button class="ghost" type="button" id="rfCant">Couldn't do it</button></div>`);
+    $('#rfAgain').onclick = () => startRomTest(cfg.romId);
+    const log = why => { note(p, `${d.name}${cfg.side ? ` (${sideWord(cfg.side)})` : ''}: ${why}.`); persist(); closeSheet(); renderRehab(); toast('Noted in your programme log. If this keeps happening, show your physio.'); };
+    $('#rfPain').onclick = () => log('too painful to do');
+    $('#rfCant').onclick = () => log('couldn\'t do the movement');
+    return;
+  }
   const rec = { at: Date.now(), test: cfg.romId, side: cfg.side || r.side || null, value: r.value, L: r.L, R: r.R, quality: q.score };
   const val = r.value != null ? `${r.value}${d.unit === '°' ? ' degrees' : ' ' + d.unit}` : `left ${r.L}, right ${r.R}`;
-  if (p) { p.tests.push(rec); note(p, `${d.name}: ${val}${rec.side ? ` (${rec.side === 'L' ? 'left' : 'right'})` : ''}.`); persist(); renderRehab(); }
+  if (p) { p.tests.push(rec); note(p, `${d.name}: ${val}${rec.side ? ` (${sideWord(rec.side)})` : ''}.`); persist(); renderRehab(); }
   say(`${d.name}: ${val}.`, { id: 'rom_' + Date.now(), priority: 'high' });
   toast(`${d.name}: ${r.value != null ? r.value + (d.unit === '°' ? '°' : ' ' + d.unit) : `L ${r.L} · R ${r.R}`}`);
 }
@@ -1159,7 +1367,7 @@ async function finishRom(frames, q) {
 function renderRehabToday() {
   const p = plan(), el = $('#rehabToday'); el.hidden = !p; if (!p) return;
   const c = condOf(p), ev = evaluatePhase(c, p.phase, p), due = Date.now() >= nextReassess(p);
-  el.innerHTML = `<span class="eyebrow" style="color:var(--good)">Rehab · phase ${p.phase + 1} of ${c.phases.length}</span><b>${esc(c.name)}</b><span class="muted small">${c.phases[p.phase].exercises.length} exercises today · ${ev.items.filter(i => i.met).length}/${ev.items.length} phase goals met${due ? ' · reassessment due' : ''}</span>`;
+  el.innerHTML = `<span class="eyebrow" style="color:var(--good)">Rehab · phase ${p.phase + 1} of ${c.phases.length}</span><b>${esc(c.name)}</b><span class="muted small">${c.phases[p.phase].exercises.length} exercises today · ${ev.items.filter(i => i.met).length}/${ev.items.length} phase checks met${due ? ' · weekly check-in due' : ''}</span>`;
   el.onclick = () => tab('rehab');
 }
 
