@@ -144,14 +144,25 @@ export function localClient(S, now = Date.now()) {
 /* ---------- Broadcasts: one message to many clients, delivered in the app and as a phone notification ---------- */
 export const AUDIENCES = [
   { id: 'all', label: 'Everyone' },
-  { id: 'quiet', label: 'Not trained in 7+ days' },
+  { id: 'notrain', label: 'Hasn\'t trained for…' },
+  { id: 'noopen', label: 'Hasn\'t opened the app for…' },
   { id: 'active', label: 'Trained this week' },
   { id: 'top', label: 'This week\'s top 10' },
 ];
-/** Which clients a broadcast reaches. lastTrain: Map client → last training time (ms). top: Set of client ids. */
-export function audienceOf(clients = [], id = 'all', { lastTrain = new Map(), top = new Set(), now = Date.now() } = {}) {
-  const days = c => { const t = lastTrain.get(c.id); return t ? (now - t) / D : Infinity; };
-  if (id === 'quiet') return clients.filter(c => days(c) >= 7);
+export const AWAY = [[3, '3 days'], [4, '4 days'], [5, '5 days'], [7, '1 week'], [14, '2 weeks'], [30, '1 month'], [90, '3 months']];
+/** "12 days", "3 weeks", "2 months", or "never". */
+export const awayText = days => (days === Infinity || days == null ? 'never' : days < 1 ? 'today' : days < 14 ? `${Math.floor(days)} day${Math.floor(days) === 1 ? '' : 's'}` : days < 60 ? `${Math.floor(days / 7)} weeks` : `${Math.floor(days / 30)} months`);
+/** Which clients a broadcast reaches, with how long each has been away (most away first for the "hasn't" groups).
+ *  lastTrain / lastOpen: Map client → time (ms). top: Set of client ids. away: days for the "hasn't" groups. */
+export function audienceOf(clients = [], id = 'all', { lastTrain = new Map(), lastOpen = new Map(), top = new Set(), away = 7, now = Date.now() } = {}) {
+  const since = (m, c) => { const t = m.get(c.id); return t ? (now - t) / D : Infinity; };
+  const days = c => since(lastTrain, c);
+  const tag = list => list.map(c => ({ ...c, trainDays: days(c), openDays: since(lastOpen, c) }));
+  if (id === 'notrain' || id === 'quiet') return tag(clients.filter(c => days(c) >= (id === 'quiet' ? 7 : away))).sort((a, b) => b.trainDays - a.trainDays);
+  if (id === 'noopen') return tag(clients.filter(c => since(lastOpen, c) >= away)).sort((a, b) => b.openDays - a.openDays);
+  return tag(audienceOfRest(clients, id, { days, top }));
+}
+function audienceOfRest(clients, id, { days, top }) {
   if (id === 'active') return clients.filter(c => days(c) < 7);
   if (id === 'top') return clients.filter(c => top.has(c.id));
   return clients;

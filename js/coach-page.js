@@ -47,7 +47,7 @@ async function load() {
   render();
   if (!state.extra) { initCoachExtra({ state, cloud, toast }); state.extra = true; }
   await loadBoard().catch(e => console.warn('board:', e.message));
-  $('#bcAud').dispatchEvent(new Event('input'));
+  $('#bcAud').dispatchEvent(new Event('change'));
 }
 
 function render() {

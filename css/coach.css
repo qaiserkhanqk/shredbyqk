@@ -60,3 +60,7 @@ body.coach-page { background: var(--ink); color: var(--text); min-height: 100vh;
 .cd-extra textarea { width: 100%; font: inherit; padding: 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--text); resize: vertical; }
 .bc-notif { display: grid; gap: 2px; padding: 12px 14px; border-radius: 16px; background: var(--surface-2); font-size: .9rem; }
 .cb-won { font-size: .8rem; color: var(--good); font-weight: 700; }
+.bc-who { display: grid; gap: 2px; max-height: 320px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; padding: 6px 10px; }
+.bc-who .check { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); }
+.bc-who .check:first-child { border-top: 0; }
+.bc-who .check .small { grid-column: 2; }

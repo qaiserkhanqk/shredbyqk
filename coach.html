@@ -46,7 +46,9 @@
         <div class="chip-wrap" id="bcTpl"></div>
         <label class="field">Title<input id="bcTitle" maxlength="60" placeholder="Dr. Doom aa gaya"></label>
         <label class="field">Message <span class="muted small" id="bcLeft">300</span><textarea id="bcBody" rows="3" maxlength="300" placeholder="Dr. Doom aa gaya lekin tum gym nahi aaye, {name}?"></textarea></label>
-        <label class="field">Who gets it <span class="muted small" id="bcCount"></span><select id="bcAud"></select></label>
+        <label class="field">Who gets it<select id="bcAud"></select></label>
+        <label class="field" id="bcAwayWrap" hidden>For how long<select id="bcAway"></select></label>
+        <div class="stack" style="gap:6px"><span class="eyebrow" id="bcCount"></span><div id="bcWho"></div></div>
         <div id="bcPreview"></div>
         <button type="button" class="cta" id="bcSend">Send notification</button>
       </section>

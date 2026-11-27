@@ -577,8 +577,14 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('dashboard: broadcast templates ready', (await p.$$('[data-bctpl]')).length >= 6);
   await p.click('[data-bctpl="0"]'); await p.waitForTimeout(100);
   check('dashboard: broadcast preview fills in the name', /Dr\. Doom aa gaya lekin tum gym nahi aaye, \w+/.test(await p.textContent('#bcPreview')), await p.textContent('#bcPreview'));
-  await p.selectOption('#bcAud', 'quiet'); await p.waitForTimeout(100);
-  check('dashboard: audience count shown', /\d+ client/.test(await p.textContent('#bcCount')));
+  await p.selectOption('#bcAud', 'notrain'); await p.selectOption('#bcAway', '3'); await p.waitForTimeout(100);
+  const away = await p.$$('#bcWho [data-bcwho]:not([data-bcwho="*"])');
+  check('dashboard: "hasn\'t trained for 3 days" lists who, with how long they\'ve been away', away.length >= 1 && /trained .* ago|trained never/.test(await p.textContent('#bcWho')), await p.textContent('#bcWho'));
+  const cntBefore = await p.textContent('#bcCount');
+  await p.click('#bcWho .bc-who input >> nth=0'); await p.waitForTimeout(100);
+  check('dashboard: untick someone → one fewer selected', /^(\d+) of (\d+)/.exec(await p.textContent('#bcCount'))[1] === String(+/^(\d+)/.exec(cntBefore)[1] - 1), `${cntBefore} → ${await p.textContent('#bcCount')}`);
+  await p.selectOption('#bcAud', 'noopen'); await p.selectOption('#bcAway', '90'); await p.waitForTimeout(100);
+  check('dashboard: "hasn\'t opened the app for 3 months" works too', /selected/.test(await p.textContent('#bcCount')));
   check('dashboard: leaderboard lists clients by score', (await p.$$('#cbList .b-row')).length >= 5);
   await p.click('[data-cbrange=month]'); await p.waitForTimeout(100);
   check('dashboard: month view lets QK record the top 3', (await p.$$('#cbList [data-award]')).length === 3);

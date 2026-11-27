@@ -2,7 +2,7 @@
 import { weekScore, weekStart, weekKey, displayName, ranked, monthTotals, MAX } from '../js/leaderboard.js';
 import { poorDays, mindDue, goodNews, reply } from '../js/mind.js';
 import { liveFitAge, ifStopped, daysSinceTraining } from '../js/fitnessage.js';
-import { audienceOf, BROADCAST_TEMPLATES, fill } from '../js/dash.js';
+import { audienceOf, awayText, BROADCAST_TEMPLATES, fill } from '../js/dash.js';
 import { broadcastJobs, lapseMsg, plan } from '../tools/push-checkins.mjs';
 
 let fail = 0;
@@ -77,8 +77,14 @@ check('broadcast: sent to each phone, not to people who turned notifications off
 // ---- Broadcast audiences ----
 const clients = [{ id: 'a', name: 'Ali' }, { id: 'b', name: 'Sara' }, { id: 'c', name: 'Omar' }];
 const lastTrain = new Map([['a', NOW - DAY], ['b', NOW - 10 * DAY]]);
-check('audience: not trained in 7+ days (and never)', audienceOf(clients, 'quiet', { lastTrain, now: NOW }).map(c => c.id).join() === 'b,c');
+check('audience: not trained in 7+ days (and never)', audienceOf(clients, 'quiet', { lastTrain, now: NOW }).map(c => c.id).join() === 'c,b');
 check('audience: trained this week', audienceOf(clients, 'active', { lastTrain, now: NOW }).map(c => c.id).join() === 'a');
+const lastOpen = new Map([['a', NOW - DAY], ['b', NOW - 40 * DAY], ['c', NOW - 100 * DAY]]);
+const nt = audienceOf(clients, 'notrain', { lastTrain, away: 3, now: NOW });
+check('hasn\'t trained for 3+ days: longest away first, never-trained included', nt.map(c => c.id).join() === 'c,b' && nt[0].trainDays === Infinity && Math.round(nt[1].trainDays) === 10, JSON.stringify(nt));
+check('hasn\'t opened for 1 month+', audienceOf(clients, 'noopen', { lastOpen, away: 30, now: NOW }).map(c => c.id).join() === 'c,b');
+check('hasn\'t opened for 3 months+', audienceOf(clients, 'noopen', { lastOpen, away: 90, now: NOW }).map(c => c.id).join() === 'c');
+check('away text: days, weeks, months, never', [awayText(4), awayText(21), awayText(95), awayText(Infinity)].join() === '4 days,3 weeks,3 months,never');
 check('templates: the Dr. Doom one is there, with their name filled in', /Dr\. Doom aa gaya lekin tum gym nahi aaye, Ali\?/.test(fill(BROADCAST_TEMPLATES[0].body, 'Ali Khan')));
 
 if (fail) { console.log(`\n${fail} failed`); process.exit(1); }
