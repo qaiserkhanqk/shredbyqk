@@ -37,7 +37,12 @@ export function foodWeekSummary(S, now = Date.now()) {
 }
 
 /** Places a client added, so QK can review them and share good ones with everyone. */
-export const placeRows = (uid, S) => (S.food?.places || []).map(p => ({ client_id: uid, name: p.name, items: p.items }));
+export const placeRows = (uid, S) => [
+  ...(S.food?.places || []).map(p => ({ client_id: uid, name: p.name, items: p.items })),
+  // Calories clients read off menus, grouped by place, for QK to review and share with everyone.
+  ...Object.entries(Object.values(S.food?.menuKcal || {}).reduce((g, m) => ((g[m.place] ||= []).push({ name: m.item, dish: m.dish, menuKcal: m.kcal, at: m.at }), g), {}))
+    .map(([place, items]) => ({ client_id: uid, name: `${place} · menu calories`, items })),
+];
 
 /** Dashboard view of one client's food: from their day rows and weekly summary. */
 export function foodCard(week, rows = [], now = Date.now()) {

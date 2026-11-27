@@ -137,7 +137,7 @@ Guardrails:
 - "Eat less" is never offered below the floor or during rehab.
 - Messages are worded to motivate, never to blame.
 
-Reminders: a notification when the app is open on a check-in day, plus an optional calendar reminder every two weeks that works even when the app is closed. QK sees each client's last check-in choice on the dashboard.
+Reminders reach the phone even when the app is closed. Web Push (`js/push.js`, `tools/webpush.mjs`, `tools/push-checkins.mjs`) runs from a daily GitHub Actions job, with no server to keep running; setup is in supabase/README.md, step 6. There's also an in-app notice and an optional calendar reminder every two weeks. QK sees each client's last check-in choice on the dashboard.
 
 **Weight graph:** every weigh-in is kept, with ranges of 1 month, 3 months, 1 year and all time, a 7-day smoothed trend line, and the change over the range and since the client started.
 
@@ -165,15 +165,39 @@ Plans start from what Pakistanis actually eat. Research on everyday eating (Gall
 
 QK sees each client's plan (calories, protein, meals) on the coach dashboard. QK editing a client's plan from the dashboard is the next step. It needs a coach-writable table, because today the database only lets coaches send messages.
 
+## Say where you ate it
+
+Clients can say or type where the food came from, and every dish in the sentence takes that place's portion, oil level and official numbers (`js/foodtext.js`, tested in `tests/placemeal.test.mjs`):
+
+| Said | Logged as |
+|---|---|
+| "Nagina se anda shami burger khaya" | Nagina Burger Point's anda shami burger |
+| "Ravi restaurant se chicken karahi aur 2 naan" | Ravi's karahi and 2 of Ravi's naans |
+| "big mac from mcdonalds" | McDonald's Big Mac, official values |
+| "zinger burger from Burger Hub" (not on their menu) | A zinger cooked restaurant-style, labelled Burger Hub |
+| "beef burger at Johnny Rockets" (not in the database) | Restaurant-style, with the place's name kept |
+| "ghar ka daal chawal" / "karahi from a dhaba" | Home cooking / dhaba oil levels |
+
+## QK edits plans on the dashboard
+
+Each client's plan shows on the coach dashboard. QK can do all of this, and every total updates as he types:
+- change any amount
+- remove a food
+- add a food from the plan list
+- write a note
+
+When QK saves, the client's app shows "Edited by QK" with the note, and they get a notification. The app never overwrites QK's version with its own: not when the client's targets change, and not when they ask for other options.
+
 ## The UAE
 
 For clients in Dubai, Abu Dhabi and Sharjah:
 - **36 Gulf, Levantine, Iranian and cafeteria dishes** are modelled from their ingredients, the same way as the desi ones. They include mandi, machboos, kabsa, harees, hummus, mutabbal, falafel, manakish, shish tawook, mixed grill, koobideh, karak chai, luqaimat and Kerala parotta. The UAE build-ups were checked against published values where they exist (Saudi MOH, FatSecret, USDA hummus and tabbouleh).
 - **15 café and chain foods** were added too, including lattes, Spanish latte, Iced Capp, croissant and toum.
 - **89 places with 358 items are in `js/places-uae.js`.** Of these:
-  - **30 are chains.** Dubai requires calories on chain menus, but most chains don't publish them online. Only 15 items have official values so far (Papa John's UAE, Calo, Kcal, Five Guys). The rest are marked `check`, to fill in from the menus or the delivery apps.
+  - **30 are chains.** Dubai requires calories on chain menus, but most chains don't publish them online. Only 18 items have official values so far (Papa John's UAE, Calo, Kcal, Five Guys, two McDonald's UAE items via a third-party calculator, one Zaatar w Zeit item). The rest are marked `check`, to fill in from the menus or the delivery apps.
   - **59 are local places:** Ravi, Karachi Darbar, Al Ustad, Bait Al Mandi, Al Fanar, Logma, Al Mallah and more.
 - **When the client's city is in the UAE, UAE branches and places come first**, and Pakistani ones come first in Pakistan.
+- **Menu calories from clients.** UAE menus must show calories, so when an item has no official number, clients can type in the one on the menu. That number is used for the item from then on, and it syncs to QK for review, so the chain list fills in as clients eat. The one official number is split into protein, carbs and fat the way the dish model splits them.
 
 ## Making it more accurate over time
 

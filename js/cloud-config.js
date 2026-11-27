@@ -8,3 +8,8 @@ export const CLOUD = {
   anonKey: '',  // the "anon public" key
 };
 export const cloudOn = () => !!(CLOUD.url && CLOUD.anonKey);
+// Notifications to a closed app: the VAPID public key from `node tools/webpush.mjs keys` (the private key
+// goes in the GitHub Actions secrets, never here). Leave empty and the app uses in-app reminders only.
+export const PUSH = {
+  vapidPublicKey: '',
+};

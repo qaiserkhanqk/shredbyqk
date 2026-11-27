@@ -6,6 +6,7 @@ import { clientCard, sortCards, overview, TEMPLATES, fill, demoData, localClient
 import { LIB } from './library.js';
 import { byId as programById } from './programs.js';
 import { EXERCISES, allRules } from './exercises.js';
+import { retotal, FOOD_CHOICES, FOODS } from './dietplan.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -16,7 +17,7 @@ const RULES_BY_ID = {}; for (const ex of Object.values(EXERCISES)) for (const r 
 const ago = t => { if (t == null) return 'never'; const d = Math.floor((Date.now() - t) / D); return d <= 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`; };
 const statusCls = s => s.replace(' ', '-');
 
-const state = { demo: !cloudOn(), cards: [], raw: null, sel: null, filter: 'all', q: '', sent: {} };
+const state = { demo: !cloudOn(), cards: [], raw: null, sel: null, filter: 'all', q: '', sent: {}, edit: {}, coachPlans: {} };
 const store = { get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 const cloud = cloudOn() ? new Cloud({ url: CLOUD.url, anonKey: CLOUD.anonKey, session: store.get('qk_coach_session'), onSession: s => store.set('qk_coach_session', s) }) : null;
 
@@ -35,6 +36,7 @@ async function load() {
     const profiles = await cloud.clients(), ids = profiles.map(p => p.id), from = new Date(now - 70 * D).toISOString();
     const [sets, opens, checks, sent, food] = await Promise.all([cloud.since('sessions', ids, from), cloud.since('events', ids, from), cloud.since('checkins', ids, from), cloud.sent(new Date(now - 14 * D).toISOString()), cloud.since('food_days', ids, new Date(now - 14 * D).toISOString().slice(0, 10)).catch(() => [])]);
     state.raw = { profiles, sets, opens, checks, food };
+    state.coachPlans = {}; for (const cp of await cloud.plans(ids).catch(() => [])) state.coachPlans[cp.client_id] = cp;
     state.sent = {}; for (const m of sent) (state.sent[m.client_id] ||= []).push(m);
   }
   const { profiles, sets, opens, checks, food = [] } = state.raw, by = (rows, id) => rows.filter(r => r.client_id === id);
@@ -79,6 +81,7 @@ function renderDetail() {
       <span>Clean reps, all time</span><span>${c.cleanReps}${c.medal ? ` · ${esc(c.medal.name)}` : ''}</span>
     </div>
     ${foodHTML(c.food)}
+    ${planHTML(c)}
     <div class="cd-msg">
       <span class="eyebrow">${kind === 'cheer' ? 'Send a cheer' : 'Send a nudge'} · QK says it when they open the app</span>
       <div class="cd-tpl">${TEMPLATES[kind].map((t, i) => `<button type="button" data-tpl="${kind}:${i}">${esc(fill(t, c.name))}</button>`).join('')}</div>
@@ -104,6 +107,56 @@ function foodHTML(f) {
       ${f.lastDay ? `<span>Latest day (${esc(String(f.lastDay.at).slice(0, 10))})</span><span>${esc((f.lastDay.items || []).slice(0, 4).map(i => i.name).join(', '))}${(f.lastDay.items || []).length > 4 ? '…' : ''}</span>` : ''}
     </div></div>`;
 }
+
+/* ---- QK edits a client's diet plan ---- */
+const r0 = v => Math.round(v);
+// The plan QK is editing: an unsaved edit, else the one QK last saved, else the client's own.
+const planFor = id => state.edit[id] || state.coachPlans[id]?.plan || state.raw?.profiles.find(p => p.id === id)?.diet_plan || null;
+function planHTML(c) {
+  const plan = planFor(c.id);
+  if (!plan?.meals) return '<div class="cd-food"><span class="eyebrow">Diet plan</span><p class="muted small" style="margin:4px 0 0">No plan yet. When the client answers the food questions in the app, their plan appears here for you to edit.</p></div>';
+  const t = plan.target || {}, d = plan.day, edited = !!state.edit[c.id];
+  const gap = k => t[k] ? Math.round((d[k] - t[k]) / t[k] * 100) : 0;
+  return `<div class="cd-food cd-plan"><span class="eyebrow">Diet plan · ${state.coachPlans[c.id] ? 'edited by you' : 'made in the app'}${edited ? ' · unsaved changes' : ''}</span>
+    <p class="small" style="margin:4px 0 8px"><b>${r0(d.kcal).toLocaleString()} kcal</b> · P ${r0(d.protein)} · C ${r0(d.carbs)} · F ${r0(d.fat)} g
+      <span class="muted">(target ${(t.kcal || 0).toLocaleString()} kcal${t.kcal ? `, ${gap('kcal') > 0 ? '+' : ''}${gap('kcal')}%` : ''}; protein ${t.protein || '–'} g)</span></p>
+    ${plan.meals.map((m, mi) => `<div class="cdp-meal"><b>${esc(m.name)}</b> <span class="muted small">${r0(m.target?.kcal || 0)} kcal target</span>
+      ${m.options.map((o, oi) => `<div class="cdp-opt"><div class="cdp-head"><span>${m.options.length > 1 ? 'ABC'[oi] + '. ' : ''}${esc(o.title)}</span><span class="muted small">${r0(o.total.kcal)} kcal · P ${r0(o.total.protein)}</span></div>
+        ${o.items.map((it, ii) => `<div class="cdp-item"><span>${esc(it.name)}</span>
+          <input type="number" min="0" step="${FOODS[it.id]?.step || 1}" value="${it.amount}" data-amt="${mi}|${oi}|${ii}" aria-label="Amount of ${esc(it.name)}">
+          <span class="muted small">${esc(FOODS[it.id]?.unit === 'g' ? 'g' : FOODS[it.id]?.unit || '')}</span><span class="muted small cdp-k">${r0(it.kcal)}</span>
+          <button type="button" class="cdp-x" data-del="${mi}|${oi}|${ii}" aria-label="Remove ${esc(it.name)}">✕</button></div>`).join('')}
+        <div class="cdp-add"><select data-addsel="${mi}|${oi}" aria-label="Add a food"><option value="">+ Add a food…</option>${FOOD_CHOICES.map(f => `<option value="${f.id}">${esc(f.name)}</option>`).join('')}</select></div>
+      </div>`).join('')}</div>`).join('')}
+    <textarea id="cdPlanNote" maxlength="300" placeholder="A note for ${esc(c.name.split(' ')[0])} (optional): what you changed and why">${esc(state.edit[c.id]?.noteDraft || state.coachPlans[c.id]?.note || '')}</textarea>
+    <div class="btn-row"><button class="cta" type="button" id="cdPlanSave" ${edited ? '' : 'disabled'}>Save and send to ${esc(c.name.split(' ')[0])}</button>${edited ? '<button class="ghost" type="button" id="cdPlanUndo">Discard changes</button>' : ''}</div></div>`;
+}
+function editPlan(id, fn) {
+  const p = structuredClone(planFor(id)); fn(p);
+  state.edit[id] = { ...retotal(p), noteDraft: $('#cdPlanNote')?.value || '' };
+  renderDetail();
+}
+$('#cdDetail').addEventListener('change', e => {
+  const id = state.sel, a = e.target.dataset;
+  if (a.amt) { const [mi, oi, ii] = a.amt.split('|').map(Number); return editPlan(id, p => { p.meals[mi].options[oi].items[ii].amount = Math.max(0, +e.target.value || 0); }); }
+  if (a.addsel && e.target.value) {
+    const [mi, oi] = a.addsel.split('|').map(Number), f = FOODS[e.target.value];
+    return editPlan(id, p => { p.meals[mi].options[oi].items.push({ id: f.id, amount: f.unit === 'g' || f.unit === 'ml' ? f.min : Math.max(f.min, f.step) }); });
+  }
+});
+$('#cdDetail').addEventListener('click', async e => {
+  const id = state.sel, del = e.target.closest('[data-del]');
+  if (del) { const [mi, oi, ii] = del.dataset.del.split('|').map(Number); return editPlan(id, p => { p.meals[mi].options[oi].items.splice(ii, 1); }); }
+  if (e.target.id === 'cdPlanUndo') { delete state.edit[id]; return renderDetail(); }
+  if (e.target.id !== 'cdPlanSave') return;
+  const c = state.cards.find(x => x.id === id), { noteDraft, ...plan } = state.edit[id], note = $('#cdPlanNote').value.trim(), at = new Date().toISOString();
+  try {
+    if (!state.demo) await cloud.setPlan(id, plan, note);
+    else if (id === LOCAL_ID) store.set('qk_demo_plan', { plan, note, at });
+    state.coachPlans[id] = { plan, note, updated_at: at }; delete state.edit[id]; renderDetail();
+    toast(state.demo && id !== LOCAL_ID ? `Sample mode: this would go to ${c.name}.` : state.demo ? 'Saved. Open the app on this phone to see it.' : `Saved. ${c.name.split(' ')[0]} gets it next time the app syncs, with a notification.`);
+  } catch (err) { toast(`Couldn't save: ${err.message}`); }
+});
 
 $('#cdList').onclick = e => { const b = e.target.closest('[data-client]'); if (!b) return; state.sel = b.dataset.client; render(); if (innerWidth < 820) $('#cdDetail').scrollIntoView({ behavior: 'smooth' }); };
 $('#cdFilter').onclick = e => { const b = e.target.closest('[data-f]'); if (!b) return; state.filter = b.dataset.f; $('#cdFilter').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); render(); };

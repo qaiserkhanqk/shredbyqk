@@ -56,12 +56,20 @@ do $$ begin insert into public.messages (coach_id, client_id, body) values (auth
 exception when others then perform pg_temp.check('coach cannot message someone else''s client', true); end $$;
 do $$ begin update public.sessions set reps = 99; perform pg_temp.check('coach cannot edit client data', (select reps from public.sessions limit 1) <> 99);
 exception when others then perform pg_temp.check('coach cannot edit client data', true); end $$;
+insert into public.coach_plans (client_id, coach_id, plan, note) values ('00000000-0000-0000-0000-00000000000a', auth.uid(), '{"meals":[]}', 'More protein');
+select pg_temp.check('coach saves a plan for their client', (select count(*) from public.coach_plans) = 1);
+do $$ begin insert into public.coach_plans (client_id, coach_id, plan) values ('00000000-0000-0000-0000-00000000000b', auth.uid(), '{}'); perform pg_temp.check('coach cannot write a plan for someone else''s client', false);
+exception when others then perform pg_temp.check('coach cannot write a plan for someone else''s client', true); end $$;
+select pg_temp.check('coach cannot see phones'' push addresses', (select count(*) from public.push_subs) = 0);
 reset role;
 
 -- Coach Z sees nothing of Q's client.
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000c2');
 set role authenticated;
 select pg_temp.check('another coach sees none of your clients', (select count(*) from public.sessions) = 0 and (select count(*) from public.profiles where id <> auth.uid()) = 0);
+select pg_temp.check('another coach sees none of your plans', (select count(*) from public.coach_plans) = 0);
+do $$ begin insert into public.coach_plans (client_id, coach_id, plan) values ('00000000-0000-0000-0000-00000000000a', auth.uid(), '{}'); perform pg_temp.check('another coach cannot write your client''s plan', false);
+exception when others then perform pg_temp.check('another coach cannot write your client''s plan', true); end $$;
 reset role;
 
 -- Client A reads the cheer and marks it read, but cannot rewrite it.
@@ -69,6 +77,13 @@ select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
 set role authenticated;
 select pg_temp.check('client receives the coach''s cheer', (select body from public.messages) = 'Great week!');
 update public.messages set read_at = now();
+select pg_temp.check('client reads the plan QK wrote', (select note from public.coach_plans) = 'More protein');
+update public.coach_plans set note = 'hacked';
+select pg_temp.check('client cannot change QK''s plan', (select note from public.coach_plans) = 'More protein');
+insert into public.push_subs (endpoint, client_id, p256dh, auth) values ('https://push.example/1', auth.uid(), 'k', 'a');
+select pg_temp.check('client saves their phone''s push address', (select count(*) from public.push_subs) = 1);
+do $$ begin insert into public.push_subs (endpoint, client_id, p256dh, auth) values ('https://push.example/2', '00000000-0000-0000-0000-00000000000b', 'k', 'a'); perform pg_temp.check('client cannot save a push address for someone else', false);
+exception when others then perform pg_temp.check('client cannot save a push address for someone else', true); end $$;
 do $$ begin update public.messages set body = 'edited'; perform pg_temp.check('client cannot rewrite a message', false);
 exception when others then perform pg_temp.check('client cannot rewrite a message', true); end $$;
 reset role;

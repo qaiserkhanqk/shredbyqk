@@ -32,6 +32,6 @@ const cloud = { uid: 'u1', upsert: async (t, r, c) => calls.push({ t, n: r.lengt
 await pushAll(cloud, S, {});
 check('sync pushes food days (conflict on client_id,at)', calls.some(x => x.t === 'food_days' && x.n === 7 && x.c === 'client_id,at'));
 check('sync pushes places', calls.some(x => x.t === 'places' && x.n === 1));
-check('sync puts the weekly summary on the profile', calls.find(x => x.t === 'me')?.f.food_week?.logged === 7);
+check('sync puts the weekly summary on the profile', calls.filter(x => x.t === 'me').some(x => x.f.food_week?.logged === 7));
 console.log(fails ? `\n${fails} FAILED` : '\nall food sync checks passed');
 process.exit(fails ? 1 : 0);

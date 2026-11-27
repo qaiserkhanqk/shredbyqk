@@ -98,6 +98,7 @@ export function initFood(c) {
     if (e.target.id === 'fsGrams') { cur.opts.grams = Math.max(1, +e.target.value || 0); renderSheetResult(); }
     if (e.target.id === 'fsWeighed') { const g = +e.target.value; cur.weighedG = g > 0 ? g : null; if (g > 0) cur.opts.grams = g; else delete cur.opts.grams; renderSheetResult(); }
     if (e.target.id === 'plItem') renderSuggestions();
+    if (e.target.id === 'fsMenuKcal') { const k = +e.target.value; cur.official = k > 20 && k < 5000 ? menuOfficial(cur.ref, { ...cur.opts, servings: cur.opts.menuBase || 1 }, k) : null; renderSheetResult(); }
   };
   const p = ctx.S.profile;
   const pl = $('#tPlate'); pl.value = F().plateCm || ''; pl.onchange = () => { F().plateCm = pl.value; ctx.persist(); };
@@ -217,7 +218,15 @@ function openSheet(ref, opts, onSave, saveLabel, extra = {}) {
   $('#foodSheet').hidden = false;
 }
 function openMenuItem(place, item) {
-  openSheet({ t: 'dish', id: item.dish }, { ...item.opts, menuBase: item.opts.servings || 1 }, null, null, { name: `${place.name} · ${item.name}`, official: item.official && { ...item.official, base: item.opts.servings || 1 }, place: place.name + (place.city ? `, ${place.area ? place.area + ', ' : ''}${place.city}` : '') });
+  // Calories a client read off the menu (UAE menus must show them) count as official for that item from then on.
+  const menuKey = `${place.id}|${item.name}`, saw = !item.official && F().menuKcal?.[menuKey];
+  const official = item.official ? { ...item.official, base: item.opts.servings || 1 } : saw ? menuOfficial({ t: 'dish', id: item.dish }, item.opts, saw.kcal) : null;
+  openSheet({ t: 'dish', id: item.dish }, { ...item.opts, menuBase: item.opts.servings || 1 }, null, null, { name: `${place.name} · ${item.name}`, official, place: place.name + (place.city ? `, ${place.area ? place.area + ', ' : ''}${place.city}` : ''), menuKey: item.official ? null : menuKey, placeName: place.name, itemName: item.name, chainOfficial: !!item.official });
+}
+// The menu's calories, split into protein, carbs and fat the way the dish model splits them.
+function menuOfficial(ref, opts, kcal) {
+  const e = N.estimate(ref, { ...opts, servings: opts.servings || 1 }), k = kcal / e.kcal, r1 = v => Math.round(v * k * 10) / 10;
+  return { kcal, protein: r1(e.protein), carbs: r1(e.carbs), fat: r1(e.fat), source: 'the menu (entered by you)', fromMenu: true, base: opts.servings || 1 };
 }
 function closeSheet() { scanStop?.(); $('#foodSheet').hidden = true; cur = null; }
 
@@ -226,7 +235,7 @@ const seg = (key, items, val) => `<div class="seg fseg" data-key="${key}" role="
 function renderSheet() {
   const { ref, hit, opts } = cur, d = ref.t === 'dish' ? hit.food : null;
   const title = cur.name || hit.name;
-  const eyebrow = cur.official ? `${esc(cur.place || '')} · official values (${esc(cur.official.source)})` : cur.place ? `${esc(cur.place)} · QK estimate from the recipe` : ref.t === 'dish' ? 'Desi model · computed from ingredients' : ref.t === 'indb' ? 'Indian Nutrient Databank' : ref.t === 'bc' ? (hit.food.source === 'FatSecret' ? 'FatSecret (live search)' : 'Packaged food · label values (Open Food Facts)') : 'Ingredient (USDA)';
+  const eyebrow = cur.official?.fromMenu ? `${esc(cur.place || '')} · calories from the menu` : cur.official ? `${esc(cur.place || '')} · official values (${esc(cur.official.source)})` : cur.place ? `${esc(cur.place)} · QK estimate from the recipe` : ref.t === 'dish' ? 'Desi model · computed from ingredients' : ref.t === 'indb' ? 'Indian Nutrient Databank' : ref.t === 'bc' ? (hit.food.source === 'FatSecret' ? 'FatSecret (live search)' : 'Packaged food · label values (Open Food Facts)') : 'Ingredient (USDA)';
   let html = `<div class="grab"></div><div><span class="eyebrow">${eyebrow}</span><h2 class="display h2" style="margin-top:6px">${esc(title)}</h2></div>`;
   // "Roti" can mean a naan or a roghni naan: one tap to say which one.
   const fam = N.family(d);
@@ -243,6 +252,8 @@ function renderSheet() {
   }
   if (cur.weigh) html += `<label class="field">Weighed it? Plate contents in grams (optional)<input id="fsWeighed" type="number" inputmode="decimal" placeholder="e.g. 260" value="${cur.weighedG || ''}"></label>
     <p class="muted small fq-why" style="margin-top:-6px">Weigh a few photo meals and QK learns your portion sizes, so every photo after that is closer.</p>`;
+  if (cur.menuKey) html += `<label class="field">${tr('Menu shows calories?')} (optional)<input id="fsMenuKcal" type="number" inputmode="numeric" placeholder="e.g. 550" value="${cur.official?.fromMenu ? cur.official.kcal : ''}"></label>
+    <p class="muted small fq-why" style="margin-top:-6px">In the UAE, chain menus must show calories. Type the number and QK uses it, for you now and next time. QK reviews it too.</p>`;
   html += `<div id="fsResult"></div><button type="button" class="cta" id="fsSave">${esc(tr(cur.saveLabel || 'Add to ' + N.mealOf().toLowerCase()))}</button>`;
   $('#foodSheetBody').innerHTML = html;
   const top = $('#fsTop'); if (top) top.onchange = () => { cur.opts.topping = top.checked; renderSheetResult(); };
@@ -267,7 +278,7 @@ function renderSheetResult() {
     <div class="macros"><div><b class="num">${r0(e.protein)}</b><span>protein g</span></div><div><b class="num">${r0(e.carbs)}</b><span>carbs g</span></div><div><b class="num">${r0(e.fat)}</b><span>fat g</span></div><div><b class="num">${r0(e.fibre)}</b><span>fibre g</span></div></div>
     <div class="split" aria-label="Where the calories come from"><i class="sf" style="width:${pf}%"></i><i class="sm" style="width:${pm}%"></i><i class="sr" style="width:${Math.max(0, 100 - pf - pm)}%"></i></div>
     <p class="muted small" style="margin:0">${d && e.fatGrams > 0 ? `${e.fatLabel}: ${r0(e.fatGrams)} g, ${r0(pf)}% of the calories. ` : `Fat gives ${r0(pf)}% of the calories. `}${pm > 0 ? `Meat or protein: ${r0(pm)}%.` : ''}</p>
-    ${cur.official ? `<p class="muted small" style="margin:0">Published by the chain for ${esc(cur.official.source)}. No chain publishes Pakistan values yet, and portions here can differ, so the range is ±10%.</p>` : ''}
+    ${cur.official?.fromMenu ? '<p class="muted small" style="margin:0">From the calories on the menu. Protein, carbs and fat are split the way this dish usually is.</p>' : cur.official ? `<p class="muted small" style="margin:0">Published by the chain for ${esc(cur.official.source)}. No chain publishes Pakistan values yet, and portions here can differ, so the range is ±10%.</p>` : ''}
     ${e.fried ? '<p class="warn-note small">This recipe counts all the frying oil as eaten, so it reads too high. For samosas, pakoray and puris use the Desi model instead.</p>' : ''}`;
 }
 
@@ -298,6 +309,7 @@ function onSheetClick(e) {
       if (N.DISH[ref.id].sizes) pr.size = opts.size;
       if (N.DISH[ref.id].topping) pr.topping = opts.topping;
     }
+    if (cur.menuKey && cur.official?.fromMenu) (F().menuKcal ||= {})[cur.menuKey] = { kcal: cur.official.kcal, place: cur.placeName, item: cur.itemName, dish: ref.id, at: Date.now() };
     const save = cur.onSave, extra = { name: cur.name, official: cur.official, weighedG: cur.weighedG };
     if (save) save({ ...opts }, ref, extra); else { addEntry(ref, opts, cur.place ? 'place' : 'search', extra); ctx.toast('Added'); $('#foodSearch').value = ''; renderResults(); }
     ctx.persist(); closeSheet(); renderFood();
@@ -588,9 +600,10 @@ function renderPlan() {
   const box = $('#foodPlan'), t = N.targets(ctx.S.profile), plan = F().plan;
   if (!t) { box.innerHTML = `<div class="card-head"><b>${tr('Your diet plan')}</b></div><p class="muted small" style="margin:0">Add your weight and age under <b>Your targets</b> and QK builds a plan with exact amounts for you.</p>`; return; }
   if (planDraft || !plan) return renderPlanForm(box, planDraft || F().planAnswers || structuredClone(DEFAULT_ANSWERS), !plan);
-  const gap = planGap(plan), stale = planHash(plan.target) !== planHash(t);
+  const gap = planGap(plan), stale = !plan.byCoach && planHash(plan.target) !== planHash(t);
   const chip = (k, label) => `<span class="data">${label} ${fmt(plan.day[k])}${k === 'kcal' ? ' kcal' : ' g'}</span>${Math.abs(gap[k]) > 5 ? ` <span class="muted">(${gap[k] > 0 ? '+' : ''}${gap[k]}%)</span>` : ''}`;
-  box.innerHTML = `<div class="card-head"><b>${tr('Your diet plan')}</b><button type="button" class="linkbtn" data-plan="edit">${tr('Change answers')}</button></div>
+  box.innerHTML = `<div class="card-head"><b>${tr('Your diet plan')}</b>${plan.byCoach ? '<span class="ftag">Edited by QK</span>' : `<button type="button" class="linkbtn" data-plan="edit">${tr('Change answers')}</button>`}</div>
+    ${plan.byCoach && plan.note ? `<p class="qk-line" style="margin:0"><span class="eyebrow">QK</span> ${esc(plan.note)}</p>` : ''}
     <p class="muted small" style="margin:0">${chip('kcal', '')} · ${chip('protein', 'P')} · ${chip('carbs', 'C')} · ${chip('fat', 'F')}<br>Target ${fmt(t.kcal)} kcal · P ${t.protein} · C ${t.carbs} · F ${t.fat} g. Pick one option per meal: they're the same size.</p>
     ${stale ? `<div class="plan-stale"><span class="small">Your targets changed since this plan was made.</span><button type="button" class="ghost" data-plan="refresh">Update the amounts</button></div>` : ''}
     ${plan.meals.map((m, mi) => `<div class="plan-meal"><div class="meal-head"><span class="eyebrow">${tr(m.name)}</span><span class="data small">${fmt(m.target.kcal)} kcal</span></div>
@@ -598,7 +611,7 @@ function renderPlan() {
         <ul>${o.items.map(it => `<li><span>${esc(it.name)}</span><span class="data">${esc(it.amountLabel)}</span></li>`).join('')}</ul>
         <button type="button" class="ghost" data-plan="log" data-m="${mi}" data-o="${oi}">${tr('I ate this')}</button></div>`).join('') || '<p class="muted small">Nothing fits your answers for this meal. Try adding a few foods you like.</p>'}
     </div>`).join('')}
-    <div class="row" style="gap:8px"><button type="button" class="ghost" data-plan="new">Show me other options</button></div>
+    ${plan.byCoach ? '' : '<div class="row" style="gap:8px"><button type="button" class="ghost" data-plan="new">Show me other options</button></div>'}
     <p class="muted small" style="margin:0">Raw weights are before cooking; cook meat in the oil listed. Amounts come from USDA values and QK's home-cooking recipes.</p>`;
 }
 function renderPlanForm(box, a, first) {
@@ -695,7 +708,7 @@ function onWeightClick(e) {
     const ws = allWeights(ctx.S), chosen = applyChoice({ profile: ctx.S.profile, adapt: adaptState(), decision, choiceId: c.dataset.choice, weight: ws[ws.length - 1]?.kg });
     decision = null; ctx.persist();
     ctx.toast(chosen.delta ? `New target: ${fmt(N.targets(ctx.S.profile).kcal)} kcal a day` : chosen.steps ? `New step goal: ${fmt(chosen.steps)} a day` : 'Got it. Same plan for two more weeks.');
-    if (F().plan && chosen.delta) F().plan = makePlan(F().planAnswers || DEFAULT_ANSWERS, N.targets(ctx.S.profile), F().plan.seed || 0);
+    if (F().plan && !F().plan.byCoach && chosen.delta) F().plan = makePlan(F().planAnswers || DEFAULT_ANSWERS, N.targets(ctx.S.profile), F().plan.seed || 0);
     return renderFood();
   }
   if (e.target.closest('#wkCal')) {

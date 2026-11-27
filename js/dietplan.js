@@ -289,3 +289,19 @@ export const LIKE_LABELS = {
   rice: 'Chawal (rice)', biryani: 'Biryani', salad: 'Salad', dahi: 'Raita / dahi', fruit: 'Fruit', nuts: 'Dry fruit / nuts', whey: 'Whey shake',
   banana: 'Banana', apple: 'Apple', guava: 'Guava', dates: 'Dates',
 };
+
+/** After QK edits amounts or foods on the dashboard: recompute every food, option total and the day. */
+export function retotal(plan) {
+  const p = structuredClone(plan);
+  for (const m of p.meals) for (const o of m.options) {
+    o.items = o.items.filter(it => FOODS[it.id] && it.amount > 0).map(it => {
+      const amount = +it.amount, u = perUnit(it.id);
+      return { ...it, amount, name: it.name || FOODS[it.id].name, amountLabel: describe({ id: it.id, amount }), ref: FOODS[it.id].ref, opts: optsFor(it.id, amount), ...Object.fromEntries(KEYS.map(k => [k, u[k] * amount])) };
+    });
+    o.total = Object.fromEntries(KEYS.map(k => [k, o.items.reduce((a, it) => a + it[k], 0)]));
+  }
+  p.day = p.meals.reduce((s, m) => { const o = m.options[0]; if (o) for (const k of KEYS) s[k] += o.total[k]; return s; }, { kcal: 0, protein: 0, carbs: 0, fat: 0 });
+  return p;
+}
+/** Foods QK can add on the dashboard, alphabetical. */
+export const FOOD_CHOICES = Object.values(FOODS).map(f => ({ id: f.id, name: f.name, unit: f.unit, step: f.step })).sort((a, b) => a.name.localeCompare(b.name));

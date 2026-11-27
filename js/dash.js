@@ -110,5 +110,6 @@ export function localClient(S, now = Date.now()) {
   const profile = { id: LOCAL_ID, name: `${S.profile?.name || 'You'} (this phone)`, goal: S.profile?.goal, weekly_goal: S.profile?.weeklyGoal || S.plan?.days?.length || 3, plan: S.plan,
     program: S.program ? { id: S.program.id, block: S.program.block || 1, name: (S.customPrograms || []).find(p => p.id === S.program.id)?.name } : null };
   profile.food_week = foodWeekSummary(S, now);
+  profile.diet_plan = S.food?.plan || null;
   return { profile, sets, opens, checks: (S.checkins || []).map(c => ({ ...c, client_id: LOCAL_ID })), food: foodDayRows(LOCAL_ID, S, now) };
 }
