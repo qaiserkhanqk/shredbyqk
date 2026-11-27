@@ -103,3 +103,17 @@ So her tap was silently lost. It could happen to a real person tapping while ano
 | Firefox 155 | **334 ok, 0 failures** |
 
 Still not tested: real iPhone, Android or Mac Safari.
+
+## Re-run on ed69ad6 (2026-11-27): sign-up, 18+ and premenstrual patterns
+**The version tested** adds the personalised sign-up (minimum age 18), the premenstrual pattern card, and the question budget.
+
+**Results** (each browser test file run separately: 23 files):
+
+| Browser | Result |
+|---|---|
+| WebKit 26.6 | **371 ok, 0 failures**, with the plain-http dashboard files in the labelled local-cookie mode (26, 14 and 20 checks), as before |
+| Firefox 155 | **371 ok, 0 failures** |
+
+New since the last run: `tests/onboarding-ui.cjs` (27) and `tests/cycle-ui-premenstrual.cjs` (10).
+
+Still not tested: real iPhone, Android or Mac Safari.
