@@ -32,6 +32,20 @@
 
   <section id="cdMain" hidden>
     <div class="cd-stats" id="cdStats"></div>
+    <div class="cd-grid cd-extra cc-top">
+      <section class="card stack" id="ccInboxCard">
+        <div class="card-head"><div><span class="eyebrow">Chats</span><h2 class="display h2">Messages</h2></div><span class="cc-count" id="ccCount"></span></div>
+        <div class="stack" id="ccInbox" style="gap:6px"></div>
+      </section>
+      <section class="card stack" id="ccSettings">
+        <div><span class="eyebrow">Your assistant</span><h2 class="display h2">How he answers</h2></div>
+        <p class="muted small" style="margin:0">He answers clients straight away from their profile, in your style. Pain, injuries, medicine, pregnancy, eating problems, money and complaints come straight to you ("QK will reply to you himself"). He answers in each client's own language (Urdu, Roman Urdu, English, Arabic and more), and clients can play his replies aloud. He never says he's a person: if a client asks, he says he's your AI assistant and that you read every chat.</p>
+        <label class="field">Name<input id="ccName" maxlength="30"></label>
+        <label class="cc-toggle"><input type="checkbox" id="ccOn" checked> Answer clients' messages</label>
+        <label class="field">How you talk (he copies this, plus your own replies)<textarea id="ccStyle" rows="6" maxlength="1500"></textarea></label>
+        <button type="button" class="ghost" id="ccSave">Save</button>
+      </section>
+    </div>
     <div class="cd-tools">
       <div class="seg" id="cdFilter" role="group" aria-label="Filter clients">
         <button type="button" data-f="all" class="on">All</button><button type="button" data-f="inactive">Inactive</button><button type="button" data-f="slipping">Slipping</button><button type="button" data-f="on track">On track</button>

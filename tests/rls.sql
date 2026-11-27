@@ -10,6 +10,7 @@ grant usage on schema public, auth to authenticated; grant execute on function a
 \ir ../supabase/schema.sql
 grant select, insert, update, delete on all tables in schema public to authenticated;
 revoke update on public.messages from authenticated; grant update (read_at) on public.messages to authenticated;
+revoke update on public.chats from authenticated; grant update (read_at, handled_at, seen_by_coach_at) on public.chats to authenticated;
 grant usage on all sequences in schema public to authenticated;
 
 -- People: coach Q, client A (joins Q), client B (no coach), another coach Z.
@@ -157,6 +158,62 @@ select pg_temp.check('winner sees their reward', (select place from public.rewar
 select pg_temp.check('client receives the broadcast', (select title from public.messages where kind = 'broadcast') = 'Dr. Doom aa gaya');
 do $$ begin insert into public.rewards (client_id, coach_id, month, place) values (auth.uid(), '00000000-0000-0000-0000-0000000000c1', '2026-12-01', 1); perform pg_temp.check('client cannot award themselves a prize', false);
 exception when others then perform pg_temp.check('client cannot award themselves a prize', true); end $$;
+reset role;
+
+-- Chat: client D (coach Q) messages QK; Muhammad's replies come from the server (service key), never from an app.
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000d');
+set role authenticated;
+insert into public.chats (client_id, coach_id, sender, body) values (auth.uid(), '00000000-0000-0000-0000-0000000000c1', 'client', 'My knee hurts');
+select pg_temp.check('client can message their coach', (select count(*) from public.chats) = 1);
+do $$ begin insert into public.chats (client_id, coach_id, sender, body) values (auth.uid(), '00000000-0000-0000-0000-0000000000c1', 'assistant', 'fake Muhammad'); perform pg_temp.check('client cannot write as Muhammad', false);
+exception when others then perform pg_temp.check('client cannot write as Muhammad', true); end $$;
+do $$ begin insert into public.chats (client_id, coach_id, sender, body) values (auth.uid(), '00000000-0000-0000-0000-0000000000c1', 'coach', 'fake QK'); perform pg_temp.check('client cannot write as QK', false);
+exception when others then perform pg_temp.check('client cannot write as QK', true); end $$;
+do $$ begin insert into public.chats (client_id, coach_id, sender, body) values (auth.uid(), '00000000-0000-0000-0000-0000000000c2', 'client', 'hi Z'); perform pg_temp.check('client cannot message another coach', false);
+exception when others then perform pg_temp.check('client cannot message another coach', true); end $$;
+do $$ begin insert into public.chats (client_id, coach_id, sender, body) values ('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-0000000000c1', 'client', 'as A'); perform pg_temp.check('client cannot write as another client', false);
+exception when others then perform pg_temp.check('client cannot write as another client', true); end $$;
+do $$ begin insert into public.chats (client_id, coach_id, sender, body, handled_at) values (auth.uid(), '00000000-0000-0000-0000-0000000000c1', 'client', 'x', now()); perform pg_temp.check('client cannot pre-mark a message handled', false);
+exception when others then perform pg_temp.check('client cannot pre-mark a message handled', true); end $$;
+reset role;
+-- The server (no signed-in user) flags it and Muhammad hands over.
+update public.chats set flagged = 'Pain or injury' where body = 'My knee hurts';
+insert into public.chats (client_id, coach_id, sender, body) values ('00000000-0000-0000-0000-00000000000d', '00000000-0000-0000-0000-0000000000c1', 'assistant', 'QK will reply to you himself.');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000d');
+set role authenticated;
+do $$ begin update public.chats set handled_at = now() where body = 'My knee hurts'; perform pg_temp.check('client cannot hide a flag from QK', false);
+exception when others then perform pg_temp.check('client cannot hide a flag from QK', true); end $$;
+do $$ begin update public.chats set flagged = null where body = 'My knee hurts'; perform pg_temp.check('client cannot clear the flag', false);
+exception when others then perform pg_temp.check('client cannot clear the flag', true); end $$;
+do $$ begin update public.chats set body = 'edited' where sender = 'assistant'; perform pg_temp.check('client cannot edit Muhammad''s reply', false);
+exception when others then perform pg_temp.check('client cannot edit Muhammad''s reply', true); end $$;
+update public.chats set read_at = now() where sender = 'assistant';
+select pg_temp.check('client marks the reply read', (select read_at is not null from public.chats where sender = 'assistant'));
+reset role;
+-- Coach Q sees it, replies, marks it handled, and can switch Muhammad off for this client.
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000c1');
+set role authenticated;
+select pg_temp.check('coach sees the conversation and the flag', (select flagged from public.chats where sender = 'client') = 'Pain or injury');
+insert into public.chats (client_id, coach_id, sender, body) values ('00000000-0000-0000-0000-00000000000d', auth.uid(), 'coach', 'Rest it 3 days, then we test it together');
+update public.chats set handled_at = now(), seen_by_coach_at = now() where sender = 'client';
+select pg_temp.check('coach marks it handled', (select handled_at is not null from public.chats where sender = 'client'));
+do $$ begin update public.chats set read_at = now() where sender = 'coach'; perform pg_temp.check('coach cannot mark the client''s read receipt', false);
+exception when others then perform pg_temp.check('coach cannot mark the client''s read receipt', true); end $$;
+do $$ begin insert into public.chats (client_id, coach_id, sender, body) values ('00000000-0000-0000-0000-00000000000b', auth.uid(), 'coach', 'hi B'); perform pg_temp.check('coach cannot message someone else''s client', false);
+exception when others then perform pg_temp.check('coach cannot message someone else''s client', true); end $$;
+insert into public.assistant_off (client_id, coach_id) values ('00000000-0000-0000-0000-00000000000d', auth.uid());
+select pg_temp.check('coach switches Muhammad off for a client', (select count(*) from public.assistant_off) = 1);
+do $$ begin insert into public.assistant_off (client_id, coach_id) values ('00000000-0000-0000-0000-00000000000b', auth.uid()); perform pg_temp.check('coach cannot pause someone else''s client', false);
+exception when others then perform pg_temp.check('coach cannot pause someone else''s client', true); end $$;
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000c2');
+set role authenticated;
+select pg_temp.check('another coach sees none of it', (select count(*) from public.chats) = 0 and (select count(*) from public.assistant_off) = 0);
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+set role authenticated;
+select pg_temp.check('another client sees none of it', (select count(*) from public.chats) = 0);
+select pg_temp.check('client cannot switch Muhammad off', (select count(*) from public.assistant_off) = 0);
 reset role;
 
 select (case when ok then 'ok   ' else 'FAIL ' end) || name from pg_temp.results;

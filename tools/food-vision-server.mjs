@@ -37,6 +37,7 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import { parseFatSecret } from '../js/fatsecret.js';
 import { catalogue as appCatalogue } from '../js/foodphoto.js';
+import { answer as chatAnswer, speak, voiceOn } from './chat-assistant.mjs';
 
 // The dish list comes from the app's own code, never from the request: a caller can't add dishes, inject text into
 // the prompt through dish names, or poison the shared cache. Its version is part of every cache key.
@@ -359,6 +360,27 @@ export const server = http.createServer(async (req, res) => {
     if (!process.env.FATSECRET_CLIENT_ID || q.length < 2) { res.setHeader('content-type', 'application/json'); return res.end('{"foods":[]}'); }
     try { res.setHeader('content-type', 'application/json'); return res.end(JSON.stringify({ foods: await fatsecretSearch(q.slice(0, 80)) })); }
     catch (e) { console.error(e.message); res.statusCode = 502; return res.end('{"foods":[]}'); }
+  }
+  // Chat: the app calls this right after a client sends a message; Muhammad answers within a few seconds.
+  // Needs the sign-in check (SUPABASE_URL + SUPABASE_ANON_KEY) to know who is asking, and the service key to reply.
+  // Muhammad's voice: { text } → WAV. Signed-in clients only (it costs money), 20 a minute.
+  if (req.method === 'POST' && req.url.startsWith('/chat-voice')) {
+    let body = ''; for await (const c of req) { body += c; if (body.length > 4000) { res.statusCode = 413; return res.end(); } }
+    const who = await caller(req);
+    if (!who) { res.statusCode = 401; return res.end('{"error":"sign in"}'); }
+    if (!voiceOn()) { res.statusCode = 501; return res.end('{"error":"no voice"}'); }
+    if (!allow('voice:' + who, Date.now(), 2)) { res.statusCode = 429; return res.end('{"error":"busy"}'); }
+    try { const q = JSON.parse(body || '{}'); const a = await speak(q.text); res.setHeader('content-type', 'audio/wav'); res.setHeader('cache-control', 'private, max-age=86400'); return res.end(a); }
+    catch (e) { console.error('voice:', e.message); res.statusCode = e.message === 'bad request' ? 400 : 502; return res.end('{"error":"failed"}'); }
+  }
+  if (req.method === 'POST' && req.url.startsWith('/chat')) {
+    res.setHeader('content-type', 'application/json');
+    for await (const _ of req); // no body needed
+    const who = await caller(req);
+    if (!who) { res.statusCode = 401; return res.end('{"error":"sign in"}'); }
+    if (!allow('chat:' + who, Date.now(), 3)) /* key isn't a bare id, so the limit is 3 × 10 = 30 a minute */ { res.statusCode = 429; return res.end('{"error":"busy"}'); }
+    try { const r = await chatAnswer(who); return res.end(JSON.stringify({ ok: true, posted: !!r.posted })); }
+    catch (e) { console.error('chat:', e.message); res.statusCode = 502; return res.end('{"error":"failed"}'); }
   }
   if (req.method !== 'POST' || !/^\/food-(vision|text)/.test(req.url)) { res.statusCode = 404; return res.end(); }
   // Too many photos waiting: say so straight away (the app waits and tries once more) rather than time out.
