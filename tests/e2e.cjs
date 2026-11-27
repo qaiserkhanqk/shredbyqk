@@ -47,7 +47,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('today: greets by name', /Sara/.test(await p.textContent('#hello')));
   check('navigation: 4 tabs (Today, Train, Food, Me)', (await p.$$('.tabs button')).length === 4 && /Food/.test(await p.textContent('.tabs')));
   check('today: one next step with one main button', await p.isVisible('#nextCard') && (await p.textContent('#nextCta')).length > 0, await p.textContent('#nextTitle'));
-  check('today: quick buttons for calm, body check and all tools', await p.isVisible('#today [data-go=calm-now]') && await p.isVisible('#today [data-go=vitals]') && await p.isVisible('#today [data-go=body]'));
+  check('today: quick buttons for calm, brain and all tools', await p.isVisible('#today [data-go=calm-now]') && await p.isVisible('#today [data-go=brain]') && await p.isVisible('#today [data-go=body]'));
   await p.click('[data-feel=great]');
   check('today: after the check-in the feel buttons fold away', !(await p.isVisible('[data-feel=ok]')) && await p.isVisible('#readyChange'));
 
@@ -221,6 +221,41 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   const bm = await p.textContent('#rsheetBody');
   check('body map: fits several movements, with reasons', /Forward lean allowed/.test(bm) && /Hinge depth/.test(bm) && /Long thighs/.test(bm) && /Tight hamstrings/.test(bm));
   await p.click('[data-bm=close]');
+
+  // Brain: score, Speed Flash (shortened), Memory Grid, Quran practice and spaced review, a lesson.
+  await p.goto('https://shred.local/'); await p.waitForTimeout(600);
+  await go('today'); await tap('#today [data-go=brain]'); await p.waitForTimeout(500);
+  check('brain: score waits for a first drill, next step is Speed Flash 1 of 10', /Not started/.test(await p.textContent('.brain-score')) && /session 1 of 10/.test(await p.textContent('.next-brain')));
+  check('brain: four games and ten lessons', (await p.$$('.game-card')).length === 4 && (await p.$$('.lesson-row')).length === 10);
+  await p.evaluate(() => { window.__shredSpeedTrials = 3; });
+  await tap('[data-brain=speed]'); await p.click('#sfGo');
+  for (let i = 0; i < 3; i++) { await p.waitForSelector('#sfVeh:not([hidden])', { timeout: 10000 }); await p.click('#sfVeh [data-v="0"]'); await p.waitForSelector('#sfArena.answer'); await p.click('.sf-spot[data-pos="0"]', { force: true }); }
+  await p.waitForSelector('#sfDone:not([hidden])', { timeout: 10000 });
+  check('speed flash: result shows a speed level and the block progress', /Speed level \d+/.test(await p.textContent('#sfDone')) && /1 of 10 sessions/.test(await p.textContent('#sfDone')));
+  await p.click('#sfFin');
+  check('brain: score appears after the first drill', /\d/.test(await p.textContent('.brain-score .sc-ring .num')));
+  await tap('[data-brain=grid]'); await p.click('#mgGo'); await p.waitForSelector('#mgGrid:not(.watch)', { timeout: 10000 });
+  check('memory grid: lights a pattern then hands over to you', /Your turn/.test(await p.textContent('#mgMsg')));
+  await p.click('#bpClose');
+  await tap('[data-brain=quran]'); await p.waitForTimeout(400);
+  check('quran: 23 surahs and passages to learn', (await p.$$('.q-row')).length === 23);
+  await p.click('[data-brain="set:s112"]');
+  check('quran: Al-Ikhlas shows 4 verses in Arabic with translation', (await p.$$('.ayah-card')).length === 4 && /He is Allah/.test(await p.textContent('#quranMain')));
+  await p.click('[data-brain="learn:s112"]');
+  for (let n = 0; n < 6 && await p.isVisible('#prBox'); n++) {
+    if (await p.isVisible('#prFin')) break;
+    while (await p.isVisible('#prNext')) await p.click('#prNext');
+    await p.click('#prCheck'); await p.click('[data-g=good]');
+  }
+  check('quran practice: finishes and schedules review', await p.isVisible('#prFin'));
+  await p.click('#prFin');
+  check('quran: practised verses marked as learning', /Learning/.test(await p.textContent('#quranMain')));
+  const due = await p.evaluate(() => { const S = JSON.parse(localStorage.getItem('shred_qk_v1')); for (const c of Object.values(S.brain.quran)) c.due = Date.now() - 1000; localStorage.setItem('shred_qk_v1', JSON.stringify(S)); return Object.keys(S.brain.quran).length; });
+  await p.goto('https://shred.local/'); await p.waitForTimeout(500); await go('today'); await tap('#today [data-go=brain]'); await p.waitForTimeout(400);
+  check('brain: due verses become the next step', new RegExp(`Review ${due} verse`).test(await p.textContent('.next-brain')), await p.textContent('.next-brain'));
+  await tap('[data-brain="lesson:plastic"]'); await p.click('[data-q="1"]');
+  check('lesson: quiz marks the right answer', await p.isVisible('#lqBox .right'));
+  await p.click('#lsDone');
 
   // 11. Body check: alertness test (shortened for the test run) and camera pulse with no finger
   await p.goto('https://shred.local/'); await p.waitForTimeout(600);

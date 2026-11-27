@@ -9,7 +9,8 @@ All video is processed **on the phone** (MediaPipe Pose) and nothing is uploaded
 The app is built so a new client is never faced with a wall of features:
 - **First run asks three things:** name, what they want help with first (get fitter, recover from pain, feel calmer), and training days.
 - **Today shows one next step**, chosen by `js/today.js`: rehab morning check → recovery day → wind down after training → rehab session → today's workout (lighter if needed) → rest day. One button, one line saying why.
-- **Four tabs:** Today, Train, Food, Me. Rehab, movement tests, posture, Body check and Sukoon sit under **All tools**, ordered by what the client came for. Calm now and Body check are also one tap from Today.
+- **Four tabs:** Today, Train, Food, Me. Rehab, movement tests, posture, Body check, Sukoon and Brain sit under **All tools**, ordered by what the client came for. Calm now and Brain are also one tap from Today.
+- **Brain:** a Brain score (exercise, sleep, calm, drills, learning), Speed Flash (the speed training with long-term evidence, with a first block and boosters), Memory Grid and Colour Clash games, Quran memorisation (listen, fade the words, recite, spaced review, Verse Order game) for 21 short surahs, Ayat al-Kursi and the end of Al-Baqarah, and ten 2-minute lessons with recall questions.
 - After the morning check-in, the feel buttons fold into one line, so the next step is what stands out.
 
 ## Features
