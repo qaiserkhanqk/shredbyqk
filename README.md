@@ -33,12 +33,13 @@ All video is processed **on the phone** (MediaPipe Pose) and nothing is uploaded
   - hip, knee osteoarthritis, kneecap pain, jumper's knee, ACL, PCL, meniscus
   - hamstring, Achilles, ankle sprain, heel pain, shin splints
 
-  Each one has:
-  - a red-flag safety screen with emergency guidance
-  - phased programmes passed on measured criteria
-  - pain traffic lights
+  It runs like a clinic visit: safety check → assessment → written care plan → treatment with weekly reassessments. Each condition has:
+  - a red-flag safety screen with emergency guidance for the person's region (UAE 998, UK 999, US 911)
+  - an assessment that grades how easily the pain flares (irritability) and sets the starting dose, pain limit and sessions a week
+  - phased programmes passed on measured criteria: the injured side's own results, 3 separate days with next-morning checks, and for ACL at least 9 months since surgery or injury
+  - pain traffic lights, with a physio review advised and progression paused after 2 flare-ups in a row
   - camera measurements (range of motion, hop test with left/right symmetry, calf-raise and sit-to-stand counts)
-  - weekly function scores
+  - weekly reassessments (warning signs rechecked, function re-rated) and running clinic notes
 
   It supports rehab and doesn't diagnose; content must be signed off by a physio before launch.
 - **Cycle tracking (prototype, off by default).** Log periods, spotting and optional symptoms; a transparent next-period range from your own history; explainable personal patterns; optional reminders; encrypted on the device. Not clinically validated, not contraception. See **[CYCLE.md](CYCLE.md)**.

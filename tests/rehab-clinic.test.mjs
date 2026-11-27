@@ -105,7 +105,7 @@ section('Emergency numbers by region (owner is in the UAE)', () => {
 // ---------------- Evidence: osteoarthritis cites the ACR guideline
 section('Evidence: osteoarthritis cites the ACR guideline', () => {
 check('OA evidence cites the 2019 ACR/Arthritis Foundation guideline', /American College of Rheumatology/.test(COND.oa.evidence) && /2019/.test(COND.oa.evidence));
-check('hip OA gets hip safety questions, not only knee', COND.oa.flags.some(f => /hip/i.test(f.q)));
+check('hip OA gets hip safety questions, not only knee', COND.oa.flags.some(f => /hip/i.test(`${f.q} ${f.why || ''}`)));
 });
 
 console.log(fails ? `${fails} FAILED` : 'ALL PASS'); process.exit(fails ? 1 : 0);

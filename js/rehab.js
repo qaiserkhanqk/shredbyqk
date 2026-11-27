@@ -63,11 +63,38 @@ const R = {
   ],
 };
 
-export const FLAG_ADVICE = {
-  emergency: { title: 'Get emergency help now', text: 'Call 999 (UK) or your local emergency number, or go to A&E. Don\'t exercise.' },
-  urgent: { title: 'See a doctor today', text: 'Contact your GP for a same-day appointment, or NHS 111. Don\'t start this programme until you\'ve been checked.' },
-  assess: { title: 'Get assessed first', text: 'See a physiotherapist or doctor to confirm what\'s wrong before starting. They can then approve this programme.' },
-};
+// Emergency and same-day advice depends on where the person is. The owner is in the UAE, where 999 is
+// police and 998 is the ambulance, and the NHS doesn't exist. Region comes from the device time zone
+// and language; when unknown, the common numbers are listed rather than guessing one.
+const US_ZONES = /^America\/(New_York|Chicago|Denver|Phoenix|Los_Angeles|Anchorage|Detroit|Indiana|Kentucky|Boise|Toronto|Vancouver|Edmonton|Winnipeg|Halifax)|^Pacific\/Honolulu/;
+export function emergencyInfo({ timeZone, lang } = {}) {
+  // Read the device only when the caller gives neither, so a caller (or test) can state a region exactly.
+  if (timeZone === undefined && lang === undefined) {
+    try { timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { /* no Intl */ }
+    try { lang = globalThis.navigator?.language; } catch { /* no navigator */ }
+  }
+  const tz = timeZone || '', lg = lang || '';
+  const doctorToday = 'Don\'t start this programme until you\'ve been checked.';
+  if (tz === 'Asia/Dubai' || /-AE$/i.test(lg)) return { region: 'UAE', number: '998',
+    text: 'Call 998 for an ambulance (999 is police), or go to the nearest emergency department. Don\'t exercise.',
+    urgent: `See a doctor today: a same-day GP appointment or an urgent care clinic. ${doctorToday}`, numberNote: 'UAE ambulance. 999 is police.' };
+  if (tz === 'Europe/London' || /-GB$/i.test(lg)) return { region: 'UK', number: '999',
+    text: 'Call 999 or go to A&E. Don\'t exercise.',
+    urgent: `Contact your GP for a same-day appointment, or NHS 111. ${doctorToday}`, numberNote: 'UK emergency number.' };
+  if (US_ZONES.test(tz) || /-(US|CA)$/i.test(lg)) return { region: 'US', number: '911',
+    text: 'Call 911 or go to the emergency room. Don\'t exercise.',
+    urgent: `See a doctor today: your doctor or an urgent care clinic. ${doctorToday}`, numberNote: 'US and Canada emergency number.' };
+  return { region: null, number: null,
+    text: 'Call your local emergency number (998 ambulance in the UAE, 999 in the UK, 911 in the US, 112 in the EU) or go to an emergency department. Don\'t exercise.',
+    urgent: `See a doctor today: a same-day appointment or an urgent care clinic. ${doctorToday}`, numberNote: '' };
+}
+
+export function flagAdvice(level, info = emergencyInfo()) {
+  if (level === 'emergency') return { title: 'Get emergency help now', text: info.text, number: info.number, numberNote: info.numberNote };
+  if (level === 'urgent') return { title: 'See a doctor today', text: info.urgent };
+  return { title: 'Get assessed first', text: 'See a physiotherapist or doctor to confirm what\'s wrong before starting. They can then approve this programme.' };
+}
+export const FLAG_ADVICE = Object.fromEntries(['emergency', 'urgent', 'assess'].map(l => [l, flagAdvice(l)]));
 
 /**
  * Worst level among the answered "yes" flags, or null if all clear.
@@ -162,9 +189,9 @@ export const CONDITIONS = [
       P('Strengthen', 4, 'Progressive hip strength in standing.', [['sitToStand', '3×10'], ['stepUp', '3×10 each'], ['singleLegBridge', '3×10 each'], ['bandedWalk', '3×10 steps each way']], [pain(3), psfs(7)]),
       P('Full function', 4, 'Single-leg strength and return to running.', [['bulgarian', '3×8'], ['singleLegRdl', '3×8'], ['hipThrust', '3×10']], [pain(2), psfs(9)]),
     ] },
-  { id: 'oa', name: 'Hip or knee osteoarthritis', area: 'Knee', flags: R.knee, painLimit: 4, tests: ['chairStand30', 'kneeFlexion'],
+  { id: 'oa', name: 'Hip or knee osteoarthritis', area: 'Knee', flags: [...R.knee, ...R.hip], painLimit: 4, tests: ['chairStand30', 'kneeFlexion'],
     about: 'Joint changes that are very common with age. Pain is not a sign of damage getting worse: strengthening and staying active are the most effective treatments.',
-    evidence: 'NICE NG226 (2022): therapeutic exercise and weight management first-line. Arthroscopy is not recommended for osteoarthritis.',
+    evidence: 'NICE NG226 (2022): therapeutic exercise and weight management first-line. Arthroscopy is not recommended for osteoarthritis. The 2019 American College of Rheumatology/Arthritis Foundation guideline (Kolasinski et al., Arthritis Care Res 2020) strongly recommends exercise, and weight loss where relevant, for hip and knee osteoarthritis.',
     phases: [
       P('Get moving', 2, 'Build confidence and daily activity.', [['sitToStand', '3×10'], ['gluteBridge', '3×12'], ['quadSet', '3×10'], ['walk', '20–30 min daily']], [pain(4), psfs(5)]),
       P('Build strength', 4, 'Progressive leg strength.', [['sitToStand', '3×12 slower'], ['stepUp', '3×10'], ['legExtension', '3×12'], ['legPress', '3×10'], ['singleLegBalance', '3×30 s']], [pain(4), test('chairStand30', '>=', 12, '30-second sit-to-stand: 12+ or better than your baseline'), psfs(7)]),
@@ -186,14 +213,14 @@ export const CONDITIONS = [
       P('Heavy slow strength', 4, 'Build tendon capacity (3 s down, 3 s up).', [['legPress', '4×8 heavy, slow'], ['declineSquat', '3×10'], ['legExtension', '3×10 slow'], ['bulgarian', '3×8']], [pain(4), psfs(7)]),
       P('Spring and return to sport', 4, 'Jumping, landing and sport-specific load.', [['jumpSquat', '3×6'], ['hopDrill', '3×20 s'], ['lunge', '3×10'], ['squat', '3×6 heavy']], [pain(3), psfs(9)]),
     ] },
-  { id: 'acl', name: 'ACL injury or reconstruction', area: 'Knee', flags: R.knee, painLimit: 3, postOp: true, tests: ['kneeExtension', 'kneeFlexion', 'hop', 'landingFPPA'],
+  { id: 'acl', name: 'ACL injury or reconstruction', area: 'Knee', flags: R.knee, painLimit: 3, postOp: true, needsDate: true, tests: ['kneeExtension', 'kneeFlexion', 'hop', 'landingFPPA'],
     about: 'The ACL controls twisting of the knee. Rehab is long (9–12 months after surgery for sport). Strength, control and passing return-to-sport tests matter more than time alone.',
     evidence: 'Meeting return-to-sport criteria (hop and strength symmetry ≥90%) and waiting ≥9 months after surgery greatly reduced re-injury (Grindem, BJSM 2016). Neuromuscular training reduces ACL injuries (FIFA 11+).',
     phases: [
       P('Swelling down, knee straight', 2, 'Full straightening, quad activation, walking without a limp.', [['quadSet', '5×10, several times daily'], ['heelSlide', '3×15'], ['straightLegRaise', '3×10'], ['terminalKneeExt', '3×15']], [pain(3), test('kneeExtension', '<=', 3, 'Knee straightens to within 3°'), test('kneeFlexion', '>=', 110, 'Knee bends 110°+')]),
       P('Strength and control', 6, 'Rebuild quad and hip strength; single-leg control.', [['legPress', '3×10'], ['gobletSquat', '3×10'], ['stepUp', '3×10'], ['singleLegBridge', '3×10'], ['singleLegBalance', '3×30 s'], ['calfRaise', '3×15']], [pain(2), test('kneeFlexion', '>=', 130, 'Knee bends 130°+'), { type: 'kneeTest', max: 10, label: 'Single-leg squat knee drift under 10°' }]),
       P('Running and power', 8, 'Start running, then jumping and landing.', [['bulgarian', '3×8'], ['singleLegRdl', '3×8'], ['nordic', '3×5'], ['jumpSquat', '3×6'], ['hopDrill', '3×20 s']], [pain(2), sym('hop', 80, 'Hop distance 80%+ of your other leg')]),
-      P('Return to sport', 8, 'Pass return-to-sport tests; sport-specific training.', [['squat', '3×6 heavy'], ['lunge', '3×10'], ['burpee', '3×8'], ['hopDrill', '4×20 s']], [pain(1), sym('hop', 90, 'Hop distance 90%+ of your other leg'), test('landingFPPA', '<=', 10, 'Landing knee drift under 10°'), psfs(9)]),
+      P('Return to sport', 8, 'Pass return-to-sport tests; sport-specific training.', [['squat', '3×6 heavy'], ['lunge', '3×10'], ['burpee', '3×8'], ['hopDrill', '4×20 s']], [pain(1), { type: 'since', months: 9, label: 'At least 9 months since surgery (or injury, if no surgery)' }, sym('hop', 90, 'Hop distance 90%+ of your other leg'), test('landingFPPA', '<=', 10, 'Landing knee drift under 10°'), psfs(9)]),
     ] },
   { id: 'pcl', name: 'PCL injury', area: 'Knee', flags: R.knee, painLimit: 3, postOp: true, tests: ['kneeExtension', 'kneeFlexion', 'hop'],
     about: 'The PCL stops the shin sliding backwards. Most isolated PCL injuries are treated without surgery. Early rehab focuses on the quads and avoids heavy hamstring curls and deep loaded knee bending.',
@@ -262,23 +289,76 @@ export const COND = Object.fromEntries(CONDITIONS.map(c => [c.id, c]));
  * plan: { startedAt, phaseStartedAt, checkins:[{at,during,after,nextMorning}], tests:[{at,test,side,value,L,R}],
  *         psfs:[{at, score}], kneeTests:[{at, L, R}], injured: 'L'|'R'|null }
  */
+const DAY = 864e5;
+const dayKey = at => { const d = new Date(at); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; };
+
+/**
+ * One record per calendar day: the WORST pain of that day, and its next-morning answer if any was given.
+ * Several check-ins on one day count once, so tapping "check in" three times can't pass a 3-session rule.
+ */
+export function checkinDays(checkins = [], since = 0) {
+  const by = new Map();
+  for (const k of checkins) {
+    if (k.at < since) continue;
+    const key = dayKey(k.at), d = by.get(key);
+    if (!d) { by.set(key, { ...k }); continue; }
+    d.at = Math.max(d.at, k.at);
+    d.during = Math.max(d.during, k.during);
+    if (k.after != null) d.after = Math.max(d.after ?? 0, k.after);
+    if (k.nextMorning != null) d.nextMorning = Math.max(d.nextMorning ?? 0, k.nextMorning);
+  }
+  return [...by.values()].sort((a, b) => a.at - b.at);
+}
+
+/** A side's value from a test record: an L/R pair, or a single-side result. */
+const sideValue = (t, s) => (t[s] != null ? t[s] : t.side === s ? t.value : null);
+
+/**
+ * The value that decides a "test" criterion.
+ * Injured side known: only that side's results count (the healthy side can't pass it for you).
+ * Both sides or not a limb: the worse of the latest left, right and no-side results.
+ */
+function criterionValue(tests, testId, injured, op) {
+  const mine = [...tests].reverse().filter(t => t.test === testId);
+  if (injured) { const t = mine.find(x => sideValue(x, injured) != null); return t ? sideValue(t, injured) : null; }
+  const vals = [
+    mine.find(x => sideValue(x, 'L') != null), mine.find(x => sideValue(x, 'R') != null), mine.find(x => !x.side && x.value != null),
+  ].map((t, i) => (t ? (i === 0 ? sideValue(t, 'L') : i === 1 ? sideValue(t, 'R') : t.value) : null)).filter(v => v != null);
+  if (!vals.length) return null;
+  return op === '>=' ? Math.min(...vals) : Math.max(...vals);
+}
+
+/** Two flare-up (red) sessions in a row in this phase: stop progressing and get a physio to review the plan. */
+export function needsReview(cond, plan) {
+  const days = checkinDays(plan.checkins, plan.phaseStartedAt || 0).slice(-2);
+  const limit = plan.painLimit ?? cond.painLimit;
+  return days.length === 2 && days.every(k => painLight({ ...k, usualMorning: plan.usualMorning ?? null }, limit).light === 'red');
+}
+
 export function evaluatePhase(cond, phaseIdx, plan, now = Date.now()) {
   const phase = cond.phases[phaseIdx], out = [];
-  const weeks = (now - (plan.phaseStartedAt || plan.startedAt)) / (7 * 864e5);
+  const weeks = (now - (plan.phaseStartedAt || plan.startedAt)) / (7 * DAY);
   out.push({ label: `At least ${phase.minWeeks} week${phase.minWeeks > 1 ? 's' : ''} in this phase`, met: weeks >= phase.minWeeks, detail: `${Math.floor(weeks * 7)} days so far` });
-  const recent = (plan.checkins || []).filter(c => c.at >= (plan.phaseStartedAt || 0)).slice(-3);
-  const latest = (testId) => [...(plan.tests || [])].reverse().find(t => t.test === testId);
+  const recent = checkinDays(plan.checkins, plan.phaseStartedAt || 0).slice(-3);
+  const tests = plan.tests || [];
   for (const c of phase.criteria) {
     if (c.type === 'pain') {
-      const ok = recent.length >= 3 && recent.every(r => r.during <= c.max && (r.nextMorning == null || r.nextMorning <= Math.max(c.max, 1)));
-      out.push({ label: c.max === 0 ? 'Pain-free during exercise (last 3 check-ins)' : `Pain ${c.max}/10 or less during exercise (last 3 check-ins)`, met: ok, detail: recent.length < 3 ? `${recent.length}/3 check-ins` : recent.map(r => r.during).join(', ') });
+      // The care plan can lower the limit (high irritability); it never raises it.
+      const max = Math.min(c.max, plan.painLimit ?? Infinity);
+      const noMorning = recent.filter(r => r.nextMorning == null).length;
+      const ok = recent.length >= 3 && !noMorning && recent.every(r => r.during <= max && r.nextMorning <= Math.max(max, 1));
+      out.push({ label: max === 0 ? 'Pain-free during exercise (last 3 session days)' : `Pain ${max}/10 or less during exercise (last 3 session days)`, met: ok,
+        detail: recent.length < 3 ? `${recent.length}/3 days checked in` : noMorning ? `${noMorning} morning check${noMorning > 1 ? 's' : ''} missing` : recent.map(r => r.during).join(', ') });
+    } else if (c.type === 'since') {
+      const from = plan.surgeryAt ?? plan.injuryAt ?? null, months = from != null ? (now - from) / (30.44 * DAY) : null;
+      out.push({ label: c.label, met: months != null && months >= c.months, detail: months == null ? 'add your surgery or injury date' : `${Math.floor(months)} months so far` });
     } else if (c.type === 'psfs') {
       const p = (plan.psfs || []).slice(-1)[0];
       out.push({ label: `Daily activities rated ${c.min}/10 or better`, met: !!p && p.score >= c.min, detail: p ? `latest ${p.score}/10` : 'not rated yet' });
     } else if (c.type === 'test') {
-      const t = latest(c.test), v = t ? (t.value ?? (plan.injured ? t[plan.injured] : Math.max(t.L ?? -Infinity, t.R ?? -Infinity))) : null;
+      const v = criterionValue(tests, c.test, plan.injured, c.op);
       const met = v != null && (c.op === '>=' ? v >= c.v : v <= c.v);
-      out.push({ label: c.label, met, detail: v == null ? 'not tested yet' : `latest ${v}`, test: c.test });
+      out.push({ label: c.label, met, detail: v == null ? (plan.injured ? `test your ${plan.injured === 'L' ? 'left' : 'right'} (injured) side` : 'not tested yet') : `latest ${v}`, test: c.test });
     } else if (c.type === 'lsi') {
       const inj = plan.injured;
       const tests = (plan.tests || []).filter(t => t.test === c.test);
@@ -295,7 +375,64 @@ export function evaluatePhase(cond, phaseIdx, plan, now = Date.now()) {
       out.push({ label: c.label, met: v != null && v <= c.max, detail: v == null ? 'do the knee test' : `latest ${v}°` });
     }
   }
+  if (needsReview(cond, plan)) out.push({ label: 'Physio review after 2 flare-ups in a row', met: false, detail: 'ease off and get your plan reviewed', review: true });
   return { items: out, allMet: out.every(i => i.met) };
+}
+
+// ---------------- Clinic intake (the first appointment) ----------------
+/**
+ * Irritability is how clinicians decide how hard to start: how severe the pain is, whether it is there at
+ * rest or at night, and how long it takes to settle after activity. It sets the starting dose and pain
+ * limit. It never skips a phase: every patient starts at phase 1 and moves on by passing its checks.
+ * answers: { restPain 0–10, worstPain 0–10, settle: 'minutes'|'hours'|'nextDay', nightPain, duration:
+ *            'acute'|'subacute'|'persistent', goal: 'daily'|'gym'|'sport', daysAvailable 0–7 }
+ */
+export function consult(a) {
+  const reasons = [], warnings = [];
+  let irritability = 'moderate';
+  if (a.restPain >= 6 || a.settle === 'nextDay' || (a.nightPain && a.worstPain >= 6)) {
+    irritability = 'high';
+    if (a.restPain >= 6) reasons.push(`Pain at rest is ${a.restPain}/10.`);
+    if (a.settle === 'nextDay') reasons.push('Pain from activity lasts until the next day.');
+    if (a.nightPain && a.worstPain >= 6) reasons.push('Strong pain that also disturbs your sleep.');
+  } else if (a.worstPain <= 3 && a.settle === 'minutes' && !a.nightPain && a.restPain <= 2) {
+    irritability = 'low';
+    reasons.push('Mild pain that settles within minutes and doesn\'t wake you.');
+  } else {
+    reasons.push(a.settle === 'hours' ? 'Pain settles within hours after activity.' : `Worst pain is ${a.worstPain}/10.`);
+  }
+  const days = Math.max(0, Math.min(7, a.daysAvailable ?? 3));
+  const sessionsPerWeek = Math.min(5, Math.max(2, days));
+  if (days < 2) warnings.push('2 sessions a week is the minimum that builds strength. Try to find a second day.');
+  if (a.duration === 'persistent') warnings.push('Pain lasting over 3 months is common and still responds to graded exercise. Progress is usually steady rather than fast.');
+  return { irritability, reasons, warnings, sessionsPerWeek, duration: a.duration, goal: a.goal, answers: a };
+}
+
+/** Starting dose: a gentle start takes one set off each exercise; everything else is as prescribed. */
+export function dose(text, level) {
+  if (level !== 'gentle') return text;
+  return text.replace(/^(\d+)×/, (m, n) => (+n >= 2 ? `${+n - 1}×` : m));
+}
+
+const IRRIT_TEXT = {
+  high: 'Your pain is easily stirred up, so we start gently: one set fewer on each exercise and a lower pain limit.',
+  moderate: 'Your pain is moderate, so you start at the standard dose for phase 1.',
+  low: 'Your pain settles quickly, so you start at the standard dose and can keep other training going if it stays within your limit.',
+};
+const GOAL_TEXT = { daily: 'everyday activities', gym: 'training in the gym', sport: 'your sport' };
+
+/** The care plan the "clinic" hands over after the first appointment. Times are minimums, never promises. */
+export function carePlan(cond, c) {
+  const minWeeks = cond.phases.reduce((s, p) => s + p.minWeeks, 0);
+  return {
+    irritability: c.irritability, doseLevel: c.irritability === 'high' ? 'gentle' : 'standard',
+    painLimit: Math.max(0, cond.painLimit - (c.irritability === 'high' ? 1 : 0)),
+    sessionsPerWeek: c.sessionsPerWeek, reassessEveryDays: 7,
+    summary: IRRIT_TEXT[c.irritability],
+    goal: `Goal: back to ${GOAL_TEXT[c.goal] || GOAL_TEXT.daily}.`,
+    expect: `${cond.phases.length} phases, at least ${minWeeks} weeks in total. You move to the next phase when you pass its checks, so it can take longer, and stepping back a phase is normal.${cond.needsDate ? ' Return to sport also needs at least 9 months since surgery or injury.' : ''}`,
+    reasons: c.reasons, warnings: c.warnings,
+  };
 }
 
 /** PSFS score: mean of the 1–3 activities the person chose (0 = unable, 10 = as before injury). */

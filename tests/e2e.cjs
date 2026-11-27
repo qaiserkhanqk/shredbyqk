@@ -104,10 +104,21 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.click('#safetyGo');
   check('rehab: safety screen requires every answer', /answer every/.test(await p.textContent('#safetyMsg')));
   await answerAll(); await p.click('#safetyGo');
-  await p.fill('#act0', 'Walking downstairs'); await p.click('#startPlan');
-  check('rehab: programme starts at phase 1 with exercises', /Phase 1 of 3/.test(await p.textContent('#rehabActive')) && (await p.$$('#rehabActive [data-train]')).length >= 4);
+  check('rehab: assessment step follows the safety check', /Step 2 of 3/.test(await p.textContent('#rsheetBody')));
+  await p.fill('#act0', 'Walking downstairs');
+  await p.click('#aSettle [data-v=nextDay]'); await p.click('#seePlan');
+  const planText = await p.textContent('#rsheetBody');
+  check('rehab: care plan shows a gentle start for pain lasting to the next day', /Step 3 of 3/.test(planText) && /Gentle start/.test(planText) && /2\/10/.test(planText), planText.slice(0, 200));
+  check('rehab: care plan never promises a cure', !/cure|guarantee/i.test(planText));
+  await p.click('#startPlan');
+  check('rehab: programme starts at phase 1 with exercises', /phase 1 of 3/i.test(await p.textContent('#rehabActive')) && (await p.$$('#rehabActive [data-train]')).length >= 4);
+  check('rehab: gentle start takes a set off (wall sit 5×30 s → 4×30 s)', /4×30 s/.test(await p.textContent('#rehabActive')));
   await p.click('#checkinRehab'); await p.click('#saveCheckin');
   check('rehab: check-in gives a traffic light', /On track|Hold the load|Ease off/.test(await p.textContent('#rehabActive')));
+  check("rehab: second check-in the same day updates instead of adding", /Update today's check-in/.test(await p.textContent('#checkinRehab')));
+  await p.click('#checkinRehab'); await p.click('#saveCheckin');
+  check('rehab: two check-ins in one day count as one day', /1\/3 days checked in/.test(await p.textContent('#rehabActive')));
+  check('rehab: clinic notes record the first assessment', /First assessment/.test(await p.textContent('#rehabActive')));
   check('rehab: phase criteria listed and not yet met', (await p.$$('#rehabActive .crit')).length >= 3 && !(await p.$('#nextPhase')));
   await p.click('#rehabActive [data-romtest=kneeFlexion]'); await p.click('#rsheetBody [data-side]'); await p.waitForTimeout(6000);
   check('rehab: camera measurement starts', await p.isVisible('#live') && /Knee bend/.test(await p.textContent('#liveEyebrow')));
@@ -119,7 +130,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.click('[data-area="Lower back"]'); await p.click('[data-cond=lbp]');
   await answerAll(0); await p.click('#safetyGo');
   const alertText = await p.textContent('#rsheetBody');
-  check('rehab: cauda equina red flag → emergency advice with 999', /Get emergency help now/.test(alertText) && /999/.test(alertText));
+  check('rehab: cauda equina red flag → emergency advice with the local number', /Get emergency help now/.test(alertText) && /998|999|911/.test(alertText));
   await p.click('#stopOk');
 
   // 7. Readiness, load and Studio

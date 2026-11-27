@@ -121,7 +121,7 @@ details[open] > summary::after { content: "–"; }
 .pic svg { width: 26px; height: 26px; }
 .ex-row b { font-weight: 650; display: block; }
 .tag { font-size: .72rem; color: var(--z1); font-weight: 600; }
-.sets { font-family: var(--f-data); font-size: .85rem; color: var(--muted); }
+.sets { font-family: var(--f-data); font-size: .85rem; color: var(--muted); max-width: 32vw; text-align: right; }
 .days { display: flex; gap: 6px; flex-wrap: wrap; }
 .day { border: 1px solid var(--line); background: var(--surface-2); border-radius: 12px; padding: 9px 0; width: 44px; text-align: center; font-weight: 650; font-size: .82rem; cursor: pointer; }
 .day.on { background: var(--z2); border-color: var(--z2); color: #fff; }
@@ -339,6 +339,20 @@ details[open] > summary::after { content: "–"; }
 .light::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--good); }
 .light.amber::before { background: var(--warn); } .light.red::before { background: var(--bad); }
 .rehab-today { text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 6px; background: linear-gradient(135deg, rgba(61,220,151,.1), transparent), var(--surface); }
+.clinic-steps { margin: 0; padding: 0; list-style: none; counter-reset: step; display: grid; gap: 10px; }
+.clinic-steps li { counter-increment: step; display: grid; grid-template-columns: 28px 1fr; column-gap: 10px; font-size: .88rem; }
+.clinic-steps li::before { content: counter(step); grid-row: span 2; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: .78rem; background: rgba(69,195,255,.12); color: var(--z1); }
+.clinic-steps span { color: var(--muted); font-size: .8rem; }
+.careplan { display: flex; flex-direction: column; gap: 6px; padding: 14px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-2); }
+.cp-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: .88rem; }
+.cp-row span:first-child { color: var(--muted); }
+.patient-file { border-top: 3px solid var(--z1); }
+.file-facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-weight: 700; font-size: .85rem; }
+.file-facts small { display: block; font-weight: 600; font-size: .66rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+@media (max-width: 380px) { .file-facts { grid-template-columns: repeat(2, 1fr); } }
+.notes { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.note-row { display: grid; grid-template-columns: 52px 1fr; gap: 8px; }
+.note-row small { color: var(--muted); font-size: .74rem; padding-top: 2px; }
 .emergency-num { font: 800 2rem var(--f-display); letter-spacing: .04em; user-select: all; }
 
 .ready-score { font-size: 2.4rem; line-height: 1; background: var(--zone); -webkit-background-clip: text; background-clip: text; color: transparent; }
