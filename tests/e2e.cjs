@@ -362,7 +362,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
 
   // Days a week: pick 3, 4 or 5 on an adjustable program; QK re-packs it and judges the pattern itself.
   await p.goto('https://shred.local/'); await go('train'); await tap('#progStrip [data-prog=massMonster]'); await p.waitForTimeout(150);
-  check('days: Mass Monster starts on the 3 days this lifter already trains, with a 3/4/5 choice', (await p.$$('#rsheetBody [data-pdays]')).length === 3 && /3 days a week/.test(await p.textContent('#rsheetBody .data')), await p.textContent('#rsheetBody .data'));
+  check('days: Mass Monster starts on the 3 days this lifter already trains, with a 3–6 choice', (await p.$$('#rsheetBody [data-pdays]')).length === 4 && /3 days a week/.test(await p.textContent('#rsheetBody .data')), await p.textContent('#rsheetBody .data'));
   await p.click('[data-pdays="5"]'); await p.waitForTimeout(150);
   check('days: 5 days gives 5 sessions', (await p.$$('#rsheetBody .prog-day')).length === 5 && /5 days a week/.test(await p.textContent('#rsheetBody .data')));
   await p.click('[data-pdays="3"]'); await p.waitForTimeout(150);
@@ -386,6 +386,49 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.reload(); await p.waitForTimeout(500); await go('train');
   check('days: after keeping 5, QK does not change it again straight away', /5 days a week/.test(await p.textContent('#progHero .eyebrow')) && !(await p.isVisible('#daysNews')));
   await tap('#progHero [data-prog]'); await p.click('[data-progstop]'); await p.waitForTimeout(200);
+
+  // Make it yours: equipment, pain, check-in, machine taken, skip, voice, weak points, time per day, reminder link.
+  await p.goto('https://shred.local/'); await go('train'); await tap('#progStrip [data-prog=massMonster]'); await p.waitForTimeout(150);
+  await p.click('[data-progstart=massMonster]'); await p.waitForTimeout(300);
+  await go('progress'); await tap('#meCard summary'); await p.waitForTimeout(150);
+  await tap('[data-eq=dumbbells]'); await tap('[data-eq=bench]'); await go('today'); await p.waitForTimeout(200);
+  const eqOk = await p.evaluate(async () => { const { LIB } = await import('/js/library.js'); return [...document.querySelectorAll('#todayList [data-train]')].every(b => !['Barbell', 'Machine', 'Cable', 'EZ bar'].includes(LIB[b.dataset.train].equipment)); });
+  check('my gym: dumbbells + bench → nothing needing a barbell, machine or cable today; QK says what it swapped', eqOk && /your equipment/.test(await p.textContent('#swapNote')), await p.textContent('#todayList'));
+  await go('progress'); await tap('[data-painarea=shoulder]'); await go('today'); await p.waitForTimeout(200);
+  const shOk = await p.evaluate(async () => { const { LIB } = await import('/js/library.js'); const ids = [...document.querySelectorAll('#todayList [data-train]')].map(b => b.dataset.train); return ids[0] === 'bandER' && ids[1] === 'bandPullApart' && !ids.some(id => ['press', 'dip'].includes(LIB[id].pattern)); });
+  check('pain: shoulder → two rehab moves first, no overhead pressing or dips', shOk, await p.textContent('#todayList'));
+  // Check-in: clear today's morning answer, then Start workout asks three questions and lightens a rough day.
+  await p.evaluate(() => { const S = JSON.parse(localStorage.getItem('shred_qk_v1')); S.readiness = []; delete S.checkin; localStorage.setItem('shred_qk_v1', JSON.stringify(S)); });
+  await p.reload(); await p.waitForTimeout(500); await go('today');
+  await tap('#planStart'); await p.waitForTimeout(250);
+  check('check-in: Start workout asks how you are (sleep, soreness, energy)', /How are you today/.test(await p.textContent('#rsheetBody')) && (await p.$$('#rsheetBody [data-rq]')).length === 9);
+  await p.click('[data-rq="sleep:bad"]'); await p.click('[data-rq="sore:very"]'); await p.click('[data-rq="energy:low"]'); await p.waitForTimeout(100);
+  check('check-in: a rough day → lighter, with a recovery option', /10% less weight/.test(await p.textContent('#rsheetBody')) && await p.isVisible('#rqRecover'));
+  await p.click('#rqGo'); await p.waitForTimeout(300); await p.evaluate(() => { document.querySelector('#rsheet').hidden = true; }); await go('today');
+  check('check-in: Today shows why it is lighter', await p.isVisible('#readyNote') && /lighter/.test(await p.textContent('#readyNote')));
+  // Machine taken and voice on a dumbbell lift.
+  const dbLift = await p.evaluate(async () => { const { LIB } = await import('/js/library.js'); return [...document.querySelectorAll('#todayList [data-train]')].map(b => b.dataset.train).find(id => /^Dumbbells?$/.test(LIB[id].equipment) && !/Rehab/.test(id)); });
+  // (After a rough check-in Today leads with recovery and folds the list away, so open the exercise directly.)
+  await p.evaluate(k => document.querySelector(`#todayList [data-train=${k}]`).click(), dbLift); await p.waitForTimeout(200);
+  check('setup: Machine taken and This hurts buttons on program exercises', await p.isVisible('#busyBtn') && await p.isVisible('#painBtn'));
+  await p.evaluate(() => window.__qkVoice('sixty two and a half kilos')); await p.waitForTimeout(150);
+  check('voice: "sixty two and a half kilos" sets 62.5 kg', await p.evaluate(k => JSON.parse(localStorage.getItem('shred_qk_v1')).prog.override[k].kg === 62.5, dbLift), dbLift);
+  check('voice: random talk is ignored', await p.evaluate(() => window.__qkVoice('what a nice day')) === null);
+  await p.click('#busyBtn'); await p.waitForTimeout(150);
+  const busyTo = await p.getAttribute('#rsheetBody [data-busyto]', 'data-busyto'); await p.click('#rsheetBody [data-busyto]'); await p.waitForTimeout(250);
+  await p.evaluate(() => { document.querySelector('#setup').hidden = true; }); await go('today');
+  check('machine taken: today uses the alternative, says so, and only today', /machine taken/.test(await p.textContent('#swapNote')) && !!(await p.$(`#todayList [data-train=${busyTo}]`)) && await p.evaluate(() => JSON.parse(localStorage.getItem('shred_qk_v1')).todaySwap.day === new Date().toDateString()));
+  // Time per training day: today's budget trims the session.
+  await p.evaluate(() => { const S = JSON.parse(localStorage.getItem('shred_qk_v1')); S.plan.minutes = { [new Date().getDay()]: 30 }; if (!S.plan.days.includes(new Date().getDay())) S.plan.days.push(new Date().getDay()); localStorage.setItem('shred_qk_v1', JSON.stringify(S)); });
+  await p.reload(); await p.waitForTimeout(500); await go('today');
+  check('time per day: a 30-minute day is trimmed, main lifts kept', /trimmed from/.test(await p.textContent('#planMins')), await p.textContent('#planMins'));
+  await go('progress');
+  check('weak points: card on Progress', await p.isVisible('#weakCard') && /Weak points/.test(await p.textContent('#weakCard')));
+  // Reminder link / app-icon shortcut: straight into today's workout.
+  await p.goto('https://shred.local/?start=today'); await p.waitForTimeout(1000);
+  check('reminder link: opens straight into today\'s workout', await p.isVisible('#rsheet') || await p.isVisible('#setup') || await p.isVisible('#live'));
+  check('app-icon shortcut: "Start today\'s workout"', JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.webmanifest'), 'utf8')).shortcuts.some(x => x.url === './?start=today'));
+  await p.evaluate(() => { const S = JSON.parse(localStorage.getItem('shred_qk_v1')); S.profile.equip = []; S.profile.pain = []; delete S.plan.minutes; S.program = null; localStorage.setItem('shred_qk_v1', JSON.stringify(S)); });
 
   // Workout builder: build a two-exercise program, save it, start it; day 1 becomes today's workout.
   await p.goto('https://shred.local/'); await go('train'); await tap('#buildNew');
