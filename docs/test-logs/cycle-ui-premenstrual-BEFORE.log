@@ -1,0 +1,12 @@
+FAIL a few days before her period: her own pattern, with the counts
+FAIL …worded as "may", with other causes named, and no labels or diet advice
+FAIL …at most 3 one-tap questions  — 0
+FAIL one check-in a day: Zara does not ask as well today
+ok   no new reminder or notification is created for it
+FAIL run completed  — page.selectOption: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('#cyPremenstrual [data-pmq=cravings]')[22m
+
+    at /home/user/shredbyqk/tests/cycle-ui-premenstrual.cjs:51:15
+ok   no JavaScript errors
+5 FAILED of 7
