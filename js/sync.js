@@ -6,6 +6,7 @@
 // The fetch function is injected, so this is unit tested without a network.
 
 import { foodDayRows, foodWeekSummary, placeRows } from './foodsync.js';
+import { careSummary } from './dash.js';
 import { allWeights, daysToCheckin } from './adapt.js';
 import { notifyLevel } from './signals.js';
 import { allScores, scoreSummary } from './scores.js';
@@ -106,6 +107,7 @@ export async function pushAll(cloud, S, mark = {}) {
     ...(food ? { food_week: food } : {}),
     name: S.profile?.name || null, goal: S.profile?.goal || null, weekly_goal: S.profile?.weeklyGoal || null,
     plan: S.plan || null, program: S.program ? { id: S.program.id, name: (S.customPrograms || []).find(p => p.id === S.program.id)?.name, block: S.program.block || 1, start: S.program.start, blockStart: S.program.blockStart } : null,
+    care: careSummary(S),
     last_seen: new Date().toISOString(),
   });
   return {

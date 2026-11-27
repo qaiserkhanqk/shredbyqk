@@ -428,3 +428,57 @@ gives the same answer, and QK always says why it changed something.
   taken" swaps an exercise for today only. Voice commands are opt-in and use the phone's speech recognition
   (on most Android phones Google turns the audio into text). Urdu covers short spoken cues only (counts,
   sets, rest, go, done); a set summary with a form tip stays English so the tip is never lost.
+
+## QK remembers, and the gaps it closes (`js/memory.js`, `js/personal.js`)
+
+**Follow-ups.** QK asks about what the client told it, one question at a time on Today, and says it once:
+- **Pain:** asked after 3 days, then weekly. "Better" brings those exercises back at 80% for two weeks.
+  "Same" twice, or "Worse", gives a clear "see a physio or doctor".
+- **Other follow-ups:**
+  - a rough day yesterday
+  - a new personal best last session
+  - an exercise skipped once ("swap it for good?")
+  - a missed week
+  - the end of a trip or of Ramadan
+  - one month with QK
+
+**Coming back after a break.** Maximal strength held fairly steady through lockdown-length breaks
+(Washif et al. 2026, doi:10.5114/biolsport.2026.153307), so the cuts are modest and ramp back quickly:
+- after 2–4 weeks off: 90% of the old weights, back to full over 2 sessions
+- after 4–8 weeks off: 85%, with one set fewer on the extras, back to full over 3 sessions
+- after 8+ weeks off: 75%, back to full over 4 sessions
+
+These percentages are practical rules, not research findings.
+
+**Ramadan mode** (30 days): sessions up to 45 minutes and one set fewer on the extras. Cutting volume by about
+22% during Ramadan improved strength and power in footballers (Rebaï et al. 2014, doi:10.1055/s-0033-1353216).
+Strength gains were better when people trained after iftar than while fasting (Triki et al. 2023,
+doi:10.1123/ijspp.2022-0268), so QK suggests training after iftar.
+
+**Smaller gaps.**
+- **Home weights ceiling:** at the heaviest dumbbell or kettlebell the client owns, QK progresses with reps and
+  a 3-second lowering instead.
+- **Micro plates:** 1 kg barbell press jumps.
+- **Early light week:** offered after 3 rough days in a week, or when every lift has stalled for 6 weeks
+  (fatigue, sleep or food, not one weak lift).
+- **Travel mode:** switches equipment for 3–14 days and switches back by itself.
+- **Classes follow the profile:** quiet (no jumping) mode is on for a sore knee or hip, and dumbbell classes
+  are hidden without dumbbells.
+- **"How was today's workout?":** two "too hard" answers in a row mean one set fewer on the extras; two
+  "too easy" answers add one.
+
+### More gaps closed
+- **Supersets before cutting:** when a session doesn't fit the time allowed, QK first pairs extras for
+  different muscles into supersets, then trims sets. Supersets give similar adaptations in about half the time
+  (Mang et al. 2025, doi:10.1519/JSC.0000000000005246).
+- **First time on a weighted exercise:** QK asks how many more reps were left and sets the next set's weight
+  aiming for about 2 in reserve. Trained lifters judge this to within about one rep (Refalo et al. 2024,
+  doi:10.1519/JSC.0000000000004653). Beginners never get more than a 10% jump from one answer.
+- **Bodyweight and holds progress:** +2 reps or +5 seconds when every set hit the target. At 25 reps or 90
+  seconds, the exercise is made harder with a slower tempo instead.
+- **Sore spots in classes and drills:** hands-on-floor moves are swapped for wrist, elbow or shoulder pain;
+  lunges and jumps for knee or hip pain. The Swap button follows equipment and pain too.
+- **Follow-ups:** reminders that don't match when the client actually trains (1.5+ hours off over 8+
+  sessions), a finished program, and a 3-monthly "same goal?" check.
+- **The coach sees what to know:** sore areas, rough days this week, travel and Ramadan, as labels and
+  counts only.

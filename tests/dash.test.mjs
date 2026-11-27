@@ -38,5 +38,12 @@ const dc = demo.profiles.map(pp => clientCard(pp, demo.sets.filter(s => s.client
 const st = Object.fromEntries(dc.map(x => [x.name.split(' ')[0], x.status]));
 check('demo has every status', st.Lena === 'inactive' && st.Jon === 'inactive' && st.Bilal === 'slipping' && st.Maya === 'slipping' && st.Sara === 'on track', JSON.stringify(st));
 
+// What the coach should know: labels and counts only.
+{
+  const { careSummary, careChips } = await import('../js/dash.js');
+  const now = Date.now(), c = careSummary({ profile: { pain: ['knee'], travel: { kind: 'hotel', until: now + 864e5 } }, checkinLog: [{ at: now - 864e5, level: 'rest' }, { at: now - 2 * 864e5, level: 'easy' }] }, now);
+  check('care: sore knee, 2 rough days, travelling → chips for the coach', careChips(c).join('|') === 'Sore: knee|2 rough days|Travelling', careChips(c).join('|'));
+  check('care: nothing to flag → null', careSummary({ profile: {} }, now) === null);
+}
 if (fail) { console.log(`${fail} FAILED`); process.exit(1); }
 console.log('dash: all pass');

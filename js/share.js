@@ -11,7 +11,7 @@ export function lastLoad(sessions, ex) {
 export const lastLoadText = l => l ? `Last time: ${+l.kg} kg × ${l.reps}` : '';
 
 const DAY = 864e5;
-const scoreOf = list => { list = list.filter(s => !s.guided && !s.edited && !s.demo); const r = list.reduce((a, s) => a + s.reps, 0); return r ? Math.round(list.reduce((a, s) => a + s.good, 0) / r * 100) : null; };
+const scoreOf = list => { list = list.filter(s => !s.guided && !s.edited && !s.demo && !s.manual); const r = list.reduce((a, s) => a + s.reps, 0); return r ? Math.round(list.reduce((a, s) => a + s.good, 0) / r * 100) : null; };
 
 import { earnedBetween } from './rewards.js';
 

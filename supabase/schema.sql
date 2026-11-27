@@ -54,6 +54,7 @@ create table if not exists public.events (
 
 -- Food: one row per day (totals and what was eaten; no photos), and places a client added.
 alter table public.profiles add column if not exists food_week jsonb;  -- QK's weekly food report, summarised
+alter table public.profiles add column if not exists care jsonb;       -- sore areas, rough days this week, travel, Ramadan (labels and counts only)
 create table if not exists public.food_days (
   client_id uuid not null references public.profiles (id) on delete cascade,
   at date not null,

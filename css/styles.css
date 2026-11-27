@@ -849,6 +849,49 @@ button.row.food-hit { padding: 11px 0; }
 .ready-note.rest { border-left-color: var(--bad); }
 #rescueNews p { margin: 4px 0 0; }
 
+/* QK remembers */
+.mem-card { display: flex; flex-direction: column; gap: 6px; border: 1px solid rgba(var(--z2-rgb), .45); background: linear-gradient(160deg, rgba(var(--z2-rgb), .14), var(--surface) 70%); }
+.mem-card[hidden] { display: none; }
+.mem-card b { font: 800 1.15rem var(--f-display, inherit); }
+#lightNews p { margin: 4px 0 0; }
+
+/* Quick log */
+.qlog { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 16px; background: var(--surface-2); }
+.qlog[hidden] { display: none; }
+.ql-head { display: flex; justify-content: space-between; align-items: baseline; }
+.ql-row { display: grid; grid-template-columns: 52px 1fr 52px; gap: 8px; align-items: center; }
+.ql-row[hidden] { display: none; }
+.ql-step { height: 52px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--text); font: 700 1.5rem var(--f-body); cursor: pointer; }
+.ql-val { display: flex; align-items: baseline; justify-content: center; gap: 6px; }
+.ql-val input { width: 5.5ch; text-align: center; font: 800 1.9rem var(--f-display, inherit); background: none; border: 0; color: var(--text); padding: 0; }
+.ql-val span { color: var(--muted); font-size: .9rem; }
+.ql-feel { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.ql-feel button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 4px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
+.ql-feel button b { font-size: .95rem; }
+.ql-feel button span { font-size: .68rem; color: var(--muted); }
+.ql-feel button.on { border-color: var(--good); background: rgba(92,195,148,.18); }
+.ql-feel button[data-qlog="0"] b { color: var(--bad); }
+.ql-feel button[data-qlog="4"] b { color: var(--good); }
+.ql-rest { display: flex; align-items: center; gap: 10px; font-size: .9rem; }
+.ql-rest[hidden] { display: none; }
+.ql-rest b { font: 800 1.4rem var(--f-data); }
+
+/* Sign-up: I know my numbers */
+.ob-know { text-align: left; }
+.ob-know summary { cursor: pointer; font-weight: 700; }
+.know-row { display: grid; grid-template-columns: 1fr 76px 14px 64px; gap: 6px; align-items: center; font-size: .88rem; }
+.know-row .field { margin: 0; }
+.know-row input { padding: 8px; }
+
+/* Simple Today */
+.cam-line { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 0 0; border: 0; background: none; color: var(--muted); font: 600 .85rem var(--f-body); cursor: pointer; text-align: left; }
+.cam-line svg { width: 18px; height: 18px; flex: none; }
+.plan-row.more { display: none; }
+#planAllBtn { justify-self: start; }
+details.adj summary { cursor: pointer; font-size: .85rem; color: var(--muted); }
+details.adj[hidden] { display: none; }
+.more-opts summary { cursor: pointer; font-weight: 700; }
+
 .cycle-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 
 /* Scores */
