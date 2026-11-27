@@ -159,7 +159,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.click('#clPh');
   check('clinician: setting a phase without a reason is refused', /reason/i.test(await p.textContent('#clMsg')));
   await p.click('#clDone');
-  check('clinician: programme shows who confirmed it', /Confirmed by Sara Ahmed/.test(await p.textContent('#rehabActive')));
+  check('clinician: programme shows who confirmed it', /confirmed by Sara Ahmed/i.test(await p.textContent('#rehabActive')));
   await p.click('#clinicianBtn'); await p.fill('#cPin', '0000'); await p.click('#cOpen');
   check('clinician: wrong PIN refused', /Wrong PIN/.test(await p.textContent('#cMsg')));
   await p.click('#rsheet', { position: { x: 5, y: 5 } }).catch(() => {});

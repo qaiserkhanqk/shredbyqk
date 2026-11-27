@@ -35,6 +35,7 @@ await section('Findings: measured, not diagnosed', () => {
   check('left knee bending 105° vs 138° is found, on the left', bend && bend.side === 'L' && /left/i.test(bend.text) && /105/.test(bend.text) && /138/.test(bend.text), bend?.text);
   check('left knee 9° short of straight is found', straight && straight.side === 'L' && /9°/.test(straight.text), straight?.text);
   check('sit-to-stand is kept as a baseline, not judged', !f.some(x => x.test === 'chairStand30' && x.criterion));
+  check('camera findings say "about" and give no exact percentage (accuracy not validated)', f.filter(x => !x.skipped && x.criterion).every(x => /about/.test(x.text) && !/%/.test(x.text)), f.map(x => x.text).join(' | '));
   check('no finding names a condition', f.every(x => !DIAGNOSIS.test(x.text)), f.map(x => x.text).join(' | '));
   check('each deficit becomes a goal for the injured side', bend.criterion?.side === 'L' && straight.criterion?.side === 'L');
   const even = R.screenFindings([{ test: 'kneeFlexion', side: 'L', value: 136 }, { test: 'kneeFlexion', side: 'R', value: 140 }]);
@@ -74,6 +75,7 @@ await section('Goals from findings gate the programme', () => {
 
 await section('Clinician access', async () => {
   const rec = await R.clinicianSetup({ name: 'Sara Ahmed', role: 'Physiotherapist', licence: 'DHA-P-12345', pin: '482915' });
+  check('no licence number is stored (it cannot be verified)', !('licence' in rec));
   check('PIN is stored only as a salted hash', rec.pinHash && rec.salt && !JSON.stringify(rec).includes('482915'));
   check('right PIN opens', (await R.verifyPin(rec, '482915', now)).ok);
   check('wrong PIN refused', !(await R.verifyPin(rec, '000000', now)).ok);
@@ -125,6 +127,9 @@ await section('Shared report', () => {
   const t = R.reportText(d);
   check('text report has the name, condition, phase and disclaimer', /Omar/.test(t) && /ACL/.test(t) && /Phase 2/.test(t) && /not a diagnosis/i.test(t));
   check('text report carries clinician notes', /Sara Ahmed/.test(t));
+  const dx = R.reportText(R.reportData({ ...p, diagnosed: true, confirmedBy: 'Sara Ahmed' }, {}, now));
+  check('report never says a clinician certified it: names are marked unverified', /can't verify/.test(dx) && !/\(confirmed by/.test(dx) && /not verified/.test(dx));
+  check('movement-check back pain is labelled as from the check, not self-picked', /from the movement check/.test(R.reportText(R.reportData({ ...p, cond: 'lbp', screened: true }, {}, now))));
 });
 
 console.log(fails ? `${fails} FAILED` : 'ALL PASS'); process.exit(fails ? 1 : 0);

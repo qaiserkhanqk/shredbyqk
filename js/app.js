@@ -1061,7 +1061,7 @@ function showPlan(c, info, a, findings = [], baseline = [], adj = { gentle: fals
       ${findings.length ? `<ul class="findings">${findings.map(f => `<li class="small">${f.criterion ? '<span class="pill cam">Goal</span> ' : ''}${esc(f.text)}</li>`).join('')}</ul>` : '<p class="small" style="margin:0">Nothing was measured. You can retest from your programme.</p>'}
       ${baseline.length && !goals.length ? '<p class="small" style="margin:0">Movement looked even between sides and within typical ranges, so the programme focuses on pain and strength.</p>' : ''}
       ${goals.length ? `<p class="small muted" style="margin:0">Each goal must be reached before the last phase. You'll retest with the camera as you go.</p>` : ''}</div>` : ''}
-    ${adj.physioAdvised ? '<div class="alert urgent"><b>See a physio before going further</b><span class="small">Some movements were too painful or couldn\'t be done. Start phase 1 gently if you like, but the programme stays in phase 1 until a physio has assessed you. Your report shows them exactly what happened.</span></div>' : ''}
+    ${adj.physioAdvised ? '<div class="alert urgent"><b>See a physio before going further</b><span class="small">Get a physio to check it before you go further. You can do the phase 1 exercises gently meanwhile, as long as they don\'t increase your pain. The programme stays in phase 1 until a physio has seen you. Your report shows them what you recorded.</span></div>' : ''}
     <div class="careplan">
       <div class="cp-row"><span>Starting level</span><b><span class="pill ${con.irritability === 'high' ? 'voice' : 'cam'}">${LEVEL_NAME[con.irritability]}</span></b></div>
       <div class="cp-row"><span>Pain limit during exercise</span><b>${cp.painLimit}/10</b></div>
@@ -1101,7 +1101,7 @@ function renderRehabDashboard() {
   const testRow = id => { const d = ROM_TESTS[id], t = latest(id); const v = t ? (t.value != null ? `${t.value}${d.unit === '°' ? '°' : ' ' + d.unit}${t.side ? ` (${sideWord(t.side)})` : ''}` : `L ${t.L ?? '–'} · R ${t.R ?? '–'}`) : 'not tested'; return `<div class="row"><div><b class="small">${esc(d.name)}</b><br><span class="muted small">${esc(v)} · typical ${esc(d.norm)}</span></div><button type="button" class="ghost" data-romtest="${id}">Test</button></div>`; };
   const painSeries = checkinDays(p.checkins).slice(-12).map(k => k.during), psfsSeries = p.psfs.map(x => x.score);
   const level = p.consult ? LEVEL_NAME[p.consult.irritability] : (p.doseLevel === 'gentle' ? 'Gentle start' : 'Standard start');
-  const status = p.diagnosed ? (p.confirmedBy ? `Confirmed by ${esc(p.confirmedBy)}` : 'Diagnosed') : c.general ? 'From your movement check' : 'Not confirmed';
+  const status = p.diagnosed ? (p.confirmedBy ? `Marked confirmed by ${esc(p.confirmedBy)} (clinician mode)` : 'Diagnosed') : c.general || p.screened ? 'From your movement check' : 'Not confirmed';
   $('#rehabActive').innerHTML = `
     ${review ? `<div class="alert urgent"><b>Get your plan reviewed by a physio</b><span class="small">Your last 2 sessions were flare-ups. Ease off to the exercises that don't flare it, and ask a physiotherapist to review the plan before you progress. If anything new or worrying appears, repeat the safety check.</span><button class="ghost" type="button" id="reviewAgain">Repeat the safety check</button></div>` : ''}
     ${pending ? `<button type="button" class="card rehab-today" id="morningBtn"><span class="eyebrow" style="color:var(--warn)">Quick check</span><b>How does it feel this morning?</b><span class="muted small">This tells the app whether yesterday's load was right. Phase checks only count days with a morning answer.</span></button>` : ''}
@@ -1167,7 +1167,7 @@ function openCheckin() {
     if (l.light === 'red') note(p, `Flare-up: pain ${k.during}/10 during exercise.`);
     if (needsReview(c, p)) note(p, 'Second flare-up in a row: physio review advised, progression paused.');
     persist(); closeSheet(); renderRehab();
-    say(l.light === 'green' ? 'Good session. Pain stayed within your limit. I\'ll check how it feels tomorrow morning.' : l.light === 'amber' ? 'A little over your limit. Keep the same load next time and we\'ll see how it settles.' : 'That was too much today. Next session, ease off: fewer sets or a smaller range.', { id: 'ck_' + Date.now(), priority: 'high' });
+    say(l.light === 'green' ? 'Good session. Pain stayed within your limit. The app will ask how it feels tomorrow morning.' : l.light === 'amber' ? 'A little over your limit. Keep the same load next time and see how it settles.' : 'That was too much today. Next session, ease off: fewer sets or a smaller range.', { id: 'ck_' + Date.now(), priority: 'high' });
   };
 }
 function openMorning(k) {
@@ -1179,7 +1179,7 @@ function openMorning(k) {
     const l = painLight({ ...k, usualMorning: p.usualMorning }, limitOf(p));
     if (l.light === 'red') note(p, `Worse the next morning (${k.nextMorning}/10 against a usual ${p.usualMorning}/10).`);
     persist(); closeSheet(); renderRehab();
-    say(l.light === 'red' ? 'It\'s more irritated than usual this morning, so we\'ll go lighter today.' : 'It settled well. Yesterday\'s load looks about right.', { id: 'mn_' + Date.now(), priority: 'high' });
+    say(l.light === 'red' ? 'It\'s more irritated than usual this morning, so go lighter today.' : 'It settled well. Yesterday\'s load looks about right.', { id: 'mn_' + Date.now(), priority: 'high' });
   };
 }
 
@@ -1213,22 +1213,21 @@ function openClinician() {
       <p class="muted small" style="margin:6px 0 0">For the physiotherapist or doctor treating you, at a visit. They choose the PIN, not you. Every change they make is logged under their name and shown on your report.</p></div>
       <label class="field">Clinician's name<input id="cName" autocomplete="off"></label>
       <label class="field">Profession<select id="cRole"><option>Physiotherapist</option><option>Doctor</option><option>Other clinician</option></select></label>
-      <label class="field">Licence number (optional)<input id="cLic" autocomplete="off"></label>
       <label class="field">PIN (4–8 digits)<input id="cPin" type="password" inputmode="numeric" autocomplete="off"></label>
       <label class="field">PIN again<input id="cPin2" type="password" inputmode="numeric" autocomplete="off"></label>
       <button class="cta" type="button" id="cSave">Save and open</button><p class="note" id="cMsg"></p>`);
     $('#cSave').onclick = async () => {
       if ($('#cPin').value !== $('#cPin2').value) { $('#cMsg').textContent = 'The PINs don\'t match.'; return; }
       try {
-        const r = await clinicianSetup({ name: $('#cName').value, role: $('#cRole').value, licence: $('#cLic').value, pin: $('#cPin').value });
+        const r = await clinicianSetup({ name: $('#cName').value, role: $('#cRole').value, pin: $('#cPin').value });
         S.rehab.clinician = r;
-        if (plan()) note(plan(), `Clinician access set up for ${r.name} (${r.role}${r.licence ? `, licence ${r.licence}` : ''}).`);
+        if (plan()) note(plan(), `Clinician access set up under the name ${r.name} (${r.role}).`);
         persist(); openClinicianPanel(r);
       } catch (e) { $('#cMsg').textContent = e.message; }
     };
     return;
   }
-  openSheet(`<div><span class="eyebrow">Clinician mode</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">${esc(rec.name)}</h2><p class="muted small" style="margin:6px 0 0">${esc(rec.role)}${rec.licence ? ` · licence ${esc(rec.licence)}` : ''}</p></div>
+  openSheet(`<div><span class="eyebrow">Clinician mode</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">${esc(rec.name)}</h2><p class="muted small" style="margin:6px 0 0">${esc(rec.role)}</p></div>
     <label class="field">PIN<input id="cPin" type="password" inputmode="numeric" autocomplete="off"></label>
     <button class="cta" type="button" id="cOpen">Open</button><p class="note" id="cMsg"></p>
     <button class="linkbtn" type="button" id="cReset">Different clinician, or forgot the PIN? Reset access</button>`);
@@ -1274,7 +1273,7 @@ function openClinicianPanel(rec, msg = '') {
 // 7. Report to share with a physio before or at a visit.
 const rpDate = at => new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 function reportHtml(d) {
-  const status = d.diagnosed ? (d.confirmedBy ? `confirmed by ${esc(d.confirmedBy)}` : 'patient reports a diagnosis') : d.general ? 'from the movement check, no diagnosis' : 'picked by the patient, not confirmed';
+  const status = d.diagnosed ? (d.confirmedBy ? `marked confirmed in clinician mode as "${esc(d.confirmedBy)}"; the app can't verify who entered this` : 'patient reports a diagnosis') : d.general || d.screened ? 'from the movement check, no diagnosis' : 'picked by the patient, not confirmed';
   return `<div class="report"><h3>Rehab progress report${d.name ? ` · ${esc(d.name)}` : ''}</h3><p class="small muted">${rpDate(d.generatedAt)}</p>
     <table class="rp"><tr><th>Programme</th><td>${esc(d.condition)} (${status})</td></tr>
       <tr><th>Phase</th><td>${d.phase} of ${d.phases}: ${esc(d.phaseName)}</td></tr>
@@ -1282,7 +1281,7 @@ function reportHtml(d) {
       <tr><th>Side</th><td>${d.injured ? sideWord(d.injured) : 'both / not a limb'}</td></tr>
       <tr><th>Pain limit</th><td>${d.painLimit}/10 · ${d.doseLevel} dose${d.requireApproval ? ' · phase changes need clinician approval' : ''}</td></tr></table>
     ${d.findings.length ? `<h4>Movement check at the start</h4><ul>${d.findings.map(f => `<li>${esc(f.text)}</li>`).join('')}</ul>` : ''}
-    ${d.measurements.length ? `<h4>Measurements</h4><table class="rp"><tr><th>Test</th><th>First</th><th>Latest</th><th>Other side</th><th>% of other</th></tr>${d.measurements.map(m => `<tr><td>${esc(m.name)}${m.side ? ` (${sideWord(m.side)})` : ''}</td><td>${m.first}${esc(m.unit)}</td><td>${m.latest}${esc(m.unit)}</td><td>${m.other ?? '–'}${m.other != null ? esc(m.unit) : ''}</td><td>${m.lsi != null ? m.lsi + '%' : '–'}</td></tr>`).join('')}</table>` : ''}
+    ${d.measurements.length ? `<h4>Measurements</h4><table class="rp"><tr><th>Test</th><th>First</th><th>Latest</th><th>Other side</th><th>Approx. % of other side</th></tr>${d.measurements.map(m => `<tr><td>${esc(m.name)}${m.side ? ` (${sideWord(m.side)})` : ''}</td><td>${m.first}${esc(m.unit)}</td><td>${m.latest}${esc(m.unit)}</td><td>${m.other ?? '–'}${m.other != null ? esc(m.unit) : ''}</td><td>${m.lsi != null ? m.lsi + '%' : '–'}</td></tr>`).join('')}</table>` : ''}
     ${d.painDays.length ? `<h4>Pain during exercise, last ${d.painDays.length} session days</h4><p>${d.painDays.map(x => x.during).join(' · ')} (0–10) · flare-ups so far: ${d.flareUps}</p>` : ''}
     ${d.psfs ? `<h4>Daily activities (0–10)</h4><p>${d.psfs.first} → ${d.psfs.latest}${d.psfs.activities.length ? ` · ${esc(d.psfs.activities.join(', '))}` : ''}</p>` : ''}
     ${d.notes.length ? `<h4>Programme log</h4><ul>${d.notes.map(n => `<li>${rpDate(n.at)}: ${esc(n.text)}</li>`).join('')}</ul>` : ''}
@@ -1336,7 +1335,7 @@ async function finishRom(frames, q) {
   const msg = bad ? (q.score < 40 ? 'Recording quality was too low: ' + (q.issues[0] || 'check the camera view.') : r.issues[0]) : '';
   // During the movement check, results go into the check, and the next test follows.
   if (cfg.intake && S.rehab.intake) {
-    if (bad) { say('The camera couldn\'t measure that one.', { id: 'rom_fail_' + Date.now(), priority: 'high' }); return openScreenRunner(`The camera couldn't measure that: ${msg} If the camera was the problem, start it again. If the movement itself was too hard, tell us below: that's useful too.`); }
+    if (bad) { say('The camera couldn\'t measure that one.', { id: 'rom_fail_' + Date.now(), priority: 'high' }); return openScreenRunner(`The camera couldn't measure that: ${msg} If the camera was the problem, start it again. If the movement itself was too hard, say so below: that's useful too.`); }
     const ik = S.rehab.intake;
     ik.results.push({ at: Date.now(), test: cfg.romId, side: cfg.side || r.side || null, value: r.value, L: r.L, R: r.R, quality: q.score });
     ik.idx++; persist();
@@ -1352,7 +1351,7 @@ async function finishRom(frames, q) {
       <button class="cta" type="button" id="rfAgain">Camera: try again</button>
       <div class="btn-row"><button class="ghost" type="button" id="rfPain">Too painful</button><button class="ghost" type="button" id="rfCant">Couldn't do it</button></div>`);
     $('#rfAgain').onclick = () => startRomTest(cfg.romId);
-    const log = why => { note(p, `${d.name}${cfg.side ? ` (${sideWord(cfg.side)})` : ''}: ${why}.`); persist(); closeSheet(); renderRehab(); toast('Noted in your programme log. If this keeps happening, show your physio.'); };
+    const log = why => { note(p, `${d.name}${cfg.side ? ` (${sideWord(cfg.side)})` : ''}: ${why}.`); persist(); closeSheet(); renderRehab(); toast('Noted in your programme log. If a movement is newly too painful, ease off and repeat the safety check. If it keeps happening, see a physio.'); };
     $('#rfPain').onclick = () => log('too painful to do');
     $('#rfCant').onclick = () => log('couldn\'t do the movement');
     return;

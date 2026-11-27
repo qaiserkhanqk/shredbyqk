@@ -1,7 +1,7 @@
 // Shred Rehab: evidence-informed rehabilitation exercise SUPPORT. Not diagnosis, not treatment, no clinician involved
 // unless one uses clinician mode. Don't call it a clinic, care plan or treatment: see the 2026-11-27 compliance review.
 //
-// How it works (mirrors how physiotherapy clinics run rehab):
+// How it works (follows how published rehab guidelines stage exercise):
 //   1. Safety first. Red-flag questions for every condition. Any "yes" stops the programme and
 //      tells the person where to go (emergency services, same-day GP, or physio first).
 //   2. Programmes are phased. A phase is passed on CRITERIA (pain, measured movement, strength,
@@ -138,7 +138,7 @@ export const CONDITIONS = [
     about: 'Most back pain is "non-specific": no single damaged structure, and it usually improves within weeks. Staying active and graded exercise work better than rest.',
     evidence: 'NICE NG59 (2016, updated 2020): exercise, self-management and staying active first; no routine scans; rest and passive treatment alone not recommended.',
     phases: [
-      P('Calm it down and keep moving', 1, 'Reduce pain and fear of moving; daily walking.', [['walk', '10–30 min daily'], ['catCamel', '2×10'], ['birdDog', '2×6 each side'], ['mcgillCurlUp', '3×5 holds']], [pain(3), psfs(4)]),
+      P('Calm it down and keep moving', 1, 'Ease back into moving; daily walking.', [['walk', '10–30 min daily'], ['catCamel', '2×10'], ['birdDog', '2×6 each side'], ['mcgillCurlUp', '3×5 holds']], [pain(3), psfs(4)]),
       P('Build strength and control', 2, 'Strengthen the hips and trunk; restore bending.', [['gluteBridge', '3×12'], ['deadBug', '3×8 each side'], ['sidePlank', '3×20 s each side'], ['hipHingeDowel', '3×10'], ['gobletSquat', '3×10']], [pain(3), test('trunkFlexion', '>=', 70, 'Forward bend 70°+ or back to your baseline'), psfs(7)]),
       P('Return to full load', 3, 'Lift, carry and train normally.', [['rdl', '3×8'], ['backExt', '3×12'], ['farmerCarry', '3×40 s'], ['squat', '3×8']], [pain(2), psfs(9)]),
     ] },
@@ -159,7 +159,7 @@ export const CONDITIONS = [
       P('Thawing: strength and full use', 4, 'Rebuild strength through the new range.', [['lateralRaise', '3×12 light'], ['dbShoulderPress', '3×10 light'], ['cableRow', '3×12'], ['bandER', '3×15']], [pain(2), sym('shoulderAbduction', 90, 'Side raise within 10% of your other arm'), psfs(8)]),
     ] },
   { id: 'cuff', name: 'Shoulder pain lifting the arm (rotator cuff)', area: 'Shoulder', flags: R.shoulder, painLimit: 4, tests: ['shoulderFlexion', 'shoulderAbduction'],
-    about: 'Pain at the top or side of the shoulder when lifting the arm, often from overload of the rotator cuff tendons. Progressive strengthening is the main treatment.',
+    about: 'Pain at the top or side of the shoulder when lifting the arm, often from overload of the rotator cuff tendons. Progressive strengthening is the usual first approach.',
     evidence: 'Exercise is first-line. In the CSAW trial (Lancet 2018), decompression surgery was no better than placebo surgery for this type of shoulder pain.',
     phases: [
       P('Settle and activate', 2, 'Load the tendons gently with holds.', [['isoER', '5×30 s'], ['isoAbd', '5×30 s'], ['pendulum', '1–2 min'], ['walk', 'daily']], [pain(4), psfs(5)]),
@@ -199,7 +199,7 @@ export const CONDITIONS = [
       P('Keep it strong', 4, 'Long-term strength habit (2–3×/week, for life).', [['gobletSquat', '3×10'], ['reverseLunge', '3×8'], ['rdl', '3×10'], ['calfRaise', '3×15']], [pain(3), psfs(8)]),
     ] },
   { id: 'pfp', name: 'Pain at the front of the knee (patellofemoral)', area: 'Knee', flags: R.knee, painLimit: 3, tests: ['kneeFlexion'],
-    about: 'Pain around or behind the kneecap with stairs, squats, running or long sitting. Very common in runners and teenagers. Responds well to hip and knee strengthening.',
+    about: 'Pain around or behind the kneecap with stairs, squats, running or long sitting. Very common in runners and teenagers. Hip and knee strengthening is the first-line approach.',
     evidence: 'Consensus (Crossley et al., BJSM 2016): combined hip and knee exercise therapy is first-line; short-term taping or foot orthoses can be added.',
     phases: [
       P('Calm and strengthen around it', 2, 'Strength without flaring the knee.', [['wallSit', '5×30 s at a pain-free depth'], ['clamshell', '3×15'], ['sideLyingAbd', '3×12'], ['quadSet', '3×10'], ['legExtension', '3×12 (0–45° range)']], [pain(3), psfs(5)]),
@@ -210,7 +210,7 @@ export const CONDITIONS = [
     about: 'Pain just below the kneecap with jumping and squatting, from overload of the patellar tendon. Tendons respond to gradual, heavy loading.',
     evidence: 'Progressive tendon loading: isometric, then heavy slow, then energy storage, then return to sport (Malliaras et al., JOSPT 2015). Some pain is OK if it settles within 24 hours.',
     phases: [
-      P('Isometric loading', 2, 'Reduce pain with long holds.', [['spanishSquat', '5×45 s'], ['wallSit', '5×45 s'], ['calfRaise', '3×15']], [pain(5), psfs(5)]),
+      P('Isometric loading', 2, 'Long holds to load the tendon gently.', [['spanishSquat', '5×45 s'], ['wallSit', '5×45 s'], ['calfRaise', '3×15']], [pain(5), psfs(5)]),
       P('Heavy slow strength', 4, 'Build tendon capacity (3 s down, 3 s up).', [['legPress', '4×8 heavy, slow'], ['declineSquat', '3×10'], ['legExtension', '3×10 slow'], ['bulgarian', '3×8']], [pain(4), psfs(7)]),
       P('Spring and return to sport', 4, 'Jumping, landing and sport-specific load.', [['jumpSquat', '3×6'], ['hopDrill', '3×20 s'], ['lunge', '3×10'], ['squat', '3×6 heavy']], [pain(3), psfs(9)]),
     ] },
@@ -232,7 +232,7 @@ export const CONDITIONS = [
       P('Power and return to sport', 6, 'Full-range strength, then running and jumping.', [['gobletSquat', '3×10'], ['lunge', '3×10'], ['singleLegRdl', '3×8'], ['hopDrill', '3×20 s']], [pain(1), sym('hop', 90, 'Hop distance 90%+ of your other leg'), psfs(9)]),
     ] },
   { id: 'meniscus', name: 'Meniscus tear (degenerative)', area: 'Knee', flags: R.knee, painLimit: 3, tests: ['kneeFlexion', 'kneeExtension'],
-    about: 'Wear-related meniscus tears are very common in adults over 40, often painless. Exercise therapy is the first treatment.',
+    about: 'Wear-related meniscus tears are very common in adults over 40, often painless. Exercise is usually the first approach.',
     evidence: 'Exercise therapy matched arthroscopic partial meniscectomy for degenerative tears in middle-aged adults at 2 years (Kise et al., BMJ 2016). A knee that LOCKS needs assessment.',
     phases: [
       P('Settle and move', 2, 'Reduce swelling, restore movement.', [['quadSet', '3×10'], ['heelSlide', '3×15'], ['gluteBridge', '3×12'], ['walk', 'daily']], [pain(3), test('kneeExtension', '<=', 5, 'Knee straightens to within 5°')]),
@@ -251,7 +251,7 @@ export const CONDITIONS = [
     about: 'Overload of the Achilles tendon: morning stiffness and pain when starting to run. Tendons need progressive load. Complete rest makes them weaker.',
     evidence: 'JOSPT Achilles clinical practice guideline (2018): progressive loading, including eccentric and heavy slow resistance. Pain-monitoring model (Silbernagel 2007): up to 5/10 is OK if it settles by the next morning.',
     phases: [
-      P('Isometric loading', 2, 'Reduce pain; keep active with tolerable load.', [['isoCalf', '5×45 s'], ['calfRaise', '3×15 two legs'], ['walk', 'daily']], [pain(5), psfs(5)]),
+      P('Isometric loading', 2, 'Keep active with load you can tolerate.', [['isoCalf', '5×45 s'], ['calfRaise', '3×15 two legs'], ['walk', 'daily']], [pain(5), psfs(5)]),
       P('Heavy slow strength', 6, 'Build tendon capacity.', [['heelDrop', '3×15 straight and bent knee'], ['singleCalf', '3×12 slow'], ['seatedCalf', '3×15 heavy'], ['legPress', '3×10']], [pain(4), sym('calfRaiseEndurance', 80, 'Calf raise reps 80%+ of the other leg')]),
       P('Spring and running', 6, 'Hopping, then a graded return to running.', [['hopDrill', '3×20 s'], ['singleCalf', '3×15 weighted'], ['jumpSquat', '3×6']], [pain(3), test('calfRaiseEndurance', '>=', 25, '25+ single-leg calf raises'), sym('calfRaiseEndurance', 90, 'Within 10% of the other leg')]),
     ] },
@@ -296,7 +296,7 @@ CONDITIONS.push(
     ] },
   { id: 'shoulderCheck', general: true, name: 'Shoulder pain (movement check)', area: 'Shoulder', flags: R.shoulder, painLimit: 3, tests: ['shoulderFlexion', 'shoulderAbduction'],
     about: CHECK_ABOUT('shoulder'),
-    evidence: 'Progressive strengthening is the usual first approach for shoulder pain without a recent injury. Your goals come from your own measurements.',
+    evidence: 'Exercise is a common first approach for shoulder pain without a recent injury. A physio can confirm the cause. Your goals come from your own measurements.',
     phases: [
       P('Settle and keep moving', 2, 'Keep the movement you have without flaring it.', [['pendulum', '1–2 min'], ['isoER', '5×30 s'], ['tableSlide', '2×10'], ['walk', 'daily']], [pain(3), psfs(5)]),
       P('Strength', 3, 'Rotator cuff and shoulder blade strength.', [['bandER', '3×15'], ['wallSlide', '3×10'], ['cableRow', '3×12'], ['lateralRaise', '3×12 light']], [pain(3), psfs(7)]),
@@ -333,7 +333,7 @@ export const screenConditionFor = area => ({ Knee: 'kneeCheck', Shoulder: 'shoul
 
 // How each measurement is described and judged. target = typical full range; baseline = recorded, not judged.
 const META = {
-  kneeFlexion: { part: 'knee', verb: 'bend', higher: true, target: 130, norm: '135°+ is a full bend' },
+  kneeFlexion: { part: 'knee', verb: 'bend', higher: true, target: 130, norm: 'about 130–140° is typical' },
   kneeExtension: { part: 'knee', verb: 'straightening', higher: false, target: 3, norm: 'fully straight is 0°' },
   shoulderFlexion: { part: 'shoulder', verb: 'forward raise', higher: true, target: 160, norm: '160–180° is typical' },
   shoulderAbduction: { part: 'shoulder', verb: 'side raise', higher: true, target: 160, norm: '160–180° is typical' },
@@ -371,14 +371,13 @@ export function screenFindings(results) {
       const [worse, better] = k.higher ? (v.L <= v.R ? ['L', 'R'] : ['R', 'L']) : (v.L >= v.R ? ['L', 'R'] : ['R', 'L']);
       const W = cap(SIDE[worse]);
       if (k.higher && v[worse] / v[better] < 0.9) {
-        const pct = Math.round((1 - v[worse] / v[better]) * 100);
-        out.push({ test, side: worse, text: `${W} ${k.part} ${k.verb}: ${deg(v[worse])}, ${pct}% less than your ${SIDE[better]} (${deg(v[better])}).`,
+        out.push({ test, side: worse, text: `${W} ${k.part} ${k.verb}: about ${deg(v[worse])}, less than your ${SIDE[better]} (about ${deg(v[better])}).`,
           criterion: { type: 'lsi', test, min: 90, side: worse, label: `${W} ${k.part} ${k.verb} within 10% of your ${SIDE[better]}` } });
       } else if (!k.higher && v[worse] - v[better] >= 5) {
-        out.push({ test, side: worse, text: `${W} ${k.part} stops ${deg(v[worse])} short of straight; your ${SIDE[better]} gets to within ${deg(v[better])}.`,
+        out.push({ test, side: worse, text: `${W} ${k.part} stops about ${deg(v[worse])} short of straight; your ${SIDE[better]} gets to within about ${deg(v[better])}.`,
           criterion: { type: 'test', test, op: '<=', v: Math.max(3, Math.round(v[better]) + 2), side: worse, label: `${W} ${k.part} straightens to within ${Math.max(3, Math.round(v[better]) + 2)}°` } });
       } else if (k.target != null && (k.higher ? Math.max(v.L, v.R) < k.target : Math.min(v.L, v.R) > k.target)) {
-        out.push({ test, side: 'both', text: `Both ${k.part}s are short of the typical range (${deg(v.L)} left, ${deg(v.R)} right; ${k.norm}).`,
+        out.push({ test, side: 'both', text: `Both ${k.part}s are short of the typical range (about ${deg(v.L)} left, ${deg(v.R)} right; ${k.norm}).`,
           criterion: { type: 'test', test, op: k.higher ? '>=' : '<=', v: k.target, side: 'both', label: `Both ${k.part}s ${k.verb} ${k.higher ? `${k.target}°+` : `within ${k.target}°`}` } });
       } else out.push({ test, text: `${cap(k.part)} ${k.verb}: ${deg(v.L)} left, ${deg(v.R)} right. Even, and within range.`, criterion: null });
     } else {
@@ -386,7 +385,7 @@ export function screenFindings(results) {
       if (val == null) continue;
       const short = k.target != null && (k.higher ? val < k.target : val > k.target);
       const who = s ? `${cap(SIDE[s])} ${k.part}` : `Your ${k.part}`;
-      out.push({ test, side: s || 'both', text: `${who} ${k.verb}: ${deg(val)}${short ? ` (${k.norm})` : ', within the typical range'}.`,
+      out.push({ test, side: s || 'both', text: `${who} ${k.verb}: about ${deg(val)}${short ? ` (${k.norm})` : ', within the typical range'}.`,
         criterion: short ? { type: 'test', test, op: k.higher ? '>=' : '<=', v: k.target, side: s || 'both', label: `${who} ${k.verb} ${k.higher ? `${k.target}°+` : `within ${k.target}°`}` } : null });
     }
   }
@@ -516,11 +515,11 @@ export function evaluatePhase(cond, phaseIdx, plan, now = Date.now()) {
   return { items: out, allMet: out.every(i => i.met) };
 }
 
-// ---------------- Clinic intake (the first appointment) ----------------
+// ---------------- Starting questions ----------------
 /**
  * Irritability is how clinicians decide how hard to start: how severe the pain is, whether it is there at
  * rest or at night, and how long it takes to settle after activity. It sets the starting dose and pain
- * limit. It never skips a phase: every patient starts at phase 1 and moves on by passing its checks.
+ * limit. It never skips a phase: everyone starts at phase 1 and moves on by passing its checks.
  * answers: { restPain 0–10, worstPain 0–10, settle: 'minutes'|'hours'|'nextDay', nightPain, duration:
  *            'acute'|'subacute'|'persistent', goal: 'daily'|'gym'|'sport', daysAvailable 0–7 }
  */
@@ -552,13 +551,13 @@ export function dose(text, level) {
 }
 
 const IRRIT_TEXT = {
-  high: 'Your pain is easily stirred up, so we start gently: one set fewer on each exercise and a lower pain limit.',
+  high: 'Your pain is easily stirred up, so you start gently: one set fewer on each exercise and a lower pain limit.',
   moderate: 'Your pain is moderate, so you start at the standard dose for phase 1.',
   low: 'Your pain settles quickly, so you start at the standard dose and can keep other training going if it stays within your limit.',
 };
 const GOAL_TEXT = { daily: 'everyday activities', gym: 'training in the gym', sport: 'your sport' };
 
-/** The care plan the "clinic" hands over after the first appointment. Times are minimums, never promises. */
+/** The plan shown before a programme starts. Times are minimums, never promises. */
 export function carePlan(cond, c) {
   const minWeeks = cond.phases.reduce((s, p) => s + p.minWeeks, 0);
   return {
@@ -583,11 +582,11 @@ const LOCK_AFTER = 5, LOCK_MS = 10 * 60e3;
 const hex = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
 const sha256 = async text => hex(await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
 
-export async function clinicianSetup({ name, role, licence = '', pin }) {
+export async function clinicianSetup({ name, role, pin }) {
   if (!name || !String(name).trim()) throw new Error('Enter the clinician\'s name.');
   if (!/^\d{4,8}$/.test(String(pin))) throw new Error('The PIN must be 4 to 8 digits.');
   const salt = hex(globalThis.crypto.getRandomValues(new Uint8Array(16)));
-  return { name: String(name).trim(), role: role || 'Physiotherapist', licence: String(licence).trim(), salt, pinHash: await sha256(`${salt}:${pin}`), fails: 0, lockedUntil: 0 };
+  return { name: String(name).trim(), role: role || 'Physiotherapist', salt, pinHash: await sha256(`${salt}:${pin}`), fails: 0, lockedUntil: 0 };
 }
 
 /** Check a PIN. 5 wrong tries lock clinician access for 10 minutes. Mutates the record's counters. */
@@ -677,7 +676,7 @@ export function reportData(p, profile = {}, now = Date.now()) {
   const limit = p.painLimit ?? c.painLimit;
   const ps = p.psfs || [];
   return {
-    name: profile.name || '', condition: c.name, general: !!c.general, diagnosed: !!p.diagnosed, confirmedBy: p.confirmedBy || null,
+    name: profile.name || '', condition: c.name, general: !!c.general, screened: !!p.screened, diagnosed: !!p.diagnosed, confirmedBy: p.confirmedBy || null,
     phase: p.phase + 1, phases: c.phases.length, phaseName: c.phases[p.phase].name, startedAt: p.startedAt, surgeryAt: p.surgeryAt ?? null, injuryAt: p.injuryAt ?? null,
     injured: inj, painLimit: limit, doseLevel: p.doseLevel || 'standard', requireApproval: !!p.requireApproval,
     measurements, painDays: days.slice(-7).map(d => ({ at: d.at, during: d.during, nextMorning: d.nextMorning ?? null })),
@@ -688,13 +687,13 @@ export function reportData(p, profile = {}, now = Date.now()) {
 }
 
 const d8 = at => new Date(at).toISOString().slice(0, 10);
-export const REPORT_DISCLAIMER = 'Made by the Shred app from the patient\'s own entries and phone-camera estimates. It is not a diagnosis, and camera angles are estimates, not clinical measurements.';
+export const REPORT_DISCLAIMER = 'Made by the Shred app from the patient\'s own entries and phone-camera estimates. It is not a diagnosis. Camera angles are estimates, not clinical measurements. Names entered in clinician mode are not verified by the app.';
 
 /** Plain-text version of the report, for sharing in a message. */
 export function reportText(d) {
   const L = [];
   L.push(`Rehab progress report${d.name ? ` · ${d.name}` : ''} · ${d8(d.generatedAt)}`);
-  L.push(`Programme: ${d.condition}${d.diagnosed ? (d.confirmedBy ? ` (confirmed by ${d.confirmedBy})` : ' (patient reports a diagnosis)') : d.general ? ' (from the movement check, no diagnosis)' : ' (picked by the patient, not confirmed)'}`);
+  L.push(`Programme: ${d.condition}${d.diagnosed ? (d.confirmedBy ? ` (marked confirmed in clinician mode as "${d.confirmedBy}"; the app can't verify who entered this)` : ' (patient reports a diagnosis)') : d.general || d.screened ? ' (from the movement check, no diagnosis)' : ' (picked by the patient, not confirmed)'}`);
   L.push(`Phase ${d.phase} of ${d.phases}: ${d.phaseName} · started ${d8(d.startedAt)}${d.surgeryAt ? ` · surgery ${d8(d.surgeryAt)}` : d.injuryAt ? ` · injury ${d8(d.injuryAt)}` : ''}`);
   L.push(`Side: ${d.injured === 'L' ? 'left' : d.injured === 'R' ? 'right' : 'both / not a limb'} · pain limit ${d.painLimit}/10 · ${d.doseLevel} dose${d.requireApproval ? ' · phase changes need clinician approval' : ''}`);
   if (d.findings.length) { L.push('', 'Movement check (start):'); d.findings.forEach(f => L.push(`- ${f.text}`)); }
