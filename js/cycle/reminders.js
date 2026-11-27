@@ -8,6 +8,7 @@
 //  • Every reminder carries a reason, shown as "Why am I seeing this?".
 //  • Lock-screen text is neutral by default. Details appear only if the user opts in, and even then
 //    never include symptom values or dates.
+import { inLatestPeriod } from './checkins.js';
 import { addDays, diffDays, hm, fmtHM, weekday, human } from './dates.js';
 import { CycleError, CATEGORIES } from './model.js';
 import { isCompanionDay, companionName } from './companion.js';
@@ -48,7 +49,8 @@ function occurrence(r, s, date, est) {
     case 'dailyLog': return t;
     case 'weeklyLog': return weekday(date) === r.weekday ? t : null;
     case 'periodCheck': {
-      if (!est?.rangeStart || s.situation?.pregnant) return null;
+      if (!est?.rangeStart || s.situation?.pregnant || s.pregnancy) return null;
+      if (inLatestPeriod(s, date, est)) return null; // never about the period she has just logged (short cycles)
       // Keeps going while the period is overdue (audit 2.2): it stops when a period is logged (the estimate moves on)
       // or when the estimate becomes 'stale' (no rangeStart). No new threshold.
       return date >= addDays(est.rangeStart, -r.offsetDays) ? t : null;

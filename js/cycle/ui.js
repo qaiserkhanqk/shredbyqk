@@ -14,7 +14,7 @@ import { clinicianSummary, summaryText, SUMMARY_MONTHS } from './summary.js';
 import { learningStage } from './learning.js';
 import { companionToday, answerCheckIn, dismissCompanion, setCompanionName, companionName } from './companion.js';
 import { adjustedEstimate, cardLines } from './adjust.js';
-import { periodCheckIn, answerPeriodCheckIn, missedLogQuestion, answerMissedLog, gapReview, confirmGap, dismissGapReview } from './checkins.js';
+import { periodCheckIn, answerPeriodCheckIn, missedLogQuestion, answerMissedLog, gapReview, confirmGap, dismissGapReview, answerNotYet, answerSpotting } from './checkins.js';
 import * as PG from './pregnancy.js';
 import { midlifeObservations, SOURCES as MIDLIFE_SOURCES, INTRO as MIDLIFE_INTRO } from './midlife.js';
 import { comfortSuggestions, pendingComfortQuestions, logComfortTry, answerComfort, deleteComfort, ANSWERS, REVIEW_STATUS } from './comfort.js';
@@ -26,7 +26,7 @@ const MSG = {
   NOT_VERIFIED: 'This device isn\'t available: its integration is not verified.', CRYPTO_UNAVAILABLE: 'This browser can\'t encrypt data, so cycle tracking is unavailable here.',
   DECRYPT_FAILED: 'Your saved cycle data could not be unlocked on this device.', CORRUPT: 'Your saved cycle data is damaged.',
   CONFLICT: 'Another tab kept saving at the same moment, so this change was not saved. Please try again.', STORAGE_NOT_ATOMIC: 'This browser can\'t store cycle data safely.',
-  LH_OFF: 'Turn on ovulation test logging in settings first.', OUT_OF_RANGE: 'That date doesn\'t look right. Check it and try again.', INVALID_INPUT: 'Please fill in one of the dates.',
+  LH_OFF: 'Turn on ovulation test logging in settings first.', LMP_BEFORE_LOGGED_PERIOD: 'You logged a period after that date. Check the first day of your last period, or correct your history first.', OUT_OF_RANGE: 'That date doesn\'t look right. Check it and try again.', INVALID_INPUT: 'Please fill in one of the dates.',
   STALE_SESSION: 'Your cycle data was changed or deleted in another tab. The screen has been refreshed; nothing was saved.', KEYSTORE_UNAVAILABLE: 'Secure storage is blocked in this browser (private mode?).',
 };
 let repo = null, root = null, toast = () => {}, openErr = null, notified = new Set(), timer = null;
@@ -486,8 +486,8 @@ async function onClick(e) {
     logEnd: () => act((s, t) => { const p = [...s.periods].reverse().find(x => x.start <= date()); if (!p) throw new M.CycleError('NOT_FOUND'); M.logPeriodEnd(s, p.id, date(), { today: t }); }, 'Period end saved'),
     endPeriod: () => act((s, t) => M.logPeriodEnd(s, ds.id, endFor, { today: t }), 'Period end saved'),
     logSpotting: () => act((s, t) => M.logDay(s, date(), { bleeding: 'spotting' }, { today: t }), 'Spotting saved'),
-    spottingToday: () => act((s, t) => M.logDay(s, t, { bleeding: 'spotting' }, { today: t }), 'Spotting saved'),
-    notYet: () => act((s, t) => { M.logDay(s, t, { bleeding: 'none' }, { today: t }); M.dismissPrompt(s, `check:${t}`, t); }, 'Noted for today'),
+    spottingToday: () => act((s, t) => answerSpotting(s, t), 'Spotting saved'),
+    notYet: () => act((s, t) => answerNotYet(s, t), 'Noted for today'),
     dismissPrompt: () => act((s, t) => M.dismissPrompt(s, ds.key, t)),
     saveDay: () => act((s, t) => M.logDay(s, snapDate, { ...dayForm }, { today: t }), 'Saved'),
     deletePeriod: () => act(s => M.deletePeriod(s, pid), 'Period deleted'),

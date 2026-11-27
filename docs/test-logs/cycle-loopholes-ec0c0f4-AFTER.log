@@ -1,0 +1,14 @@
+ok   control: the forecast has a range
+ok   Zara checks in on her typical date (15, 15, 35, 15 days)
+ok   control: with 28-day cycles she still checks in before the range
+ok   it does not fire during the period she has just logged (no end logged: first 7 days)
+ok   …but it does fire on her typical date
+ok   control: with 28-day cycles it still fires 2 days before her range
+ok   an LMP before a period she logged after it is refused, so she can check the date
+ok   control: her last logged start as the LMP is accepted
+ok   control: a due date from her midwife is accepted as given
+ok   "Not yet" keeps spotting she logged earlier today
+ok   …and quiets the question for today
+ok   "Not yet" with nothing logged today records no bleeding today (her answer)
+ok   "Spotting only" saves spotting and quiets the question for today
+ALL PASS (13)

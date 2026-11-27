@@ -11,6 +11,7 @@
 // start (days 1–3, the first days of bleeding) and her own estimated range (predict.js), with two days' notice.
 import { addDays, diffDays, human } from './dates.js';
 import { CycleError, hasConsent, categoryOn, CATEGORIES, logDay, logPeriodStart } from './model.js';
+import { inLatestPeriod } from './checkins.js';
 
 export const COMPANION_VERSION = 'companion-0.2.0'; // 0.2.0: renamed from "QK" to "Zara"; her own name; privacy line
 export const DEFAULT_NAME = 'Zara';
@@ -60,7 +61,8 @@ function dayKind(s, date, estimate, patterns = []) {
   if (last && diffDays(last, date) < PERIOD_DAYS) return { kind: 'periodDays', day: diffDays(last, date) + 1 };
   const e = estimate;
   // From two days before her estimated range, and on while it is late, until she logs a start (the estimate then moves on).
-  if (e?.rangeStart && date >= addDays(e.rangeStart, -NOTICE_DAYS) && !(last && last >= addDays(e.rangeStart, -10))) return { kind: 'periodSoon' };
+  // (Fix: the old guard, last >= rangeStart - 10, assumed ~4-week cycles; she was never asked with short cycles.)
+  if (e?.rangeStart && date >= addDays(e.rangeStart, -NOTICE_DAYS) && !inLatestPeriod(s, date, e)) return { kind: 'periodSoon' };
   if (patterns.length && last) {
     const cd = diffDays(last, date) + 1;
     const p = patterns.find(x => cd + NOTICE_DAYS >= x.from && cd <= x.to);

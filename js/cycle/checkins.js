@@ -7,10 +7,10 @@
 // Nothing is logged without her tap. The cadence and the "about two cycles" tolerance are data-quality choices for the
 // prototype, not physiological thresholds.
 import { addDays, diffDays, human } from './dates.js';
-import { CycleError, hasConsent, cycles, logPeriodStart, editPeriod, dismissPrompt, restartDate, PLAUSIBLE } from './model.js';
+import { CycleError, hasConsent, cycles, logPeriodStart, logDay, editPeriod, dismissPrompt, restartDate, PLAUSIBLE } from './model.js';
 import { estimateNext, typicalPeriodLength } from './predict.js';
 
-export const CHECKINS_VERSION = 'checkins-0.2.0'; // 0.2.0: fixes reported against a531ff2 (pregnancy, short cycles, long-gap review)
+export const CHECKINS_VERSION = 'checkins-0.3.0'; // 0.3.0: shared just-logged-period rule, Not yet/Spotting answers; 0.2.0: fixes reported against a531ff2
 /** How often to ask after her range has ended without a logged start (a UI choice, not physiology). */
 export const CADENCE = Object.freeze({ DAILY_DAYS_AFTER_RANGE: 7, THEN_EVERY_DAYS: 3 });
 /** Asking about a possibly missed log (a data-quality question, not physiology). */
@@ -23,6 +23,17 @@ export const QUIET = Object.freeze({ DEFAULT_PERIOD_DAYS: 7 });
 
 const lastStartUpTo = (s, today) => s.periods.map(p => p.start).filter(d => d <= today).sort().at(-1) || null;
 
+/** True while `date` is still within the period she logged most recently: until its logged end, else her usual
+ *  period length, else QUIET.DEFAULT_PERIOD_DAYS, and always before her typical date. Used by the check-in, Zara and
+ *  the "Has your period started?" reminder, so none of them asks about the period she has just logged. */
+export function inLatestPeriod(s, date, estimate) {
+  const last = lastStartUpTo(s, date); if (!last) return false;
+  const latest = s.periods.find(p => p.start === last);
+  const periodEnd = latest?.end || addDays(last, (typicalPeriodLength(s) || QUIET.DEFAULT_PERIOD_DAYS) - 1);
+  const quietUntil = !estimate?.typicalDate || periodEnd < estimate.typicalDate ? periodEnd : addDays(estimate.typicalDate, -1);
+  return date <= quietUntil;
+}
+
 /** Today's "Has your period started?" check-in, or null. Never changes her data. */
 export function periodCheckIn(s, today) {
   if (!hasConsent(s) || isPregnant(s)) return null;
@@ -31,10 +42,7 @@ export function periodCheckIn(s, today) {
   if (!e.rangeStart || !last || today < e.rangeStart) return null;
   // Not about the period she has just logged. (Fix: the old guard, last >= rangeStart - 10, assumed ~4-week cycles
   // and hid the question for good when cycles were short or variable; reported against a531ff2.)
-  const latest = s.periods.find(p => p.start === last);
-  const periodEnd = latest?.end || addDays(last, (typicalPeriodLength(s) || QUIET.DEFAULT_PERIOD_DAYS) - 1);
-  const quietUntil = periodEnd < e.typicalDate ? periodEnd : addDays(e.typicalDate, -1);
-  if (today <= quietUntil) return null;
+  if (inLatestPeriod(s, today, e)) return null;
   const quietFrom = addDays(e.rangeEnd, CADENCE.DAILY_DAYS_AFTER_RANGE);
   if (today > quietFrom && diffDays(quietFrom, today) % CADENCE.THEN_EVERY_DAYS !== 0) return null;
   const opt = (id, label, n) => { const d = addDays(today, -n); return d > last ? { id, label, date: d } : null; };
@@ -50,6 +58,19 @@ export function periodCheckIn(s, today) {
 
 /** "Not yet": quiet for the rest of today. */
 export const dismissPeriodCheckIn = (s, today) => dismissPrompt(s, `check:${today}`, today);
+/** "Not yet" button: records "no bleeding" today only if she hasn't logged bleeding today (it never overwrites what
+ *  she logged), and quiets the question for today. */
+export function answerNotYet(s, today, { at = new Date().toISOString() } = {}) {
+  if (!hasConsent(s)) throw new CycleError('NO_CONSENT');
+  if (s.days?.[today]?.bleeding == null) logDay(s, today, { bleeding: 'none' }, { today, at });
+  dismissPeriodCheckIn(s, today); return s;
+}
+/** "Spotting only": saves spotting today and quiets the question for today (she has answered it). */
+export function answerSpotting(s, today, { at = new Date().toISOString() } = {}) {
+  if (!hasConsent(s)) throw new CycleError('NO_CONSENT');
+  logDay(s, today, { bleeding: 'spotting' }, { today, at });
+  dismissPeriodCheckIn(s, today); return s;
+}
 
 /** She tells us the day it started. Refuses a future date and any day on or before her last logged start. */
 export function answerPeriodCheckIn(s, today, date, { at = new Date().toISOString(), source = 'checkin' } = {}) {

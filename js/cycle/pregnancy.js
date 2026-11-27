@@ -72,6 +72,8 @@ export function startPregnancy(s, { dueDate, lmp, today, at = new Date().toISOSt
     if (!lmp) throw new CycleError('INVALID_INPUT');
     if (!isDate(lmp)) throw new CycleError('INVALID_DATE');
     if (lmp > today) throw new CycleError('FUTURE_DATE');
+    // A period she logged after this date contradicts it: ask her to check, never guess which one is wrong.
+    if ((s.periods || []).some(p => p.start > lmp && p.start <= today)) throw new CycleError('LMP_BEFORE_LOGGED_PERIOD');
     dueDate = dueDateFromLmp(lmp); source = 'lmp';
   }
   checkDue(dueDate, today);
