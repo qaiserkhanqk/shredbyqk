@@ -83,7 +83,9 @@ export function judge(day, target) {
   const tReps = target?.reps ?? day[0].target ?? LINEAR.reps;
   const clean = work.reduce((a, s) => a + Math.min(s.good ?? s.reps, s.reps), 0) / (reps.reduce((a, b) => a + b, 0) || 1);
   const slow = Math.max(0, ...work.map(s => s.vl || 0));
-  return { kg, reps, tReps, hit: reps.length > 0 && Math.min(...reps) >= tReps, clean, grind: slow >= GRIND, cleanOk: clean >= CLEAN_OK, best: Math.max(...reps), worst: Math.min(...reps), sets: work.length };
+  // Logged by hand: two sets with nothing left ("Max") count as a grind, like slow bar speed on camera.
+  const maxed = work.filter(s => s.rir === 0).length >= 2;
+  return { kg, reps, tReps, hit: reps.length > 0 && Math.min(...reps) >= tReps, clean, grind: slow >= GRIND || maxed, cleanOk: clean >= CLEAN_OK, best: Math.max(...reps), worst: Math.min(...reps), sets: work.length };
 }
 
 /**

@@ -1,5 +1,6 @@
 // Progression: QK's next-weight decisions, units, plate rounding, light weeks and strength charts.
 import * as P from '../js/progression.js';
+import { LIB } from '../js/library.js';
 
 let fail = 0;
 const check = (name, ok, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${ok ? '' : ' ' + extra}`); if (!ok) fail++; };
@@ -91,5 +92,12 @@ check('plates: lighter than the bar → none', P.plates(15) === null);
 check('plates: unloadable → none', P.plates(60.3) === null);
 check('plates: micro plates load 61 kg as 20 + 0.5 a side', P.plates(61)?.text === 'Bar + 20 + 0.5 each side');
 check('micro plates: bench goes up 1 kg, squat 2.5 kg', P.stepKg('big-upper', 'kg', true) === 1 && P.stepKg('big-lower', 'kg', true) === 2.5 && P.roundLoad(61.2, 'big-upper', 'kg', true) === 61 && P.stepKg('mid', 'kg', true) === 2.5);
+// Hand-logged sets: how it felt stands in for the camera. Two sets with nothing left = hold the weight.
+{
+  const T0 = Date.UTC(2026, 9, 1), hand = rir => [0, 1, 2].map(i => ({ ex: 'benchPress', at: T0 + i * 6e4, kg: 60, reps: 5, rir, manual: true, target: 5 }));
+  const easy = P.nextFor(LIB.benchPress, hand(2.5), {}), maxed = P.nextFor(LIB.benchPress, hand(0), {});
+  check('hand-logged: all reps done at "Good" → add weight', easy.kg > 60, JSON.stringify(easy));
+  check('hand-logged: reps done but "Max" on 2+ sets → same weight', maxed.kg === 60, JSON.stringify(maxed));
+}
 if (fail) { console.log(`${fail} FAILED`); process.exit(1); }
 console.log('progression: all pass');

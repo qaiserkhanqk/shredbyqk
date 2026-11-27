@@ -20,6 +20,9 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   });
   // Simulated demo lifters are hidden in the app; this switch turns them on for the test run only.
   await ctx.addInitScript(() => { try { localStorage.setItem('qk_demo', '1'); } catch {} });
+  // Quick log (weight, reps, how it felt) is the app's default. Most checks below exercise the camera flow, so they
+  // run with camera logging chosen; the quick-log block switches back to the default and checks it.
+  await ctx.addInitScript(() => { try { const k = 'shred_qk_v1', S = JSON.parse(localStorage.getItem(k) || '{}'); S.prefs ||= {}; if (!S.prefs.logMode) { S.prefs.logMode = 'camera'; localStorage.setItem(k, JSON.stringify(S)); } } catch {} });
   const p = await ctx.newPage(); const errs = [];
   p.on('pageerror', e => errs.push(e.message)); p.on('console', m => m.type() === 'error' && !/favicon|fonts\.g/.test(m.text()) && errs.push(m.text()));
   // Centre an element before tapping it, so the fixed tab bar never covers it.
@@ -271,7 +274,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   // Camera coach: one tap, QK recognises the exercise, coaches it, and follows a switch to another one.
   // A simulated lifter stands in for the camera: curls with a body swing, then squats.
   await p.goto('https://shred.local/'); await p.waitForTimeout(500);
-  check('camera coach: one big button at the top of Today', await p.isVisible('#camCoach'));
+  check('camera coach: one tap from Today', await p.isVisible('#camCoach'));
   await p.evaluate(async () => {
     const { frameAt } = await import('/tests/synth.mjs'); let t0 = null;
     window.__qkFeed = now => { t0 ??= now; const t = (now - t0) / 1000;
@@ -448,12 +451,16 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('remembers: "Still tired" → today is lighter', await p.isVisible('#readyNote') && /lighter|5% off/.test(await p.textContent('#readyNote')), await p.textContent('#readyNote'));
   // Three rough days this week → an early light week offer.
   await setS(`S.checkinLog = [0, 1, 2].map(d => ({ at: Date.now() - d * 864e5 - 3600e3, level: 'easy' })); S.memory.done = Object.fromEntries([0,1,2,3].map(d => { const x = new Date(Date.now() - d * 864e5); x.setHours(0,0,0,0); return ['rough:' + x.getTime(), 1]; })); (S.prog ||= {}).lightAt = 0; S.prog.lightOfferAt = 0;`);
-  await p.goto('https://shred.local/'); await p.waitForTimeout(500); await go('today');
+  await p.goto('https://shred.local/'); await p.waitForTimeout(500);
+  await p.evaluate(async () => { const { followUps } = await import('/js/memory.js'); const { LIB } = await import('/js/library.js'); const S = JSON.parse(localStorage.getItem('shred_qk_v1')); S.memory ||= { done: {} }; S.memory.done ||= {}; for (const f of followUps(S, { lib: LIB })) S.memory.done[f.id] = 1; localStorage.setItem('shred_qk_v1', JSON.stringify(S)); });
+  await p.reload(); await p.waitForTimeout(500); await go('today');
   check('fatigue: 3 rough days this week → "Take a light week" offered', await p.isVisible('#lightNews') && /rough days this week/.test(await p.textContent('#lightNews')));
   await tap('#lightNews [data-lw=yes]'); await p.waitForTimeout(200);
   check('fatigue: one tap starts the light week', await p.evaluate(() => JSON.parse(localStorage.getItem('shred_qk_v1')).prog.lightAt > 0) && !(await p.isVisible('#lightNews')));
   // Make it yours extras: dumbbell ceiling, travel, Ramadan.
   await go('progress'); await tap('#meCard summary'); await p.waitForTimeout(150);
+  await tap('#moreOpts summary'); await p.waitForTimeout(100);
+  check('settings: essentials first, the rest under "More options"', await p.isVisible('#painChips') && await p.isVisible('#pLogMode'));
   await p.fill('#pMaxDb', '20'); await p.press('#pMaxDb', 'Tab');
   await p.selectOption('#pTravel', 'none'); await p.waitForTimeout(150);
   check('travel: "No equipment" for a week, ends by itself', /until/.test(await p.textContent('#travelNote')) && await p.evaluate(() => JSON.parse(localStorage.getItem('shred_qk_v1')).profile.travel.until > Date.now() + 6 * 864e5));
@@ -466,6 +473,28 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('classes: knee marked sore → quiet mode (no jumping) is on', await p.isChecked('#classQuiet') && /on for your knee/.test(await p.textContent('#rsheetBody')));
   await p.evaluate(() => { document.querySelector('#rsheet').hidden = true; });
   await p.evaluate(() => { const S = JSON.parse(localStorage.getItem('shred_qk_v1')); S.profile.equip = []; S.profile.pain = []; S.profile.travel = null; delete S.profile.maxKg; delete S.plan.minutes; S.program = null; localStorage.setItem('shred_qk_v1', JSON.stringify(S)); });
+
+  // Quick log (the default): weight and reps pre-filled, one tap on how it felt logs the set, QK rests and moves on.
+  await setS(`S.prefs.logMode = 'quick'; S.prog ||= {}; S.prog.skipDrills = true; S.checkin = { day: new Date().toDateString(), r: null }; S.program = { id: 'strengthBuilder', start: Date.now(), blockStart: Date.now(), block: 1, log: [], days: 4 }; S.profile.pain = []; S.profile.equip = [];`);
+  await p.goto('https://shred.local/'); await p.waitForTimeout(500); await go('today');
+  await tap('#planStart'); await p.waitForTimeout(500);
+  check('quick log: Start workout opens the quick log, camera is the second option', await p.isVisible('#qlog') && /Check my form with the camera/.test(await p.textContent('#startCam')) && !(await p.isVisible('#setupSteps')));
+  const qlEx = await p.evaluate(() => document.querySelector('#setupEyebrow').textContent.split(' · ')[0]);
+  check('quick log: weight and reps already filled in', +(await p.inputValue('#qlReps')) > 0 && (await p.isHidden('#qlKgRow') || +(await p.inputValue('#qlKg')) > 0));
+  const setNo = async () => +((await p.textContent('#qlSet')).match(/Set (\d+)/) || [])[1];
+  const before = await setNo();
+  await p.click('#qlFeel [data-qlog="2.5"]'); await p.waitForTimeout(250);
+  const ql1 = await p.evaluate(() => JSON.parse(localStorage.getItem('shred_qk_v1')).sessions.filter(s => s.manual).pop());
+  check('quick log: one tap logs the set with how it felt; the rest timer starts', ql1?.rir === 2.5 && ql1.reps > 0 && await p.isVisible('#qlRest') && /Logged ✓/.test(await p.textContent('#qlNote')), JSON.stringify(ql1));
+  await p.click('#qlRestSkip'); await p.waitForTimeout(400);
+  check('quick log: after the rest, the next set is ready (same exercise, still quick log)', (await setNo()) === before + 1 && (await p.textContent('#setupEyebrow')).startsWith(qlEx) && await p.isVisible('#qlog'), `${before} → ${await setNo()}`);
+  await p.evaluate(() => window.__qkVoice('done')); await p.waitForTimeout(250);
+  check('quick log: saying "done" logs the set too', await p.evaluate(() => JSON.parse(localStorage.getItem('shred_qk_v1')).sessions.filter(s => s.manual).length) >= 2);
+  check('quick log: hand-logged sets never count as camera clean reps', await p.evaluate(async () => { const { lifetimeClean } = await import('/js/rewards.js'); const S = JSON.parse(localStorage.getItem('shred_qk_v1')); return lifetimeClean(S.sessions.filter(s => s.manual)) === 0; }));
+  await p.evaluate(() => { document.querySelector('#setup').hidden = true; });
+  await go('progress'); await tap('#meCard summary'); await p.waitForTimeout(100);
+  check('quick log: "How I log sets" setting, quick tap by default', (await p.inputValue('#pLogMode')) === 'quick');
+  await setS(`S.prefs.logMode = 'camera'; S.program = null; delete S.checkin;`);
 
   // Workout builder: build a two-exercise program, save it, start it; day 1 becomes today's workout.
   await p.goto('https://shred.local/'); await go('train'); await tap('#buildNew');

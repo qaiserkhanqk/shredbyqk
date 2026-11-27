@@ -214,7 +214,7 @@ function nudgeLine() {
 }
 
 function formScoreOf(list) {
-  list = list.filter(s => !s.guided && !s.edited); // hand-corrected counts have no camera form data for the extra reps
+  list = list.filter(s => !s.guided && !s.edited && !s.manual); // no camera form data for hand-corrected or hand-logged sets
   const r = list.reduce((a, s) => a + s.reps, 0), g = list.reduce((a, s) => a + s.good, 0);
   return r ? Math.round(g / r * 100) : null;
 }
@@ -273,7 +273,7 @@ function renderToday() {
   }
 
   const items = [
-    ...S.sessions.map(s => ({ at: s.at, icon: 'good', t: `${esc(s.name)}: ${s.reps} reps, ${s.good} clean` })),
+    ...S.sessions.map(s => ({ at: s.at, icon: 'good', t: s.manual ? `${esc(s.name)}: ${s.kg ? prog.fmtW(s.kg, unit()) + ' × ' : ''}${s.reps} reps, ${feelWord(s.rir) || 'logged'}` : `${esc(s.name)}: ${s.reps} reps, ${s.good} clean` })),
     ...S.checkins.map(c => ({ at: c.at, icon: 'good', t: 'Trained (logged without camera)' })),
     ...S.scans.map(c => ({ at: c.at, icon: 'z1', t: c.bf ? `Body fat ${c.bf.toFixed(1)}%` : 'Posture scan' })),
     ...S.gaits.map(g => ({ at: g.at, icon: 'z1', t: `Gait check: ${Math.round(g.cadence)} steps/min` })),
@@ -420,7 +420,7 @@ function openSetup(k) {
   $('#loadWrap').hidden = !vbtOn();
   const ll = lastLoad(S.sessions, k);
   $('#setupLast').textContent = ll ? `Last time: ${prog.fmtW(ll.kg, unit())} × ${ll.reps}` : '';
-  showRx(k);
+  showRx(k); quickLog(k);
   const inT = (dayItems() || []).some(x => x[0] === k);
   $('#busyBtn').hidden = $('#painBtn').hidden = !inT; $('#skipEx').hidden = !flow || !inT;
   $('#setup').hidden = false;
@@ -1416,6 +1416,7 @@ const planToday = () => {
   const rows = brief.planRows(todayItems().map(x => x[0]), { lib: LIB, sets: S.sessions, unit: unit(), light: lightWeek(), schemeFor: programScheme, micro: !!S.profile.micro });
   return rows.map(x => { if (!x.rx) return x; const a = adjustKg(x.id, x.rx.kg, x.rx.cls); if (!a.changed) return x; return { ...x, rx: { ...x.rx, kg: a.kg }, change: x.change === 'up' ? 'same' : x.change, tag: 'adjusted today', line: `${x.rx.sets} × ${x.rx.reps} · ${prog.fmtW(a.kg, unit())}`, why: a.note }; });
 };
+let planAll = false;
 function renderPlan(rows) {
   // With a program, every item of the day is listed (runs and stations too); without one, only weighted lifts.
   const sets = Object.fromEntries(todayItems()), prg = !!activeProgram();
@@ -1430,6 +1431,7 @@ function renderPlan(rows) {
   const known = lifts.filter(r => r.rx), needW = lifts.some(r => r.change === 'new');
   $('#planTitle').textContent = known.length ? (newWeek ? 'New week. Your weights are set.' : 'Your weights are set') : needW ? 'Pick your starting weights' : `Today: ${programDay()?.day?.name || 'your workout'}`;
   $('#planSummary').textContent = (brief.summary(known) + (known.length ? ' Based on how your last session went. Just follow the numbers.' : needW ? ' Do your first set and QK plans every one after it.' : ' Tap Start workout and follow QK.')).trim();
+  if (needW && quickMode() && !known.length) { $('#planTitle').textContent = 'First week: QK finds your weights'; $('#planSummary').textContent = 'Start each new exercise light and tap how it felt. QK sets the rest of your sets from that.'; }
   const dItems = dayItems() || [], lab = Object.fromEntries(SS.labels(dItems).map((l, i) => [dItems[i][0], l]));
   const raw = dayItemsRaw(), cap = capToday();
   $('#planTime').hidden = !raw;
@@ -1443,7 +1445,9 @@ function renderPlan(rows) {
     $('#planCut').hidden = !cut.length && !ft.paired;
     $('#planCut').textContent = pairTxt + (cut.length ? 'Trimmed: ' + cut.map(c => c.to ? `${LIB[c.id]?.name} ${c.from}→${c.to} sets` : `skipped ${LIB[c.id]?.name}`).join(', ') + '. Main lifts stay.' : ft.paired ? 'Same sets, less waiting.' : '');
   }
-  $('#planRows').innerHTML = lifts.map(r => `<button type="button" class="plan-row ${r.change}" data-train="${r.id}"><b>${lab[r.id] ? `<span class="ss">${lab[r.id]}</span> ` : ''}${esc(r.name)}</b><span class="tgt">${esc(r.line)}</span><span class="why">${esc(r.why)}</span><span class="chg">${esc(r.tag || '')}</span>${platesFor(r)}</button>`).join('');
+  const firstWeek = r => r.change === 'new' && quickMode();
+  $('#planRows').innerHTML = lifts.map((r, i) => `<button type="button" class="plan-row ${r.change} ${i >= 4 && !planAll ? 'more' : ''}" data-train="${r.id}"><b>${lab[r.id] ? `<span class="ss">${lab[r.id]}</span> ` : ''}${esc(r.name)}</b><span class="tgt">${esc(firstWeek(r) ? r.line.replace('pick weight', 'QK finds it') : r.line)}</span>${r.change === 'new' || r.change === 'none' ? '' : `<span class="why">${esc(r.why)}</span>`}<span class="chg">${esc(r.tag || '')}</span>${platesFor(r)}</button>`).join('')
+    + (lifts.length > 4 && !planAll ? `<button type="button" class="linkbtn" id="planAllBtn">Show all ${lifts.length} exercises</button>` : '');
 }
 const platesFor = r => { const pl = r.rx && r.rx.cls?.startsWith('big') ? prog.plates(r.rx.kg, unit()) : null; return pl ? `<span class="plates">${esc(pl.text)}</span>` : ''; };
 // The plan, out loud: the weekly summary then each lift's target.
@@ -1539,7 +1543,7 @@ function nextInFlow(first) {
     return;
   }
   const n = setsToday(k) + 1, of = plannedSets(k);
-  if (!first && k === exKey && lastSource === 'camera' && exFor(k)) {
+  if (!first && k === exKey && lastSource === 'camera' && exFor(k) && !quickMode()) { // quick log stays in quick log
     say(`Set ${n} of ${of}.`, { id: 'flow_set_' + Date.now(), priority: 'high' });
     return startLive({ mode: 'form', source: 'camera' });
   }
@@ -1596,7 +1600,7 @@ setInterval(checkReminder, 5 * 60e3); document.addEventListener('visibilitychang
 const MONTH = 28 * 864e5;
 const inPlan = k => !!activeProgram()?.plan.some(d => d.items.some(it => it[0] === k));
 // Reps done cleanly in the last 4 weeks (form quality for the volume decision).
-const cleanRate = () => { const from = Date.now() - MONTH, xs = S.sessions.filter(x => x.at >= from && !x.demo && !x.guided && x.reps); const r = xs.reduce((a, x) => a + x.reps, 0); return r ? xs.reduce((a, x) => a + Math.min(x.good || 0, x.reps), 0) / r : 1; };
+const cleanRate = () => { const from = Date.now() - MONTH, xs = S.sessions.filter(x => x.at >= from && !x.demo && !x.guided && !x.manual && x.reps); const r = xs.reduce((a, x) => a + x.reps, 0); return r ? xs.reduce((a, x) => a + Math.min(x.good || 0, x.reps), 0) / r : 1; };
 // Days a week. `how`: 'auto' (QK judged it), 'manual' (the lifter chose), 'undo'.
 function setDays(n, how, extra = {}) {
   const P = S.program, def = P && programById(P.id); if (!def || !freq.canAdapt(def)) return;
@@ -2108,7 +2112,7 @@ function renderRewards() {
 
 function renderProgress() {
   renderRewards(); renderStrength(); renderWeak();
-  const sets = S.sessions.filter(s => s.reps && !s.guided).slice(-12);
+  const sets = S.sessions.filter(s => s.reps && !s.guided && !s.manual).slice(-12);
   const scores = sets.map(s => Math.round(s.good / s.reps * 100));
   $('#pfScore').textContent = scores.length ? scores[scores.length - 1] + '%' : '–';
   $('#pfDelta').textContent = scores.length >= 2 ? `${scores[scores.length - 1] - scores[0] >= 0 ? '+' : ''}${scores[scores.length - 1] - scores[0]} pts` : '';
@@ -2480,7 +2484,7 @@ function renderNext(level) {
     trainedToday: S.sessions.some(s => !s.demo && dayKey(s.at) === today) || S.checkins.some(x => dayKey(x.at) === today),
     calmedToday: (S.calm || []).some(x => dayKey(x.at) === today),
     rehab: p ? { name: c.name, phase: p.phase, phases: c.phases.length, morningDue: !!morningDue } : null,
-    workout: { name: todayName(), minutes: 38, count: todayItems().length },
+    workout: { name: todayName(), minutes: (it => (it ? warm.dayMinutes(it, warmCount(it)) : 38))(dayItems()), count: todayItems().length },
   });
   $('#nextCard').dataset.kind = step.kind;
   $('#nextEyebrow').textContent = step.eyebrow; $('#nextTitle').textContent = step.title; $('#nextSub').textContent = step.sub; $('#nextCta').textContent = step.cta;
@@ -2615,13 +2619,35 @@ function chooseProgram(id) {
   if (!S.plan.days.length) { S.plan.days = defaultDays(nd); S.profile.weeklyGoal = nd; }
   persist(); drawObDays();
   $('#obDaysNote').textContent = `QK picked ${p.name}: ${p.tagline} It's ${nd} days a week, so QK suggested days. Change them to fit your life${freq.canAdapt(p) ? ': pick 3 to 6 and QK re-packs the program' : ''}.`;
+  drawObKnow(p);
   obStep(3);
+}
+// "I know my numbers": the program's big lifts, weight × reps. QK turns them into day-1 working weights.
+function drawObKnow(p) {
+  const v = freq.canAdapt(p) ? daysView(p, S.program?.days || p.days) : p, seen = new Set();
+  const lifts = v.plan.flatMap(d => d.items.map(it => it[0])).filter(id => (prog.liftClass(LIB[id]) || '').startsWith('big') && !seen.has(id) && seen.add(id)).slice(0, 4);
+  $('#obKnowWrap').hidden = !lifts.length;
+  $('#obKnow').innerHTML = lifts.map(id => `<div class="know-row" data-know="${id}"><span>${esc(LIB[id].name)}</span><label class="field"><input type="number" inputmode="decimal" min="0" placeholder="${unit()}" aria-label="${esc(LIB[id].name)} weight (${unit()})" data-kk></label><span class="muted">×</span><label class="field"><input type="number" inputmode="numeric" min="1" max="20" placeholder="reps" aria-label="${esc(LIB[id].name)} reps" data-kr></label></div>`).join('');
+}
+function saveObKnow() {
+  const p = S.program && programById(S.program.id); if (!p) return;
+  const P = (S.prog ||= {}); P.override ||= {}; let n = 0;
+  for (const row of $$('#obKnow [data-know]')) {
+    const id = row.dataset.know, kg = parseFloat(row.querySelector('[data-kk]').value), reps = parseInt(row.querySelector('[data-kr]').value, 10);
+    if (!(kg > 0 && reps > 0 && reps <= 20)) continue;
+    const it = activeProgram()?.plan.flatMap(d => d.items).find(x => x[0] === id), sc = it ? progScheme(it[1], it[2]) : null, target = sc?.lo ?? 8;
+    // Their usual set (assume ~1 rep left) → the weight for today's target with about 2 left.
+    const w = prog.roundLoad(personal.rirKg(prog.fromUnit(kg, unit()), reps, 1, target), prog.liftClass(LIB[id]), unit(), !!S.profile.micro);
+    P.override[id] = { kg: w, at: Date.now(), known: true }; n++;
+  }
+  if (n) persist();
 }
 const OB_ORDER = [1, 2, 3, 4, 5, 6, 0], OB_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 function drawObDays() { $('#obDays').innerHTML = OB_ORDER.map(d => `<button type="button" class="day ${S.plan.days.includes(d) ? 'on' : ''}" data-day="${d}" aria-pressed="${S.plan.days.includes(d)}">${OB_NAMES[d]}</button>`).join(''); }
 $('#obDays').onclick = e => { const b = e.target.closest('[data-day]'); if (!b) return; const d = +b.dataset.day, i = S.plan.days.indexOf(d); i >= 0 ? S.plan.days.splice(i, 1) : S.plan.days.push(d); if (S.plan.days.length) S.profile.weeklyGoal = S.plan.days.length; persist(); drawObDays(); };
 $('#obDone').onclick = $('#obSkip').onclick = () => finishWelcome();
 function finishWelcome() {
+  saveObKnow();
   if (S.program && S.plan?.days.length) setDays(freq.clampDays(S.plan.days.length), 'plan');
   $('#welcome').hidden = true; bindPlan(); renderPrograms(); renderToday(); tab('today');
   if (S.profile.goal === 'athlete' && !S.athlete) setTimeout(() => { tab('train'); openAthlete('sport'); }, 600);
@@ -2673,6 +2699,7 @@ function bindPersonal() {
   const ram = () => { const on = personal.ramadanOn(p); $('#pRamadan').checked = on; $('#ramadanNote').textContent = on ? `Ramadan mode until ${new Date(p.ramadan.until).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}: sessions up to 45 minutes, one set fewer on the extras. Train after iftar if you can.` : 'Train after iftar if you can: in a 2023 study, strength gains were better fed than fasted.'; };
   $('#pRamadan').onchange = e => { if (e.target.checked) p.ramadan = { until: Date.now() + 30 * 864e5 }; else if (p.ramadan) p.ramadan.until = Date.now() - 1; persist(); ram(); renderToday(); };
   ram();
+  $('#pLogMode').value = P.logMode || 'quick'; $('#pLogMode').onchange = e => { P.logMode = e.target.value; persist(); };
   $('#pCheckin').checked = P.checkin !== false; $('#pCheckin').onchange = e => { P.checkin = e.target.checked; persist(); };
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   $('#pVoiceCmd').checked = !!P.voiceCmd; $('#pVoiceCmd').disabled = !SR;
@@ -2690,12 +2717,14 @@ function bindPersonal() {
 
 // Notes on the Today plan: a missed session folded in, exercises fitted to the client, how they feel today.
 function renderPersonalNotes() {
+  setTimeout(oneNotice);
   const r = personalNote.rescue, box = $('#rescueNews');
   box.hidden = !r;
   if (r) box.innerHTML = `<b>Missed ${r.missedDays.map(d => WDAY_(d)).join(' and ')}? Nothing is lost.</b><p class="muted small">Today also has the main lifts from ${esc(r.nextName)}: ${r.added.map(id => esc(LIB[id]?.name || id)).join(', ')}. One set lighter each, so it still fits.</p><div class="btn-row"><button class="ghost" type="button" id="rescueOff">Just today's session</button></div>`;
   const travelling = S.profile.travel && Date.now() < S.profile.travel.until;
   const sw = personalNote.swaps, why = { equipment: travelling ? 'your travel kit' : 'your equipment', pain: 'easy on the sore spot', skipped: 'you skipped it twice', busy: 'machine taken' };
-  $('#swapNote').hidden = !sw.length;
+  $('#swapBox').hidden = !sw.length;
+  $('#swapSum').textContent = sw.length === 1 ? '1 exercise fitted to you' : `${sw.length} exercises fitted to you`;
   $('#swapNote').textContent = sw.length ? 'Fitted to you: ' + sw.map(x => (x.to ? `${LIB[x.from]?.name} → ${LIB[x.to]?.name} (${why[x.why]})` : `${LIB[x.from]?.name} left out (nothing similar for ${why[x.why]})`)).join('; ') + '.' : '';
   const adj = todayAdjust();
   $('#readyNote').hidden = !adj?.note;
@@ -2775,16 +2804,17 @@ function handleVoice(text) {
   const c = parseVoice(text); if (!c) return null;
   const setupOpen = !$('#setup').hidden, sumOpen = !$('#summary').hidden;
   const showKg = kg => +prog.toUnit(kg, unit()).toFixed(2);
-  const setRx = kg => { $('#rxKg').value = showKg(kg); $('#rxSave').click(); };
+  const setRx = kg => { $('#rxKg').value = showKg(kg); $('#rxSave').click(); if (ql && !$('#qlog').hidden) { ql.kg = kg; qlDraw(); } };
   if (c.cmd === 'weight') {
     const kg = prog.fromUnit(c.kg, c.unit), said = `${c.kg} ${c.unit === 'lb' ? 'pounds' : 'kilos'}.`;
     if (setupOpen) { setRx(kg); say(said, { priority: 'high' }); }
     else if (sumOpen) { $('#setKg').value = showKg(kg); $('#setKg').dispatchEvent(new Event('change')); say(said, { priority: 'high' }); }
     else return null;
-  } else if ((c.cmd === 'heavier' || c.cmd === 'lighter') && setupOpen && curRx) {
-    const st = prog.stepKg(curRx.cls, unit()); setRx(Math.max(0, curRx.kg + (c.cmd === 'heavier' ? st : -st))); say(c.cmd === 'heavier' ? 'Heavier.' : 'Lighter.', { priority: 'high' });
+  } else if ((c.cmd === 'heavier' || c.cmd === 'lighter') && setupOpen && (curRx || ql?.cls)) {
+    const base = ql?.cls && !$('#qlog').hidden ? { kg: ql.kg, cls: ql.cls } : curRx, st = prog.stepKg(base.cls, unit()); setRx(Math.max(0, base.kg + (c.cmd === 'heavier' ? st : -st))); say(c.cmd === 'heavier' ? 'Heavier.' : 'Lighter.', { priority: 'high' });
   } else if (c.cmd === 'start' && setupOpen) (!$('#startCam').hidden ? $('#startCam') : $('#startGuided')).click();
   else if (c.cmd === 'done' && live) $('#endLive').click();
+  else if (c.cmd === 'done' && setupOpen && ql && !$('#qlog').hidden) $('#qlFeel [data-qlog="2.5"]').click();
   else if (c.cmd === 'next' && flow && sumOpen) nextInFlow();
   else if (c.cmd === 'skip' && flow && setupOpen) $('#skipEx').click();
   else return null;
@@ -2865,3 +2895,116 @@ $('#rirSeg').onclick = e => {
   $('#rirNote').textContent = same ? `Spot on. Stay at ${prog.fmtW(kg, unit())} for the next set.` : `Next set: ${prog.fmtW(kg, unit())} for ${target} reps. QK takes it from there.`;
   say(same ? 'Spot on. Same weight next set.' : `Next set, ${prog.fmtW(kg, unit()).replace('kg', 'kilos').replace('lb', 'pounds')}.`, { priority: 'high' });
 };
+
+
+/* ---------- Quick log: the default way to log a set (camera is the option) ---------- */
+// Weight and reps come pre-filled from QK's plan; the four feel buttons ARE the log button, so a set the
+// client did as planned is one tap. First time on an exercise: a light feeler set, and how it felt sets the next one.
+function feelWord(rir) { return { 4: 'easy', 2.5: 'good', 1: 'hard', 0: 'max' }[rir]; } // hoisted: the activity list uses it at startup
+function quickMode() { return (S.prefs?.logMode || 'quick') === 'quick'; } // hoisted: Today uses it while drawing at startup
+let ql = null, qlTimer = null;
+function qlStartKg(k) {
+  const it = LIB[k], cls = prog.liftClass(it), eq = it.equipment, newb = S.profile.experience === 'new';
+  const kg = cls?.startsWith('big') ? (unit() === 'lb' ? prog.fromUnit(45, 'lb') : 20) : /Dumbbell/.test(eq) ? (newb ? 4 : 8) : /Kettlebell/.test(eq) ? 8 : 10;
+  return prog.roundLoad(kg, cls, unit());
+}
+function quickLog(k) {
+  const it = LIB[k], cls = prog.liftClass(it), item = (dayItems() || []).find(x => x[0] === k);
+  const timed = item && /s$|min|m$|km|rounds/.test(String(item[2])) || it.kind === 'run' || it.kind === 'hyrox';
+  // Weight-and-reps exercises only: holds, intervals and stopwatch work keep QK's voice coaching.
+  const show = quickMode() && !timed && !isHoldId(k) && !['hold', 'intervals', 'stopwatch'].includes(coachOf(it)) && (cls || !!exFor(k) || (it.kind || 'gym') === 'gym');
+  $('#qlog').hidden = !show; clearInterval(qlTimer); $('#qlRest').hidden = true;
+  // The camera becomes the second option while quick log is on.
+  $('#startCam').classList.toggle('cta', !show); $('#startCam').classList.toggle('ghost', show);
+  $('#startCam').lastChild.textContent = show ? 'Check my form with the camera' : 'Start camera';
+  $('#recordChk').parentElement.hidden = show || !exFor(k);
+  $('#startGuided').hidden = show || !!exFor(k);
+  // Hand logging: hide the camera set-up (placement line, body map, bar speed) and the duplicate target box.
+  if (show) { $('#setupSteps').hidden = true; $('#fitNote').hidden = true; $('#loadWrap').hidden = true; $('#rxBox').hidden = true; }
+  $('#qlSwap').hidden = !show || !inPlan(k);
+  if (!show) { $('#setupSteps').hidden = false; ql = null; return; }
+  const sc = programScheme(k), r = cls ? rxFor(k) : null, bw = !cls ? personal.bwTarget(S.sessions, k, sc) : null;
+  const first = cls && !S.sessions.some(s => s.ex === k && s.kg > 0 && !s.demo && new Date(s.at).toDateString() !== todayKey());
+  // Later sets today: the weight just used (or QK's calibrated one) and the day's rep target, not next session's.
+  const today = S.sessions.filter(s => s.ex === k && !s.demo && new Date(s.at).toDateString() === todayKey()), last = today[today.length - 1];
+  const o = S.prog?.override?.[k], kgToday = last?.kg ? (o && o.at > last.at ? o.kg : last.kg) : null;
+  const target = sc?.lo ?? last?.target ?? r?.reps ?? 8;
+  const hist = S.sessions.some(s => s.ex === k && s.kg > 0 && !s.demo);
+  ql = { k, cls, kg: cls ? (kgToday ?? r?.kg ?? qlStartKg(k)) : null, reps: last || (cls && !hist) ? target : r?.reps ?? bw?.reps ?? target, first: first && !S.prog?.override?.[k]?.known && !(last && last.rir != null && last.rir < 4), target };
+  $('#qlKgRow').hidden = !cls; $('#qlUnit').textContent = unit();
+  qlDraw();
+  const known = S.prog?.override?.[k]?.known && !hist;
+  $('#qlHint').textContent = ql.first ? 'First time: start light' : known ? 'From your numbers' : '';
+  $('#qlNote').textContent = ql.first ? 'Know your usual weight? Type it in. Otherwise do this light set and tap how it felt: QK sets your next set from that.' : known ? 'Worked out from the numbers you gave QK. Tap how it felt and QK fine-tunes from here.' : r ? 'Pre-filled from QK\'s plan. Change the numbers only if you did something different.' : '';
+  $('#setupTitle').textContent = cls || exFor(k) ? 'Log your sets' : $('#setupTitle').textContent;
+}
+function qlDraw() {
+  if (!ql) return;
+  const done = setsToday(ql.k), of = plannedSets(ql.k);
+  $('#qlSet').textContent = `Set ${done + 1}${of ? ' of ' + of : ''}`;
+  $('#setupEyebrow').textContent = `${LIB[ql.k].name} · set ${done + 1}`;
+  if (ql.cls) $('#qlKg').value = +prog.toUnit(ql.kg, unit()).toFixed(2);
+  $('#qlReps').value = ql.reps;
+  // Plates for barbell lifts; warm-up sets before the first working set.
+  const pl = ql.cls?.startsWith('big') ? prog.plates(ql.kg, unit()) : null;
+  $('#qlPlates').hidden = !pl; $('#qlPlates').textContent = pl ? pl.text : '';
+  const wu = !ql.first && !done && ql.cls ? warm.warmupSets(LIB[ql.k], ql.kg, unit()) : [];
+  $('#qlWarm').hidden = !wu.length; $('#qlWarm').textContent = wu.length ? `Warm-up first: ${warm.warmupLine(wu, unit())}` : '';
+}
+$('#qlSwap').onclick = () => $('#swapBtn').click();
+$('#qlog').addEventListener('click', e => {
+  const b = e.target.closest('[data-ql]'); if (!b || !ql) return;
+  const st = ql.cls ? prog.stepKg(ql.cls, unit(), !!S.profile.micro) : 0;
+  if (b.dataset.ql === 'kg+') ql.kg += st; if (b.dataset.ql === 'kg-') ql.kg = Math.max(0, ql.kg - st);
+  if (b.dataset.ql === 'r+') ql.reps += 1; if (b.dataset.ql === 'r-') ql.reps = Math.max(1, ql.reps - 1);
+  qlDraw();
+});
+$('#qlKg').onchange = e => { if (ql) { const v = parseFloat(e.target.value); if (v >= 0) ql.kg = prog.fromUnit(v, unit()); } };
+$('#qlReps').onchange = e => { if (ql) { const v = parseInt(e.target.value, 10); if (v > 0) ql.reps = v; } };
+$('#qlFeel').addEventListener('click', e => {
+  const b = e.target.closest('[data-qlog]'); if (!b || !ql) return;
+  const rir = +b.dataset.qlog, k = ql.k, it = LIB[k];
+  S.sessions.push(lastSet = { at: Date.now(), ex: k, name: it.name, reps: ql.reps, kg: ql.cls ? ql.kg : undefined, rir, manual: true, target: ql.target });
+  logProgramDay(k); persist(); setTimeout(() => syncNow?.(), 2000);
+  $$('#qlFeel button').forEach(x => x.classList.toggle('on', x === b)); setTimeout(() => $$('#qlFeel button').forEach(x => x.classList.remove('on')), 900);
+  // First time: the answer sets the next set. Otherwise: keep the weight, and say what it means.
+  let note;
+  if (ql.first && ql.cls) {
+    // Finding the working weight. "Easy" (4 or more left) on a feeler set: ramp up and ask again, like
+    // building up to a working weight with a coach. Good/Hard/Max: calculate the weight from reps in reserve.
+    const newb = S.profile.experience === 'new', st = prog.stepKg(ql.cls, unit(), !!S.profile.micro);
+    let kg = personal.rirKg(ql.kg, ql.reps, rir, ql.target, { beginner: newb });
+    if (rir >= 4) kg = Math.max(kg, ql.kg * (newb ? 1.1 : 1.25), ql.kg + (newb ? 1 : 2) * st);
+    kg = prog.roundLoad(kg, ql.cls, unit(), !!S.profile.micro);
+    const P = (S.prog ||= {}); P.override ||= {}; P.override[k] = { kg, at: Date.now() + 1 }; persist();
+    note = rir >= 4 ? `Easy: try ${prog.fmtW(kg, unit())} next and tell QK again.` : Math.abs(kg - ql.kg) < 0.01 ? `Spot on: this is your working weight.` : `Your working weight: ${prog.fmtW(kg, unit())} for ${ql.target}.`;
+    ql.kg = kg; ql.reps = ql.target; ql.first = rir >= 4;
+  } else note = { 4: 'Felt easy. If the rest feel the same, QK adds weight next time.', 2.5: 'Right where it should be.', 1: 'Hard but done. Same weight next set.', 0: 'Nothing left. If the next one is the same, drop a little.' }[rir];
+  $('#qlNote').textContent = `Logged ✓ ${note}`;
+  $('#qlHint').textContent = '';
+  const done = setsToday(k), of = plannedSets(k), item = (dayItems() || []).find(x => x[0] === k), rest = item?.[3] || 90;
+  const allDone = of && done >= of;
+  // In a workout: rest, then the next set or exercise (supersets go straight on). Outside one: just rest.
+  const st = flow ? flowStep() : null, goNow = flow && st && !st.rest && st.id !== k;
+  if (goNow) { say('Logged. Next exercise.', { priority: 'high' }); return setTimeout(() => nextInFlow(), 600); }
+  if (allDone && !flow) { say(`Logged. All ${of} sets done.`, { priority: 'high' }); qlDraw(); $('#qlSet').textContent = `All ${of} sets done ✓`; return; }
+  qlRest(rest, () => { if (flow) nextInFlow(); else { qlDraw(); say(`Set ${setsToday(k) + 1}. Go.`, { priority: 'high' }); } });
+  say(`Logged. Rest ${rest >= 120 && rest % 60 === 0 ? rest / 60 + ' minutes' : rest + ' seconds'}.`, { priority: 'high' });
+  qlDraw();
+});
+function qlRest(secs, then) {
+  clearInterval(qlTimer); let left = secs; const box = $('#qlRest'); box.hidden = false;
+  const draw = () => { $('#qlRestT').textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`; };
+  draw();
+  const end = () => { clearInterval(qlTimer); qlTimer = null; box.hidden = true; then(); };
+  $('#qlRestSkip').onclick = end;
+  qlTimer = setInterval(() => { left--; draw(); if (left === 10) say('Ten seconds.', { priority: 'low' }); if (left <= 0) end(); }, 1000);
+}
+
+document.addEventListener('click', e => { if (e.target.id === 'planAllBtn') { planAll = true; renderToday(); } });
+// One notice at a time on Today: the most important shows, the rest wait their turn.
+function oneNotice() {
+  const ids = ['#memCard', '#rescueNews', '#lightNews', '#daysNews', '#planNews'];
+  let shown = false;
+  for (const id of ids) { const el = $(id); if (!el) continue; if (el.hidden) continue; if (shown) el.hidden = true; else shown = true; }
+}

@@ -29,7 +29,7 @@ const CHEERS = {
 };
 
 /** Sessions that count: real camera sets (no demos, guided timers or hand-edited counts). */
-const counts = (s, isHold) => s && !s.demo && !s.guided && !(isHold && isHold(s.ex));
+const counts = (s, isHold) => s && !s.demo && !s.guided && !s.manual && !(isHold && isHold(s.ex));
 
 /** All clean reps ever done. isHold(id) → true for exercises scored in seconds. */
 export function lifetimeClean(sessions = [], isHold) {

@@ -11,7 +11,7 @@ const D = 864e5;
 export const weekStart = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime(); }; // Monday
 const ms = x => (typeof x === 'number' ? x : Date.parse(x));
 const dayKey = t => new Date(t).toDateString();
-const score = sets => { const xs = sets.filter(s => !s.guided && s.reps); const r = xs.reduce((a, s) => a + s.reps, 0); return r ? Math.round(xs.reduce((a, s) => a + Math.min(s.good || 0, s.reps), 0) / r * 100) : null; };
+const score = sets => { const xs = sets.filter(s => !s.guided && !s.manual && s.reps); const r = xs.reduce((a, s) => a + s.reps, 0); return r ? Math.round(xs.reduce((a, s) => a + Math.min(s.good || 0, s.reps), 0) / r * 100) : null; };
 
 /**
  * @param p profile row, @param sets session rows, @param opens event rows, @param checks checkin rows
