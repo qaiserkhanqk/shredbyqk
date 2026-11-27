@@ -1,0 +1,23 @@
+FAIL module js/onboarding.js exists  — Cannot find module '/home/user/shredbyqk/js/onboarding.js' imported from /home/user/shredbyqk/tests/onboarding.test.mjs
+FAIL man: no age or period question  — {"error":"O.personalise is not a function"}
+FAIL woman: asked her age
+FAIL other or prefer not to say: asked her age too (nobody who has periods is locked out)
+FAIL woman under 13: no period question, with a note
+FAIL woman 13–17 and 18+: asked whether she would like to track her periods
+FAIL "Not right now": asked which applies (pregnant, recently gave birth, menopause, just not now)
+FAIL man: period tracking and Zara stay off, and he lands on Today  — {"error":"O.personalise is not a function"}
+FAIL woman, yes: period tracking and Zara on, and she goes straight to her cycle screen  — {"error":"O.personalise is not a function"}
+FAIL 13–17, yes: the same
+FAIL under 13: never turned on, even if a period answer is sent  — {"error":"O.personalise is not a function"}
+FAIL woman, no: off, lands on Today, and is told she can turn it on in settings  — {"error":"O.personalise is not a function"}
+FAIL not right now, pregnant: pregnancy mode on and she goes to her cycle screen  — {"error":"O.personalise is not a function"}
+FAIL not right now, recently gave birth: postpartum (pregnancy mode) on
+FAIL not right now, menopause: menopause mode on
+FAIL not right now, just not now: off, lands on Today
+FAIL other or prefer not to say, yes: on (no sex assumed for the body-fat formula)  — {"error":"O.personalise is not a function"}
+FAIL no answers (skipped): nothing is changed  — {"error":"O.personalise is not a function"}
+FAIL Zara is introduced as a companion, never as clinical or medical
+FAIL the welcome says she can rename Zara
+FAIL the minimum age is 13
+ok   invalid answers are refused
+21 FAILED of 22
