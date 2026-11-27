@@ -98,6 +98,8 @@ export async function renderCycle() {
       ${canReset ? '<p class="muted small">You can reset cycle tracking on this device. This deletes the unreadable data and its key; it can\'t be recovered.</p><button class="stop" type="button" data-act="resetStorage">Reset cycle data on this device</button>' : ''}</div>`;
     return;
   }
+  // The re-read above may have finished while her finger is down (it started just before the press): wait for it.
+  if (pressing) { pendingRedraw = true; return; }
   render();
   clearInterval(timer); timer = setInterval(() => { if (root.closest('.screen.on')) notifyDue(); }, 60e3);
 }
