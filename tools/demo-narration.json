@@ -133,18 +133,30 @@
   },
   {
     "id": "23",
+    "step": "Quran reader",
+    "caption": "Read the whole Quran: all 114 surahs, with translation.",
+    "say": "And you can read the whole Quran here. All one hundred and fourteen surahs, with the translation."
+  },
+  {
+    "id": "24",
+    "step": "Quran reader",
+    "caption": "Listen as it follows along, bookmark, and continue where you left off.",
+    "say": "Press play and it follows along with the recitation. And it remembers where you stopped."
+  },
+  {
+    "id": "25",
     "step": "Me",
     "caption": "Your progress, all in one place.",
     "say": "Your progress is all in one place."
   },
   {
-    "id": "24",
+    "id": "26",
     "step": "Me",
     "caption": "One tap sends QK your week. Text only, never video.",
     "say": "And with one tap, you send me your week, so I can coach you properly."
   },
   {
-    "id": "25",
+    "id": "27",
     "step": "Shred by QK",
     "caption": "Your coach in your pocket.",
     "say": "Shred. Your coach in your pocket. Let's get to work."
