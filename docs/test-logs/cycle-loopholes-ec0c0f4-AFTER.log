@@ -11,4 +11,11 @@ ok   "Not yet" keeps spotting she logged earlier today
 ok   …and quiets the question for today
 ok   "Not yet" with nothing logged today records no bleeding today (her answer)
 ok   "Spotting only" saves spotting and quiets the question for today
-ALL PASS (13)
+ok   the months of a pregnancy are not counted as "12 months without a period"
+ok   …and the text says it counts from the end of the pregnancy
+ok   …so spotting after the birth does not raise the "bleeding after 12 months" alert
+ok   a gap that contains a pregnancy is not described as a long gap without periods
+ok   while marked as recently given birth or breastfeeding, a long time without periods is not compared with the 12-month definition
+ok   control: without a pregnancy, 13 months without a period is still described
+ok   control: …and spotting after it still raises the alert
+ALL PASS (20)

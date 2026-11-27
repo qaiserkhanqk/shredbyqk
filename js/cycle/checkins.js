@@ -84,7 +84,7 @@ export function answerPeriodCheckIn(s, today, date, { at = new Date().toISOStrin
 
 const isPregnant = s => !!(s.situation?.pregnant || s.pregnancy);
 /** Dates she was marked pregnant: ended pregnancies she recorded, and times "Pregnant" was ticked as a situation. */
-function pregnantSpans(s) {
+export function pregnantSpans(s) {
   const out = (s.pregnancies || []).filter(p => p.endDate).map(p => ({ from: p.lmp || (p.dueDate ? addDays(p.dueDate, -280) : p.endDate), to: p.endDate }));
   let on = null;
   for (const e of [...(s.situationLog || [])].filter(e => e.key === 'pregnant').sort((a, b) => a.at.localeCompare(b.at))) {
@@ -102,7 +102,7 @@ export function missedLogQuestion(s, today) {
   const since = restartDate(s, today), spans = pregnantSpans(s);
   const cs = cycles(s).filter(c => c.nextStart <= today && (!since || c.start >= since));
   const latest = cs.at(-1); if (!latest) return null;
-  if (spans.some(p => latest.start <= p.to && latest.nextStart >= p.from)) return null;
+  if (spans.some(p => latest.start < p.to && latest.nextStart > p.from)) return null;
   const period = s.periods.find(p => p.start === latest.nextStart);
   if (!period || period.missedBefore || s.promptsDismissed?.[`missed:${period.id}`]) return null;
   const earlier = cs.slice(0, -1).filter(c => c.usable).slice(-6).map(c => c.length);

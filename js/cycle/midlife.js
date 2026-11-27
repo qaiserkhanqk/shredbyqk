@@ -15,7 +15,8 @@
 //  • Cycles she marked as "missed a log before this" are left out.
 // All wording is a placeholder awaiting clinician review.
 import { addDays, diffDays, human } from './dates.js';
-import { hasConsent } from './model.js';
+import { hasConsent, restartDate } from './model.js';
+import { pregnantSpans } from './checkins.js';
 
 export const MIDLIFE_VERSION = 'midlife-observations-0.1.0';
 export const REVIEW_STATUS = 'awaiting_clinician_review';
@@ -65,8 +66,10 @@ export function midlifeObservations(s, today) {
   const ps = [...s.periods].filter(p => p.start <= today).sort((a, b) => a.start.localeCompare(b.start));
   const lastDay = p => (p.end && p.end <= today ? p.end : p.start);
   // Cycle lengths between consecutive starts, unless she marked a missed log before the later start.
+  // A gap that contains a pregnancy is not a cycle or a gap without periods (fixed after ec0c0f4).
+  const spans = pregnantSpans(s), crossesPregnancy = (a, b) => spans.some(p => a < p.to && b > p.from);
   const cyc = [];
-  for (let i = 0; i + 1 < ps.length; i++) cyc.push({ start: ps[i].start, next: ps[i + 1].start, length: diffDays(ps[i].start, ps[i + 1].start), missed: !!ps[i + 1].missedBefore, from: ps[i] });
+  for (let i = 0; i + 1 < ps.length; i++) if (!crossesPregnancy(ps[i].start, ps[i + 1].start)) cyc.push({ start: ps[i].start, next: ps[i + 1].start, length: diffDays(ps[i].start, ps[i + 1].start), missed: !!ps[i + 1].missedBefore, from: ps[i] });
 
   // 1. Variability: a ≥7-day difference between consecutive cycles, in two separate episodes within 10 cycles.
   const idx = [];
@@ -88,19 +91,25 @@ export function midlifeObservations(s, today) {
     : longest ? `Your longest gap without a logged period was ${longest.days} days.` : 'No gaps to describe yet.' };
 
   // 3. Time since the last logged period, and bleeding after 12 months without one.
-  const last = ps.at(-1);
+  // After a pregnancy, the months are counted from its end, not from the last period before it; while she is marked
+  // as recently given birth or breastfeeding, a long time without periods is common and is not compared at all.
+  const last = ps.at(-1), since = restartDate(s, today), postpartum = !!s.situation?.postpartum;
   let sinceLastPeriod = null;
   if (last) {
-    const from = lastDay(last), months = monthsBetween(from, today), twelve = months >= STRAW.FMP_MONTHS;
-    sinceLastPeriod = { from, months, twelveMonths: twelve, text: twelve
-      ? `It has been ${months} months since your last logged period. Looking back, 12 months without a period is how menopause is defined (STRAW+10). Any bleeding from now on, even spotting, should be checked by a doctor.`
-      : `It has been ${months} ${months === 1 ? 'month' : 'months'} since your last logged period.` };
+    const afterPregnancy = !!since && lastDay(last) < since;
+    const from = afterPregnancy ? since : lastDay(last), months = monthsBetween(from, today), twelve = !postpartum && months >= STRAW.FMP_MONTHS;
+    const what = afterPregnancy ? `your pregnancy ended (${human(since)})` : 'your last logged period';
+    sinceLastPeriod = { from, months, twelveMonths: twelve, afterPregnancy, text: twelve
+      ? `It has been ${months} months since ${what}. Looking back, 12 months without a period is how menopause is defined (STRAW+10). Any bleeding from now on, even spotting, should be checked by a doctor.`
+      : `It has been ${months} ${months === 1 ? 'month' : 'months'} since ${what}.${afterPregnancy || postpartum ? ' Periods can take many months to come back after a pregnancy, often longer while breastfeeding, so this time is not compared with the 12-month menopause definition' + (postpartum ? ' while you are marked as recently given birth or breastfeeding.' : ' until 12 months after the pregnancy ended.') : ''}` };
   }
   const bleedDates = [...ps.map(p => p.start), ...Object.entries(s.days).filter(([d, v]) => d <= today && (v.bleeding === 'period' || v.bleeding === 'spotting')).map(([d]) => d)].sort();
   let afterTwelve = false;
   for (const d of bleedDates) {
+    if (postpartum) break;
     const prev = ps.filter(p => lastDay(p) < d).at(-1); if (!prev) continue;
-    if (monthsBetween(lastDay(prev), d) >= STRAW.FMP_MONTHS) { afterTwelve = true; break; }
+    const ended = spans.filter(p => p.to >= lastDay(prev) && p.to < d).map(p => p.to).sort().at(-1); // a pregnancy in between
+    if (monthsBetween(ended || lastDay(prev), d) >= STRAW.FMP_MONTHS) { afterTwelve = true; break; }
   }
   const alerts = afterTwelve ? ['You logged bleeding after 12 months or more without a period. Please see a doctor to have this checked.'] : [];
   return { ...base, applicable: true, variability, longGap, sinceLastPeriod, bleedingAfterTwelveMonths: afterTwelve, alerts };
