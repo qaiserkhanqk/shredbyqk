@@ -219,6 +219,7 @@ const num = s => +String(s).replace(/[^\d]/g, '');
   check('diet plan card offers the questionnaire', /Breakfast you like/.test(await p.textContent('#foodPlan')));
   await p.click('#foodPlan [data-pdiet=nobeef]');
   await p.click('#foodPlan [data-plike="breakfast|cornflakes"]');
+  for (const k of ['paratha', 'bread', 'peanutButter']) await p.click(`#foodPlan [data-plike="breakfast|${k}"]`); // untick: cereal, eggs and roti mornings
   await p.click('#foodPlan [data-plan=make]');
   const plan = await p.textContent('#foodPlan');
   check('plan has 4 meals with options', (await p.$$('#foodPlan .plan-meal')).length === 4 && (await p.$$('#foodPlan .plan-opt')).length >= 6);
@@ -235,6 +236,32 @@ const num = s => +String(s).replace(/[^\d]/g, '');
   await p.click('#foodPlan [data-plan=edit]');
   check('answers can be changed', /Meals a day/.test(await p.textContent('#foodPlan')) && (await p.$eval('#foodPlan [data-pdiet=nobeef]', el => el.classList.contains('on'))));
   await p.click('#foodPlan [data-plan=cancel]');
+  // Weight graph over years, and the two-weekly check-in.
+  await p.evaluate(() => {
+    const k = 'shred_qk_v1', S = JSON.parse(localStorage.getItem(k)), D = 864e5, now = Date.now();
+    // 18 months of weigh-ins from 92 kg down, then a flat last fortnight (a plateau).
+    S.food.weights = Array.from({ length: 50 }, (_, i) => ({ at: now - (540 - i * 10.5) * D, kg: +(92 - i * 0.2).toFixed(1) }))
+      .concat([{ at: now - 13 * D, kg: 82.2 }, { at: now - 9 * D, kg: 82.0 }, { at: now - 5 * D, kg: 82.3 }]);
+    S.profile.dietGoal = 'lose'; S.profile.job = 'desk'; S.profile.trainDays = 4;
+    S.food.adapt = { lastAt: now - 15 * D };
+    localStorage.setItem(k, JSON.stringify(S));
+  });
+  await p.reload(); await p.click('.tabs [data-tab=food]');
+  check('weight card shows a graph', !!(await p.$('#foodWeight svg.wchart')));
+  await p.click('#foodWeight [data-range=all]');
+  const wAll = await p.textContent('#foodWeight');
+  check('"All" range spans the whole history', /in 5\d\d days/.test(wAll), wAll.match(/[−+-]?[\d.]+ kg in \d+ days/)?.[0]);
+  check('check-in day is announced', /Check-in day/.test(wAll));
+  await p.fill('#wkKg', '82.1'); await p.click('#wkSave');
+  const ci = await p.textContent('#foodWeight');
+  check('plateau while cutting → kind message, steps offered first', /paused/.test(ci) && /more steps a day/.test(await p.textContent('#foodWeight [data-choice]')), ci.slice(0, 160));
+  const tk = async () => +(await p.textContent('#tSummary')).match(/([\d,]+) kcal/)[1].replace(/,/g, '');
+  const kcalBefore = await tk();
+  await p.click('#foodWeight [data-choice=kcal]');
+  const kcalAfter = await tk();
+  check('choosing "eat 150 less" lowers the target by 150', kcalBefore - kcalAfter === 150, `${kcalBefore} → ${kcalAfter}`);
+  check('next check-in is in two weeks', /Next check-in in 1[34] days/.test(await p.textContent('#foodWeight')));
+  await p.$eval('#foodWeight', el => el.scrollIntoView()); await shot('7-weight');
   // Coach dashboard (sample mode): this phone's food shows on its card.
   await p.goto('https://shred.local/coach.html'); await p.waitForTimeout(700);
   await p.click('.cd-row'); await p.waitForTimeout(200);

@@ -31,6 +31,7 @@ export function foodWeekSummary(S, now = Date.now()) {
     target: rep.target ? { kcal: rep.target.kcal, protein: rep.target.protein } : null,
     weightPerWeek: rep.trend ? Math.round(rep.trend.perWeek * 100) / 100 : null, maintenance: rep.maintenance || null,
     wins: rep.wins, focus: rep.focus.map(x => x.title), outShare: Math.round((rep.avg.outShare || 0) * 100),
+    checkin: f.adapt?.history?.length ? { last: f.adapt.history[f.adapt.history.length - 1], kcalAdjust: +(S.profile?.kcalAdjust || 0), stepGoal: f.adapt.stepGoal || null } : null,
     plan: f.plan ? { at: new Date(f.plan.at).toISOString(), kcal: r(f.plan.day.kcal), protein: r(f.plan.day.protein), meals: f.plan.meals.length, diet: f.plan.answers?.diet || 'all' } : null,
   };
 }
@@ -48,6 +49,6 @@ export function foodCard(week, rows = [], now = Date.now()) {
     daysLogged: recent.length, avgKcal: recent.length ? r(recent.reduce((a, x) => a + x.kcal, 0) / recent.length) : null,
     avgProtein: recent.length ? r(recent.reduce((a, x) => a + x.protein, 0) / recent.length) : null,
     target: week?.target || null, focus: week?.focus || [], wins: week?.wins || [], weightPerWeek: week?.weightPerWeek ?? null,
-    maintenance: week?.maintenance ?? null, lastDay: last, plan: week?.plan || null,
+    maintenance: week?.maintenance ?? null, lastDay: last, plan: week?.plan || null, checkin: week?.checkin || null,
   };
 }

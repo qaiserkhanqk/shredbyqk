@@ -98,6 +98,7 @@ function foodHTML(f) {
       <span>Protein a day</span><span>${f.avgProtein == null ? '–' : f.avgProtein + ' g'}${t ? ` / ${t.protein} g${pct(f.avgProtein, t.protein)}` : ''}</span>
       <span>Weight trend</span><span>${f.weightPerWeek == null ? '–' : `${f.weightPerWeek > 0 ? '+' : ''}${f.weightPerWeek} kg / week`}</span>
       ${f.maintenance ? `<span>Real maintenance (logs + scale)</span><span>${f.maintenance.toLocaleString()} kcal</span>` : ''}
+      <span>Last check-in</span><span>${f.checkin ? `${esc(f.checkin.last.day)}: ${esc({ keep: 'kept the plan', kcal: `calories ${f.checkin.last.delta > 0 ? '+' : ''}${f.checkin.last.delta}`, steps: `steps goal ${(f.checkin.stepGoal || 0).toLocaleString()}`, ok: 'weighed in' }[f.checkin.last.choice] || f.checkin.last.choice)}${f.checkin.kcalAdjust ? ` · total ${f.checkin.kcalAdjust > 0 ? '+' : ''}${f.checkin.kcalAdjust} kcal` : ''}` : 'None yet'}</span>
       <span>Diet plan</span><span>${f.plan ? `${f.plan.kcal.toLocaleString()} kcal · ${f.plan.protein} g protein · ${f.plan.meals} meals (made ${esc(f.plan.at.slice(0, 10))})` : 'Not made yet'}</span>
       <span>QK suggested</span><span>${f.focus.length ? esc(f.focus.join(' · ')) : '–'}</span>
       ${f.lastDay ? `<span>Latest day (${esc(String(f.lastDay.at).slice(0, 10))})</span><span>${esc((f.lastDay.items || []).slice(0, 4).map(i => i.name).join(', '))}${(f.lastDay.items || []).length > 4 ? '…' : ''}</span>` : ''}

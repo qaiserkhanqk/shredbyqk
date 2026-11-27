@@ -26,7 +26,7 @@ export const FOODS = Object.fromEntries([
   f('cholay', 'Cholay (home-cooked)', dish('cholay'), 'katori', 0.5, 0.5, 1.5, {}),
   f('paneer', 'Paneer', ing('paneer'), 'g', 25, 50, 150, { tags: ['dairy'] }),
   f('eggs', 'Eggs, boiled or omelette', ing('egg'), 'egg', 1, 1, 4, { per: 50, tags: ['egg'] }),
-  f('eggWhites', 'Egg whites', ing('eggWhite'), 'white', 1, 0, 8, { per: 33, tags: ['egg'] }),
+  f('eggWhites', 'Egg whites', ing('eggWhite'), 'white', 1, 0, 4, { per: 33, tags: ['egg'] }),
   f('greekYogurt', 'Greek yogurt, low fat', ing('greekYogurt'), 'g', 50, 100, 300, { tags: ['dairy'] }),
   f('dahi', 'Dahi (yogurt)', ing('dahi'), 'g', 50, 100, 250, { tags: ['dairy'] }),
   f('whey', 'Whey protein', ing('whey'), 'scoop', 0.5, 0.5, 2, { per: 30, tags: ['dairy'] }),
@@ -46,6 +46,23 @@ export const FOODS = Object.fromEntries([
   // Fat
   f('nuts', 'Almonds or pistachios', ing('nuts'), 'g', 5, 10, 40, { tags: ['nuts'] }),
   f('peanutButter', 'Peanut butter', ing('peanutButter'), 'g', 5, 10, 30, { tags: ['nuts'] }),
+  // Pakistani staples (dish models, home-cooked)
+  f('andaFry', 'Fried egg (anda, 1 tsp oil)', dish('anda_fry'), 'egg', 1, 2, 4, { tags: ['egg'] }),
+  f('boiledEgg', 'Boiled egg', dish('boiled_egg'), 'egg', 1, 1, 4, { tags: ['egg'] }),
+  f('alooParatha', 'Aloo paratha (home)', dish('aloo_paratha'), 'paratha', 1, 1, 2, { tags: ['gluten'] }),
+  f('chapati', 'Chapati / phulka (thin)', dish('chapati_thin'), 'phulka', 1, 1, 5, { tags: ['gluten'] }),
+  f('chickenTikka', 'Chicken tikka (leg or breast piece)', dish('chicken_tikka'), 'piece', 1, 1, 2, { tags: ['chicken'] }),
+  f('chickenBoti', 'Chicken boti (seekh of pieces)', dish('chicken_boti'), 'seekh', 1, 1, 3, { tags: ['chicken'] }),
+  f('seekhKebab', 'Seekh kebab', dish('seekh_kebab'), 'kebab', 1, 1, 4, { tags: ['beef', 'redmeat'] }),
+  f('shamiKebab', 'Shami kebab (pan-fried)', dish('shami_kebab'), 'kebab', 1, 1, 3, { tags: ['beef', 'redmeat'] }),
+  f('chickenKarahi', 'Chicken karahi (home, light oil)', dish('chicken_karahi'), 'katori', 0.5, 1, 2, { tags: ['chicken'] }),
+  f('muttonKarahi', 'Mutton karahi (home)', dish('mutton_karahi'), 'katori', 0.5, 1, 2, { tags: ['mutton', 'redmeat'] }),
+  f('qeema', 'Qeema (home)', dish('qeema'), 'katori', 0.5, 0.5, 1.5, { tags: ['beef', 'redmeat'] }),
+  f('biryani', 'Chicken biryani (home)', dish('chicken_biryani'), 'plate', 0.5, 0.5, 1.5, { tags: ['chicken'] }),
+  f('chanaChaat', 'Chana chaat', dish('chana_chaat'), 'plate', 0.5, 0.5, 1, {}),
+  f('raita', 'Raita', dish('raita'), 'katori', 1, 1, 1, { tags: ['dairy'] }),
+  f('lassi', 'Lassi (salted)', dish('salted_lassi'), 'glass', 1, 1, 1, { tags: ['dairy'] }),
+  f('sweetLassi', 'Lassi (sweet)', dish('sweet_lassi'), 'glass', 1, 1, 1, { tags: ['dairy'] }),
   // Fixed sides
   f('chai', 'Chai (doodh patti)', dish('chai'), 'cup', 1, 1, 1, { tags: ['dairy'] }),
   f('salad', 'Salad (kachumber)', dish('salad'), 'plate', 1, 1, 1, {}),
@@ -63,13 +80,20 @@ export const DIETS = [
 ];
 export const AVOID = [{ id: 'dairy', label: 'Dairy (lactose)' }, { id: 'gluten', label: 'Gluten (wheat)' }, { id: 'nuts', label: 'Nuts' }, { id: 'egg', label: 'Eggs' }];
 export const LIKES = {
-  breakfast: ['eggs', 'paratha', 'roti', 'bread', 'oats', 'cornflakes', 'greekYogurt', 'banana', 'chai'],
-  main: ['chicken', 'chickenSalan', 'fish', 'beef', 'mutton', 'daal', 'cholay', 'paneer', 'roti', 'rice', 'salad', 'sabzi', 'dahi'],
-  snack: ['banana', 'apple', 'guava', 'dates', 'nuts', 'peanutButter', 'greekYogurt', 'whey', 'eggs', 'chai'],
+  breakfast: ['paratha', 'eggs', 'roti', 'bread', 'peanutButter', 'chai', 'oats', 'cornflakes', 'greekYogurt', 'chanaChaat', 'lassi'],
+  main: ['chicken', 'bbq', 'karahi', 'chickenSalan', 'kebabs', 'qeema', 'beef', 'mutton', 'fish', 'daal', 'cholay', 'sabzi', 'paneer', 'roti', 'rice', 'biryani', 'salad', 'dahi'],
+  snack: ['fruit', 'nuts', 'peanutButter', 'eggs', 'greekYogurt', 'chanaChaat', 'chai', 'lassi', 'whey'],
+};
+// What each chip means in foods.
+export const LIKE_FOODS = {
+  eggs: ['andaFry', 'eggs', 'boiledEgg'], paratha: ['paratha', 'alooParatha'], roti: ['roti', 'chapati'],
+  chicken: ['chicken', 'chickenTikka'], bbq: ['chickenTikka', 'chickenBoti', 'seekhKebab'], karahi: ['chickenKarahi', 'muttonKarahi'],
+  kebabs: ['seekhKebab', 'shamiKebab'], fruit: ['banana', 'apple', 'orange', 'guava', 'dates'], lassi: ['lassi', 'sweetLassi'],
+  greekYogurt: ['greekYogurt', 'dahi'], dahi: ['dahi', 'raita'],
 };
 export const DEFAULT_ANSWERS = {
   diet: 'all', meals: 4, avoid: [],
-  likes: { breakfast: ['eggs', 'roti', 'oats', 'chai'], main: ['chicken', 'daal', 'fish', 'roti', 'rice', 'salad'], snack: ['banana', 'nuts', 'greekYogurt'] },
+  likes: { breakfast: ['paratha', 'eggs', 'roti', 'bread', 'peanutButter', 'chai'], main: ['chicken', 'bbq', 'karahi', 'daal', 'roti', 'rice', 'salad', 'dahi'], snack: ['fruit', 'nuts', 'chai'] },
 };
 
 const SPLITS = {
@@ -94,31 +118,40 @@ export function allowed(food, a) {
 //   fixed: true → a set amount (chai, salad), counted but not resized
 //   boost: true → may be 0; added only when the meal is short of protein
 const FRUIT = ['banana', 'apple', 'orange', 'guava', 'dates'];
+const CHAI = { foods: ['chai'], fixed: true, liked: true, opt: true };
+const SIDE = { foods: ['salad', 'sabzi'], fixed: true, liked: true, opt: true };
 const TEMPLATES = {
   breakfast: [
-    { name: 'Eggs and roti', slots: [{ foods: ['eggs'], key: true }, { foods: ['roti', 'paratha', 'bread'] }, { foods: ['eggWhites'], boost: true, opt: true }, { foods: ['chai'], fixed: true, liked: true, opt: true }] },
-    { name: 'Paratha and omelette', slots: [{ foods: ['paratha'], key: true }, { foods: ['eggs', 'dahi'] }, { foods: ['eggWhites', 'greekYogurt'], boost: true, opt: true }, { foods: ['chai'], fixed: true, liked: true, opt: true }] },
+    { name: 'Paratha and anda', slots: [{ foods: ['paratha', 'alooParatha'], key: true }, { foods: ['andaFry', 'eggs'] }, { foods: ['eggWhites'], boost: true, opt: true }, CHAI] },
+    { name: 'Anda and roti', slots: [{ foods: ['andaFry', 'eggs', 'boiledEgg'], key: true }, { foods: ['roti', 'chapati', 'paratha'] }, { foods: ['eggWhites'], boost: true, opt: true }, CHAI] },
+    { name: 'Bread, peanut butter and eggs', slots: [{ foods: ['bread'], key: true }, { foods: ['peanutButter'], liked: true, opt: true }, { foods: ['boiledEgg', 'andaFry', 'eggs'] }, { foods: ['eggWhites'], boost: true, opt: true }, CHAI] },
+    { name: 'Peanut butter toast', slots: [{ foods: ['peanutButter'], key: true }, { foods: ['bread'] }, { foods: ['boiledEgg', 'eggWhites', 'greekYogurt', 'milk'], boost: true, opt: true }, { foods: ['banana'], opt: true }, CHAI] },
     { name: 'Oats bowl', slots: [{ foods: ['oats'], key: true }, { foods: ['milk'], opt: true }, { foods: ['banana', 'dates', 'apple'] }, { foods: ['whey', 'greekYogurt', 'eggWhites'], boost: true, opt: true }, { foods: ['nuts', 'peanutButter'], opt: true }] },
-    { name: 'Cereal and milk', slots: [{ foods: ['cornflakes'], key: true }, { foods: ['milk'] }, { foods: ['banana', 'apple'] }, { foods: ['eggs', 'whey', 'greekYogurt'], boost: true, opt: true }] },
-    { name: 'Yogurt bowl', slots: [{ foods: ['greekYogurt', 'dahi'], key: true }, { foods: FRUIT }, { foods: ['oats', 'cornflakes'], opt: true }, { foods: ['nuts', 'peanutButter'], opt: true }] },
-    { name: 'Eggs on toast', slots: [{ foods: ['bread'], key: true }, { foods: ['eggs'] }, { foods: ['eggWhites'], boost: true, opt: true }, { foods: ['chai'], fixed: true, liked: true, opt: true }] },
+    { name: 'Cereal and milk', slots: [{ foods: ['cornflakes'], key: true }, { foods: ['milk'] }, { foods: ['banana', 'apple'] }, { foods: ['boiledEgg', 'whey', 'greekYogurt'], boost: true, opt: true }] },
+    { name: 'Dahi bowl', slots: [{ foods: ['greekYogurt', 'dahi'], key: true }, { foods: FRUIT }, { foods: ['oats', 'cornflakes'], opt: true }, { foods: ['nuts', 'peanutButter'], opt: true }] },
+    { name: 'Chana chaat and eggs', slots: [{ foods: ['chanaChaat'], key: true }, { foods: ['boiledEgg', 'eggs'] }, CHAI] },
+    { name: 'Lassi and paratha', slots: [{ foods: ['lassi', 'sweetLassi'], key: true, fixed: true }, { foods: ['paratha', 'roti'] }, { foods: ['andaFry', 'boiledEgg'], boost: true, opt: true }] },
   ],
   main: [
     // One template per protein; the carb alternates between the client's choices.
-    ...['chicken', 'chickenSalan', 'fish', 'beef', 'mutton', 'paneer'].map(p => ({
-      name: FOODS[p].name, slots: [{ foods: [p], key: true }, { foods: ['roti', 'rice'], carb: true }, { foods: ['salad', 'sabzi'], fixed: true, liked: true, opt: true }, { foods: ['dahi'], liked: true, opt: true }],
+    ...['chickenTikka', 'chicken', 'chickenKarahi', 'chickenBoti', 'seekhKebab', 'chickenSalan', 'muttonKarahi', 'qeema', 'shamiKebab', 'fish', 'beef', 'mutton', 'paneer'].map(p => ({
+      name: FOODS[p].name.replace(/ \(.*\)$/, ''), slots: [{ foods: [p], key: true }, { foods: ['roti', 'chapati', 'rice'], carb: true }, SIDE, { foods: ['raita', 'dahi'], liked: true, opt: true }, { foods: ['chicken', 'eggWhites'], boost: true, opt: true }],
     })),
+    { name: 'Biryani day', slots: [{ foods: ['biryani'], key: true }, { foods: ['raita'], fixed: true, opt: true }, { foods: ['salad'], fixed: true, opt: true }, { foods: ['chickenTikka', 'chicken'], boost: true, opt: true }] },
     ...['daal', 'cholay'].map(p => ({
-      name: FOODS[p].name, slots: [{ foods: [p], key: true }, { foods: ['roti', 'rice'], carb: true }, { foods: ['greekYogurt', 'dahi', 'paneer', 'eggs', 'chicken'], boost: true, opt: true }, { foods: ['salad', 'sabzi'], fixed: true, liked: true, opt: true }],
+      name: FOODS[p].name.replace(/ \(.*\)$/, ''), slots: [{ foods: [p], key: true }, { foods: ['roti', 'chapati', 'rice'], carb: true }, { foods: ['chicken', 'boiledEgg', 'greekYogurt', 'dahi', 'paneer'], boost: true, opt: true }, SIDE],
     })),
+    { name: 'Sabzi with protein', slots: [{ foods: ['sabzi'], key: true, fixed: true }, { foods: ['roti', 'chapati'], carb: true }, { foods: ['chicken', 'chickenTikka', 'boiledEgg', 'paneer', 'greekYogurt'] }, { foods: ['raita', 'dahi'], liked: true, opt: true }] },
   ],
   snack: [
-    { name: 'Fruit and nuts', slots: [{ foods: FRUIT, key: true }, { foods: ['nuts', 'peanutButter'], opt: true }, { foods: ['greekYogurt', 'whey', 'eggs', 'eggWhites'], boost: true, opt: true }] },
-    { name: 'Yogurt and fruit', slots: [{ foods: ['greekYogurt'], key: true }, { foods: FRUIT }, { foods: ['nuts'], opt: true }] },
-    { name: 'Protein shake', slots: [{ foods: ['whey'], key: true }, { foods: ['milk'], opt: true }, { foods: ['banana', 'dates'], opt: true }, { foods: ['peanutButter', 'nuts', 'oats'], opt: true, boost: true }] },
-    { name: 'Boiled eggs and fruit', slots: [{ foods: ['eggs'], key: true }, { foods: FRUIT }] },
+    { name: 'Fruit and nuts', slots: [{ foods: FRUIT, key: true }, { foods: ['nuts', 'peanutButter'], opt: true }, { foods: ['greekYogurt', 'whey', 'boiledEgg', 'eggWhites'], boost: true, opt: true }] },
+    { name: 'Chai and nuts', slots: [{ foods: ['chai'], key: true, fixed: true }, { foods: ['nuts', 'dates'] }, { foods: ['boiledEgg', 'greekYogurt', 'whey'], boost: true, opt: true }] },
+    { name: 'Boiled eggs and fruit', slots: [{ foods: ['boiledEgg'], key: true }, { foods: FRUIT }] },
+    { name: 'Chana chaat', slots: [{ foods: ['chanaChaat'], key: true }, { foods: ['boiledEgg', 'greekYogurt'], boost: true, opt: true }] },
     { name: 'Peanut butter toast', slots: [{ foods: ['peanutButter'], key: true }, { foods: ['bread'], opt: true }, { foods: ['banana'], opt: true }] },
-    { name: 'Chai and nuts', slots: [{ foods: ['chai'], key: true, fixed: true }, { foods: ['nuts', 'dates'] }, { foods: ['greekYogurt', 'whey', 'eggs'], boost: true, opt: true }] },
+    { name: 'Dahi and fruit', slots: [{ foods: ['greekYogurt', 'dahi'], key: true }, { foods: FRUIT }, { foods: ['nuts'], opt: true }] },
+    { name: 'Lassi', slots: [{ foods: ['lassi', 'sweetLassi'], key: true, fixed: true }, { foods: FRUIT, opt: true }, { foods: ['nuts'], opt: true }] },
+    { name: 'Protein shake', slots: [{ foods: ['whey'], key: true }, { foods: ['milk'], opt: true }, { foods: ['banana', 'dates'], opt: true }, { foods: ['peanutButter', 'nuts', 'oats'], opt: true, boost: true }] },
   ],
 };
 
@@ -135,7 +168,7 @@ export const optsFor = (id, amount) => FOODS[id].ref.t === 'dish'
   : { grams: Math.round(amount * FOODS[id].per) };
 
 const KEYS = ['kcal', 'protein', 'carbs', 'fat'];
-const W = { kcal: 3, protein: 3, carbs: 1, fat: 1 };
+const W = { kcal: 3, protein: 3, carbs: 1, fat: 1.5 };
 const sum = items => items.reduce((s, it) => { const u = perUnit(it.id); for (const k of KEYS) s[k] += u[k] * it.amount; return s; }, { kcal: 0, protein: 0, carbs: 0, fat: 0 });
 // A little over on protein is fine (it's the hardest target to reach); under on calories or protein is not.
 const err = (tot, T) => KEYS.reduce((e, k) => {
@@ -175,12 +208,13 @@ export function solve(items, T) {
   return { total: sum(items), error: win.e };
 }
 
-const likedSet = a => new Set([...(a.likes?.breakfast || []), ...(a.likes?.main || []), ...(a.likes?.snack || [])]);
+const expand = ids => (ids || []).flatMap(id => LIKE_FOODS[id] || [id]);
+const likedSet = a => new Set(expand([...(a.likes?.breakfast || []), ...(a.likes?.main || []), ...(a.likes?.snack || [])]));
 const kindOf = name => /breakfast/i.test(name) ? 'breakfast' : /snack/i.test(name) ? 'snack' : 'main';
 
 // Turn one template into concrete foods for this client, or null if it doesn't fit them.
 function fill(tpl, kind, a, turn) {
-  const likesHere = new Set(a.likes?.[kind] || []), liked = likedSet(a);
+  const likesHere = new Set(expand(a.likes?.[kind])), liked = likedSet(a);
   const items = [];
   for (const s of tpl.slots) {
     let pool = s.foods.filter(id => allowed(FOODS[id], a));
@@ -200,8 +234,8 @@ function describe(it) {
   const fd = FOODS[it.id], a = it.amount;
   if (fd.unit === 'g') return `${Math.round(a)} g${fd.raw ? ' raw' : ''}${fd.yield ? ` (about ${Math.round(a * fd.yield / 5) * 5} g cooked)` : ''}`;
   if (fd.unit === 'ml') return `${Math.round(a)} ml`;
-  const n = N.fmtN(a), plural = a <= 1 ? fd.unit : fd.unit === 'katori' ? 'katori' : fd.unit + 's';
-  return `${n} ${plural}${fd.per > 1 && fd.ref.t === 'ing' && fd.unit !== 'tsp' ? ` (${Math.round(a * fd.per)} g)` : fd.unit === 'tsp' ? ' (5 g)' : ''}`;
+  const n = N.fmtN(a), plural = a <= 1 || ['katori', 'tsp'].includes(fd.unit) ? fd.unit : fd.unit + 's';
+  return `${n} ${plural}${fd.per > 1 && fd.ref.t === 'ing' ? ` (${Math.round(a * fd.per)} g)` : ''}`;
 }
 
 /** Build the plan. a: questionnaire answers; T: N.targets(profile). seed rotates the options for "Make another". */
@@ -224,15 +258,18 @@ export function makePlan(a, T, seed = 0) {
         const sig = items.map(i => i.id).sort().join('+');
         if (seen.has(sig)) continue;
         seen.add(sig);
-        const { total } = solve(items, target);
-        const kept = items.filter(i => i.amount > 0);
+        const { total, error } = solve(items, target);
+        const cooks = items.some(i => i.amount > 0 && FOODS[i.id].cook);
+        const kept = items.filter(i => i.amount > 0 && (i.id !== 'oil' || cooks));
         options.push({
           title: tpl.name,
-          items: kept.map(it => ({ id: it.id, amount: it.amount, name: FOODS[it.id].name, amountLabel: describe(it), ref: FOODS[it.id].ref, opts: optsFor(it.id, it.amount), ...Object.fromEntries(KEYS.map(k => [k, perUnit(it.id)[k] * it.amount])) })),
-          total,
+          items: kept.map(it => ({ id: it.id, amount: it.amount, name: (it.boost && !['eggWhites', 'whey'].includes(it.id) ? 'Extra: ' : '') + FOODS[it.id].name, amountLabel: describe(it), ref: FOODS[it.id].ref, opts: optsFor(it.id, it.amount), ...Object.fromEntries(KEYS.map(k => [k, perUnit(it.id)[k] * it.amount])) })),
+          total, error,
         });
       }
     }
+    // The closest fit leads; the others stay as swaps of about the same size.
+    options.sort((x, y) => x.error - y.error);
     if (kind === 'main') mainTurn += 2;
     return { name, share, target, options };
   });
@@ -245,9 +282,10 @@ export const planGap = plan => Object.fromEntries(KEYS.map(k => [k, Math.round((
 
 // Short names for the questionnaire chips.
 export const LIKE_LABELS = {
-  eggs: 'Eggs', paratha: 'Paratha', roti: 'Roti', bread: 'Bread / toast', oats: 'Oats', cornflakes: 'Cereal',
-  greekYogurt: 'Yogurt', banana: 'Banana', chai: 'Chai', chicken: 'Chicken', chickenSalan: 'Chicken salan', fish: 'Fish',
-  beef: 'Beef', mutton: 'Mutton', daal: 'Daal', cholay: 'Cholay', paneer: 'Paneer', rice: 'Rice', salad: 'Salad',
-  sabzi: 'Sabzi', dahi: 'Dahi / raita', apple: 'Apple', guava: 'Guava', dates: 'Dates', nuts: 'Nuts',
-  peanutButter: 'Peanut butter', whey: 'Whey shake',
+  paratha: 'Paratha', eggs: 'Anda (eggs)', roti: 'Roti', bread: 'Bread / toast', peanutButter: 'Peanut butter', chai: 'Chai',
+  oats: 'Oats', cornflakes: 'Cereal', greekYogurt: 'Dahi / yogurt', chanaChaat: 'Chana chaat', lassi: 'Lassi',
+  chicken: 'Chicken', bbq: 'BBQ (tikka, boti, seekh)', karahi: 'Karahi', chickenSalan: 'Chicken salan', kebabs: 'Kebabs',
+  qeema: 'Qeema', beef: 'Beef', mutton: 'Mutton', fish: 'Fish', daal: 'Daal', cholay: 'Cholay', sabzi: 'Sabzi', paneer: 'Paneer',
+  rice: 'Chawal (rice)', biryani: 'Biryani', salad: 'Salad', dahi: 'Raita / dahi', fruit: 'Fruit', nuts: 'Dry fruit / nuts', whey: 'Whey shake',
+  banana: 'Banana', apple: 'Apple', guava: 'Guava', dates: 'Dates',
 };

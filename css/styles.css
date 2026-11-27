@@ -827,3 +827,12 @@ button.row.food-hit { padding: 11px 0; }
 .plan-opt .ghost { justify-self: start; }
 .plan-stale { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .plan-opt > .row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+
+/* Weight graph and check-ins */
+.wchart { width: 100%; height: auto; display: block; }
+.wchart circle { fill: var(--text); }
+.wchart .trend { fill: none; stroke: var(--accent, #7bbf9e); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.wchart text { font-size: 10px; fill: var(--muted); }
+.wrange { justify-self: start; }
+.checkin { border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; gap: 8px; background: var(--surface); }
+.checkin p { margin: 0; }

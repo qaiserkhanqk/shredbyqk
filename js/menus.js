@@ -12,6 +12,10 @@
 import { DISH, DISHES, estimate } from './nutrition.js';
 import { near, typo } from './fuzzy.js';
 import { LOCAL_PLACES } from './places-local.js';
+import { UAE_PLACES } from './places-uae.js';
+const UAE_CITIES = new Set(['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Al Ain', 'Ras Al Khaimah', 'Fujairah', 'UAE']);
+// In the UAE, the UAE branch of a chain and local UAE places come first; in Pakistan, the reverse.
+const nearBoost = (p, myCity) => !myCity ? 0 : p.city === myCity ? 0.8 : UAE_CITIES.has(myCity) === (p.country === 'UAE') ? (p.country === 'UAE' ? 0.6 : 0) : -0.6;
 
 const I = (name, dish, opts = {}, official = null) => ({ name, dish, opts, official });
 const R = { style: 'restaurant', styleKnown: true }, S = { style: 'shaadi', styleKnown: true };
@@ -108,7 +112,7 @@ export const PLACES = [
 const norm = s => String(s).toLowerCase().replace(/['’]/g, '').normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
 /** All places: the seed list plus the client's own. */
-export const allPlaces = (custom = []) => [...PLACES, ...LOCAL_PLACES, ...custom.map(p => ({ ...p, type: p.type || 'Added by you', custom: true }))];
+export const allPlaces = (custom = []) => [...PLACES, ...LOCAL_PLACES, ...UAE_PLACES, ...custom.map(p => ({ ...p, type: p.type || 'Added by you', custom: true }))];
 
 /** Nutrition for a menu item: the chain's official numbers if present, else the dish model. */
 export function itemNutrition(item) {
@@ -139,7 +143,7 @@ export function searchPlaces(q, custom = [], limit = 12, myCity = '') {
       if (!rest.every(w => hit(w, iw))) continue;
       if (!placeHit.length && !rest.length) continue; // a city alone isn't enough to list every item there
       const exactName = placeHit.filter(w => pw.includes(w)).length;
-      out.push({ place: p, item: it, score: placeHit.length * 3 + exactName * 0.5 + cityHit.length * 2.5 + rest.length * 2 - (placeHit.length && !rest.length ? 0.5 : 0) + (p.custom ? 0.3 : 0) + (myCity && p.city === myCity ? 0.8 : 0) });
+      out.push({ place: p, item: it, score: placeHit.length * 3 + exactName * 0.5 + cityHit.length * 2.5 + rest.length * 2 - (placeHit.length && !rest.length ? 0.5 : 0) + (p.custom ? 0.3 : 0) + nearBoost(p, myCity) });
     }
   }
   return out.sort((a, b) => b.score - a.score).slice(0, limit);
