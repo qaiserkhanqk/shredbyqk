@@ -113,6 +113,24 @@ No public database lists Pakistani restaurant and cart menus with nutrition. `js
 
 Every item points at a dish model with that place's portion and oil level. When a chain publishes official values, add them as `official` on the item and they replace the estimate. Clients add their own places with **Add a place**: they pick the closest dish, so the numbers stay realistic. Places are stored on the phone for now. With a backend, places added by one client could be shared with all (after QK reviews them).
 
+## Diet plans
+
+The questionnaire QK used to send by form is now in the app (Food → Your diet plan). It asks:
+- what the client eats (everything, no beef, chicken and fish only, vegetarian with or without eggs)
+- meals a day (3, 4 or 5)
+- the breakfasts, lunches, dinners and snacks they like
+- anything they can't eat (dairy, gluten, nuts, eggs)
+
+`js/dietplan.js` then builds the plan:
+- **Each meal gets a share of the day's targets** (calories, protein, carbs, fat from Mifflin-St Jeor).
+- **Each meal offers up to 3 options of the same size**, built from foods the client likes.
+- **Every food gets an exact amount on real portion steps**: 25 g of chicken, whole eggs, whole rotis, half katoris. A small search finds the amounts closest to the calories and protein first, then carbs and fat.
+- **Meat is given raw**, with the cooked weight beside it, plus the oil to cook it in.
+- **Values come from the same USDA ingredients and home-cooked dish models as the rest of the app.** "I ate this" therefore logs exactly what was planned.
+- **Tests check the results** for five client types (`tests/dietplan.test.mjs`): calories within 8% of target, diet and allergies respected, and logged numbers equal to planned numbers.
+
+QK sees each client's plan (calories, protein, meals) on the coach dashboard. QK editing a client's plan from the dashboard is the next step. It needs a coach-writable table, because today the database only lets coaches send messages.
+
 ## Making it more accurate over time
 
 - **Weigh real plates.** Order or cook each top dish a few times, weigh the katori, and skim and weigh the oil. Then adjust the fat grams in `DISHES`. This is the single biggest accuracy gain, and the tests show how far each change moves away from INDB.
@@ -128,7 +146,7 @@ Facts about other apps come from their store listings and press coverage (see th
 |---|---|---|---|---|---|---|
 | Desi dishes | 113 recipe models + 1,014 INDB recipes | 750+ home and street dishes | Desi foods | User-entered | Large Indian database | Generic |
 | Oil, who cooked it, meat vs gravy | **Yes, with a range** | Not mentioned | Not mentioned | No | Not mentioned | No |
-| Restaurants and carts | 45 places / 170 items, 20 with official values; clients add their own | **223 chains / 12,500+ items** | Local cafés | Large, mostly Western | Indian chains | Few |
+| Restaurants and carts | 45 chains (170 items, 20 with official values) + 259 local places in 11 cities (646 items); clients add their own | **223 chains / 12,500+ items** | Local cafés | Large, mostly Western | Indian chains | Few |
 | Photo logging | One tap, same answer every time, learns your portions | Not mentioned | Not mentioned | Meal Scan + Cal AI | Snap | Yes |
 | Say it / type the meal (Urdu, Roman Urdu) | **Yes** | Not mentioned | Not mentioned | English voice | Ria AI chat | Text describe |
 | Barcode | Yes (Open Food Facts) | Not mentioned | Not mentioned | Yes | Yes | Yes |

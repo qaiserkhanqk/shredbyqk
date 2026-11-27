@@ -79,6 +79,14 @@ export const ING = {
   iceCream: ['Ice cream', 207, 3.5, 24, 11, 0.7],
   orange: ['Orange (malta / kinnow)', 47, 0.9, 11.8, 0.1, 2.4],
   guava: ['Guava (amrood)', 68, 2.6, 14.3, 1, 5.4],
+  // For diet plans (USDA SR Legacy): foods weighed as eaten.
+  eggWhite: ['Egg white', 52, 10.9, 0.7, 0.2, 0],
+  riceCooked: ['Rice, white/basmati, cooked', 130, 2.7, 28.2, 0.3, 0.4],
+  brownBread: ['Brown (whole-wheat) bread', 252, 12.4, 42.7, 3.5, 6],
+  cornflakes: ['Cornflakes', 357, 7.5, 84.1, 0.4, 3.3],
+  milkLow: ['Milk, low fat (1%)', 42, 3.4, 5, 1, 0],
+  greekYogurt: ['Greek yogurt, low fat', 73, 10, 3.9, 1.9, 0],
+  peanutButter: ['Peanut butter', 588, 25, 20, 50, 6],
 };
 const FATS = { oil: 'Oil', ghee: 'Ghee', butter: 'Butter' };
 

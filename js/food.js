@@ -17,6 +17,7 @@ import { portionFactor, factors, studyCSV, studySummary } from './calibrate.js';
 import { canSyncSteps, syncSteps } from './activity.js';
 import { searchFatSecret } from './fatsecret.js';
 import { t as tr, setLang, getLang, translate } from './food-ur.js';
+import { makePlan, planGap, DIETS, AVOID, LIKES, LIKE_LABELS, DEFAULT_ANSWERS } from './dietplan.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -27,6 +28,7 @@ let ctx; // { S, persist, toast, rehab: () => bool }
 let cur = null; // the sheet: { mode: 'food'|'place', ref, opts, name, official, onSave, saveLabel }
 let fsCache = { q: '', list: [] }, fsTimer = null;
 let mealPending = null, aiExtra = null, pendingPhoto = null; // parsed sentence waiting for "Add all"
+let planDraft = null; // questionnaire answers being edited, or null when the plan is showing
 let snap = null; // the last photo added: { dataUrl, ids, unsure, unknown, setting }
 
 const F = () => {
@@ -39,6 +41,7 @@ const byId = id => F().log.find(x => x.id === id);
 
 export function initFood(c) {
   ctx = c; F();
+  $('#foodPlan').onclick = onPlanClick;
   $('#foodSearch').oninput = () => renderResults();
   $('#foodResults').onclick = e => {
     const m = e.target.closest('[data-menu]');
@@ -142,6 +145,7 @@ export function renderFood() {
         <span class="r data">${fmt(e.kcal)}</span></button>
         <button type="button" class="linkbtn del" data-del="${e.id}" aria-label="Remove ${esc(e.name)}">✕</button></div>`).join('');
   }).join('') : '<p class="muted small" style="margin:0">Nothing logged yet. Snap your meal, or search a dish or a place.</p>';
+  renderPlan();
   renderWeek();
 }
 
@@ -577,4 +581,66 @@ function applyLang() {
   for (const el of [$('#food'), $('#foodSheet')]) { el.dir = ur ? 'rtl' : 'ltr'; el.classList.toggle('ur', ur); }
   $('#foodLang').textContent = ur ? 'English' : 'اردو';
   translate($('#food'));
+}
+
+/* ---------- Diet plan ---------- */
+// The client answers QK's questionnaire once (diet, meals a day, what they like and avoid) and gets a plan
+// with exact amounts for their calories and macros. Every option of a meal is the same size, so they can
+// swap freely, and "I ate this" logs the exact grams.
+const planHash = t => t ? `${t.kcal}|${t.protein}|${t.carbs}|${t.fat}` : '';
+function renderPlan() {
+  const box = $('#foodPlan'), t = N.targets(ctx.S.profile), plan = F().plan;
+  if (!t) { box.innerHTML = `<div class="card-head"><b>${tr('Your diet plan')}</b></div><p class="muted small" style="margin:0">Add your weight and age under <b>Your targets</b> and QK builds a plan with exact amounts for you.</p>`; return; }
+  if (planDraft || !plan) return renderPlanForm(box, planDraft || F().planAnswers || structuredClone(DEFAULT_ANSWERS), !plan);
+  const gap = planGap(plan), stale = planHash(plan.target) !== planHash(t);
+  const chip = (k, label) => `<span class="data">${label} ${fmt(plan.day[k])}${k === 'kcal' ? ' kcal' : ' g'}</span>${Math.abs(gap[k]) > 5 ? ` <span class="muted">(${gap[k] > 0 ? '+' : ''}${gap[k]}%)</span>` : ''}`;
+  box.innerHTML = `<div class="card-head"><b>${tr('Your diet plan')}</b><button type="button" class="linkbtn" data-plan="edit">${tr('Change answers')}</button></div>
+    <p class="muted small" style="margin:0">${chip('kcal', '')} · ${chip('protein', 'P')} · ${chip('carbs', 'C')} · ${chip('fat', 'F')}<br>Target ${fmt(t.kcal)} kcal · P ${t.protein} · C ${t.carbs} · F ${t.fat} g. Pick one option per meal: they're the same size.</p>
+    ${stale ? `<div class="plan-stale"><span class="small">Your targets changed since this plan was made.</span><button type="button" class="ghost" data-plan="refresh">Update the amounts</button></div>` : ''}
+    ${plan.meals.map((m, mi) => `<div class="plan-meal"><div class="meal-head"><span class="eyebrow">${tr(m.name)}</span><span class="data small">${fmt(m.target.kcal)} kcal</span></div>
+      ${m.options.map((o, oi) => `<div class="plan-opt"><div class="row"><b>${m.options.length > 1 ? `${'ABC'[oi]}. ` : ''}${esc(o.title)}</b><span class="data small">${fmt(o.total.kcal)} kcal · P ${r0(o.total.protein)}</span></div>
+        <ul>${o.items.map(it => `<li><span>${esc(it.name)}</span><span class="data">${esc(it.amountLabel)}</span></li>`).join('')}</ul>
+        <button type="button" class="ghost" data-plan="log" data-m="${mi}" data-o="${oi}">${tr('I ate this')}</button></div>`).join('') || '<p class="muted small">Nothing fits your answers for this meal. Try adding a few foods you like.</p>'}
+    </div>`).join('')}
+    <div class="row" style="gap:8px"><button type="button" class="ghost" data-plan="new">Show me other options</button></div>
+    <p class="muted small" style="margin:0">Raw weights are before cooking; cook meat in the oil listed. Amounts come from USDA values and QK's home-cooking recipes.</p>`;
+}
+function renderPlanForm(box, a, first) {
+  const chips = (attr, list, on) => `<div class="chips-wrap">${list.map(([id, label]) => `<button type="button" class="mchip ${on(id) ? 'on' : ''}" data-${attr}="${id}" aria-pressed="${!!on(id)}">${esc(label)}</button>`).join('')}</div>`;
+  const likes = kind => chips('plike', LIKES[kind].map(id => [`${kind}|${id}`, LIKE_LABELS[id]]), k => a.likes[kind].includes(k.split('|')[1]));
+  planDraft = a;
+  box.innerHTML = `<div class="card-head"><b>${tr('Your diet plan')}</b>${first ? '' : '<button type="button" class="linkbtn" data-plan="cancel">Cancel</button>'}</div>
+    <p class="muted small" style="margin:0">Tell QK what you like eating. Your plan gets exact amounts for your calories, protein, carbs and fat.</p>
+    <div class="fq"><span class="eyebrow">What do you eat?</span>${chips('pdiet', DIETS.map(d => [d.id, d.label]), id => a.diet === id)}</div>
+    <div class="fq"><span class="eyebrow">Meals a day</span>${chips('pmeals', [[3, '3 meals'], [4, '3 meals + a snack'], [5, '3 meals + 2 snacks']], id => +a.meals === +id)}</div>
+    <div class="fq"><span class="eyebrow">Breakfast you like</span>${likes('breakfast')}</div>
+    <div class="fq"><span class="eyebrow">Lunch and dinner you like</span>${likes('main')}</div>
+    ${+a.meals > 3 ? `<div class="fq"><span class="eyebrow">Snacks you like</span>${likes('snack')}</div>` : ''}
+    <div class="fq"><span class="eyebrow">Anything you can't eat?</span>${chips('pavoid', AVOID.map(x => [x.id, x.label]), id => a.avoid.includes(id))}</div>
+    <button type="button" class="cta full" data-plan="make">${tr('Make my plan')}</button>`;
+}
+function onPlanClick(e) {
+  const b = e.target.closest('button'); if (!b) return;
+  const a = planDraft, d = b.dataset;
+  const toggle = (arr, v) => { const i = arr.indexOf(v); if (i >= 0) arr.splice(i, 1); else arr.push(v); };
+  if (a && d.pdiet) { a.diet = d.pdiet; return renderPlan(); }
+  if (a && d.pmeals) { a.meals = +d.pmeals; return renderPlan(); }
+  if (a && d.pavoid) { toggle(a.avoid, d.pavoid); return renderPlan(); }
+  if (a && d.plike) { const [k, id] = d.plike.split('|'); toggle(a.likes[k], id); return renderPlan(); }
+  const t = N.targets(ctx.S.profile);
+  if (d.plan === 'make') {
+    F().planAnswers = a; F().plan = makePlan(a, t, 0); planDraft = null; ctx.persist(); renderPlan();
+    ctx.toast('Your plan is ready'); return;
+  }
+  if (d.plan === 'edit') { planDraft = structuredClone(F().planAnswers || DEFAULT_ANSWERS); return renderPlan(); }
+  if (d.plan === 'cancel') { planDraft = null; return renderPlan(); }
+  if (d.plan === 'new' || d.plan === 'refresh') {
+    const seed = (F().plan?.seed || 0) + (d.plan === 'new' ? 1 : 0);
+    F().plan = makePlan(F().planAnswers || DEFAULT_ANSWERS, t, seed); ctx.persist(); return renderPlan();
+  }
+  if (d.plan === 'log') {
+    const o = F().plan.meals[+d.m].options[+d.o];
+    o.items.forEach(it => addEntry(it.ref, it.opts, 'plan', { name: it.name }));
+    ctx.toast(`${o.title} logged`); renderFood();
+  }
 }
