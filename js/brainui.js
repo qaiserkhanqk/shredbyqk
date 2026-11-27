@@ -23,14 +23,31 @@ async function quran() {
   Q = await r.json();
   return Q;
 }
-const setById = id => Q?.sets.find(s => s.id === id);
+const extra = {}; // whole surahs from the reader, for memorising any surah (id "s<number>")
+const setById = id => Q?.sets.find(s => s.id === id) || extra[id];
+const pad3 = n => String(n).padStart(3, '0');
+const surahFiles = {};
+/** One surah of the full Quran (data/quran/NNN.json), cached. */
+export function loadSurah(n) {
+  return (surahFiles[n] ||= fetch(`data/quran/${pad3(n)}.json`).then(r => { if (!r.ok) throw new Error('surah ' + n); return r.json(); }).catch(e => { delete surahFiles[n]; throw e; }));
+}
+let indexP = null;
+export const quranIndex = () => (indexP ||= fetch('data/quran/index.json').then(r => r.json()).catch(e => { indexP = null; throw e; }));
+/** A memorisation set by id: the short-surah sets, or any whole surah loaded from the reader. */
+async function getSet(id) {
+  await quran();
+  if (setById(id)) return setById(id);
+  const m = /^s(\d+)$/.exec(id || ''); if (!m) return null;
+  const d = await loadSurah(+m[1]);
+  return (extra[id] = { id, s: d.s, name: d.name, meaning: d.meaning, arName: d.arName, ayahs: d.ayahs.map(({ a, ar, en }) => ({ a, ar, en })) });
+}
 const NICE = { 'Al-Faatiha': 'Al-Fatiha', 'Al-Ikhlaas': 'Al-Ikhlas', 'An-Naas': 'An-Nas', 'Al-Kaafiroon': 'Al-Kafirun', 'Al-Maa\'un': 'Al-Ma\'un', 'At-Takaathur': 'At-Takathur', 'Al-Qaari\'a': 'Al-Qari\'ah', 'Al-Aadiyaat': 'Al-\'Adiyat', 'Az-Zalzala': 'Az-Zalzalah', 'Ad-Dhuhaa': 'Ad-Duha', 'Quraish': 'Quraysh' };
 const nice = set => NICE[set.name] || set.name;
 const ref = (set, a) => `${set.s}:${a}`;
 
 /* ---------- Audio: one element, unlocked by the tap that starts it ---------- */
 let audio = null, audioStop = null;
-function playAyah(s, a, times = 1, onEnd) {
+export function playAyah(s, a, times = 1, onEnd) {
   stopAudio();
   audio ||= new Audio();
   const urls = ayahUrls(s, a, reciter());
@@ -41,7 +58,7 @@ function playAyah(s, a, times = 1, onEnd) {
   audioStop = () => { stopped = true; audio.pause(); };
   play();
 }
-function stopAudio() { audioStop?.(); audioStop = null; }
+export function stopAudio() { audioStop?.(); audioStop = null; }
 
 /* ---------- Overlay (dark session screen) ---------- */
 const ov = () => $('#brainPlay');
@@ -59,9 +76,9 @@ export function initBrain(c) {
   document.addEventListener('click', e => {
     const a = e.target.closest('[data-brain]'); if (!a) return;
     const [act, arg] = a.dataset.brain.split(':');
-    ({ speed: startSpeed, grid: startGrid, clash: startClash, order: () => startOrder(arg), lesson: () => openLesson(arg), recall: () => openRecall(arg),
-      review: startReview, learn: () => startLearn(arg), set: () => { openSet = arg; ctx.go('quran'); }, sets: () => { openSet = null; renderQuran(); },
-      listen: () => listenSet(arg), play: () => { const [sid, n] = arg.split('-'); const set = setById(sid); playAyah(set.s, +n); },
+    ({ speed: startSpeed, grid: startGrid, clash: startClash, lights: startLights, batak: startBatak, track: startTrack, order: () => startOrder(arg), lesson: () => openLesson(arg), recall: () => openRecall(arg),
+      review: startReview, learn: () => startLearn(arg), set: () => { openSet = arg; getSet(arg).then(() => ctx.go('quran')).catch(() => ctx.toast('Couldn\'t load that surah. Check your connection.')); }, sets: () => { openSet = null; renderQuran(); },
+      listen: () => listenSet(arg), play: () => { const [sid, n] = arg.split('-'); const set = setById(sid); playAyah(set.s, +n); }, reader: () => ctx.go('reader'),
       next: () => doNext(), games: () => $('#brainGames')?.scrollIntoView({ behavior: 'smooth' }), quran: () => { openSet = null; ctx.go('quran'); } }[act] || (() => {}))();
   });
 }
@@ -84,7 +101,9 @@ export async function renderBrain() {
   const learning = Q ? Q.sets.map(s => ({ s, p: B.setProgress(s, b.quran) })).filter(x => x.p.started) : [];
   const pill = k => { const v = sc.pillars[k]; return `<div class="bs-pill"><span>${B.PILLAR_NAMES[k]}</span><span class="bs-bar"><i style="width:${v ?? 0}%"></i></span><b class="num">${v ?? '–'}</b></div>`; };
   const dots = prog.of ? `<div class="bs-dots" aria-label="${prog.done} of ${prog.of} sessions">${Array.from({ length: prog.of }, (_, i) => `<i class="${i < prog.done ? 'on' : ''}"></i>`).join('')}</div>` : '';
-  const gameBest = { speed: lastSpeed ? `Level ${lastSpeed.level}` : 'New', grid: best.grid ? `Best ${best.grid}` : 'New', clash: best.clash != null ? `Best ${best.clash}` : 'New', order: best.order != null ? `Best ${best.order}` : 'New' };
+  const lastTrack = [...b.games].filter(g => g.game === 'track').sort((x, y) => y.at - x.at)[0];
+  const gameBest = { lights: best.lights != null ? `Best ${b.games.filter(g => g.game === 'lights' && g.best).reduce((m, g) => Math.min(m, g.best), 9999)} ms` : 'New', batak: best.batak != null ? `Best ${best.batak} hits` : 'New', track: best.track != null ? `Level ${lastTrack.score} · best ${best.track}` : 'New', speed: lastSpeed ? `Level ${lastSpeed.level}` : 'New', grid: best.grid ? `Best ${best.grid}` : 'New', clash: best.clash != null ? `Best ${best.clash}` : 'New', order: best.order != null ? `Best ${best.order}` : 'New' };
+  const card = g => `<button type="button" class="game-card g-${g.id}" data-brain="${g.id}"><span class="game-ic">${GAME_IC[g.id]}</span><b>${esc(g.name)}</b><span class="small">${esc(g.sub)}</span><span class="game-best">${esc(gameBest[g.id])}${g.proven ? ' · <em>evidence</em>' : ''}</span></button>`;
   el.innerHTML = `
     <div class="card brain-score ${bd.id}">
       <div class="bs-top">${ring(sc.score, bd.id)}<div><span class="eyebrow">Brain score · last 7 days</span><b class="bs-band">${esc(sc.score == null ? 'Not started' : bd.label)}</b><p class="small muted" style="margin:4px 0 0">${esc(sc.fix)}</p></div></div>
@@ -102,9 +121,12 @@ export async function renderBrain() {
       ${dots}
       <p class="small muted" style="margin:0">${prog.phase === 'maintain' ? `Block done. Your next booster starts ${new Date(prog.nextAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}. Play any time for fun.` : prog.phase === 'block' ? `${prog.done} of 10 sessions. Aim for 2–3 a week. In the ACTIVE trial, the protection came with booster sessions, so you'll get a short booster every 3 months.` : `${prog.done} of 4 booster sessions. Boosters are what made speed training protective in ACTIVE.`}</p>
     </div>
-    <div id="brainGames"><div class="card-head" style="padding:0 4px"><b>Games</b><span class="muted small">tap to play</span></div>
-      <div class="game-grid">${B.GAMES.map(g => `<button type="button" class="game-card g-${g.id}" data-brain="${g.id}"><span class="game-ic">${GAME_IC[g.id]}</span><b>${esc(g.name)}</b><span class="small">${esc(g.sub)}</span><span class="game-best">${esc(gameBest[g.id])}${g.proven ? ' · <em>evidence</em>' : ''}</span></button>`).join('')}</div></div>
+    <div id="brainGames"><div class="card-head" style="padding:0 4px"><b>Brain games</b><span class="muted small">tap to play</span></div>
+      <div class="game-grid">${B.GAMES.filter(g => !g.reflex).map(g => card(g)).join('')}</div></div>
+    <div id="reflexGames"><div class="card-head" style="padding:0 4px"><b>Reflex games</b><span class="muted small">how F1 drivers train</span></div>
+      <div class="game-grid">${B.GAMES.filter(g => g.reflex).map(g => card(g)).join('')}</div></div>
     <button type="button" class="tile quran-tile" data-brain="quran"><span class="tile-ic quran-ic">${QURAN_IC}</span><span><b>Quran memory</b><span>${due ? `<strong>${due} verse${due === 1 ? '' : 's'} to review today.</strong> ` : ''}${learning.length ? `Learning ${learning.length} surah${learning.length === 1 ? '' : 's'}, ${learning.reduce((a, x) => a + x.p.memorised, 0)} verses memorised.` : 'Learn short surahs and Ayat al-Kursi: listen, fade the words, recite, review.'}</span></span></button>
+    <button type="button" class="tile" data-go="reader"><span class="tile-ic quran-ic">${QURAN_IC}</span><span><b>Read the Quran</b><span>All 114 surahs with translation and recitation.${ctx.S.reader?.last ? ` Continue: ${esc(ctx.S.reader.last.name)} ${ctx.S.reader.last.a}.` : ''}</span></span></button>
     <button type="button" class="tile" data-go="calm"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></span><span><b>Calm: Sukoon</b><span>Slow breathing, a recitation and a dua. Stress is what steals your focus.</span></span></button>
     ${lq.recall.length ? `<div class="card stack recall"><span class="eyebrow">Quick recall</span><p style="margin:0">Remember <b>${esc(lq.recall[0].title.toLowerCase())}</b>? Answering from memory makes it stick.</p><button class="ghost" type="button" data-brain="recall:${lq.recall[0].id}">Answer one question</button></div>` : ''}
     <div class="card stack"><div class="card-head"><b>Learn your brain</b><span class="muted small">${lq.read} of ${B.LESSONS.length} read</span></div>
@@ -113,6 +135,7 @@ export async function renderBrain() {
       <p style="margin:0"><b>Strongest:</b> regular exercise, good sleep, treating hearing loss, blood pressure and cholesterol, not smoking, and staying social. The Lancet Commission (2024) links 14 such factors to about 45% of dementia cases.</p>
       <p style="margin:0"><b>Speed Flash:</b> modelled on the speed training in the ACTIVE trial, where 10 sessions plus boosters were linked to about 25% fewer dementia diagnoses 20 years later. Speed Flash is our own version, not the study's software.</p>
       <p style="margin:0"><b>Memory Grid and Colour Clash:</b> fun focus and memory games. Like most brain games, they mainly make you better at the game.</p>
+      <p style="margin:0"><b>Reflex games:</b> F1 drivers train on light boards like the Batak, react to start lights, and some use object-tracking drills like NeuroTracker. Reaction drills make you faster at reaction drills; studies of object tracking in athletes are mixed. Play them for fun and focus, not as a promise.</p>
       <p style="margin:0"><b>Quran memory:</b> uses spaced review, the most reliable way to remember anything long-term, and the way huffaz have always worked.</p>
       <p style="margin:0">None of this diagnoses or treats any condition. If you're worried about your memory, see a doctor.</p>
     </div></details>`;
@@ -128,6 +151,9 @@ function doNext() {
 }
 
 const GAME_IC = {
+  lights: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="8" width="20" height="8" rx="4"/><circle cx="7" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="17" cy="12" r="1.8" fill="currentColor"/></svg>',
+  batak: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="12" cy="4.5" r="1"/><circle cx="19.5" cy="12" r="1"/><circle cx="12" cy="19.5" r="1"/><circle cx="4.5" cy="12" r="1"/></svg>',
+  track: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="7" r="2.5" fill="currentColor"/><circle cx="17" cy="6" r="2.5"/><circle cx="9" cy="17" r="2.5"/><circle cx="18" cy="16" r="2.5" fill="currentColor"/><path d="M8 9l6 5" stroke-dasharray="2 2"/></svg>',
   speed: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg>',
   grid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5" fill="currentColor"/><rect x="3" y="14" width="7" height="7" rx="1.5" fill="currentColor"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
   clash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="9" r="5"/><circle cx="16" cy="9" r="5"/><circle cx="12" cy="16" r="5"/></svg>',
@@ -292,13 +318,127 @@ function startClash() {
   }
 }
 
+
+/* ---------- Lights Out (F1 start) ---------- */
+function startLights() {
+  let alive = true, results = [], state = 'idle', outAt = 0, timers = [];
+  overlayCleanup = () => { alive = false; timers.forEach(clearTimeout); };
+  openOverlay('Lights Out', `<p style="margin:0" id="loMsg">Five red lights come on, one a second. When they <b>all go out</b>, tap as fast as you can. Tap before that and it's a jump start.</p>
+    <div class="lo-gantry" id="loG">${'<div class="lo-pod"><i></i><i></i></div>'.repeat(5)}</div>
+    <button type="button" class="lo-pad" id="loPad">Tap here</button>
+    <div class="lo-times" id="loTimes"></div>
+    <div id="loEnd"></div>`);
+  const pods = [...$('#loG').children], pad = $('#loPad'), msg = $('#loMsg');
+  const set = n => pods.forEach((p, i) => p.classList.toggle('on', i < n));
+  const later = (fn, ms) => timers.push(setTimeout(() => alive && fn(), ms));
+  const drawTimes = () => { $('#loTimes').innerHTML = results.map((r, i) => `<span class="${r == null ? 'jump' : ''}">${i + 1}. ${r == null ? 'Jump start' : `${(r / 1000).toFixed(3)} s`}</span>`).join(''); $('#bpClock').textContent = `Start ${Math.min(results.length + 1, B.LIGHTS.starts)} of ${B.LIGHTS.starts}`; };
+  function go() {
+    state = 'lights'; set(0); pad.textContent = 'Wait for lights out…'; pad.classList.remove('ready');
+    for (let n = 1; n <= 5; n++) later(() => set(n), n * B.LIGHTS.gap);
+    later(() => { set(0); state = 'out'; outAt = performance.now(); }, 5 * B.LIGHTS.gap + B.lightsHold());
+  }
+  pad.addEventListener('pointerdown', () => {
+    if (state === 'idle') { msg.textContent = 'Eyes on the lights. Tap when they go out.'; return go(); }
+    if (state === 'lights') { timers.forEach(clearTimeout); timers = []; set(0); results.push(null); state = 'wait'; pad.textContent = 'Jump start! Tap for the next start'; navigator.vibrate?.([30, 40, 30]); drawTimes(); return next(); }
+    if (state === 'out') {
+      const rt = Math.round(performance.now() - outAt); results.push(rt < B.LIGHTS.minHuman ? null : rt); state = 'wait';
+      pad.textContent = rt < B.LIGHTS.minHuman ? 'Too quick to be real: jump start' : `${(rt / 1000).toFixed(3)} s`; navigator.vibrate?.(15); drawTimes(); return next();
+    }
+    if (state === 'wait' && results.length < B.LIGHTS.starts) go();
+  });
+  function next() {
+    if (results.length < B.LIGHTS.starts) { later(() => { if (state === 'wait') pad.textContent += ' · tap for the next start'; }, 400); return; }
+    state = 'done';
+    const s = B.lightsScore(results), b = brain(), prev = b.games.filter(g => g.game === 'lights' && g.best).reduce((m, g) => Math.min(m, g.best), Infinity);
+    b.games.push({ game: 'lights', at: Date.now(), score: s.score, best: s.best, avg: s.avg, jumps: s.jumps }); ctx.persist();
+    $('#loEnd').innerHTML = `<div class="stack"><h2 class="display h2" style="margin:0">${esc(s.label)}</h2>
+      <div class="kv">${s.avg != null ? `<span>Average</span><span class="num">${(s.avg / 1000).toFixed(3)} s</span><span>Best</span><span class="num">${(s.best / 1000).toFixed(3)} s</span>` : ''}<span>Jump starts</span><span class="num">${s.jumps}</span></div>
+      <p class="muted small" style="margin:0">F1 drivers react in about 0.2 s, measured by the car. A phone screen and touch add their own delay, so beat your own best on this phone.${s.best && s.best < prev ? ' <b>New personal best!</b>' : ''}</p>
+      <div class="btn-row"><button class="ghost" type="button" id="loAgain">Race again</button><button class="cta" type="button" id="loFin">Done</button></div></div>`;
+    $('#loAgain').onclick = startLights; $('#loFin').onclick = closeOverlay;
+    pad.hidden = true;
+  }
+  drawTimes(); $('#bpClock').textContent = '';
+}
+
+/* ---------- Reaction Wall (Batak) ---------- */
+function startBatak() {
+  let alive = true, lit = -1, hits = 0, misses = 0, end = 0;
+  overlayCleanup = () => { alive = false; };
+  const pos = Array.from({ length: B.BATAK.lights }, (_, i) => { const a = i * 2 * Math.PI / B.BATAK.lights - Math.PI / 2; return { x: 50 + 42 * Math.cos(a), y: 50 + 42 * Math.sin(a) }; });
+  openOverlay('Reaction Wall', `<p style="margin:0" id="bkMsg">A light comes on somewhere on the ring. Hit it, and the next one lights up. 30 seconds: how many can you hit?</p>
+    <div class="bk-ring" id="bkRing">${pos.map((p, i) => `<button type="button" class="bk-l" data-l="${i}" style="left:${p.x}%;top:${p.y}%" aria-label="Light ${i + 1}"></button>`).join('')}<div class="bk-score"><b class="num" id="bkHits">0</b><span>hits</span></div></div>
+    <button class="cta" type="button" id="bkGo">Start</button><div id="bkEnd"></div>`);
+  const ls = [...$('#bkRing').querySelectorAll('.bk-l')];
+  const light = () => { if (lit >= 0) ls[lit].classList.remove('on'); lit = B.batakNext(lit); ls[lit].classList.add('on'); };
+  $('#bkRing').addEventListener('pointerdown', e => {
+    const t = e.target.closest('[data-l]'); if (!t || !end) return;
+    if (+t.dataset.l === lit) { hits++; $('#bkHits').textContent = hits; t.classList.add('hit'); setTimeout(() => t.classList.remove('hit'), 160); light(); }
+    else { misses++; t.classList.add('miss'); setTimeout(() => t.classList.remove('miss'), 200); }
+  });
+  const tick = () => { if (!alive) return; const left = Math.max(0, end - performance.now()); $('#bpClock').textContent = `${Math.ceil(left / 1000)} s`; if (left <= 0) return finish(); setTimeout(tick, 100); };
+  $('#bkGo').onclick = () => { $('#bkGo').hidden = true; $('#bkMsg').textContent = 'Go!'; end = performance.now() + (globalThis.__shredBatakSeconds || B.BATAK.seconds) * 1000; light(); tick(); };
+  function finish() {
+    end = 0; if (lit >= 0) ls[lit].classList.remove('on');
+    const b = brain(), prev = B.bests(b.games).batak;
+    b.games.push({ game: 'batak', at: Date.now(), score: hits, misses }); ctx.persist();
+    $('#bkEnd').innerHTML = `<div class="stack"><h2 class="display h2" style="margin:0">${hits} hits</h2>
+      <p class="muted small" style="margin:0">${misses ? `${misses} wrong taps. ` : ''}${prev != null && hits > prev ? 'New personal best! ' : prev != null ? `Your best is ${prev}. ` : ''}That's ${(hits / B.BATAK.seconds).toFixed(1)} a second. Drivers use this kind of board to sharpen hand–eye speed and peripheral vision.</p>
+      <div class="btn-row"><button class="ghost" type="button" id="bkAgain">Play again</button><button class="cta" type="button" id="bkFin">Done</button></div></div>`;
+    $('#bkAgain').onclick = startBatak; $('#bkFin').onclick = closeOverlay;
+  }
+}
+
+/* ---------- Tracker (multiple-object tracking) ---------- */
+function startTrack() {
+  const b = brain(), last = [...b.games].filter(g => g.game === 'track').sort((x, y) => y.at - x.at)[0];
+  let alive = true, speed = last ? Math.max(B.TRACK.min, last.speed / B.TRACK.step) : B.TRACK.startSpeed, round = 0, bestSpeed = 0, perfectRounds = 0;
+  const ROUNDS = globalThis.__shredTrackRounds || B.TRACK.rounds, SECS = globalThis.__shredTrackSeconds || B.TRACK.seconds;
+  overlayCleanup = () => { alive = false; };
+  openOverlay('Tracker', `<p style="margin:0" id="tkMsg">3 balls flash green. Then they all look the same and move around. Keep your eyes on the 3, then tap them when they stop.</p>
+    <div class="tk-box" id="tkBox"></div><button class="cta" type="button" id="tkGo">Start</button><div id="tkEnd"></div>`);
+  const box = $('#tkBox'), msg = $('#tkMsg');
+  async function playRound() {
+    round++; $('#bpClock').textContent = `Round ${round} of ${ROUNDS}`;
+    const balls = B.trackSetup();
+    box.innerHTML = balls.map((x, i) => `<button type="button" class="tk-b ${x.target ? 'tgt' : ''}" data-b="${i}"></button>`).join('');
+    const els = [...box.children];
+    const draw = () => balls.forEach((x, i) => { els[i].style.left = `${x.x * 100}%`; els[i].style.top = `${x.y * 100}%`; });
+    draw(); msg.textContent = 'Remember the green balls…'; box.classList.remove('pick');
+    await wait(1800); if (!alive) return;
+    els.forEach(e => e.classList.remove('tgt')); msg.textContent = 'Follow them…';
+    let t = performance.now(); const stop = t + SECS * 1000;
+    while (alive && performance.now() < stop) { await frame(); const n = performance.now(); B.trackStep(balls, Math.min(0.05, (n - t) / 1000), speed); t = n; draw(); }
+    if (!alive) return;
+    msg.textContent = `Tap the ${B.TRACK.targets} you followed.`; box.classList.add('pick');
+    const picked = await new Promise(res => { const got = new Set(); box.onclick = e => { const el = e.target.closest('[data-b]'); if (!el || got.has(+el.dataset.b)) return; got.add(+el.dataset.b); el.classList.add('picked'); if (got.size === B.TRACK.targets) { box.onclick = null; res([...got]); } }; });
+    const right = picked.filter(i => balls[i].target).length, perfect = right === B.TRACK.targets;
+    balls.forEach((x, i) => { if (x.target) els[i].classList.add('truth'); if (picked.includes(i) && !x.target) els[i].classList.add('wrongpick'); });
+    msg.textContent = perfect ? 'All 3! Faster next round.' : `${right} of 3. A bit slower next round.`;
+    navigator.vibrate?.(perfect ? 15 : [20, 40, 20]);
+    if (perfect) { perfectRounds++; bestSpeed = Math.max(bestSpeed, speed); }
+    speed = B.trackNext(speed, perfect);
+    await wait(1300);
+    if (round < ROUNDS) return playRound();
+    const level = B.trackLevel(bestSpeed || B.TRACK.min), prev = B.bests(brain().games).track;
+    brain().games.push({ game: 'track', at: Date.now(), score: level, speed: bestSpeed || speed, perfect: perfectRounds }); ctx.persist();
+    $('#tkEnd').innerHTML = `<div class="stack"><h2 class="display h2" style="margin:0">Tracking level ${level}</h2>
+      <p class="muted small" style="margin:0">${perfectRounds} of ${ROUNDS} rounds perfect. ${prev != null && level > prev ? 'New personal best! ' : ''}This trains holding attention on several moving things at once, like reading traffic or a game.</p>
+      <div class="btn-row"><button class="ghost" type="button" id="tkAgain">Play again</button><button class="cta" type="button" id="tkFin">Done</button></div></div>`;
+    $('#tkAgain').onclick = startTrack; $('#tkFin').onclick = closeOverlay;
+  }
+  $('#tkGo').onclick = () => { $('#tkGo').hidden = true; playRound(); };
+}
+
 /* ---------- Verse Order (Quran game) ---------- */
 async function startOrder(setId) {
   await quran();
   const b = brain();
   // Default: the surah being learned most recently, else Al-Fatiha.
   const recent = Object.entries(b.quran).sort((x, y) => (y[1].last || 0) - (x[1].last || 0))[0]?.[0].split(':')[0];
-  const set = setById(setId) || setById(recent) || Q.sets[0];
+  let set = null;
+  try { set = await getSet(setId) || await getSet(recent); } catch {}
+  set ||= Q.sets[0];
   const parts = set.ayahs.flatMap(a => B.chunks(B.words(a.ar)).map((ws, i, all) => ({ a: a.a, ws, part: all.length > 1 ? `${i + 1}/${all.length}` : '' })));
   let k = 0, firstTry = 0, total = 0, alive = true;
   overlayCleanup = () => { alive = false; };
@@ -343,12 +483,22 @@ export async function renderQuran() {
   const el = $('#quranMain'); if (!el) return;
   try { await quran(); } catch { el.innerHTML = '<p class="muted">Couldn\'t load the Quran text. Check your connection and try again.</p>'; return; }
   const b = brain(), due = B.dueCards(b.quran).length;
-  const set = openSet && setById(openSet);
+  let set = null;
+  try { set = openSet && await getSet(openSet); } catch {}
   if (!set) {
+    // Whole surahs started from the reader (not in the short-surah list).
+    const ids = [...new Set(Object.keys(b.quran).map(k => k.split(':')[0]))].filter(id => !Q.sets.some(x => x.id === id));
+    let extraHtml = '';
+    if (ids.length) {
+      let idx = null; try { idx = await quranIndex(); } catch {}
+      extraHtml = `<div class="card stack"><b>Also learning</b><div class="list">${ids.map(id => { const n = +id.slice(1), m = idx?.surahs[n - 1]; const started = Object.keys(b.quran).filter(k => k.startsWith(id + ':')).length; return `<button type="button" class="row q-row" data-brain="set:${id}"><span class="q-num num">${n}</span><div><b>${esc(m?.name || 'Surah ' + n)}</b> <span class="ar q-ar" dir="rtl">${esc((m?.arName || '').replace(/^سُورَةُ\s*/, ''))}</span><span class="q-sub small muted">${started} of ${m?.verses ?? '?'} verses started</span></div></button>`; }).join('')}</div></div>`;
+    }
     el.innerHTML = `
       <p class="muted" style="margin:0">Learn a verse at a time: listen, read along, fade the words away, recite from memory. Then review on a schedule so it stays.</p>
       ${due ? `<div class="card stack due-card"><b>${due} verse${due === 1 ? '' : 's'} to review today</b><p class="small muted" style="margin:0">Recite each one from memory, then check yourself.</p><button class="cta" type="button" data-brain="review">Review now</button></div>` : ''}
       <div class="list q-sets">${Q.sets.map(s => { const p = B.setProgress(s, b.quran); return `<button type="button" class="row q-row" data-brain="set:${s.id}"><span class="q-num num">${s.id === 'kursi' ? '2:255' : s.id === 'baqarah-end' ? '2:285' : s.s}</span><div><b>${esc(nice(s))}</b> <span class="ar q-ar" dir="rtl">${esc(s.arName.replace(/^سُورَةُ\s*/, ''))}</span><span class="q-sub small muted">${esc(s.meaning)} · ${s.ayahs.length} verse${s.ayahs.length === 1 ? '' : 's'}</span>${p.started ? `<span class="bs-bar q-bar"><i style="width:${Math.max(4, Math.round(100 * p.started / p.total))}%" class="started"></i><i style="width:${p.pct}%"></i></span>` : ''}</div><span class="r">${p.memorised ? `${p.memorised}/${p.total}` : p.started ? 'Learning' : ''}</span></button>`; }).join('')}</div>
+      ${extraHtml}
+      <button type="button" class="tile" data-brain="reader"><span class="tile-ic quran-ic">${QURAN_IC}</span><span><b>Read the full Quran</b><span>All 114 surahs with translation and recitation. Memorise any surah from there.</span></span></button>
       <details class="card"><summary><b>How the review schedule works</b></summary><div class="stack small" style="margin-top:10px">
         <p style="margin:0">Each time you recite a verse well from memory, its next review moves further away: 1 day, 3 days, a week, 2 weeks, a month and beyond. Stumble, and it comes back sooner. A verse counts as memorised after 4 good reviews.</p>
         <p style="margin:0">This is spaced repetition, the most reliable method for long-term memory, and the same idea as daily muraja'ah. The Prophet ﷺ said to keep reciting the Quran, because it slips away faster than a camel from its rope (Bukhari 5033, Muslim 791).</p>
@@ -388,9 +538,10 @@ function ayahHtml(a, level) {
   const ws = B.words(a.ar), f = B.fade(ws, level);
   return f.map(x => x.hidden ? `<span class="fl">${esc(B.cue(x.w))}</span>` : esc(x.w)).join(' ');
 }
-async function startLearn(id) {
-  await quran();
-  const set = setById(id); if (!set) return;
+async function startLearn(id, only) {
+  let set = null; try { set = await getSet(id); } catch {}
+  if (!set) return ctx.toast('Couldn\'t load that surah. Check your connection.');
+  if (only) { const a = set.ayahs.find(x => x.a === only); if (a) return practise(set, [a], 'learn'); }
   const b = brain();
   // Start with verses not yet learned; if all started, practise those due first, then the rest.
   const order = [...set.ayahs].sort((x, y) => { const cx = b.quran[B.cardId(set.id, x.a)], cy = b.quran[B.cardId(set.id, y.a)]; return (cx ? cx.due : -1) - (cy ? cy.due : -1); });
@@ -400,14 +551,20 @@ async function startLearn(id) {
   queue.sort((x, y) => x.a - y.a);
   practise(set, queue, 'learn');
 }
-function startReview() {
-  quran().then(() => {
-    const ids = B.dueCards(brain().quran);
-    if (!ids.length) return ctx.toast('Nothing to review today.');
-    const items = ids.map(id => { const [sid, a] = id.split(':'); const set = setById(sid); return set && { set, a: set.ayahs.find(x => x.a === +a) }; }).filter(Boolean);
-    practise(null, items, 'review');
-  });
+async function startReview() {
+  const ids = B.dueCards(brain().quran);
+  if (!ids.length) return ctx.toast('Nothing to review today.');
+  const items = [];
+  for (const id of ids) {
+    const [sid, a] = id.split(':');
+    let set = null; try { set = await getSet(sid); } catch {}
+    const ay = set?.ayahs.find(x => x.a === +a); if (ay) items.push({ set, a: ay });
+  }
+  if (!items.length) return ctx.toast('Couldn\'t load your verses. Check your connection.');
+  practise(null, items, 'review');
 }
+/** From the reader: memorise one verse (or the next verses) of any surah. */
+export function learnVerse(s, a) { return startLearn(`s${s}`, a); }
 function practise(set, list, mode) {
   let i = 0, level = mode === 'review' ? 3 : 0, revealed = false, done = 0;
   const item = () => mode === 'review' ? list[i] : { set, a: list[i] };

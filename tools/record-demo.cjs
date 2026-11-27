@@ -25,7 +25,7 @@ const seed = {
     ...[13, 11, 9, 6, 4, 2].flatMap((d, i) => [0, 1, 2].map(k => ({ at: ago(d) + k * 4e5, ex: 'hipThrust', name: 'Barbell hip thrust', reps: 10, good: 6 + Math.min(4, i >> 1) + (k === 2 ? 0 : 0), faults: k === 0 && i < 3 ? { ht_feet_far: 2 } : {}, kg: 50 + i * 2.5 }))),
     ...[12, 8, 5, 1].flatMap((d, i) => [0, 1].map(k => ({ at: ago(d) + k * 4e5, ex: 'squat', name: 'Back squat', reps: 8, good: 5 + i, faults: i < 2 ? { sq_valgus: 2 } : {}, kg: 40 + i * 2.5 }))),
   ],
-  checkins: [], scans: [],
+  checkins: [], scans: [], prefs: { logMode: 'camera' }, // camera logging, as in the walkthrough
   readiness: [13, 11, 9, 6, 4, 2, 1].map(d => ({ at: ago(d, 7), feel: 'ok', sleepQ: 3, fatigue: 3, stress: 3, soreness: 3, sleepH: 7.5 })),
   loads: Array.from({ length: 28 }, (_, d) => d + 1).filter(d => [1, 3, 5, 6].includes(new Date(now - d * DAY).getDay())).map(d => ({ at: ago(d), rpe: 6, minutes: 55 })),
   vitals: [
@@ -34,6 +34,14 @@ const seed = {
     { at: ago(1, 8), kind: 'hr', source: 'camera', bpm: 64 },
   ],
   calm: [6, 4, 2].map((d, i) => ({ at: ago(d, 22), goal: i === 1 ? 'sleep' : 'anxiety', before: [7, 6, 7][i], after: [4, 3, 4][i], minutes: 9, hr: { before: [84, 80, 86][i], after: [72, 70, 74][i] } })),
+  brain: {
+    drills: [12, 10, 8, 6, 4, 2].map((d, i) => ({ kind: 'speed', at: ago(d, 20), ms: [260, 220, 190, 170, 150, 140][i], level: [19, 24, 29, 32, 36, 37][i], acc: 72 })),
+    games: [{ game: 'grid', at: ago(5, 21), score: 6 }, { game: 'clash', at: ago(3, 21), score: 31 }, { game: 'batak', at: ago(2, 21), score: 38 }, { game: 'lights', at: ago(1, 21), score: 712, best: 262, avg: 288, jumps: 0 }],
+    lessons: { plastic: { read: ago(9), recalled: ago(6) }, exercise: { read: ago(7), recalled: ago(4) }, sleep: { read: ago(4) } },
+    quran: { ...Object.fromEntries([1, 2, 3, 4].map(a => [`s112:${a}`, { box: 4, seen: 5, last: ago(3), due: ago(-8) }])),
+      ...Object.fromEntries([1, 2, 3, 4, 5].map(a => [`s113:${a}`, { box: a < 3 ? 2 : 1, seen: 2, last: ago(1), due: ago(a < 3 ? -2 : 0, 4) }])) },
+    reviews: [6, 4, 3, 1].map(d => ({ at: ago(d, 21), n: 4 })),
+  },
   calmPrefs: { tones: 'off', mode: 'binaural', minutes: 5, reciter: 'Alafasy_128kbps', quran: true, cue: true, breath: 'slow', hr: false, lastGoal: 'anxiety' },
 };
 
@@ -43,7 +51,7 @@ const seed = {
   await ctx.route('https://shred.local/**', r => { let p = new URL(r.request().url()).pathname; if (p === '/') p = '/index.html'; const f = path.join(ROOT, p);
     if (!fs.existsSync(f)) return r.fulfill({ status: 404, body: '' }); r.fulfill({ status: 200, body: fs.readFileSync(f), headers: { 'content-type': T[path.extname(f)] || 'application/octet-stream' } }); });
   for (const h of ['everyayah.com', 'verses.quran.com', 'verses.quran.foundation']) await ctx.route(`https://${h}/**`, r => r.abort());
-  await ctx.addInitScript(s => { if (!localStorage.getItem('shred_qk_v1')) localStorage.setItem('shred_qk_v1', s); try { localStorage.setItem('qk_muted', '1'); } catch {} }, JSON.stringify(seed));
+  await ctx.addInitScript(s => { if (!localStorage.getItem('shred_qk_v1')) localStorage.setItem('shred_qk_v1', s); try { localStorage.setItem('qk_muted', '1'); localStorage.setItem('qk_demo', '1'); } catch {} }, JSON.stringify(seed));
   const p = await ctx.newPage();
   const t0 = Date.now(); // the video starts with the page
   const wait = ms => p.waitForTimeout(ms);
@@ -51,8 +59,8 @@ const seed = {
   // A caption bar drawn over the app, so the video explains itself.
   const showCaption = async (step, text) => p.evaluate(([s, t]) => {
     let el = document.getElementById('__cap');
-    if (!el) { el = document.createElement('div'); el.id = '__cap'; el.style.cssText = 'position:fixed;left:10px;right:10px;bottom:96px;z-index:999;background:rgba(10,13,20,.92);border:1px solid #7c6cff;border-radius:16px;padding:10px 14px;font:600 14px/1.35 Figtree,system-ui;color:#edf0f6;box-shadow:0 8px 30px rgba(0,0,0,.5);pointer-events:none;transition:opacity .3s'; document.body.appendChild(el); }
-    el.innerHTML = `<span style="display:block;font:700 10px/1 Figtree;letter-spacing:.14em;text-transform:uppercase;color:#45c3ff;margin-bottom:4px">${s}</span>${t}`; el.style.opacity = 1;
+    if (!el) { el = document.createElement('div'); el.id = '__cap'; el.style.cssText = 'position:fixed;left:10px;right:10px;bottom:96px;z-index:999;background:rgba(11,19,17,.92);border:1px solid #5FB39D;border-radius:16px;padding:10px 14px;font:600 14px/1.35 Figtree,system-ui;color:#ECF1EC;box-shadow:0 8px 30px rgba(0,0,0,.5);pointer-events:none;transition:opacity .3s'; document.body.appendChild(el); }
+    el.innerHTML = `<span style="display:block;font:700 10px/1 Figtree;letter-spacing:.14em;text-transform:uppercase;color:#9FD0B6;margin-bottom:4px">${s}</span>${t}`; el.style.opacity = 1;
   }, [step, text]);
   // Show line `id` of the narration; if QK's recording exists, stay on it at least as long as he speaks.
   const narr = async (id, minMs) => {
@@ -70,7 +78,7 @@ const seed = {
   // 1. Today: one tap, then one next step
   await narr('01', 2500); await tap('[data-feel=great]'); await wait(1200);
   await narr('02', 3000); await shot('01-today');
-  await p.click('#nextBtn'); await wait(800);
+  await p.evaluate(() => window.scrollTo({ top: 0 })); await p.click('.tabs [data-tab=train]'); await wait(500); await tap('#exOpen'); await wait(400); await p.click('.ex-card.feature'); await wait(800);
 
   // 2. Train: live form coaching with the demo athlete
   await narr('03', 2500); await p.fill('#loadKg', '60'); await shot('03-setup');
@@ -110,16 +118,44 @@ const seed = {
   await p.evaluate(() => document.querySelector('#calmHistory').scrollIntoView({ block: 'center', behavior: 'smooth' }));
   await narr('16', 3000); await shot('13-sukoon-history');
 
-  // 5. Me
+  // 5. Brain: score, Speed Flash, reflex games, Quran memory
+  await p.click('.tabs [data-tab=today]'); await wait(500); await tap('#today [data-go=brain]'); await wait(800);
+  await narr('17', 3200); await shot('16-brain');
+  await p.evaluate(() => { window.__shredSpeedTrials = 3; window.__shredBatakSeconds = 8; });
+  await tap('[data-brain=speed]'); await wait(300); await p.click('#sfGo');
+  const speedTrial = async () => { await p.waitForSelector('#sfVeh:not([hidden])', { timeout: 10000 }); await wait(500); await p.click('#sfVeh [data-v="0"]'); await p.waitForSelector('#sfArena.answer'); await wait(500); await p.click('.sf-spot[data-pos="2"]', { force: true }); };
+  await narr('18', 600); await speedTrial(); await p.waitForSelector('#sfVeh:not([hidden])', { timeout: 10000 }); await shot('17-speed-flash');
+  await p.click('#sfVeh [data-v="1"]'); await p.waitForSelector('#sfArena.answer'); await wait(400); await p.click('.sf-spot[data-pos="5"]', { force: true });
+  await speedTrial(); await p.waitForSelector('#sfDone:not([hidden])', { timeout: 10000 }); await wait(1200); await p.click('#sfFin'); await wait(500);
+  await p.$eval('#reflexGames', el => el.scrollIntoView({ block: 'center', behavior: 'smooth' })); await wait(900);
+  await tap('[data-brain=lights]'); await wait(300);
+  await narr('19', 400); await p.click('#loPad');
+  await p.waitForFunction(() => document.querySelectorAll('.lo-pod.on').length === 5, null, { timeout: 8000 }); await shot('18-lights-out');
+  await p.waitForFunction(() => document.querySelectorAll('.lo-pod.on').length === 0, null, { timeout: 8000 }); await wait(240); await p.click('#loPad'); await wait(1800);
+  await p.click('#bpClose'); await wait(400);
+  await p.$eval('#reflexGames', el => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
+  await tap('[data-brain=batak]'); await wait(300); await p.click('#bkGo');
+  await narr('20', 200);
+  for (let i = 0; i < 14; i++) { await wait(260); await p.click('.bk-l.on'); if (i === 9) await p.screenshot({ path: path.join(OUT, '19-reaction-wall.png') }); }
+  await p.waitForSelector('#bkFin', { timeout: 10000 }); await wait(1200); await p.click('#bkFin'); await wait(400);
+  await tap('[data-brain=quran]'); await wait(700); await p.click('[data-brain="set:s113"]'); await wait(700);
+  await narr('21', 2200); await shot('20-quran-surah');
+  await p.click('[data-brain="learn:s113"]'); await wait(1500); await p.click('#prNext'); await wait(1000); await p.click('#prNext'); await wait(800);
+  await p.click('#prNext'); await wait(900); await shot('21-quran-recite');
+  await p.click('#prCheck'); await wait(1200); await p.click('[data-g=good]'); await wait(500);
+  await p.click('#bpClose'); await wait(400); await p.click('[data-brain=sets]'); await wait(700);
+  await narr('22', 3200); await shot('22-quran-review');
+
+  // 6. Me
   await p.click('.tabs [data-tab=progress]'); await wait(700);
-  await narr('17', 2800); await shot('14-you');
+  await narr('23', 2800); await shot('14-you');
   await p.evaluate(() => document.querySelector('#sendWeek').scrollIntoView({ block: 'center', behavior: 'smooth' })); await wait(900);
   await p.evaluate(() => { navigator.share = undefined; navigator.clipboard.writeText = () => Promise.reject(new Error('demo')); });
   await p.click('#sendWeek'); await wait(600);
   await p.evaluate(() => document.querySelector('#weekText').scrollIntoView({ block: 'center', behavior: 'smooth' }));
-  await narr('18', 3500); await shot('15-send-week');
+  await narr('24', 3500); await shot('15-send-week');
   await p.click('.tabs [data-tab=today]'); await wait(500);
-  await narr('19', 3000);
+  await narr('25', 3000);
 
   const vid = await p.video().path(); await ctx.close(); await b.close();
   fs.renameSync(vid, path.join(OUT, 'demo.webm'));

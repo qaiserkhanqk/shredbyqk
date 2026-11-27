@@ -29,7 +29,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   const tap = async sel => { await p.$eval(sel, el => el.scrollIntoView({ block: 'center' })); await p.click(sel); };
   const go = async id => {
     if (id === 'body') { await go('today'); await p.click('#today [data-go=body]'); }
-    else if (['gait', 'scan', 'rehab', 'calm', 'vitals'].includes(id)) { await go('body'); await p.click(`#body [data-go=${id}]`); }
+    else if (['gait', 'scan', 'rehab', 'calm', 'vitals', 'reader'].includes(id)) { await go('body'); await p.click(`#body [data-go=${id}]`); }
     else await p.click(`.tabs [data-tab=${id}]`);
   };
   await p.goto('https://shred.local/');
@@ -226,7 +226,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.goto('https://shred.local/'); await p.waitForTimeout(600);
   await go('today'); await tap('#today [data-go=brain]'); await p.waitForTimeout(500);
   check('brain: score waits for a first drill, next step is Speed Flash 1 of 10', /Not started/.test(await p.textContent('.brain-score')) && /session 1 of 10/.test(await p.textContent('.next-brain')));
-  check('brain: four games and ten lessons', (await p.$$('.game-card')).length === 4 && (await p.$$('.lesson-row')).length === 10);
+  check('brain: seven games (three reflex) and ten lessons', (await p.$$('.game-card')).length === 7 && (await p.$$('#reflexGames .game-card')).length === 3 && (await p.$$('.lesson-row')).length === 10);
   await p.evaluate(() => { window.__shredSpeedTrials = 3; });
   await tap('[data-brain=speed]'); await p.click('#sfGo');
   for (let i = 0; i < 3; i++) { await p.waitForSelector('#sfVeh:not([hidden])', { timeout: 10000 }); await p.click('#sfVeh [data-v="0"]'); await p.waitForSelector('#sfArena.answer'); await p.click('.sf-spot[data-pos="0"]', { force: true }); }
@@ -237,6 +237,30 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await tap('[data-brain=grid]'); await p.click('#mgGo'); await p.waitForSelector('#mgGrid:not(.watch)', { timeout: 10000 });
   check('memory grid: lights a pattern then hands over to you', /Your turn/.test(await p.textContent('#mgMsg')));
   await p.click('#bpClose');
+  // Reflex games: Lights Out (one jump start, then clean starts), Reaction Wall (short), Tracker (one round).
+  await tap('[data-brain=lights]');
+  await p.click('#loPad'); await p.waitForTimeout(1300); await p.click('#loPad'); // tapped while lights were coming on
+  check('lights out: tapping before lights out is a jump start', /Jump start/.test(await p.textContent('#loTimes')));
+  for (let i = 0; i < 4; i++) {
+    await p.click('#loPad');
+    await p.waitForFunction(() => document.querySelectorAll('.lo-pod.on').length === 5, null, { timeout: 8000 });
+    await p.waitForFunction(() => document.querySelectorAll('.lo-pod.on').length === 0, null, { timeout: 8000 });
+    await p.waitForTimeout(180); await p.click('#loPad'); await p.waitForTimeout(300);
+  }
+  check('lights out: 5 starts → average and best reaction time', await p.isVisible('#loFin') && /Average/.test(await p.textContent('#loEnd')), await p.textContent('#loEnd'));
+  await p.click('#loFin');
+  await p.evaluate(() => { window.__shredBatakSeconds = 3; window.__shredTrackRounds = 1; window.__shredTrackSeconds = 1; });
+  await tap('[data-brain=batak]'); await p.click('#bkGo');
+  for (let i = 0; i < 5; i++) await p.click('.bk-l.on');
+  await p.waitForSelector('#bkFin', { timeout: 8000 });
+  check('reaction wall: counts hits', /5 hits/.test(await p.textContent('#bkEnd')));
+  await p.click('#bkFin');
+  await tap('[data-brain=track]'); await p.click('#tkGo'); await p.waitForSelector('#tkBox.pick', { timeout: 10000 });
+  for (const i of [0, 1, 2]) await p.click(`.tk-b[data-b="${i}"]`, { force: true });
+  await p.waitForSelector('#tkFin', { timeout: 8000 });
+  check('tracker: picking the 3 followed balls gives a tracking level', /Tracking level \d+/.test(await p.textContent('#tkEnd')) && /1 of 1 rounds perfect/.test(await p.textContent('#tkEnd')));
+  await p.click('#tkFin');
+
   await tap('[data-brain=quran]'); await p.waitForTimeout(400);
   check('quran: 23 surahs and passages to learn', (await p.$$('.q-row')).length === 23);
   await p.click('[data-brain="set:s112"]');
@@ -256,6 +280,30 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await tap('[data-brain="lesson:plastic"]'); await p.click('[data-q="1"]');
   check('lesson: quiz marks the right answer', await p.isVisible('#lqBox .right'));
   await p.click('#lsDone');
+
+  // Quran reader: all 114 surahs, search, a long surah, bookmark, continue reading, memorise any verse.
+  await p.goto('https://shred.local/'); await p.waitForTimeout(500);
+  await go('body'); await p.click('#body [data-go=reader]'); await p.waitForTimeout(600);
+  check('reader: lists all 114 surahs', (await p.$$('#rdList .q-row')).length === 114);
+  await p.fill('#rdSearch', 'cave');
+  check('reader: search by meaning finds Al-Kahf', (await p.$$('#rdList .q-row')).length === 1 && /Al-Kahf/.test(await p.textContent('#rdList')));
+  await p.click('#rdList [data-rd="open:18"]'); await p.waitForTimeout(600);
+  check('reader: Al-Kahf shows 110 verses with the Basmala heading', (await p.$$('.rd-v')).length === 110 && await p.isVisible('.rd-basmala'));
+  await tap('[data-rd="mark:10"]');
+  await p.$eval('#rv-30', el => el.scrollIntoView({ block: 'start' })); await p.waitForTimeout(1600);
+  await tap('[data-rd="tr"]');
+  check('reader: translation can be hidden', !(await p.isVisible('#rv-30 .rd-en')));
+  await tap('[data-rd="tr"]');
+  await tap('[data-rd="learn:30"]');
+  check('reader: Memorise opens practice for that verse', /Al-Kahf · verse 30/.test(await p.textContent('#prBox')));
+  await p.click('#prNext'); await p.click('#prNext'); await p.click('#prNext'); await p.click('#prCheck'); await p.click('[data-g=good]');
+  await p.click('#prFin');
+  await p.click('#readerMain [data-rd=list]'); await p.waitForTimeout(400);
+  check('reader: continue reading where you left off, and the bookmark', /Al-Kahf · verse 3\d/.test(await p.textContent('.rd-continue')) && /18:10/.test(await p.textContent('.rd-marks')), await p.textContent('.rd-continue'));
+  await p.fill('#rdSearch', ''); await p.click('#rdList [data-rd="open:9"]'); await p.waitForTimeout(500);
+  check('reader: At-Tawbah has no Basmala heading', (await p.$$('.rd-basmala')).length === 0 && (await p.$$('.rd-v')).length === 129);
+  await go('today'); await tap('#today [data-go=brain]'); await tap('[data-brain=quran]'); await p.waitForTimeout(500);
+  check('quran memory: a verse memorised from the reader shows under Also learning', /Also learning/.test(await p.textContent('#quranMain')) && /Al-Kahf/.test(await p.textContent('#quranMain')));
 
   // 11. Body check: alertness test (shortened for the test run) and camera pulse with no finger
   await p.goto('https://shred.local/'); await p.waitForTimeout(600);

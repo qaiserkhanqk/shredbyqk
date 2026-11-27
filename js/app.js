@@ -42,6 +42,7 @@ import * as freq from './frequency.js';
 import { ExerciseDetector, PICK_LIST } from './detect.js';
 import { initCalm, renderCalm, startCalmNow } from './calm.js';
 import { initBrain, renderBrain, renderQuran } from './brainui.js';
+import { initReader, renderReader, leaveReader } from './reader.js';
 import { WEIGHTED, lastLoad, weekSummary } from './share.js';
 import { initVitals, renderVitals } from './vitals.js';
 import { initFitAge, renderFitAge } from './fitage-ui.js';
@@ -71,6 +72,7 @@ ErrorLog.install();
 initCalm({ S, persist: () => persist(), toast: m => toast(m) });
 initVitals({ S, persist: () => persist(), toast: m => toast(m) });
 initBrain({ S, persist: () => persist(), toast: m => toast(m), go: id => tab(id) });
+initReader({ S, persist: () => persist(), toast: m => toast(m) });
 initFitAge({ S, persist: () => persist(), toast: m => toast(m), say: (t, o) => say(t, o) });
 initBoard({ S, persist: () => persist(), toast: m => toast(m), cloud: () => cloud, sync: () => syncNow() });
 initFood({ S, persist: () => persist(), toast: m => toast(m), rehab: () => !!S.rehab?.active });
@@ -101,7 +103,7 @@ function mountOrbs() {
 /* ---------- Navigation ---------- */
 function tab(id) {
   $$('.screen').forEach(s => s.classList.toggle('on', s.id === id));
-  const tabFor = ['body', 'gait', 'scan', 'rehab', 'calm', 'vitals', 'fitage', 'brain', 'quran'].includes(id) ? 'today' : id === 'board' ? 'progress' : id; // tools live under Today
+  const tabFor = ['body', 'gait', 'scan', 'rehab', 'calm', 'vitals', 'fitage', 'brain', 'quran', 'reader'].includes(id) ? 'today' : id === 'board' ? 'progress' : id; // tools live under Today
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tabFor));
   if (id === 'today') renderToday();
   if (id === 'train') renderPrograms();
@@ -111,6 +113,8 @@ function tab(id) {
   if (id === 'vitals') renderVitals();
   if (id === 'brain') renderBrain();
   if (id === 'quran') renderQuran();
+  if (id !== 'reader') leaveReader();
+  if (id === 'reader') renderReader();
   if (id === 'fitage') renderFitAge();
   if (id === 'board') renderBoard();
   if (id === 'food') renderFood();
