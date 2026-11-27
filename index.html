@@ -126,6 +126,8 @@
     <label class="field"><span class="eyebrow" data-t>Search, or type the whole meal</span><input id="foodSearch" type="search" placeholder="do roti aur karahi · KFC zinger · gol gappay" autocomplete="off"></label>
     <div class="card" id="foodResults" hidden></div>
     <div class="card"><div class="card-head"><b data-t>Today’s food</b></div><div class="list" id="foodLog"></div></div>
+    <div class="card stack" id="foodWeight"></div>
+    <div class="card stack" id="foodPlan"></div>
     <div class="card stack" id="foodWeek"></div>
     <details class="card" id="foodTargets">
       <summary><span data-t>Your targets</span> <span class="muted small" id="tSummary"></span></summary>
@@ -136,12 +138,13 @@
         </div>
         <div class="grid2">
           <label class="field">Goal<select id="tGoal"><option value="lose">Lose fat</option><option value="maintain" selected>Stay the same</option><option value="gain">Build muscle</option></select></label>
-          <label class="field">How active<select id="tActivity"><option value="low">Train 1–2 days</option><option value="mid" selected>Train 3–5 days</option><option value="high">Train 6–7 days or a physical job</option></select></label>
+          <label class="field">Your day<select id="tJob"><option value="">Choose…</option><option value="desk">Desk job or student</option><option value="feet">On my feet a lot</option><option value="physical">Physical work</option></select></label>
         </div>
-        <label class="field">Your city (local places show first)<select id="tCity"><option value="">Not set</option><option>Rawalpindi</option><option>Islamabad</option><option>Lahore</option><option>Karachi</option><option>Peshawar</option><option>Faisalabad</option><option>Multan</option><option>Hyderabad</option><option>Quetta</option><option>Sialkot</option><option>Gujranwala</option></select></label>
+        <label class="field">Training days a week<select id="tTrain"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option></select></label>
+        <label class="field">Your city (local places show first)<select id="tCity"><option value="">Not set</option><option>Rawalpindi</option><option>Islamabad</option><option>Lahore</option><option>Karachi</option><option>Peshawar</option><option>Faisalabad</option><option>Multan</option><option>Hyderabad</option><option>Quetta</option><option>Sialkot</option><option>Gujranwala</option><option>Dubai</option><option>Abu Dhabi</option><option>Sharjah</option><option>Ajman</option><option>Al Ain</option></select></label>
         <label class="field">Your usual dinner plate (helps photos judge portions)<select id="tPlate"><option value="">Not set</option><option value="23">Small, about 23 cm (9 in)</option><option value="26">Standard, about 26 cm (10 in)</option><option value="28">Large, about 28 cm (11 in)</option><option value="32">Big thaal, about 32 cm</option></select></label>
         <div id="calInfo"></div>
-        <p class="muted small" style="margin:0">Uses your height and sex from Me → Profile. Calories from the Mifflin-St Jeor equation; protein 1.8 g per kg (2.0 when losing fat).</p>
+        <p class="muted small" style="margin:0" id="tHow">Uses your height and sex from Me → Profile. Calories: Mifflin-St Jeor for your body, times your daily movement, plus your training sessions; protein 1.8 g per kg (2.0 when losing fat). Your two-weekly check-ins fine-tune it.</p>
       </div>
     </details>
     <p class="muted small food-how">Desi dishes are worked out from their ingredients: meat, masala and the oil or ghee for who cooked it. Every number shows a likely range, because no app can see the oil in a karahi. Indian recipes come from the Indian Nutrient Databank, ingredients from USDA.</p>

@@ -45,6 +45,7 @@ import { initVitals, renderVitals } from './vitals.js';
 import { vitalNotes } from './hr.js';
 import { nextStep } from './today.js';
 import { initFood, renderFood } from './food.js';
+import { enablePush } from './push.js';
 import { landmarksFrom, analyse, render, navyBodyFat, bfCategory, stanceProblem } from './bodyscan.js';
 
 const $ = s => document.querySelector(s);
@@ -1534,6 +1535,7 @@ $('#remindNotify').onclick = async () => {
   if (!('Notification' in window)) return toast('This phone doesn\'t support app notifications. Use the calendar reminders.');
   const p = await Notification.requestPermission();
   S.profile.remind = p === 'granted'; persist();
+  if (p === 'granted' && cloud?.signedIn) enablePush(cloud).catch(() => {}); // also when the app is closed
   toast(p === 'granted' ? 'Done. QK will remind you on training days.' : 'Notifications are off. The calendar reminders still work.');
   checkReminder();
 };
@@ -1644,6 +1646,9 @@ async function syncNow() {
   syncing = true;
   try {
     S.cloud.mark = await pushAll(cloud, S, S.cloud.mark || {}); persist();
+    // A diet plan QK edited on the dashboard replaces the app's own.
+    const cp = await cloud.coachPlan().catch(() => null);
+    if (cp && applyCoachPlan(cp.plan, cp.note, cp.updated_at)) toast('QK updated your diet plan');
     const msgs = await cloud.unread();
     if (msgs.length) {
       const from = S.cloud.coach || 'Your coach';
@@ -1660,9 +1665,15 @@ function renderCoachLink() {
   $('#clStatus').textContent = coach ? `Connected to ${coach} ✓ Your sessions sync automatically. Only numbers are shared; your videos never leave your phone.`
     : signed ? 'Signed in. Now enter your coach\'s invite code.' : 'Connect to your coach so they can see your training and cheer you on. Only numbers are shared (sets, reps, weights, form scores). Your videos never leave your phone.';
 }
+function applyCoachPlan(plan, note, at) {
+  if (!plan || !at || (S.food?.coachPlanAt && S.food.coachPlanAt >= at)) return false;
+  (S.food ||= { log: [], prefs: {}, style: 'home' }).plan = { ...plan, byCoach: true, note: note || '', editedAt: at };
+  S.food.coachPlanAt = at; persist(); renderFood(); return true;
+}
 // Demo (no server yet): messages sent to "this phone" from the dashboard demo are read out here.
 function demoInbox() {
   if (cloud) return;
+  try { const dp = JSON.parse(localStorage.getItem('qk_demo_plan') || 'null'); if (dp && applyCoachPlan(dp.plan, dp.note, dp.at)) toast('QK updated your diet plan'); } catch {}
   let msgs = []; try { msgs = JSON.parse(localStorage.getItem('qk_demo_inbox') || '[]'); localStorage.removeItem('qk_demo_inbox'); } catch {}
   msgs.forEach((m, i) => setTimeout(() => { say(`Message from your coach. ${m.body}`, { id: 'demomsg_' + m.id, priority: 'high' }); toast(`Coach: ${m.body}`); }, 1500 + i * 6000));
 }
@@ -1671,7 +1682,7 @@ if (cloud) {
   $('#clSend').onclick = async () => { const e = $('#clEmail').value.trim(); if (!e) return; try { await cloud.sendCode(e); $('#clStep2').hidden = false; toast('Code sent. Check your email.'); } catch (err) { toast(err.message); } };
   $('#clVerify').onclick = async () => { try { await cloud.verify($('#clEmail').value, $('#clCode').value); renderCoachLink(); } catch (err) { toast(err.message); } };
   $('#clJoin').onclick = async () => {
-    try { const name = await cloud.joinCoach($('#clInvite').value.trim()); (S.cloud ||= {}).coach = name || 'your coach'; persist(); renderCoachLink(); toast(`Connected to ${S.cloud.coach} ✓`); say(`You're connected to ${S.cloud.coach}. They'll see your training and cheer you on.`, { priority: 'high' }); await cloud.opened(); syncNow(); }
+    try { const name = await cloud.joinCoach($('#clInvite').value.trim()); (S.cloud ||= {}).coach = name || 'your coach'; persist(); renderCoachLink(); if (globalThis.Notification?.permission === 'granted') enablePush(cloud).catch(() => {}); toast(`Connected to ${S.cloud.coach} ✓`); say(`You're connected to ${S.cloud.coach}. They'll see your training and cheer you on.`, { priority: 'high' }); await cloud.opened(); syncNow(); }
     catch (err) { toast(/No coach/.test(err.message) ? 'That invite code didn\'t match. Check it with your coach.' : err.message); }
   };
   $('#clOut').onclick = () => { cloud.signOut(); S.cloud = {}; persist(); renderCoachLink(); };
@@ -2542,6 +2553,8 @@ if (S.profile.name) {
 }
 // Home-screen shortcut or a shared link: ?calm=now opens Sukoon.
 if (new URLSearchParams(location.search).has('calm') || location.hash === '#calm') { $('#welcome').hidden = true; tab('calm'); startCalmNow(); }
+// A notification tap: ?tab=food opens Food (check-in day, or a plan QK updated).
+else if (['food', 'train', 'today', 'progress'].includes(new URLSearchParams(location.search).get('tab')) && S.profile?.name) { $('#welcome').hidden = true; tab(new URLSearchParams(location.search).get('tab')); }
 // From a calendar reminder or the app-icon shortcut: ?start=today opens straight into today's workout.
 if (new URLSearchParams(location.search).get('start') === 'today' && S.profile.name) { $('#welcome').hidden = true; tab('today'); if (activeProgram()) setTimeout(startFlow, 500); }
 // First run: three short questions, then straight to Today.

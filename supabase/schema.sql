@@ -170,6 +170,37 @@ create policy "client marks read" on public.messages for update using (client_id
 revoke update on public.messages from authenticated;
 grant update (read_at) on public.messages to authenticated;
 
+-- Notifications that reach a closed app (Web Push). The phone saves its push address here; a daily job
+-- (tools/push-checkins.mjs, run by .github/workflows/push.yml) reminds clients whose check-in is due.
+alter table public.profiles add column if not exists next_checkin date;   -- set by the client's app
+alter table public.profiles add column if not exists diet_plan jsonb;     -- the client's current diet plan
+create table if not exists public.push_subs (
+  endpoint text primary key,
+  client_id uuid not null references public.profiles (id) on delete cascade,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamptz not null default now(),
+  last_sent date
+);
+alter table public.push_subs enable row level security;
+drop policy if exists "own push" on public.push_subs;
+create policy "own push" on public.push_subs for all using (client_id = auth.uid()) with check (client_id = auth.uid());
+
+-- Diet plans QK edits: the coach writes, the client reads (and the app shows "Edited by QK").
+create table if not exists public.coach_plans (
+  client_id uuid primary key references public.profiles (id) on delete cascade,
+  coach_id uuid not null references public.profiles (id) on delete cascade,
+  plan jsonb not null,
+  note text,
+  updated_at timestamptz not null default now(),
+  notified_at timestamptz
+);
+alter table public.coach_plans enable row level security;
+drop policy if exists "coach writes plans" on public.coach_plans;
+create policy "coach writes plans" on public.coach_plans for all using (coach_id = auth.uid() and public.is_my_client(client_id)) with check (coach_id = auth.uid() and public.is_my_client(client_id));
+drop policy if exists "client reads own plan" on public.coach_plans;
+create policy "client reads own plan" on public.coach_plans for select using (client_id = auth.uid());
+
 -- Joining a coach: a client calls this with the coach's invite code. Returns the coach's name.
 create or replace function public.join_coach(code text) returns text
 language plpgsql security definer set search_path = public as $$

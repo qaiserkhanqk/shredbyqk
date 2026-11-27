@@ -1,0 +1,22 @@
+// Who gets a notification today, and the check-in date the phone reports.
+import { plan } from '../tools/push-checkins.mjs';
+import { nextCheckin } from '../js/sync.js';
+let fails = 0;
+const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${ok ? '' : '  ' + detail}`); if (!ok) fails++; };
+const day = '2026-11-27';
+const profiles = [{ id: 'a', name: 'Sara Khan', next_checkin: '2026-11-27' }, { id: 'b', name: 'Ali', next_checkin: '2026-11-20' }, { id: 'c', name: 'Zara', next_checkin: '2026-12-05' }];
+const subs = [{ client_id: 'a', endpoint: 'e1' }, { client_id: 'a', endpoint: 'e2', last_sent: day }, { client_id: 'b', endpoint: 'e3' }, { client_id: 'c', endpoint: 'e4' }];
+const plans = [{ client_id: 'c', note: 'Swapped rice for roti at dinner', updated_at: '2026-11-27T10:00:00Z', notified_at: null }, { client_id: 'b', updated_at: '2026-11-01T10:00:00Z', notified_at: '2026-11-01T18:00:00Z' }];
+const jobs = plan({ profiles: profiles.filter(p => p.next_checkin <= day), subs, plans, day });
+const by = k => jobs.filter(j => j.kind === k).map(j => j.sub.endpoint).sort().join();
+check('due today or overdue → check-in reminder', by('checkin') === 'e1,e3', by('checkin'));
+check('never twice the same day on one phone', !jobs.some(j => j.sub.endpoint === 'e2'));
+check('reminder uses their first name and opens Food', jobs.find(j => j.sub.endpoint === 'e1').msg.title === 'Check-in day, Sara' && jobs[0].msg.url === './?tab=food');
+check('a plan QK just edited → "QK updated your diet plan" with QK\'s note', by('plan') === 'e4' && jobs.find(j => j.kind === 'plan').msg.body === 'Swapped rice for roti at dinner');
+check('an old, already-notified plan → nothing', !jobs.some(j => j.kind === 'plan' && j.sub.endpoint === 'e3'));
+const DAY = 864e5, now = Date.UTC(2026, 10, 27, 9);
+const S = { food: { weights: [{ at: now - 20 * DAY, kg: 80 }], adapt: { lastAt: now - 10 * DAY } } };
+check('next check-in: 14 days after the last one', nextCheckin(S, now) === '2026-12-01', nextCheckin(S, now));
+check('overdue → today', nextCheckin({ food: { weights: [{ at: now - 30 * DAY, kg: 80 }], adapt: {} } }, now) === '2026-11-27');
+console.log(fails ? `\n${fails} failed` : '\nall push checks pass');
+process.exit(fails ? 1 : 0);

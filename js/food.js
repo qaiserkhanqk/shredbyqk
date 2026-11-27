@@ -17,6 +17,8 @@ import { portionFactor, factors, studyCSV, studySummary } from './calibrate.js';
 import { canSyncSteps, syncSteps } from './activity.js';
 import { searchFatSecret } from './fatsecret.js';
 import { t as tr, setLang, getLang, translate } from './food-ur.js';
+import { allWeights, checkinDue, daysToCheckin, evaluate, applyChoice, weighInIcs, weightSeries, RANGES, stepGoal } from './adapt.js';
+import { makePlan, planGap, DIETS, AVOID, LIKES, LIKE_LABELS, DEFAULT_ANSWERS } from './dietplan.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -27,6 +29,8 @@ let ctx; // { S, persist, toast, rehab: () => bool }
 let cur = null; // the sheet: { mode: 'food'|'place', ref, opts, name, official, onSave, saveLabel }
 let fsCache = { q: '', list: [] }, fsTimer = null;
 let mealPending = null, aiExtra = null, pendingPhoto = null; // parsed sentence waiting for "Add all"
+let wRange = '3m', decision = null; // weight chart range; the check-in being answered
+let planDraft = null; // questionnaire answers being edited, or null when the plan is showing
 let snap = null; // the last photo added: { dataUrl, ids, unsure, unknown, setting }
 
 const F = () => {
@@ -39,6 +43,7 @@ const byId = id => F().log.find(x => x.id === id);
 
 export function initFood(c) {
   ctx = c; F();
+  $('#foodPlan').onclick = onPlanClick;
   $('#foodSearch').oninput = () => renderResults();
   $('#foodResults').onclick = e => {
     const m = e.target.closest('[data-menu]');
@@ -79,6 +84,8 @@ export function initFood(c) {
     if (w) { const k = dayKey(Date.now()), W = F().water; W[k] = Math.max(0, (W[k] || 0) + +w.dataset.water); ctx.persist(); renderFood(); }
   };
   $('#foodWeek').onclick = onWeekClick;
+  $('#foodWeight').onclick = onWeightClick;
+  setInterval(checkinNotice, 30 * 60e3); document.addEventListener('visibilitychange', () => { if (!document.hidden) checkinNotice(); });
   $('#calInfo').onclick = e => { if (e.target.closest('#calExport')) download('shred-food-accuracy.csv', studyCSV(F().log), 'text/csv'); };
   loadSaved();
   setLang(F().lang); applyLang();
@@ -91,11 +98,13 @@ export function initFood(c) {
     if (e.target.id === 'fsGrams') { cur.opts.grams = Math.max(1, +e.target.value || 0); renderSheetResult(); }
     if (e.target.id === 'fsWeighed') { const g = +e.target.value; cur.weighedG = g > 0 ? g : null; if (g > 0) cur.opts.grams = g; else delete cur.opts.grams; renderSheetResult(); }
     if (e.target.id === 'plItem') renderSuggestions();
+    if (e.target.id === 'fsMenuKcal') { const k = +e.target.value; cur.official = k > 20 && k < 5000 ? menuOfficial(cur.ref, { ...cur.opts, servings: cur.opts.menuBase || 1 }, k) : null; renderSheetResult(); }
   };
   const p = ctx.S.profile;
   const pl = $('#tPlate'); pl.value = F().plateCm || ''; pl.onchange = () => { F().plateCm = pl.value; ctx.persist(); };
   const ct = $('#tCity'); ct.value = F().city || ''; ct.onchange = () => { F().city = ct.value; ctx.persist(); };
-  for (const [id, key] of [['#tWeight', 'weightKg'], ['#tAge', 'age'], ['#tGoal', 'dietGoal'], ['#tActivity', 'activity']]) {
+  if (p.trainDays == null && ctx.S.plan?.days?.length) p.trainDays = ctx.S.plan.days.length; // from the training plan picked at sign-up
+  for (const [id, key] of [['#tWeight', 'weightKg'], ['#tAge', 'age'], ['#tGoal', 'dietGoal'], ['#tJob', 'job'], ['#tTrain', 'trainDays']]) {
     const el = $(id); el.value = key === 'dietGoal' ? N.dietGoal(p) : p[key] ?? el.value;
     el.onchange = () => { p[key] = el.value; ctx.persist(); renderFood(); };
   }
@@ -142,6 +151,8 @@ export function renderFood() {
         <span class="r data">${fmt(e.kcal)}</span></button>
         <button type="button" class="linkbtn del" data-del="${e.id}" aria-label="Remove ${esc(e.name)}">✕</button></div>`).join('');
   }).join('') : '<p class="muted small" style="margin:0">Nothing logged yet. Snap your meal, or search a dish or a place.</p>';
+  renderWeight();
+  renderPlan();
   renderWeek();
 }
 
@@ -207,7 +218,15 @@ function openSheet(ref, opts, onSave, saveLabel, extra = {}) {
   $('#foodSheet').hidden = false;
 }
 function openMenuItem(place, item) {
-  openSheet({ t: 'dish', id: item.dish }, { ...item.opts, menuBase: item.opts.servings || 1 }, null, null, { name: `${place.name} · ${item.name}`, official: item.official && { ...item.official, base: item.opts.servings || 1 }, place: place.name + (place.city ? `, ${place.area ? place.area + ', ' : ''}${place.city}` : '') });
+  // Calories a client read off the menu (UAE menus must show them) count as official for that item from then on.
+  const menuKey = `${place.id}|${item.name}`, saw = !item.official && F().menuKcal?.[menuKey];
+  const official = item.official ? { ...item.official, base: item.opts.servings || 1 } : saw ? menuOfficial({ t: 'dish', id: item.dish }, item.opts, saw.kcal) : null;
+  openSheet({ t: 'dish', id: item.dish }, { ...item.opts, menuBase: item.opts.servings || 1 }, null, null, { name: `${place.name} · ${item.name}`, official, place: place.name + (place.city ? `, ${place.area ? place.area + ', ' : ''}${place.city}` : ''), menuKey: item.official ? null : menuKey, placeName: place.name, itemName: item.name, chainOfficial: !!item.official });
+}
+// The menu's calories, split into protein, carbs and fat the way the dish model splits them.
+function menuOfficial(ref, opts, kcal) {
+  const e = N.estimate(ref, { ...opts, servings: opts.servings || 1 }), k = kcal / e.kcal, r1 = v => Math.round(v * k * 10) / 10;
+  return { kcal, protein: r1(e.protein), carbs: r1(e.carbs), fat: r1(e.fat), source: 'the menu (entered by you)', fromMenu: true, base: opts.servings || 1 };
 }
 function closeSheet() { scanStop?.(); $('#foodSheet').hidden = true; cur = null; }
 
@@ -216,7 +235,7 @@ const seg = (key, items, val) => `<div class="seg fseg" data-key="${key}" role="
 function renderSheet() {
   const { ref, hit, opts } = cur, d = ref.t === 'dish' ? hit.food : null;
   const title = cur.name || hit.name;
-  const eyebrow = cur.official ? `${esc(cur.place || '')} · official values (${esc(cur.official.source)})` : cur.place ? `${esc(cur.place)} · QK estimate from the recipe` : ref.t === 'dish' ? 'Desi model · computed from ingredients' : ref.t === 'indb' ? 'Indian Nutrient Databank' : ref.t === 'bc' ? (hit.food.source === 'FatSecret' ? 'FatSecret (live search)' : 'Packaged food · label values (Open Food Facts)') : 'Ingredient (USDA)';
+  const eyebrow = cur.official?.fromMenu ? `${esc(cur.place || '')} · calories from the menu` : cur.official ? `${esc(cur.place || '')} · official values (${esc(cur.official.source)})` : cur.place ? `${esc(cur.place)} · QK estimate from the recipe` : ref.t === 'dish' ? 'Desi model · computed from ingredients' : ref.t === 'indb' ? 'Indian Nutrient Databank' : ref.t === 'bc' ? (hit.food.source === 'FatSecret' ? 'FatSecret (live search)' : 'Packaged food · label values (Open Food Facts)') : 'Ingredient (USDA)';
   let html = `<div class="grab"></div><div><span class="eyebrow">${eyebrow}</span><h2 class="display h2" style="margin-top:6px">${esc(title)}</h2></div>`;
   // "Roti" can mean a naan or a roghni naan: one tap to say which one.
   const fam = N.family(d);
@@ -233,6 +252,8 @@ function renderSheet() {
   }
   if (cur.weigh) html += `<label class="field">Weighed it? Plate contents in grams (optional)<input id="fsWeighed" type="number" inputmode="decimal" placeholder="e.g. 260" value="${cur.weighedG || ''}"></label>
     <p class="muted small fq-why" style="margin-top:-6px">Weigh a few photo meals and QK learns your portion sizes, so every photo after that is closer.</p>`;
+  if (cur.menuKey) html += `<label class="field">${tr('Menu shows calories?')} (optional)<input id="fsMenuKcal" type="number" inputmode="numeric" placeholder="e.g. 550" value="${cur.official?.fromMenu ? cur.official.kcal : ''}"></label>
+    <p class="muted small fq-why" style="margin-top:-6px">In the UAE, chain menus must show calories. Type the number and QK uses it, for you now and next time. QK reviews it too.</p>`;
   html += `<div id="fsResult"></div><button type="button" class="cta" id="fsSave">${esc(tr(cur.saveLabel || 'Add to ' + N.mealOf().toLowerCase()))}</button>`;
   $('#foodSheetBody').innerHTML = html;
   const top = $('#fsTop'); if (top) top.onchange = () => { cur.opts.topping = top.checked; renderSheetResult(); };
@@ -257,7 +278,7 @@ function renderSheetResult() {
     <div class="macros"><div><b class="num">${r0(e.protein)}</b><span>protein g</span></div><div><b class="num">${r0(e.carbs)}</b><span>carbs g</span></div><div><b class="num">${r0(e.fat)}</b><span>fat g</span></div><div><b class="num">${r0(e.fibre)}</b><span>fibre g</span></div></div>
     <div class="split" aria-label="Where the calories come from"><i class="sf" style="width:${pf}%"></i><i class="sm" style="width:${pm}%"></i><i class="sr" style="width:${Math.max(0, 100 - pf - pm)}%"></i></div>
     <p class="muted small" style="margin:0">${d && e.fatGrams > 0 ? `${e.fatLabel}: ${r0(e.fatGrams)} g, ${r0(pf)}% of the calories. ` : `Fat gives ${r0(pf)}% of the calories. `}${pm > 0 ? `Meat or protein: ${r0(pm)}%.` : ''}</p>
-    ${cur.official ? `<p class="muted small" style="margin:0">Published by the chain for ${esc(cur.official.source)}. No chain publishes Pakistan values yet, and portions here can differ, so the range is ±10%.</p>` : ''}
+    ${cur.official?.fromMenu ? '<p class="muted small" style="margin:0">From the calories on the menu. Protein, carbs and fat are split the way this dish usually is.</p>' : cur.official ? `<p class="muted small" style="margin:0">Published by the chain for ${esc(cur.official.source)}. No chain publishes Pakistan values yet, and portions here can differ, so the range is ±10%.</p>` : ''}
     ${e.fried ? '<p class="warn-note small">This recipe counts all the frying oil as eaten, so it reads too high. For samosas, pakoray and puris use the Desi model instead.</p>' : ''}`;
 }
 
@@ -288,6 +309,7 @@ function onSheetClick(e) {
       if (N.DISH[ref.id].sizes) pr.size = opts.size;
       if (N.DISH[ref.id].topping) pr.topping = opts.topping;
     }
+    if (cur.menuKey && cur.official?.fromMenu) (F().menuKcal ||= {})[cur.menuKey] = { kcal: cur.official.kcal, place: cur.placeName, item: cur.itemName, dish: ref.id, at: Date.now() };
     const save = cur.onSave, extra = { name: cur.name, official: cur.official, weighedG: cur.weighedG };
     if (save) save({ ...opts }, ref, extra); else { addEntry(ref, opts, cur.place ? 'place' : 'search', extra); ctx.toast('Added'); $('#foodSearch').value = ''; renderResults(); }
     ctx.persist(); closeSheet(); renderFood();
@@ -483,10 +505,7 @@ function report() {
 }
 function renderWeek() {
   const r = report(), el = $('#foodWeek');
-  const lastW = F().weights.slice(-1)[0];
-  const weigh = `<div class="weigh"><label class="field">Weigh-in (kg)<input id="wkKg" type="number" inputmode="decimal" step="0.1" placeholder="${lastW ? lastW.kg : 'e.g. 72.5'}"></label><button type="button" class="ghost" id="wkSave">Save</button></div>
-    <p class="muted small" style="margin:0">${lastW ? `Last: ${lastW.kg} kg on ${new Date(lastW.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}. ` : ''}Weigh in on the same morning each week, before breakfast.</p>`;
-  if (!r.enough) { el.innerHTML = `<div class="card-head"><div><span class="eyebrow">Your week</span><h2 class="display h2">QK's food report</h2></div></div><p class="muted small" style="margin:0 0 12px">${esc(r.line)}</p>${weigh}`; return; }
+  if (!r.enough) { el.innerHTML = `<div class="card-head"><div><span class="eyebrow">Your week</span><h2 class="display h2">QK's food report</h2></div></div><p class="muted small" style="margin:0">${esc(r.line)}</p>`; return; }
   const A = r.avg;
   el.innerHTML = `<div class="card-head"><div><span class="eyebrow">Your week · ${r.logged} days logged</span><h2 class="display h2">${tr("QK's food report")}</h2></div></div>
     <div class="wk-stats"><div><b class="num">${fmt(A.kcal)}</b><span>kcal / day</span></div><div><b class="num">${fmt(A.protein)}</b><span>protein g</span></div><div><b class="num">${fmt(A.vegFruit)}</b><span>veg + fruit g</span></div><div><b class="num">${r.water.avg === null ? '–' : fmt(r.water.avg)}</b><span>glasses</span></div></div>
@@ -494,16 +513,9 @@ function renderWeek() {
     ${r.focus.length ? `<div class="wk-block"><span class="eyebrow">${tr('For next week')}</span>${r.focus.map(f => `<div class="focus"><b>${esc(f.title)}</b><p>${esc(f.why)}</p><p class="tip">${esc(f.tip)}</p>${f.nutrients ? `<div class="nut">${f.nutrients.map(n => `<span class="ftag">${esc(n)}</span>`).join('')}</div>` : ''}</div>`).join('')}</div>` : ''}
     ${r.notes.length ? `<div class="wk-block"><span class="eyebrow">${tr('Worth knowing')}</span>${r.notes.map(n => `<p class="muted small" style="margin:4px 0 0">${esc(n)}</p>`).join('')}</div>` : ''}
     <p class="qk-line"><span class="eyebrow">QK</span> ${esc(r.line)}</p>
-    <button type="button" class="ghost full" id="wkShare">${tr('Send my week to QK')}</button>
-    ${weigh}`;
+    <button type="button" class="ghost full" id="wkShare">${tr('Send my week to QK')}</button>`;
 }
 async function onWeekClick(e) {
-  if (e.target.closest('#wkSave')) {
-    const kg = +$('#wkKg').value;
-    if (!(kg > 25 && kg < 350)) return ctx.toast('Enter your weight in kg');
-    F().weights.push({ at: Date.now(), kg }); ctx.S.profile.weightKg = kg; $('#tWeight').value = kg;
-    ctx.persist(); ctx.toast('Weight saved'); renderFood();
-  }
   if (e.target.closest('#wkShare')) {
     const text = reportText(report(), ctx.S.profile.name);
     try { if (navigator.share) { await navigator.share({ text }); return; } } catch (err) { if (err?.name === 'AbortError') return; }
@@ -577,4 +589,143 @@ function applyLang() {
   for (const el of [$('#food'), $('#foodSheet')]) { el.dir = ur ? 'rtl' : 'ltr'; el.classList.toggle('ur', ur); }
   $('#foodLang').textContent = ur ? 'English' : 'اردو';
   translate($('#food'));
+}
+
+/* ---------- Diet plan ---------- */
+// The client answers QK's questionnaire once (diet, meals a day, what they like and avoid) and gets a plan
+// with exact amounts for their calories and macros. Every option of a meal is the same size, so they can
+// swap freely, and "I ate this" logs the exact grams.
+const planHash = t => t ? `${t.kcal}|${t.protein}|${t.carbs}|${t.fat}` : '';
+function renderPlan() {
+  const box = $('#foodPlan'), t = N.targets(ctx.S.profile), plan = F().plan;
+  if (!t) { box.innerHTML = `<div class="card-head"><b>${tr('Your diet plan')}</b></div><p class="muted small" style="margin:0">Add your weight and age under <b>Your targets</b> and QK builds a plan with exact amounts for you.</p>`; return; }
+  if (planDraft || !plan) return renderPlanForm(box, planDraft || F().planAnswers || structuredClone(DEFAULT_ANSWERS), !plan);
+  const gap = planGap(plan), stale = !plan.byCoach && planHash(plan.target) !== planHash(t);
+  const chip = (k, label) => `<span class="data">${label} ${fmt(plan.day[k])}${k === 'kcal' ? ' kcal' : ' g'}</span>${Math.abs(gap[k]) > 5 ? ` <span class="muted">(${gap[k] > 0 ? '+' : ''}${gap[k]}%)</span>` : ''}`;
+  box.innerHTML = `<div class="card-head"><b>${tr('Your diet plan')}</b>${plan.byCoach ? '<span class="ftag">Edited by QK</span>' : `<button type="button" class="linkbtn" data-plan="edit">${tr('Change answers')}</button>`}</div>
+    ${plan.byCoach && plan.note ? `<p class="qk-line" style="margin:0"><span class="eyebrow">QK</span> ${esc(plan.note)}</p>` : ''}
+    <p class="muted small" style="margin:0">${chip('kcal', '')} · ${chip('protein', 'P')} · ${chip('carbs', 'C')} · ${chip('fat', 'F')}<br>Target ${fmt(t.kcal)} kcal · P ${t.protein} · C ${t.carbs} · F ${t.fat} g. Pick one option per meal: they're the same size.</p>
+    ${stale ? `<div class="plan-stale"><span class="small">Your targets changed since this plan was made.</span><button type="button" class="ghost" data-plan="refresh">Update the amounts</button></div>` : ''}
+    ${plan.meals.map((m, mi) => `<div class="plan-meal"><div class="meal-head"><span class="eyebrow">${tr(m.name)}</span><span class="data small">${fmt(m.target.kcal)} kcal</span></div>
+      ${m.options.map((o, oi) => `<div class="plan-opt"><div class="row"><b>${m.options.length > 1 ? `${'ABC'[oi]}. ` : ''}${esc(o.title)}</b><span class="data small">${fmt(o.total.kcal)} kcal · P ${r0(o.total.protein)}</span></div>
+        <ul>${o.items.map(it => `<li><span>${esc(it.name)}</span><span class="data">${esc(it.amountLabel)}</span></li>`).join('')}</ul>
+        <button type="button" class="ghost" data-plan="log" data-m="${mi}" data-o="${oi}">${tr('I ate this')}</button></div>`).join('') || '<p class="muted small">Nothing fits your answers for this meal. Try adding a few foods you like.</p>'}
+    </div>`).join('')}
+    ${plan.byCoach ? '' : '<div class="row" style="gap:8px"><button type="button" class="ghost" data-plan="new">Show me other options</button></div>'}
+    <p class="muted small" style="margin:0">Raw weights are before cooking; cook meat in the oil listed. Amounts come from USDA values and QK's home-cooking recipes.</p>`;
+}
+function renderPlanForm(box, a, first) {
+  const chips = (attr, list, on) => `<div class="chips-wrap">${list.map(([id, label]) => `<button type="button" class="mchip ${on(id) ? 'on' : ''}" data-${attr}="${id}" aria-pressed="${!!on(id)}">${esc(label)}</button>`).join('')}</div>`;
+  const likes = kind => chips('plike', LIKES[kind].map(id => [`${kind}|${id}`, LIKE_LABELS[id]]), k => a.likes[kind].includes(k.split('|')[1]));
+  planDraft = a;
+  box.innerHTML = `<div class="card-head"><b>${tr('Your diet plan')}</b>${first ? '' : '<button type="button" class="linkbtn" data-plan="cancel">Cancel</button>'}</div>
+    <p class="muted small" style="margin:0">Tell QK what you like eating. Your plan gets exact amounts for your calories, protein, carbs and fat.</p>
+    <div class="fq"><span class="eyebrow">What do you eat?</span>${chips('pdiet', DIETS.map(d => [d.id, d.label]), id => a.diet === id)}</div>
+    <div class="fq"><span class="eyebrow">Meals a day</span>${chips('pmeals', [[3, '3 meals'], [4, '3 meals + a snack'], [5, '3 meals + 2 snacks']], id => +a.meals === +id)}</div>
+    <div class="fq"><span class="eyebrow">Breakfast you like</span>${likes('breakfast')}</div>
+    <div class="fq"><span class="eyebrow">Lunch and dinner you like</span>${likes('main')}</div>
+    ${+a.meals > 3 ? `<div class="fq"><span class="eyebrow">Snacks you like</span>${likes('snack')}</div>` : ''}
+    <div class="fq"><span class="eyebrow">Anything you can't eat?</span>${chips('pavoid', AVOID.map(x => [x.id, x.label]), id => a.avoid.includes(id))}</div>
+    <button type="button" class="cta full" data-plan="make">${tr('Make my plan')}</button>`;
+}
+function onPlanClick(e) {
+  const b = e.target.closest('button'); if (!b) return;
+  const a = planDraft, d = b.dataset;
+  const toggle = (arr, v) => { const i = arr.indexOf(v); if (i >= 0) arr.splice(i, 1); else arr.push(v); };
+  if (a && d.pdiet) { a.diet = d.pdiet; return renderPlan(); }
+  if (a && d.pmeals) { a.meals = +d.pmeals; return renderPlan(); }
+  if (a && d.pavoid) { toggle(a.avoid, d.pavoid); return renderPlan(); }
+  if (a && d.plike) { const [k, id] = d.plike.split('|'); toggle(a.likes[k], id); return renderPlan(); }
+  const t = N.targets(ctx.S.profile);
+  if (d.plan === 'make') {
+    F().planAnswers = a; F().plan = makePlan(a, t, 0); planDraft = null; ctx.persist(); renderPlan();
+    ctx.toast('Your plan is ready'); return;
+  }
+  if (d.plan === 'edit') { planDraft = structuredClone(F().planAnswers || DEFAULT_ANSWERS); return renderPlan(); }
+  if (d.plan === 'cancel') { planDraft = null; return renderPlan(); }
+  if (d.plan === 'new' || d.plan === 'refresh') {
+    const seed = (F().plan?.seed || 0) + (d.plan === 'new' ? 1 : 0);
+    F().plan = makePlan(F().planAnswers || DEFAULT_ANSWERS, t, seed); ctx.persist(); return renderPlan();
+  }
+  if (d.plan === 'log') {
+    const o = F().plan.meals[+d.m].options[+d.o];
+    o.items.forEach(it => addEntry(it.ref, it.opts, 'plan', { name: it.name }));
+    ctx.toast(`${o.title} logged`); renderFood();
+  }
+}
+
+/* ---------- Weight: the graph, weigh-ins and the two-weekly check-in ---------- */
+const avgStepsNow = () => { const v = Object.entries(F().steps).filter(([k]) => Date.parse(k) > Date.now() - 14 * 864e5).map(([, n]) => +n).filter(n => n > 0); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0; };
+const adaptState = () => (F().adapt ||= {});
+function currentDecision() {
+  const p = ctx.S.profile;
+  return evaluate({ weights: allWeights(ctx.S), goal: N.dietGoal(p), target: N.targets(p), adapt: adaptState(), avgSteps: avgStepsNow(), rehab: !!ctx.rehab?.() });
+}
+function chartSVG(ser) {
+  const W = 320, H = 140, P = 8, pts = ser.pts;
+  if (pts.length < 2) return '';
+  const xs = pts.map(p => p.at), ys = [...pts, ...ser.smooth].map(p => p.kg);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), lo = Math.min(...ys) - 0.5, hi = Math.max(...ys) + 0.5;
+  const X = t => P + (t - x0) / Math.max(1, x1 - x0) * (W - 2 * P), Y = kg => H - P - (kg - lo) / (hi - lo) * (H - 2 * P);
+  const line = arr => arr.map((p, i) => `${i ? 'L' : 'M'}${X(p.at).toFixed(1)},${Y(p.kg).toFixed(1)}`).join('');
+  const d = t => new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', ...(x1 - x0 > 300 * 864e5 ? { year: '2-digit' } : {}) });
+  return `<svg class="wchart" viewBox="0 0 ${W} ${H + 16}" role="img" aria-label="Weight from ${pts[0].kg} kg to ${pts[pts.length - 1].kg} kg">
+    <path d="${line(ser.smooth)}" class="trend"/>${pts.map(p => `<circle cx="${X(p.at).toFixed(1)}" cy="${Y(p.kg).toFixed(1)}" r="${pts.length > 25 ? 1.6 : 2.6}" opacity="${pts.length > 25 ? 0.45 : 1}"/>`).join('')}
+    <text x="${P}" y="${H + 13}">${d(x0)}</text><text x="${W - P}" y="${H + 13}" text-anchor="end">${d(x1)}</text>
+    <text x="${P}" y="12" class="lab">${hi.toFixed(1)}</text><text x="${P}" y="${H - P - 2}" class="lab">${lo.toFixed(1)}</text></svg>`;
+}
+function renderWeight() {
+  const box = $('#foodWeight'), ws = allWeights(ctx.S), A = adaptState(), last = ws[ws.length - 1];
+  const ser = weightSeries(ws, wRange), due = checkinDue(ws, A);
+  const fmtKg = v => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v)} kg`;
+  const p = ctx.S.profile, t = N.targets(p);
+  if (due && !decision && last && last.at > Date.now() - 2 * 864e5) decision = currentDecision();
+  const ci = decision && decision.kind !== 'weigh' ? `<div class="checkin"><span class="eyebrow">QK check-in</span><b>${esc(decision.title)}</b><p class="small">${esc(decision.message)}</p>
+      ${decision.choices.map(c => `<button type="button" class="${c.id === decision.choices[0].id ? 'cta' : 'ghost'} full" data-choice="${c.id}">${esc(c.label)}</button>`).join('')}
+      ${decision.choices.length ? '' : '<button type="button" class="ghost full" data-choice="ok">OK</button>'}</div>`
+    : due ? `<div class="checkin"><span class="eyebrow">QK check-in</span><b>${ws.length ? 'Check-in day' : 'Your first weigh-in'}</b><p class="small">Weigh yourself in the morning, after the toilet and before breakfast, and enter it below. Every two weeks QK reads your progress and suggests your next step.</p></div>` : '';
+  box.innerHTML = `<div class="card-head"><b>${tr('Your weight')}</b>${last ? `<span class="data">${last.kg} kg</span>` : ''}</div>
+    ${ci}
+    ${ser.pts.length > 1 ? `<div class="seg wrange" role="group" aria-label="Range">${RANGES.map(r => `<button type="button" data-range="${r.id}" class="${r.id === wRange ? 'on' : ''}" aria-pressed="${r.id === wRange}">${r.label}</button>`).join('')}</div>
+      ${chartSVG(ser)}
+      <p class="muted small" style="margin:0">${ser.change != null ? `${fmtKg(ser.change)} in ${ser.days} days` : ''}${ser.sinceStart != null && wRange !== 'all' ? ` · ${fmtKg(ser.sinceStart)} since you started (${new Date(ser.startAt).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })})` : ''}</p>`
+      : ws.length ? '<p class="muted small" style="margin:0">Your graph starts with your second weigh-in.</p>' : ''}
+    <div class="weigh"><label class="field">Weigh-in (kg)<input id="wkKg" type="number" inputmode="decimal" step="0.1" placeholder="${last ? last.kg : 'e.g. 72.5'}"></label><button type="button" class="ghost" id="wkSave">Save</button></div>
+    <p class="muted small" style="margin:0">${due ? '' : `Next check-in in ${daysToCheckin(ws, A)} day${daysToCheckin(ws, A) === 1 ? '' : 's'}. `}Step goal: <b>${fmt(stepGoal(A, avgStepsNow()))}</b> a day${t?.adjust ? ` · calories ${t.adjust > 0 ? '+' : '−'}${Math.abs(t.adjust)} from your check-ins` : ''}.
+      <button type="button" class="linkbtn" id="wkCal">Add check-in reminders to my calendar</button></p>`;
+}
+function onWeightClick(e) {
+  const r = e.target.closest('[data-range]'); if (r) { wRange = r.dataset.range; return renderWeight(); }
+  if (e.target.closest('#wkSave')) {
+    const kg = +$('#wkKg').value;
+    if (!(kg > 25 && kg < 350)) return ctx.toast('Enter your weight in kg');
+    F().weights.push({ at: Date.now(), kg }); ctx.S.profile.weightKg = kg; $('#tWeight').value = kg;
+    decision = checkinDue(allWeights(ctx.S), adaptState()) ? currentDecision() : null;
+    ctx.persist(); ctx.toast('Weight saved'); return renderFood();
+  }
+  const c = e.target.closest('[data-choice]');
+  if (c && decision) {
+    const ws = allWeights(ctx.S), chosen = applyChoice({ profile: ctx.S.profile, adapt: adaptState(), decision, choiceId: c.dataset.choice, weight: ws[ws.length - 1]?.kg });
+    decision = null; ctx.persist();
+    ctx.toast(chosen.delta ? `New target: ${fmt(N.targets(ctx.S.profile).kcal)} kcal a day` : chosen.steps ? `New step goal: ${fmt(chosen.steps)} a day` : 'Got it. Same plan for two more weeks.');
+    if (F().plan && !F().plan.byCoach && chosen.delta) F().plan = makePlan(F().planAnswers || DEFAULT_ANSWERS, N.targets(ctx.S.profile), F().plan.seed || 0);
+    return renderFood();
+  }
+  if (e.target.closest('#wkCal')) {
+    const url = URL.createObjectURL(new Blob([weighInIcs(Date.now(), location.href.split('#')[0].split('?')[0])], { type: 'text/calendar' }));
+    const a = document.createElement('a'); a.href = url; a.download = 'shred-qk-check-ins.ics'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000); ctx.toast('Open the file to add it to your calendar.');
+  }
+}
+// While the app is open on a check-in day, a notification (once a day) if they turned notifications on.
+async function checkinNotice() {
+  if (!ctx.S.profile.remind || !('Notification' in window) || Notification.permission !== 'granted') return;
+  const A = adaptState(), today = new Date().toDateString();
+  if (!checkinDue(allWeights(ctx.S), A) || A.notifiedOn === today || new Date().getHours() < 7) return;
+  const title = 'Check-in day with QK', body = 'Weigh yourself before breakfast and enter it in Food. QK will read your two weeks and suggest your next step.';
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration?.();
+    reg ? reg.showNotification(title, { body, icon: 'icons/icon.svg', tag: 'qk-checkin' }) : new Notification(title, { body, tag: 'qk-checkin' });
+    A.notifiedOn = today; ctx.persist();
+  } catch {}
 }

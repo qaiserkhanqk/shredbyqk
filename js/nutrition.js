@@ -79,6 +79,27 @@ export const ING = {
   iceCream: ['Ice cream', 207, 3.5, 24, 11, 0.7],
   orange: ['Orange (malta / kinnow)', 47, 0.9, 11.8, 0.1, 2.4],
   guava: ['Guava (amrood)', 68, 2.6, 14.3, 1, 5.4],
+  // Gulf and Levantine kitchens (USDA SR Legacy unless noted)
+  tahini: ['Tahini (sesame paste)', 595, 17, 21.2, 53.8, 9.3],
+  favaCooked: ['Fava beans (foul), cooked', 110, 7.6, 19.7, 0.4, 5.4],
+  eggplant: ['Eggplant (baingan)', 25, 1, 5.9, 0.2, 3],
+  parsley: ['Parsley, mint and herbs', 36, 3, 6.3, 0.8, 3.3],
+  pita: ['Arabic bread (khubz / pita)', 275, 9.1, 55.7, 1.2, 2.2],
+  lamb: ['Lamb, raw (lean and fat)', 230, 18, 0, 17, 0],
+  evapMilk: ['Evaporated milk', 134, 6.8, 10, 7.6, 0],
+  dateSyrup: ['Date syrup (dibs)', 290, 1.5, 72, 0.2, 1], // label values of common UAE brands
+  crisps: ['Potato crisps (Chips Oman)', 536, 7, 53, 35, 4.4],
+  condensedMilk: ['Sweetened condensed milk', 321, 7.9, 54.4, 8.7, 0],
+  garlic: ['Garlic', 149, 6.4, 33, 0.5, 2.1],
+  coconut: ['Coconut, fresh', 354, 3.3, 15.2, 33.5, 9],
+  // For diet plans (USDA SR Legacy): foods weighed as eaten.
+  eggWhite: ['Egg white', 52, 10.9, 0.7, 0.2, 0],
+  riceCooked: ['Rice, white/basmati, cooked', 130, 2.7, 28.2, 0.3, 0.4],
+  brownBread: ['Brown (whole-wheat) bread', 252, 12.4, 42.7, 3.5, 6],
+  cornflakes: ['Cornflakes', 357, 7.5, 84.1, 0.4, 3.3],
+  milkLow: ['Milk, low fat (1%)', 42, 3.4, 5, 1, 0],
+  greekYogurt: ['Greek yogurt, low fat', 73, 10, 3.9, 1.9, 0],
+  peanutButter: ['Peanut butter', 588, 25, 20, 50, 6],
 };
 const FATS = { oil: 'Oil', ghee: 'Ghee', butter: 'Butter' };
 
@@ -274,10 +295,66 @@ export const DISHES = [
   D('raita', 'Raita', 'raita yogurt', 'side', 'katori', 100, null, [['dahi', 90], ['cucumber', 15]], NOFAT),
   D('dahi', 'Dahi (plain yogurt)', 'yogurt curd', 'side', 'katori', 150, null, [['dahi', 150]], NOFAT),
   D('salad', 'Salad (kachumber)', 'salad kachumber', 'side', 'plate', 100, null, [['tomato', 40], ['onion', 30], ['cucumber', 30]], NOFAT),
+  // UAE and the Gulf: Emirati, Yemeni/Saudi rice, Levantine, Iranian, cafeteria. Serving sizes follow
+  // typical UAE restaurant plates; build-ups checked against published values where they exist
+  // (Saudi MOH, FatSecret, USDA hummus/tabbouleh) — see docs/NUTRITION.md.
+  D('chicken_mandi', 'Chicken mandi (quarter chicken)', 'mandi mendi yemeni chicken mandi rice', 'rice', 'plate', 450, ['chicken', 150], [['rice', 100], ['onion', 15], ['nuts', 5], ['spices', 4]], F('ghee', 12, 18, 25)),
+  D('lamb_mandi', 'Lamb mandi', 'mandi lamb laham mandi madfoon lamb', 'rice', 'plate', 450, ['lamb', 160], [['rice', 100], ['onion', 15], ['nuts', 5], ['spices', 4]], F('ghee', 15, 22, 30)),
+  D('chicken_machboos', 'Chicken machboos', 'machboos majboos emirati chicken rice', 'rice', 'plate', 450, ['chicken', 150], [['rice', 100], ['onion', 30], ['tomato', 30], ['spices', 5]], F('ghee', 10, 15, 20)),
+  D('lamb_machboos', 'Lamb machboos', 'machboos lamb majboos laham', 'rice', 'plate', 450, ['lamb', 150], [['rice', 100], ['onion', 30], ['tomato', 30], ['spices', 5]], F('ghee', 12, 18, 24)),
+  D('fish_machboos', 'Fish machboos', 'machboos samak fish rice hamour kingfish', 'rice', 'plate', 450, ['fish', 140], [['rice', 100], ['onion', 30], ['tomato', 30], ['spices', 5]], F('oil', 10, 15, 20)),
+  D('chicken_kabsa', 'Chicken kabsa', 'kabsa kabsah saudi chicken rice', 'rice', 'plate', 450, ['chicken', 150], [['rice', 100], ['tomato', 40], ['onion', 20], ['nuts', 5], ['spices', 4]], F('oil', 10, 15, 20)),
+  D('chelo_rice', 'Chelo rice with butter', 'chelo kabab rice persian rice iranian', 'rice', 'plate', 300, null, [['rice', 100]], F('butter', 8, 12, 15)),
+  D('harees', 'Harees (Emirati)', 'harees harris emirati wheat chicken', 'curry', 'bowl', 250, ['chicken', 60], [['dalia', 55]], F('ghee', 6, 10, 14)),
+  D('hummus', 'Hummus', 'hummus houmous humus chickpea dip', 'side', 'plate', 150, null, [['kabuli', 35], ['tahini', 20], ['spices', 2]], F('oil', 8, 12, 15)),
+  D('mutabbal', 'Mutabbal (moutabal)', 'mutabbal moutabal baba ghanoush eggplant dip', 'side', 'plate', 150, null, [['eggplant', 120], ['tahini', 15], ['dahi', 15]], F('oil', 5, 10, 12)),
+  D('labneh', 'Labneh', 'labneh labne labna', 'side', 'plate', 100, null, [['greekYogurt', 80], ['cream', 15]], F('oil', 6, 10, 12)),
+  D('foul_medames', 'Foul medames', 'foul ful medames fava beans', 'curry', 'bowl', 250, null, [['favaCooked', 180], ['tahini', 5], ['tomato', 20], ['spices', 2]], F('oil', 8, 12, 15)),
+  D('fattoush', 'Fattoush', 'fattoush fatoush salad', 'side', 'bowl', 250, null, [['cucumber', 60], ['tomato', 60], ['cabbage', 50], ['parsley', 20], ['pita', 20]], F('oil', 10, 15, 18)),
+  D('tabbouleh', 'Tabbouleh', 'tabbouleh tabouli taboule', 'side', 'bowl', 200, null, [['parsley', 100], ['tomato', 50], ['dalia', 15], ['onion', 10]], F('oil', 10, 15, 18)),
+  D('falafel', 'Falafel (piece)', 'falafel falafil tamiya', 'fried', 'piece', 20, null, [['kabuli', 8], ['onion', 3], ['spices', 1]], F('oil', 3, 4, 5)),
+  D('falafel_sandwich', 'Falafel sandwich', 'falafel wrap falafel sandwich', 'street', 'wrap', 200, null, [['pita', 70], ['kabuli', 30], ['tahini', 10], ['cabbage', 30], ['tomato', 20]], F('oil', 10, 14, 18)),
+  D('kibbeh', 'Kibbeh (fried, piece)', 'kibbeh kubba kibbe', 'fried', 'piece', 60, ['lamb', 20], [['dalia', 20], ['onion', 5], ['nuts', 3]], F('oil', 5, 6, 8)),
+  D('shish_tawook', 'Shish tawook (skewer)', 'shish tawook tawouk taouk chicken skewer', 'bbq', 'skewer', 120, ['chickenBreast', 170], [['dahi', 15], ['spices', 3]], F('oil', 5, 8, 10)),
+  D('mixed_grill', 'Mixed grill (platter, meat only)', 'mixed grill arabic grill kofta tikka tawook platter', 'bbq', 'platter', 350, ['chickenBreast', 170], [['lamb', 100], ['beefMince', 100], ['onion', 20], ['spices', 4]], F('oil', 10, 15, 20)),
+  D('koobideh_kebab', 'Koobideh kebab (skewer)', 'koobideh kubideh kabab persian kebab', 'bbq', 'skewer', 100, ['beefMince', 130], [['onion', 10], ['spices', 2]], NOFAT),
+  D('joojeh_kebab', 'Joojeh kebab (skewer)', 'joojeh jujeh chicken kabab saffron', 'bbq', 'skewer', 200, ['chickenBreast', 250], [['spices', 3]], F('butter', 8, 10, 14)),
+  D('manakish_zaatar', 'Manakish zaatar', 'manakish manakeesh manaeesh zaatar zatar', 'bread', 'piece', 120, null, [['maida', 60], ['sesame', 5]], F('oil', 8, 10, 12)),
+  D('manakish_cheese', 'Manakish cheese', 'manakish cheese akkawi jibneh', 'bread', 'piece', 150, null, [['maida', 60], ['mozzarella', 50]], F('oil', 4, 5, 6)),
+  D('manakish_meat', 'Lahm bi ajeen (meat manakish)', 'lahm bi ajeen lahmacun meat manakish', 'bread', 'piece', 150, ['beefMince', 50], [['maida', 60], ['onion', 10], ['tomato', 10]], F('oil', 6, 8, 10)),
+  D('khameer', 'Khameer bread', 'khameer khamir emirati bread', 'bread', 'bread', 80, null, [['maida', 50], ['sugar', 5]], F('ghee', 4, 5, 6)),
+  D('khubz', 'Khubz / Arabic bread', 'khubz khubus kuboos pita arabic bread lebanese bread', 'bread', 'piece', 70, null, [['pita', 70]], NOFAT),
+  D('regag', 'Regag (plain)', 'regag rigag emirati thin bread', 'bread', 'sheet', 60, null, [['maida', 40]], F('ghee', 2, 3, 4)),
+  D('chebab', 'Chebab (Emirati pancake)', 'chebab chabab emirati pancake', 'bread', 'pancake', 50, null, [['maida', 20], ['egg', 8], ['sugar', 3]], F('butter', 3, 4, 5)),
+  D('kerala_parotta', 'Kerala parotta', 'parotta porotta malabar paratha', 'bread', 'parotta', 90, null, [['maida', 55]], F('oil', 10, 12, 14)),
+  D('bun_maska', 'Bun maska', 'bun maska butter bun', 'bread', 'bun', 80, null, [['bun', 65]], F('butter', 10, 15, 18)),
+  D('chips_oman_paratha', 'Chips Oman paratha', 'chips oman paratha roll cafeteria', 'street', 'roll', 140, null, [['maida', 50], ['cheese', 15], ['crisps', 25], ['ketchup', 5]], F('oil', 8, 10, 12)),
+  // Café drinks (a regular/medium cup; milk is whole unless the café says otherwise)
+  D('latte', 'Caffè latte', 'latte cafe latte caffe latte', 'drink', 'cup', 350, null, [['milk', 250]], NOFAT),
+  D('cappuccino', 'Cappuccino', 'cappuccino capuccino', 'drink', 'cup', 240, null, [['milk', 150]], NOFAT),
+  D('flat_white', 'Flat white', 'flat white', 'drink', 'cup', 180, null, [['milk', 120]], NOFAT),
+  D('spanish_latte', 'Spanish latte', 'spanish latte condensed milk latte', 'drink', 'cup', 300, null, [['milk', 200], ['condensedMilk', 30]], NOFAT),
+  D('iced_latte', 'Iced latte', 'iced latte cold latte', 'drink', 'cup', 350, null, [['milk', 200]], NOFAT),
+  D('caramel_macchiato', 'Caramel macchiato', 'caramel macchiato', 'drink', 'cup', 350, null, [['milk', 250], ['sugar', 20]], NOFAT),
+  D('frappuccino', 'Frappuccino (blended coffee)', 'frappuccino frappe blended coffee', 'drink', 'cup', 400, null, [['milk', 150], ['sugar', 40], ['cream', 20]], NOFAT),
+  D('iced_capp', 'Iced Capp', 'iced capp iced cappuccino tim hortons', 'drink', 'cup', 400, null, [['cream', 50], ['milk', 100], ['sugar', 35]], NOFAT),
+  D('coffee_cream_sugar', 'Coffee with cream and sugar', 'coffee double double regular coffee black coffee', 'drink', 'cup', 300, null, [['cream', 15], ['sugar', 8]], NOFAT),
+  D('fresh_juice', 'Fresh juice (orange or mixed fruit)', 'juice fresh juice cocktail juice orange juice mango juice', 'drink', 'glass', 300, null, [['orange', 250], ['sugar', 15]], NOFAT),
+  D('protein_shake', 'Protein shake (whey + milk)', 'protein shake whey shake', 'drink', 'shake', 300, null, [['whey', 30], ['milkLow', 250]], NOFAT),
+  D('croissant', 'Croissant (butter)', 'croissant croissan biscuit', 'snack', 'croissant', 60, null, [['maida', 30]], F('butter', 13, 13, 13)),
+  D('onion_rings', 'Onion rings', 'onion rings', 'fried', 'portion', 120, null, [['onion', 60], ['maida', 25]], F('oil', 18, 22, 26)),
+  D('garlic_bread', 'Garlic bread', 'garlic bread', 'bread', 'piece', 40, null, [['maida', 25], ['garlic', 2]], F('butter', 6, 8, 10)),
+  D('toum', 'Garlic sauce (toum)', 'toum garlic sauce garlic dip', 'side', 'tub', 30, null, [['garlic', 5]], F('oil', 19, 19, 19)), // oil whipped with lemon juice and water: ~600 kcal per 100 g
+  D('karak_chai', 'Karak chai', 'karak chai karak tea cafeteria tea', 'drink', 'cup', 150, null, [['evapMilk', 50], ['sugar', 12]], NOFAT),
+  D('luqaimat', 'Luqaimat (piece)', 'luqaimat lugaimat awamat dumplings', 'sweet', 'piece', 15, null, [['maida', 8], ['dateSyrup', 4]], F('oil', 3, 3.5, 4)),
+  D('balaleet', 'Balaleet', 'balaleet sweet vermicelli egg', 'sweet', 'plate', 200, null, [['vermicelli', 50], ['sugar', 20], ['egg', 50]], F('ghee', 8, 10, 12)),
+  D('beef_fry', 'Kerala beef fry', 'beef fry beef ularthiyathu kerala', 'curry', 'plate', 150, ['beef', 150], [['coconut', 10], ['onion', 20], ['spices', 3]], F('oil', 10, 15, 20)),
+  D('chicken_adobo', 'Chicken adobo', 'adobo filipino chicken', 'curry', 'portion', 200, ['chickenSkin', 180], [['onion', 10], ['spices', 3]], F('oil', 5, 8, 10)),
+  D('sisig', 'Sisig (chicken)', 'sisig sizzling filipino', 'curry', 'plate', 200, ['chickenSkin', 150], [['mayo', 15], ['onion', 20]], F('oil', 5, 8, 10)),
 ];
 export const DISH = Object.fromEntries(DISHES.map(d => [d.id, d]));
 const fam = (name, ids) => FAM(name, ids.map(id => DISH[id]));
-fam('Bread', ['roti', 'chapati_thin', 'tandoori_roti', 'naan', 'garlic_naan', 'roghni_naan', 'kulcha', 'taftan', 'sheermal', 'paratha', 'lachha_paratha', 'aloo_paratha', 'anda_paratha', 'puri', 'makki_roti', 'bakarkhani', 'bread_slice']);
+fam('Bread', ['roti', 'khubz', 'kerala_parotta', 'khameer', 'regag', 'chapati_thin', 'tandoori_roti', 'naan', 'garlic_naan', 'roghni_naan', 'kulcha', 'taftan', 'sheermal', 'paratha', 'lachha_paratha', 'aloo_paratha', 'anda_paratha', 'puri', 'makki_roti', 'bakarkhani', 'bread_slice']);
 fam('Rice', ['plain_rice', 'zeera_rice', 'matar_pulao', 'chicken_pulao', 'beef_pulao', 'chicken_biryani', 'mutton_biryani', 'khichdi']);
 fam('Daal', ['daal_masoor', 'daal_moong', 'daal_chana', 'daal_mash', 'daal_makhani', 'rajma', 'cholay']);
 fam('Chicken salan', ['chicken_karahi', 'chicken_handi', 'chicken_qorma', 'chicken_salan', 'chicken_jalfrezi', 'butter_chicken']);
@@ -287,7 +364,12 @@ fam('Pizza and pasta', ['pizza_slice', 'cheesy_pizza_slice', 'creamy_pasta', 'la
 fam('Burger', ['zinger_burger', 'mighty_zinger', 'beef_burger', 'chicken_burger', 'anda_shami_burger', 'bun_kebab']);
 fam('Fried chicken', ['fried_chicken', 'broast', 'nuggets', 'wings']);
 fam('Eggs', ['boiled_egg', 'anda_fry', 'omelette', 'anda_curry']);
-fam('Lassi and drinks', ['chai', 'sweet_lassi', 'salted_lassi', 'milkshake', 'cola']);
+fam('Gulf rice', ['chicken_mandi', 'lamb_mandi', 'chicken_machboos', 'lamb_machboos', 'fish_machboos', 'chicken_kabsa', 'chelo_rice']);
+fam('Arabic grill', ['shish_tawook', 'mixed_grill', 'koobideh_kebab', 'joojeh_kebab']);
+fam('Manakish', ['manakish_zaatar', 'manakish_cheese', 'manakish_meat']);
+fam('Mezze', ['hummus', 'mutabbal', 'labneh', 'foul_medames', 'fattoush', 'tabbouleh', 'falafel']);
+fam('Coffee', ['latte', 'cappuccino', 'flat_white', 'spanish_latte', 'iced_latte', 'caramel_macchiato', 'frappuccino', 'iced_capp', 'coffee_cream_sugar']);
+fam('Lassi and drinks', ['chai', 'karak_chai', 'sweet_lassi', 'salted_lassi', 'milkshake', 'cola']);
 export const family = d => (d?.fam ? DISHES.filter(x => x.fam === d.fam) : []);
 
 // "1½ katori (≈300 g)", "2 rotis". Containers show grams so people can check against a scale.
@@ -452,17 +534,37 @@ export function dietGoal(p) {
   if (['lose', 'maintain', 'gain'].includes(p.dietGoal)) return p.dietGoal;
   return p.goal === 'lose' ? 'lose' : GAIN_GOALS.includes(p.goal) ? 'gain' : 'maintain';
 }
-export function targets(p) {
+// Daily movement from the job (Mifflin-St Jeor × these is the standard sedentary-to-active scale), and
+// each training session's net cost: ~4 kcal per kg for an hour of weights and some cardio (MET ≈ 5, minus rest).
+export const JOBS = [
+  { id: 'desk', label: 'Desk job or student', f: 1.2 },
+  { id: 'feet', label: 'On my feet a lot (teacher, shop, nurse)', f: 1.35 },
+  { id: 'physical', label: 'Physical work (labour, delivery, farm)', f: 1.5 },
+];
+const SESSION_KCAL_PER_KG = 4;
+export const kcalFloor = (sex, bmr) => Math.max(sex === 'female' ? 1200 : 1500, Math.round(bmr * 0.9));
+export function maintenance(p) {
   const w = +p.weightKg, h = +p.heightCm, a = +p.age;
   if (!(w > 30 && h > 120 && a >= 14)) return null;
   const bmr = 10 * w + 6.25 * h - 5 * a + (p.sex === 'female' ? -161 : 5);
-  const act = { low: 1.375, mid: 1.55, high: 1.725 }[p.activity] || 1.55;
+  const job = JOBS.find(j => j.id === p.job);
+  // Until the client says what their job is and how often they train, the older single activity setting applies.
+  const tdee = job ? bmr * job.f + Math.min(7, Math.max(0, +p.trainDays || 0)) * SESSION_KCAL_PER_KG * w / 7
+    : bmr * ({ low: 1.375, mid: 1.55, high: 1.725 }[p.activity] || 1.55);
+  return { bmr, tdee };
+}
+export function targets(p) {
+  const m = maintenance(p); if (!m) return null;
+  const w = +p.weightKg, { bmr, tdee } = m;
   const dg = dietGoal(p), goal = { lose: -0.2, maintain: 0, gain: 0.1 }[dg];
-  const kcal = Math.round(bmr * act * (1 + goal) / 10) * 10;
+  // kcalAdjust comes from the two-weekly check-ins (js/adapt.js): bodies adapt, so targets move with the scale.
+  // Safety floor: 90% of resting burn, and never under 1,500 (men) / 1,200 (women) kcal.
+  const floor = kcalFloor(p.sex, bmr);
+  const kcal = Math.max(Math.round(floor / 10) * 10, Math.round((tdee * (1 + goal) + (+p.kcalAdjust || 0)) / 10) * 10);
   const protein = Math.round(w * (dg === 'lose' ? 2.0 : 1.8));
   const fat = Math.round(kcal * 0.27 / 9);
   const carbs = Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4));
-  return { kcal, protein, fat, carbs, bmr: Math.round(bmr) };
+  return { kcal, protein, fat, carbs, bmr: Math.round(bmr), tdee: Math.round(tdee), adjust: +p.kcalAdjust || 0, floor: Math.round(floor / 10) * 10 };
 }
 
 const dayKey = t => { const x = new Date(t); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };

@@ -38,6 +38,21 @@ leaves the phone.
    ```
    The anon key is designed to be public. The privacy rules from step 2 decide what each person can see.
 
+## 6. Notifications when the app is closed (optional, about 5 minutes)
+Check-in reminders every two weeks, and "QK updated your diet plan", reach clients' phones even when the app is closed.
+1. Re-run `supabase/schema.sql` (it adds `push_subs`, `coach_plans` and two profile columns, and keeps your data).
+2. On any computer with Node: `node tools/webpush.mjs keys`. It prints a public and a private key.
+3. Put the **public** key in `js/cloud-config.js` → `PUSH.vapidPublicKey`.
+4. GitHub → the repository → **Settings → Secrets and variables → Actions → New repository secret**, add:
+   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (Project Settings → API → service_role; keep it secret),
+   `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT` (`mailto:` plus your email).
+5. That's it: `.github/workflows/push.yml` runs every morning (08:30 Pakistan, 07:30 UAE) and evening. To test,
+   open **Actions → Push reminders → Run workflow**.
+
+Clients turn it on with **Remind me in the app** (Me → training reminders) after connecting to you. It works on
+Android, and on iPhone once the app is added to the Home Screen (iOS 16.4 or later). Without these steps the
+app still reminds them whenever it's open, and the calendar reminder works everywhere.
+
 ## What each person can see
 | Who | Can see | Can change |
 |---|---|---|
