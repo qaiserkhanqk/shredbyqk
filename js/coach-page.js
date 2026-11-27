@@ -10,6 +10,7 @@ import { retotal, FOOD_CHOICES, FOODS } from './dietplan.js';
 import { cleanProfile } from './clean.js';
 import { initCoachExtra, loadBoard } from './coach-extra.js';
 import { scoreChips } from './scoreview.js';
+import { initCoachChat, loadChats, chatHTML } from './coach-chat.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -47,7 +48,8 @@ async function load() {
   // Demo: your own row first, so you can find yourself.
   const mine = state.cards.findIndex(c => c.id === LOCAL_ID); if (mine > 0) state.cards.unshift(...state.cards.splice(mine, 1));
   render();
-  if (!state.extra) { initCoachExtra({ state, cloud, toast }); state.extra = true; }
+  if (!state.extra) { initCoachExtra({ state, cloud, toast }); initCoachChat({ state, cloud, toast, render, select: id => { state.sel = id; render(); } }); state.extra = true; }
+  await loadChats().catch(e => console.warn('chats:', e.message));
   await loadBoard().catch(e => console.warn('board:', e.message));
   $('#bcAud').dispatchEvent(new Event('change'));
 }
@@ -76,6 +78,7 @@ function renderDetail() {
   const fault = c.topFault ? (RULES_BY_ID[c.topFault.id] || c.topFault.id) : null;
   box.innerHTML = `<div><span class="cd-badge ${statusCls(c.status)}">${c.status}</span><h2 class="display h2" style="margin-top:6px">${esc(c.name)}</h2><p class="muted small" style="margin:2px 0 0">${esc(c.reason)}</p></div>
     <div class="cd-scores">${scoreChips(state.raw?.profiles.find(p => p.id === c.id)?.scores)}</div>
+    ${state.extra ? chatHTML(c) : ''}
     <div class="cd-kv">
       <span>Last opened the app</span><span>${ago(c.lastSeen)}</span>
       <span>Training days this week</span><span>${c.daysTrained} of ${c.weeklyGoal}</span>

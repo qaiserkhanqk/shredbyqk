@@ -38,6 +38,7 @@
     </div>
 
     <div class="card stack" id="scoreCard"></div>
+    <button type="button" class="card chat-card" id="chatCard" hidden></button>
     <div class="card stack" id="readyCard">
       <div class="ready-q"><span class="eyebrow">How do you feel today?</span><button type="button" class="linkbtn" id="readyChange" hidden>Change</button></div>
       <div class="feel" role="group" aria-label="How do you feel today?">
@@ -784,6 +785,18 @@
     <div class="live-actions"><button class="ghost" type="button" id="calmSkip">Next</button><button class="stop" type="button" id="calmEnd">End</button></div>
   </div>
 </div>
+<div class="sheet-wrap" id="chatSheet" hidden>
+  <div class="sheet chat-sheet" role="dialog" aria-modal="true" aria-labelledby="chatTitle">
+    <div class="grab"></div>
+    <div class="chat-head"><div><span class="eyebrow">Chat</span><h2 class="display h2" id="chatTitle" style="margin:4px 0 0;font-size:1.3rem">Message <span id="chatCoachName">QK</span></h2></div><button type="button" class="linkbtn" id="chatClose">Close</button></div>
+    <p class="muted small" id="chatNote" style="margin:0"></p>
+    <div class="chat-thread" id="chatThread" aria-live="polite"></div>
+    <p class="muted small chat-typing" id="chatTyping" hidden>Muhammad is typing…</p>
+    <div class="chat-voice"><label class="cc-toggle"><input type="checkbox" id="chatSpeak"> Read replies aloud</label><label class="chat-lang">🎤 <select id="chatMicLang" aria-label="Language you speak in"></select></label></div>
+    <form class="chat-form" id="chatForm"><button type="button" class="chat-mic" id="chatMic" aria-label="Talk instead of typing" aria-pressed="false">🎤</button><textarea id="chatText" rows="1" maxlength="2000" placeholder="Type a message, or tap 🎤 and talk" aria-label="Message" dir="auto"></textarea><button class="cta" type="submit">Send</button></form>
+  </div>
+</div>
+
 <div class="sheet-wrap" id="calmSheet" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="calmSheetTitle">
     <div class="grab"></div>

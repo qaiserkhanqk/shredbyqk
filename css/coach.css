@@ -68,3 +68,22 @@ body.coach-page { background: var(--ink); color: var(--text); min-height: 100vh;
 .cd-scores { margin: 6px 0 2px; }
 .sc-chip { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: .78rem; font-weight: 650; background: #eef1ee; color: #5b625e; margin: 2px 2px 0 0; }
 .sc-chip.good { background: #e3f4ec; color: #1f7a50; } .sc-chip.mid { background: #fbf0da; color: #946510; } .sc-chip.low { background: #fbe4e4; color: #b03030; }
+
+/* ---------- Chats ---------- */
+.cc-row { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: inherit; font: inherit; cursor: pointer; }
+.cc-row.needs { border-color: var(--warn); }
+.cc-flag { color: var(--warn); font-size: .78rem; font-weight: 700; }
+.cc-new { color: var(--good); font-size: .78rem; font-weight: 700; }
+.cc-count { font-weight: 700; color: var(--warn); }
+.cc-thread { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; margin: 8px 0; }
+.cc-chat textarea { width: 100%; min-height: 70px; }
+.cc-toggle { display: flex; gap: 8px; align-items: center; font-size: .9rem; }
+.chat-msg { max-width: 85%; padding: 8px 12px; border-radius: 16px; background: var(--surface-2); align-self: flex-start; }
+.chat-msg p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat-msg time { display: block; font-size: .7rem; opacity: .6; margin-top: 2px; }
+.chat-msg.coach { align-self: flex-end; background: var(--cta); color: var(--on-cta); }
+.chat-msg.assistant { border: 1px dashed var(--line-strong); }
+.chat-who { display: block; font-size: .72rem; font-weight: 700; opacity: .75; margin-bottom: 2px; }
+/* On the dashboard QK is "me": the client's messages sit on the left, QK's on the right. */
+.cc-thread .chat-msg.client { align-self: flex-start; background: var(--surface-2); color: inherit; border-radius: 16px 16px 16px 4px; }
+.cc-thread .chat-msg.coach { border-radius: 16px 16px 4px 16px; }
