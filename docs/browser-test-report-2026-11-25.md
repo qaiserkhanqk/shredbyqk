@@ -80,3 +80,26 @@ For the research dashboard in WebKit over local http, set `RESEARCH_E2E_INSECURE
 **As before:**
 - Not tested here, because the browser builds lack the feature: recording in WebKit (no MediaRecorder) and pose analysis in Firefox (no WebGL).
 - Still not tested: real iPhone, Android or Mac Safari.
+
+## Re-run on 941e237 (2026-11-27): the Firefox two-tab failure is fixed
+**Cause found:** the failure was not in storage. A trace of the failing tab showed this sequence:
+1. the press lands on "Period started";
+2. 4 ms later the page redraws, because the other tab's save had started this tab's re-read just before the press, and the re-read finished during it;
+3. the release lands on a paragraph that moved under the pointer, so the browser fires no click.
+
+So her tap was silently lost. It could happen to a real person tapping while another tab saves.
+
+**Fix:** a redraw never happens while a finger is down. One asked for during a press, or a re-read that finishes during one, waits until the press ends and then runs after the click (`a6d5595`, `df46371`). `tests/cycle-ui-tap-during-redraw.cjs` holds the press to make it deterministic; it failed in all three browsers before the fix and passes after.
+
+**Verification:**
+- 40 repeated Firefox two-tab scenarios: 40 of 40 passed. Before any fix, 4 of 40 failed; after the first, partial fix (`a6d5595`), 11 of 40.
+- 6 repeated Firefox runs of `tests/e2e.cjs`: 6 of 6 passed. Before the fix, roughly half failed.
+
+**Full run on 941e237** (each browser test file run separately: 20 files):
+
+| Browser | Result |
+|---|---|
+| WebKit 26.6 | **334 ok, 0 failures**, with the plain-http dashboard files in the labelled local-cookie mode (26, 14 and 20 checks), as before |
+| Firefox 155 | **334 ok, 0 failures** |
+
+Still not tested: real iPhone, Android or Mac Safari.
