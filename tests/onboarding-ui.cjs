@@ -59,18 +59,25 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
       check('nothing about periods was put in a notification', await p.evaluate(() => !window.__notified));
       await c.close();
     }
-    { // Woman under 13
+    { // Under 18 (minimum age raised from 13 to 18 by the product owner, 2026-11-27)
       const { c, p } = await fresh();
-      await pick(p, 'gender', 'woman'); await pick(p, 'age', 'under13');
-      check('under 13: no period question, and a note says it is for 13 and over', !(await visible(p, '#aboutPeriods')) && /13/.test(await p.textContent('#aboutNote').catch(() => '')));
+      await pick(p, 'gender', 'woman');
+      check('the age choices are "Under 18" and "18 or over"', (await p.$$eval('#aboutAge [data-about=age]', bs => bs.map(b => b.dataset.val))).join() === 'under18,18+');
+      await pick(p, 'age', 'under18');
+      const note = await p.textContent('#aboutNote').catch(() => '');
+      check('under 18: no period question, and a kind note (18 and over; a parent or guardian, school nurse or doctor can help)', !(await visible(p, '#aboutPeriods')) && /18/.test(note) && /parent|guardian/i.test(note), note);
       await p.click('#welcomeBtn'); await p.waitForTimeout(400);
       check('…and period tracking stays off', (await flags(p)).cycleTracking !== true && !(await visible(p, '.tabs [data-tab=cycle]')));
+      await p.click('.tabs [data-tab=progress]'); await p.waitForTimeout(300);
+      if (!(await p.$eval('#profileCard', d => d.open))) await p.click('#profileCard summary');
+      const sw = await p.$eval('#profileCycle', x => ({ disabled: x.disabled, why: x.closest('.stack')?.textContent || '' }));
+      check('…and the Profile switch can\'t turn it on, with the same note beside it', sw.disabled && /18/.test(sw.why), JSON.stringify(sw).slice(0, 200));
       await c.close();
     }
-    { // Teen and Other
+    { // Adult and Other
       const { c, p } = await fresh();
-      await pick(p, 'gender', 'woman'); await pick(p, 'age', '13-17');
-      check('13–17: asked whether she would like to track her periods', await visible(p, '#aboutPeriods'));
+      await pick(p, 'gender', 'woman'); await pick(p, 'age', '18+');
+      check('18 or over: asked whether she would like to track her periods', await visible(p, '#aboutPeriods'));
       await pick(p, 'gender', 'other');
       check('other or prefer not to say: asked the age and period questions too', await visible(p, '#aboutAge'));
       await c.close();
