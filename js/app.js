@@ -18,7 +18,7 @@ import { SessionRecorder, ErrorLog, downloadJSON, APP_VERSION } from './diagnost
 import { LIBRARY, LIB, MUSCLES, exFor } from './library.js';
 import { HipThrustDemo, WalkDemo, DEMO_W, DEMO_H } from './demo.js';
 import { landmarksFrom, analyse, render, navyBodyFat, bfCategory, stanceProblem } from './bodyscan.js';
-import { personalise, GENDERS, AGES, PERIODS, NOT_NOW } from './onboarding.js';
+import { personalise, GENDERS, AGES, PERIODS, NOT_NOW, NOTES as ABOUT_NOTES } from './onboarding.js';
 import { initCycle, renderCycle } from './cycle/ui.js';
 import { readFlags, setFlag } from './cycle/flags.js';
 
@@ -1172,7 +1172,12 @@ $('#studioExport').onclick = async () => { const data = await exportClips(); if 
 /* ---------- Cycle tracking (prototype, off by default) ----------
    Lives in its own encrypted store (js/cycle/store.js). Nothing from it goes into S, the coach voice,
    session exports or the error log. */
-function applyCycleFlag() { const on = readFlags().cycleTracking; $('#cycleTile').hidden = !on; $('#cycleTabBtn').hidden = !on; $('#cycle .back').hidden = on; /* it has its own tab when on */ $('#flagCycle').checked = on; $('#profileCycle').checked = on; }
+function applyCycleFlag() {
+  // Under 18 (her own answer at sign-up): the Profile switch can't turn period tracking on; the note says why.
+  const minor = S.profile.ageBand === 'under18';
+  if (minor && readFlags().cycleTracking) setFlag('cycleTracking', false);
+  $('#profileCycle').disabled = minor; $('#profileCycleNote').hidden = !minor; $('#profileCycleNote').textContent = minor ? ABOUT_NOTES.under18 : '';
+  const on = readFlags().cycleTracking; $('#cycleTile').hidden = !on; $('#cycleTabBtn').hidden = !on; $('#cycle .back').hidden = on; /* it has its own tab when on */ $('#flagCycle').checked = on; $('#profileCycle').checked = on; }
 $('#flagCycle').onchange = e => { setFlag('cycleTracking', e.target.checked); applyCycleFlag(); };
 $('#profileCycle').onchange = e => { setFlag('cycleTracking', e.target.checked); applyCycleFlag(); };
 
