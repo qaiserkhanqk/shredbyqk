@@ -41,7 +41,7 @@ const num = s => +String(s).replace(/[^\d]/g, '');
   const rows = () => p.$$('#foodLog .row');
 
   await p.goto('https://shred.local/');
-  await p.fill('#welcomeName', 'Sara'); await p.click('#welcomeBtn'); await p.click('[data-focus=train]');
+  await p.fill('#welcomeName', 'Sara'); await p.click('#welcomeBtn'); await p.click('#aboutNext'); /* merge 2026-11-27: skip the optional "about you" step */ await p.click('[data-focus=train]');
   await p.click('[data-goal=muscle]'); await p.click('[data-exp=trained]');
   await p.click('#obDays [data-day="1"]'); await p.click('#obDone');
   check('today: "Snap meal" quick button', await p.isVisible('#snapMeal'));
