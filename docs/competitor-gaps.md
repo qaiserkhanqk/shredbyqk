@@ -1,5 +1,7 @@
 # Competitor comparison and the gaps we built (Hume Band, WHOOP, Oura)
 
+> **Superseded on 2026-11-27** by `docs/competitor-comparison-2026-11-27.md` (16 products). Kept for the record of the gaps built on 2026-11-25.
+
 **Date:** 2026-11-25.
 
 **Sources:**
