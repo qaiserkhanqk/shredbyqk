@@ -1,0 +1,17 @@
+# chromium
+FAIL a tap in progress while another tab saves is not lost (both periods are saved)  — ["2026-10-18"]
+FAIL …and after the tap, this tab shows the other tab's save too  — 1 periods shown
+ok   no JavaScript errors
+2 FAILED of 3
+# firefox
+browser: firefox 155.0
+FAIL a tap in progress while another tab saves is not lost (both periods are saved)  — ["2026-10-18"]
+FAIL …and after the tap, this tab shows the other tab's save too  — 1 periods shown
+ok   no JavaScript errors
+2 FAILED of 3
+# webkit
+browser: webkit 26.6
+FAIL a tap in progress while another tab saves is not lost (both periods are saved)  — ["2026-10-18"]
+FAIL …and after the tap, this tab shows the other tab's save too  — 1 periods shown
+ok   no JavaScript errors
+2 FAILED of 3
