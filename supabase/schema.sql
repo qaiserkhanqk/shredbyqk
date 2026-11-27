@@ -223,3 +223,85 @@ grant execute on function public.join_coach(text) to authenticated;
 --   update public.profiles set role = 'coach', invite_code = 'QK' || upper(substr(md5(random()::text), 1, 4))
 --   where id = (select id from auth.users where email = 'you@example.com');
 -- (Roles are never set from the app, so nobody can make themselves a coach.)
+
+-- ============ Broadcasts, Fitness Age reminders, leaderboard and monthly rewards ============
+-- Broadcasts are ordinary messages (kind 'broadcast', with a title), one row per client, so they show in the app
+-- like any coach message. The push job sends each one as a phone notification and stamps pushed_at.
+alter table public.messages add column if not exists title text;
+alter table public.messages add column if not exists pushed_at timestamptz;
+alter table public.messages drop constraint if exists messages_kind_check;
+alter table public.messages add constraint messages_kind_check check (kind in ('cheer', 'nudge', 'note', 'broadcast'));
+alter table public.profiles add column if not exists last_train date;      -- last training day (for "we miss you" and Fitness Age reminders)
+alter table public.profiles add column if not exists nickname text;        -- what shows on the leaderboard (optional)
+alter table public.profiles add column if not exists board_hidden boolean not null default false; -- show as "Anonymous" on the board
+alter table public.profiles add column if not exists prizes jsonb;         -- coaches: { "1": "…", "2": "…", "3": "…" } for this month
+alter table public.profiles add column if not exists lapse_sent date;      -- last "your Fitness Age went up" notification
+
+-- Weekly health scores (0–100), one row per client per week (week = Monday). The client's app writes its own.
+create table if not exists public.scores (
+  client_id uuid not null references public.profiles (id) on delete cascade,
+  week date not null,
+  score int not null check (score between 0 and 100),
+  parts jsonb,
+  updated_at timestamptz not null default now(),
+  primary key (client_id, week)
+);
+alter table public.scores enable row level security;
+drop policy if exists "own scores" on public.scores;
+create policy "own scores" on public.scores for all using (client_id = auth.uid()) with check (client_id = auth.uid());
+drop policy if exists "coach reads scores" on public.scores;
+create policy "coach reads scores" on public.scores for select using (public.is_my_client(client_id));
+create index if not exists scores_week on public.scores (week, score desc);
+
+-- The board everyone in a coach's community sees: rank, board name and score only (never health details).
+-- Top 50 plus the caller's own row. Board name: nickname, else first name + last initial; "Anonymous" if hidden.
+create or replace function public.board_name(p public.profiles) returns text language sql immutable as $$
+  select case when p.board_hidden then 'Anonymous'
+    when coalesce(trim(p.nickname), '') <> '' then left(trim(p.nickname), 24)
+    else coalesce(nullif(split_part(trim(coalesce(p.name, '')), ' ', 1), ''), 'Shredder')
+      || coalesce(' ' || nullif(upper(left(split_part(trim(coalesce(p.name, '')), ' ', 2), 1)), '') || '.', '') end $$;
+
+create or replace function public.leaderboard(wk date, months int default 0)
+returns table (rank bigint, name text, score bigint, me boolean, players bigint)
+language sql stable security definer set search_path = public as $$
+  with caller as (select coalesce(case when role = 'coach' then id end, coach_id) as cid from public.profiles where id = auth.uid()),
+  -- Month mode: the Mondays of wk's month up to wk. Score = average points per week, counted from their first week
+  -- on the board (weeks skipped after that count as 0), so someone who joins on the 15th can still win.
+  m as (select date_trunc('month', wk)::date as m0),
+  weeks as (select g::date as w from m, generate_series((m0 + ((8 - extract(isodow from m0)::int) % 7))::timestamp, wk::timestamp, interval '7 days') g
+            where g::date < (m0 + interval '1 month')::date),
+  totals as (
+    select s.client_id, s.score::bigint as score from public.scores s join public.profiles p on p.id = s.client_id
+    where months = 0 and p.coach_id = (select cid from caller) and s.week = wk
+    union all
+    select s.client_id, round(sum(s.score)::numeric / greatest(1, (select count(*) from weeks where w >= (select min(s2.week) from public.scores s2 where s2.client_id = s.client_id))))::bigint
+    from public.scores s join public.profiles p on p.id = s.client_id
+    where months > 0 and p.coach_id = (select cid from caller) and s.week in (select w from weeks)
+    group by s.client_id),
+  r as (select t.client_id, t.score, rank() over (order by t.score desc) as rank, count(*) over () as players from totals t)
+  select r.rank, public.board_name(p), r.score, r.client_id = auth.uid(), r.players
+  from r join public.profiles p on p.id = r.client_id
+  where r.rank <= 50 or r.client_id = auth.uid() order by r.rank $$;
+grant execute on function public.leaderboard(date, int) to authenticated;
+
+-- This month's prizes, set by the coach on the dashboard, read by their clients.
+create or replace function public.my_prizes() returns jsonb language sql stable security definer set search_path = public as $$
+  select c.prizes from public.profiles me join public.profiles c on c.id = me.coach_id where me.id = auth.uid() $$;
+grant execute on function public.my_prizes() to authenticated;
+
+-- Monthly winners the coach records (and marks as given). The winner's app celebrates.
+create table if not exists public.rewards (
+  client_id uuid not null references public.profiles (id) on delete cascade,
+  coach_id uuid not null references public.profiles (id) on delete cascade,
+  month date not null,
+  place int not null check (place between 1 and 3),
+  prize text,
+  given_at timestamptz,
+  created_at timestamptz not null default now(),
+  primary key (client_id, month)
+);
+alter table public.rewards enable row level security;
+drop policy if exists "coach manages rewards" on public.rewards;
+create policy "coach manages rewards" on public.rewards for all using (coach_id = auth.uid() and public.is_my_client(client_id)) with check (coach_id = auth.uid() and public.is_my_client(client_id));
+drop policy if exists "client reads own rewards" on public.rewards;
+create policy "client reads own rewards" on public.rewards for select using (client_id = auth.uid());

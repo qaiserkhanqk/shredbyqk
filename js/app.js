@@ -43,6 +43,9 @@ import { ExerciseDetector, PICK_LIST } from './detect.js';
 import { initCalm, renderCalm, startCalmNow } from './calm.js';
 import { WEIGHTED, lastLoad, weekSummary } from './share.js';
 import { initVitals, renderVitals } from './vitals.js';
+import { initFitAge, renderFitAge } from './fitage-ui.js';
+import { initBoard, renderBoard, renderBoardCard } from './board-ui.js';
+import * as mind from './mind.js';
 import { vitalNotes } from './hr.js';
 import { nextStep } from './today.js';
 import { initFood, renderFood } from './food.js';
@@ -63,6 +66,8 @@ const persist = () => {
 ErrorLog.install();
 initCalm({ S, persist: () => persist(), toast: m => toast(m) });
 initVitals({ S, persist: () => persist(), toast: m => toast(m) });
+initFitAge({ S, persist: () => persist(), toast: m => toast(m), say: (t, o) => say(t, o) });
+initBoard({ S, persist: () => persist(), toast: m => toast(m), cloud: () => cloud, sync: () => syncNow() });
 initFood({ S, persist: () => persist(), toast: m => toast(m), rehab: () => !!S.rehab?.active });
 const recorder2 = new SessionRecorder();
 const bar = new BarTracker();
@@ -91,14 +96,16 @@ function mountOrbs() {
 /* ---------- Navigation ---------- */
 function tab(id) {
   $$('.screen').forEach(s => s.classList.toggle('on', s.id === id));
-  const tabFor = ['body', 'gait', 'scan', 'rehab', 'calm', 'vitals'].includes(id) ? 'today' : id; // tools live under Today
+  const tabFor = ['body', 'gait', 'scan', 'rehab', 'calm', 'vitals', 'fitage'].includes(id) ? 'today' : id === 'board' ? 'progress' : id; // tools live under Today
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tabFor));
   if (id === 'today') renderToday();
   if (id === 'train') renderPrograms();
-  if (id === 'progress') { renderProgress(); renderLoad(); renderToday(); $('#youName').textContent = S.profile.name || 'You'; }
+  if (id === 'progress') { renderProgress(); renderLoad(); renderToday(); $('#youName').textContent = S.profile.name || 'You'; renderBoardCard(); }
   if (id === 'rehab') renderRehab();
   if (id === 'calm') renderCalm();
   if (id === 'vitals') renderVitals();
+  if (id === 'fitage') renderFitAge();
+  if (id === 'board') renderBoard();
   if (id === 'food') renderFood();
   if (id === 'scan') $('#hipWrap').hidden = S.profile.sex === 'male';
   if (id === 'body') { const first = { recover: 'rehab', calm: 'calm' }[S.profile.focus]; const t = first && $(`#body [data-go=${first}]`); if (t) $('#body .page-head').after(t); }
@@ -110,6 +117,7 @@ document.addEventListener('click', e => {
   if (g) { if (g.dataset.go === 'calm-now') { tab('calm'); return startCalmNow(); } return tab(g.dataset.go); }
   if (e.target.closest('[data-back]')) tab('body');
   if (e.target.closest('[data-home]')) tab('today');
+  const tg = e.target.closest('[data-tabgo]'); if (tg) tab(tg.dataset.tabgo);
 });
 
 /* ---------- Today ---------- */
@@ -1694,10 +1702,12 @@ async function syncNow() {
     // A diet plan QK edited on the dashboard replaces the app's own.
     const cp = await cloud.coachPlan().catch(() => null);
     if (cp && applyCoachPlan(cp.plan, cp.note, cp.updated_at)) toast('QK updated your diet plan');
+    const won = await cloud.myRewards().catch(() => []);
+    if (won.length) { S.won = won; persist(); }
     const msgs = await cloud.unread();
     if (msgs.length) {
       const from = S.cloud.coach || 'Your coach';
-      msgs.forEach((m, i) => setTimeout(() => { say(`Message from ${from}. ${m.body}`, { id: 'coachmsg_' + m.id, priority: 'high' }); toast(`${from}: ${m.body}`); }, 1500 + i * 6000));
+      msgs.forEach((m, i) => setTimeout(() => { const t = m.title ? `${m.title}. ${m.body}` : m.body; say(m.kind === 'broadcast' ? t : `Message from ${from}. ${t}`, { id: 'coachmsg_' + m.id, priority: 'high' }); toast(`${m.kind === 'broadcast' ? m.title || from : from}: ${m.body}`); }, 1500 + i * 6000));
       await cloud.markRead(msgs.map(m => m.id));
     }
   } catch (e) { if (e.status === 401) { S.cloud.session = null; persist(); renderCoachLink(); } }
@@ -2852,6 +2862,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-mem]'); if (!b) return;
   const id = $('#memCard').dataset.id, [kind, a, v] = b.dataset.mem.split(':'), p = S.profile, now = Date.now(), M = (S.memory ||= { done: {} });
   M.done ||= {}; M.done[id] = now;
+  if (kind === 'ok' && id?.startsWith('mindr:')) S.mindReply = null;
   if (kind === 'pain') {
     p.painAsked = { ...(p.painAsked || {}), [a]: now }; p.painAskCount = { ...(p.painAskCount || {}), [a]: (p.painAskCount?.[a] || 0) + 1 };
     const label = personal.PAIN[a]?.label.toLowerCase() || a;
@@ -2873,6 +2884,18 @@ document.addEventListener('click', e => {
     S.plan.time = `${a}:${v}`; toast(`Reminder moved to ${a}:${v}. Re-add it to your calendar from Training days to update it there.`); bindPlan();
   } else if (kind === 'programs') {
     tab('train');
+  } else if (kind === 'fitage') {
+    tab('fitage');
+  } else if (kind === 'mind') {
+    (S.mind ||= []).push({ at: now, answer: a });
+    const r = mind.reply(a, S, now); S.mindReply = { at: now, ...r };
+    if (r.light) S.checkin = { day: todayKey(), a: { sleep: 'bad', sore: 'none', energy: 'ok' }, r: personal.readiness({ sleep: 'bad', sore: 'none', energy: 'ok' }) };
+    say(`${r.title}. ${r.text}`, { priority: 'high' });
+  } else if (kind === 'mindshare') {
+    S.mindShare = { at: now, answer: 'struggling' }; S.mindReply = null;
+    toast('QK will know you could use some support. Only that, none of your details.'); setTimeout(() => syncNow(), 0);
+  } else if (kind === 'helpline') {
+    window.open('https://findahelpline.com', '_blank', 'noopener');
   } else if (kind === 'skip' && v === 'swap') {
     const P = (S.prefs ||= {}); P.avoid = [...new Set([...(P.avoid || []), a])]; toast(`Swapped for good: no more ${LIB[a]?.name}.`);
   }

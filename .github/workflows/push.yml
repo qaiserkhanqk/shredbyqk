@@ -8,6 +8,7 @@ on:
   schedule:
     - cron: '30 3 * * *'   # 08:30 Pakistan, 07:30 UAE: check-in mornings
     - cron: '30 13 * * *'  # 18:30 Pakistan: plan updates QK made during the day
+    - cron: '5 * * * *'    # every hour: QK's broadcasts from the dashboard (only those)
   workflow_dispatch:
 permissions:
   contents: read
@@ -26,3 +27,4 @@ jobs:
           VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+          PUSH_ONLY: ${{ github.event.schedule == '5 * * * *' && 'broadcasts' || '' }}

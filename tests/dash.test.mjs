@@ -44,6 +44,7 @@ check('demo has every status', st.Lena === 'inactive' && st.Jon === 'inactive' &
   const now = Date.now(), c = careSummary({ profile: { pain: ['knee'], travel: { kind: 'hotel', until: now + 864e5 } }, checkinLog: [{ at: now - 864e5, level: 'rest' }, { at: now - 2 * 864e5, level: 'easy' }] }, now);
   check('care: sore knee, 2 rough days, travelling → chips for the coach', careChips(c).join('|') === 'Sore: knee|2 rough days|Travelling', careChips(c).join('|'));
   check('care: nothing to flag → null', careSummary({ profile: {} }, now) === null);
+  check('care: latest Fitness Age shown to the coach', careChips(careSummary({ profile: {}, fitage: [{ at: now, fitnessAge: 31, age: 35 }] }, now)).join() === 'Fitness Age 31 (-4)');
 }
 if (fail) { console.log(`${fail} FAILED`); process.exit(1); }
 console.log('dash: all pass');

@@ -7,6 +7,7 @@ import { lifetimeClean, progress as rewardProgress } from './rewards.js';
 import { allScores, scoreSummary } from './scores.js';
 import { e1rm } from './progression.js';
 import { foodCard, foodDayRows, foodWeekSummary } from './foodsync.js';
+import { ifStopped } from './fitnessage.js';
 
 const D = 864e5;
 export const weekStart = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime(); }; // Monday
@@ -81,10 +82,13 @@ export function careSummary(S, now = Date.now()) {
     travel: p.travel && now < p.travel.until ? p.travel.kind : null,
     ramadan: !!(p.ramadan && now < p.ramadan.until),
   };
-  return care.pain.length || care.rough7 || care.travel || care.ramadan ? care : null;
+  const fa = (S?.fitage || []).slice(-1)[0];
+  if (fa) care.fitAge = { fa: fa.fitnessAge, age: fa.age, at: fa.at, ifStopped: fa.active ? ifStopped(fa) : null };
+  if (S?.mindShare && now - S.mindShare.at < wk) care.mind = S.mindShare.answer;
+  return care.pain.length || care.rough7 || care.travel || care.ramadan || care.fitAge || care.mind ? care : null;
 }
 /** Short chips for the coach: "Sore: knee", "2 rough days", "Travelling", "Ramadan". */
-export const careChips = c => (c ? [...(c.pain?.length ? [`Sore: ${c.pain.join(', ')}`] : []), ...(c.rough7 ? [`${c.rough7} rough day${c.rough7 > 1 ? 's' : ''}`] : []), ...(c.travel ? ['Travelling'] : []), ...(c.ramadan ? ['Ramadan'] : [])] : []);
+export const careChips = c => (c ? [...(c.pain?.length ? [`Sore: ${c.pain.join(', ')}`] : []), ...(c.rough7 ? [`${c.rough7} rough day${c.rough7 > 1 ? 's' : ''}`] : []), ...(c.travel ? ['Travelling'] : []), ...(c.ramadan ? ['Ramadan'] : []), ...(c.mind ? [c.mind === 'struggling' ? 'Asked for support' : 'Feeling low'] : []), ...(c.fitAge ? [`Fitness Age ${c.fitAge.fa} (${c.fitAge.fa - c.fitAge.age > 0 ? '+' : ''}${c.fitAge.fa - c.fitAge.age})`] : [])] : []);
 
 /** Ready-made messages. {name} is the client's first name. */
 export const TEMPLATES = {
@@ -138,3 +142,41 @@ export function localClient(S, now = Date.now()) {
   profile.scores = scoreSummary(allScores(S, now));
   return { profile, sets, opens, checks: (S.checkins || []).map(c => ({ ...c, client_id: LOCAL_ID })), food: foodDayRows(LOCAL_ID, S, now) };
 }
+
+/* ---------- Broadcasts: one message to many clients, delivered in the app and as a phone notification ---------- */
+export const AUDIENCES = [
+  { id: 'all', label: 'Everyone' },
+  { id: 'notrain', label: 'Hasn\'t trained for…' },
+  { id: 'noopen', label: 'Hasn\'t opened the app for…' },
+  { id: 'active', label: 'Trained this week' },
+  { id: 'top', label: 'This week\'s top 10' },
+];
+export const AWAY = [[3, '3 days'], [4, '4 days'], [5, '5 days'], [7, '1 week'], [14, '2 weeks'], [30, '1 month'], [90, '3 months']];
+/** "12 days", "3 weeks", "2 months", or "never". */
+export const awayText = days => (days === Infinity || days == null ? 'never' : days < 1 ? 'today' : days < 14 ? `${Math.floor(days)} day${Math.floor(days) === 1 ? '' : 's'}` : days < 60 ? `${Math.floor(days / 7)} weeks` : `${Math.floor(days / 30)} months`);
+/** Which clients a broadcast reaches, with how long each has been away (most away first for the "hasn't" groups).
+ *  lastTrain / lastOpen: Map client → time (ms). top: Set of client ids. away: days for the "hasn't" groups. */
+export function audienceOf(clients = [], id = 'all', { lastTrain = new Map(), lastOpen = new Map(), top = new Set(), away = 7, now = Date.now() } = {}) {
+  const since = (m, c) => { const t = m.get(c.id); return t ? (now - t) / D : Infinity; };
+  const days = c => since(lastTrain, c);
+  const tag = list => list.map(c => ({ ...c, trainDays: days(c), openDays: since(lastOpen, c) }));
+  if (id === 'notrain' || id === 'quiet') return tag(clients.filter(c => days(c) >= (id === 'quiet' ? 7 : away))).sort((a, b) => b.trainDays - a.trainDays);
+  if (id === 'noopen') return tag(clients.filter(c => since(lastOpen, c) >= away)).sort((a, b) => b.openDays - a.openDays);
+  return tag(audienceOfRest(clients, id, { days, top }));
+}
+function audienceOfRest(clients, id, { days, top }) {
+  if (id === 'active') return clients.filter(c => days(c) < 7);
+  if (id === 'top') return clients.filter(c => top.has(c.id));
+  return clients;
+}
+/** Ready-made, with {name}. Funny ones in Roman Urdu and English: QK's voice, not a robot's. */
+export const BROADCAST_TEMPLATES = [
+  { title: 'Dr. Doom aa gaya', body: 'Dr. Doom aa gaya lekin tum gym nahi aaye, {name}? Villain bhi time pe aata hai. Aaj ka session ready hai.' },
+  { title: 'Movie night?', body: 'Movie dekhni hai? Pehle 20 minute ka session, phir popcorn guilt-free, {name}.' },
+  { title: 'Biryani alert', body: 'Shaadi season hai, {name}. Biryani khao, lekin kal gym zaroor aana. Deal?' },
+  { title: 'Monday motivation', body: 'Naya hafta, naya record, {name}. Your plan is set. Just press Start.' },
+  { title: 'Weekend warrior', body: 'Weekend pe bhi 1 session, {name}? Your leaderboard rank will thank you.' },
+  { title: 'Ramadan', body: 'Ramadan Mubarak, {name}! Ramadan mode is in the app: shorter sessions, timed around iftar.' },
+  { title: 'Leaderboard', body: 'New week, new leaderboard, {name}. Who takes number 1 this time?' },
+];
+export const BROADCAST_MAX = 300;

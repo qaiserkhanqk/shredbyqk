@@ -163,8 +163,65 @@
     <button type="button" class="tile" data-go="rehab"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.5-9-9.5C1.6 7.6 4.2 4 7.8 4c1.8 0 3.2 1 4.2 2.4C13 5 14.4 4 16.2 4 19.8 4 22.4 7.6 21 11.5 19 16.5 12 21 12 21z"/><path d="M9 12h6M12 9v6"/></svg></span><span><b>Fix a pain or injury</b><span>Back, shoulder, knee, ankle and more. A safe, step-by-step plan.</span></span></button>
     <button type="button" class="tile" data-go="gait"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round"><path d="M8 4c2 0 3 2 3 4s-1 5-3 5-3-3-3-5 1-4 3-4zM16 9c2 0 3 2 3 4s-1 4-3 4-3-2-3-4 1-4 3-4z"/></svg></span><span><b>Test how you move</b><span>Walking and running, jump height, knee control.</span></span></button>
     <button type="button" class="tile" data-go="scan"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="12" r="3"/></svg></span><span><b>Posture &amp; body fat</b><span>A photo check of how you stand, plus body fat.</span></span></button>
+    <button type="button" class="tile" data-go="fitage"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span><b>Fitness Age</b><span>How old your body really is, from the HUNT fitness research. Plus what would make you younger.</span></span></button>
     <button type="button" class="tile" data-go="vitals"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-5 4 10 2-5h6"/></svg></span><span><b>Body check</b><span>Heart rate and HRV with your fingertip on the camera, plus a 3-minute alertness test.</span></span></button>
     <button type="button" class="tile" data-go="calm"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></span><span><b>Calm your mind</b><span>Sukoon: slow breathing, Quran and dua for anxiety, anger, sleep and more.</span></span></button>
+  </section>
+
+  <!-- LEADERBOARD -->
+  <section class="screen" id="board">
+    <button type="button" class="back" data-tabgo="progress">‹ Progress</button>
+    <div class="page-head"><div><span class="eyebrow">Leaderboard</span><h1 class="display h1">Who's healthiest this week?</h1></div></div>
+    <p class="muted" style="margin:0">Points for training, your Fitness Age compared with your own age, recovery, sleep and stress. Fair at any age: you're compared with yourself, and showing up earns the most.</p>
+    <div class="card stack" id="bMine"></div>
+    <div class="card stack" id="bPrizes" hidden></div>
+    <div class="card stack">
+      <div class="chip-wrap"><button type="button" class="chip on" data-brange="month">This month · prizes</button><button type="button" class="chip" data-brange="week">This week</button></div>
+      <div class="stack" id="bList" style="gap:0"></div>
+    </div>
+    <details class="card"><summary><b>Your name on the board</b></summary>
+      <div class="stack small" style="margin-top:10px">
+        <label class="field">Nickname (optional)<input id="bNick" maxlength="24" autocomplete="off"></label>
+        <label class="check"><input type="checkbox" id="bHide"> Show me as "Anonymous"</label>
+        <p class="muted" style="margin:0">Only your board name and points are shared. Your sleep, stress and health numbers never are.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- FITNESS AGE -->
+  <section class="screen" id="fitage">
+    <button type="button" class="back" data-back>‹ Tools</button>
+    <div class="page-head"><div><span class="eyebrow">Fitness Age</span><h1 class="display h1">How old is your body, really?</h1></div></div>
+    <p class="muted" style="margin:0">Built on the HUNT Study, which measured the fitness of over 4,600 healthy adults. Three things you know about yourself give your fitness, and your Fitness Age is the age whose average matches it.</p>
+    <div class="card stack" id="faResult" hidden></div>
+    <div class="card stack">
+      <p class="muted small" id="faNeed" style="margin:0" hidden>Add your age and sex under Today → Profile first.</p>
+      <label class="field">Waist (cm), at the belly button, relaxed<input type="number" inputmode="decimal" id="faWaist" min="50" max="200" step="0.5"></label>
+      <div class="stack" style="gap:6px"><label class="field">Resting heart rate (beats a minute)<input type="number" inputmode="numeric" id="faRhr" min="30" max="130"></label>
+        <button type="button" class="ghost" id="faRhrBtn">Measure with the camera</button></div>
+      <div class="stack" style="gap:6px"><span class="eyebrow">150 minutes of training or brisk activity a week?</span>
+        <div class="chip-wrap"><button type="button" class="chip" data-faact="yes">Yes</button><button type="button" class="chip" data-faact="no">Not yet</button></div>
+        <p class="muted small" id="faActNote" style="margin:0"></p></div>
+      <button type="button" class="cta" id="faGo">Work out my Fitness Age</button>
+    </div>
+    <div class="card stack" id="faHistory" hidden></div>
+    <details class="card"><summary><b>Extra checks: push-ups and sit-and-rise</b></summary>
+      <div class="stack small" style="margin-top:10px">
+        <label class="field" id="faPushWrap">Push-ups in one go, good form (men)<input type="number" inputmode="numeric" id="faPush" min="0" max="150"></label>
+        <label class="field">Sit-and-rise score (0–10)<input type="number" inputmode="decimal" id="faSit" min="0" max="10" step="0.5"></label>
+        <p class="muted" style="margin:0">Sit down cross-legged on the floor and stand back up, without leaning on anything if you can. Start at 10: take off 1 for each hand, knee or forearm you use (going down and coming up), and 0.5 for a wobble.</p>
+        <button type="button" class="ghost" id="faExtraSave">Compare with the research</button>
+        <div class="stack" id="faExtraOut"></div>
+      </div>
+    </details>
+    <details class="card"><summary><b>The research behind it</b></summary>
+      <div class="stack small" style="margin-top:10px">
+        <p style="margin:0"><b>Your fitness:</b> the HUNT Study fitness model (Nes, Nauman and colleagues, Norwegian University of Science and Technology) estimates VO2peak, the gold-standard fitness measure, from age, waist, resting heart rate and activity. It was built and checked against lab treadmill tests.</p>
+        <p style="margin:0"><b>Your Fitness Age:</b> compared with lab-measured VO2max in 4,631 healthy adults aged 20–90 (Aspenes et al. 2011, PLOS ONE).</p>
+        <p style="margin:0"><b>Why it matters:</b> in 37,000+ adults followed for over 20 years, each step up in this fitness (1 MET) went with about 15% lower risk of dying early (Nes et al. 2014, Medicine &amp; Science in Sports &amp; Exercise).</p>
+        <p style="margin:0"><b>Extra checks:</b> push-ups (Yang et al. 2019, JAMA Network Open), sit-and-rise (Brito et al. 2012, European Journal of Preventive Cardiology) and resting heart rate (Zhang et al. 2016, CMAJ).</p>
+      </div>
+    </details>
   </section>
 
   <!-- BODY CHECK (vitals) -->
@@ -393,6 +450,8 @@
         </div>
       </div>
     </div>
+
+    <button type="button" class="card b-card" data-go="board"><span><span class="eyebrow">Leaderboard</span><b class="display h2" style="display:block"><span id="boardCardScore">0</span> points</b><span class="muted small" id="boardCardRank"></span></span><span class="b-chev">›</span></button>
 
     <div class="card stack" id="rewardsCard">
       <div class="card-head" style="margin:0"><div><span class="eyebrow">Rewards</span><h2 class="display h2" id="rwTitle">Clean reps</h2></div><span class="num" style="font-size:1.6rem" id="rwTotal">0</span></div>

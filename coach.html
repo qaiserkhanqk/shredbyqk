@@ -39,6 +39,35 @@
       <div class="cd-list" id="cdList" role="list"></div>
       <aside class="card cd-detail" id="cdDetail" aria-live="polite"><p class="empty">Pick a client to see their week, lifts and form, and to send a message.</p></aside>
     </div>
+    <div class="cd-grid cd-extra">
+      <section class="card stack" id="cdBroadcast">
+        <div><span class="eyebrow">Notification</span><h2 class="display h2">Send to everyone</h2></div>
+        <p class="muted small" style="margin:0">Lands on their phone as a notification (within the hour) and in the app. Use {name} for their first name.</p>
+        <div class="chip-wrap" id="bcTpl"></div>
+        <label class="field">Title<input id="bcTitle" maxlength="60" placeholder="Dr. Doom aa gaya"></label>
+        <label class="field">Message <span class="muted small" id="bcLeft">300</span><textarea id="bcBody" rows="3" maxlength="300" placeholder="Dr. Doom aa gaya lekin tum gym nahi aaye, {name}?"></textarea></label>
+        <label class="field">Who gets it<select id="bcAud"></select></label>
+        <label class="field" id="bcAwayWrap" hidden>For how long<select id="bcAway"></select></label>
+        <div class="stack" style="gap:6px"><span class="eyebrow" id="bcCount"></span><div id="bcWho"></div></div>
+        <div id="bcPreview"></div>
+        <button type="button" class="cta" id="bcSend">Send notification</button>
+      </section>
+      <section class="card stack" id="cdBoard">
+        <div><span class="eyebrow">Leaderboard</span><h2 class="display h2">Who's on top</h2></div>
+        <div class="chip-wrap"><button type="button" class="chip on" data-cbrange="month">This month · prizes</button><button type="button" class="chip" data-cbrange="week">This week</button></div>
+        <button type="button" class="ghost" id="cbMvp" hidden>Shout out the weekly MVP to everyone</button>
+        <div class="stack" id="cbList" style="gap:0"></div>
+        <details><summary><b>This month's prizes</b></summary>
+          <div class="stack" style="margin-top:10px">
+            <label class="field">🥇 1st<input id="cbPrize1" maxlength="80" placeholder="Free month of coaching"></label>
+            <label class="field">🥈 2nd<input id="cbPrize2" maxlength="80" placeholder="Shred shaker bottle"></label>
+            <label class="field">🥉 3rd<input id="cbPrize3" maxlength="80" placeholder="Shoutout on Instagram"></label>
+            <button type="button" class="ghost" id="cbSavePrizes">Save prizes</button>
+            <p class="muted small" style="margin:0">At the end of the month, open "This month" and tap Record on the top 3. Their app celebrates and shows the prize.</p>
+          </div>
+        </details>
+      </section>
+    </div>
   </section>
 </main>
 <div class="toast" id="toast" hidden></div>

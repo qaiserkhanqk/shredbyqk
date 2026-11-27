@@ -7,6 +7,7 @@
 
 import { foodDayRows, foodWeekSummary, placeRows } from './foodsync.js';
 import { careSummary } from './dash.js';
+import { weekScore, weekStart, weekKey } from './leaderboard.js';
 import { allWeights, daysToCheckin } from './adapt.js';
 import { notifyLevel } from './signals.js';
 import { allScores, scoreSummary } from './scores.js';
@@ -57,7 +58,11 @@ export class Cloud {
     return this.req(`/rest/v1/${table}?on_conflict=${conflict}`, { method: 'POST', body: rows, headers: { Prefer: 'resolution=merge-duplicates,return=minimal' } });
   }
   opened() { return this.req('/rest/v1/events', { method: 'POST', body: { client_id: this.uid, kind: 'open' }, headers: { Prefer: 'return=minimal' } }); }
-  unread() { return this.req(`/rest/v1/messages?client_id=eq.${this.uid}&read_at=is.null&order=created_at.asc&select=id,kind,body,created_at`); }
+  unread() { return this.req(`/rest/v1/messages?client_id=eq.${this.uid}&read_at=is.null&order=created_at.asc&select=id,kind,title,body,created_at`); }
+  /** Leaderboard: this week's (or, with months = 1, this month's) top 50 plus my own row. */
+  leaderboard(week, months = 0) { return this.req('/rest/v1/rpc/leaderboard', { method: 'POST', body: { wk: week, months } }); }
+  prizes() { return this.req('/rest/v1/rpc/my_prizes', { method: 'POST', body: {} }); }
+  myRewards() { return this.req(`/rest/v1/rewards?client_id=eq.${this.uid}&select=month,place,prize,given_at&order=month.desc`); }
   markRead(ids) { return ids.length ? this.req(`/rest/v1/messages?id=in.(${ids.join(',')})`, { method: 'PATCH', body: { read_at: new Date().toISOString() }, headers: { Prefer: 'return=minimal' } }) : Promise.resolve(); }
 
   /* ---- coach ---- */
@@ -70,6 +75,12 @@ export class Cloud {
   setPlan(clientId, plan, note = '') { return this.upsert('coach_plans', [{ client_id: clientId, coach_id: this.uid, plan, note, updated_at: new Date().toISOString(), notified_at: null }], 'client_id'); }
   plans(ids) { return ids.length ? this.req(`/rest/v1/coach_plans?client_id=in.(${ids.join(',')})&select=*`) : Promise.resolve([]); }
   send(clientId, kind, body) { return this.req('/rest/v1/messages', { method: 'POST', body: { coach_id: this.uid, client_id: clientId, kind, body }, headers: { Prefer: 'return=minimal' } }); }
+  /** One message per client (they see it in the app; the push job sends it as a notification within the hour). */
+  broadcast(clientIds, title, bodyFor) { return clientIds.length ? this.req('/rest/v1/messages', { method: 'POST', body: clientIds.map(id => ({ coach_id: this.uid, client_id: id, kind: 'broadcast', title, body: bodyFor(id) })), headers: { Prefer: 'return=minimal' } }) : Promise.resolve(); }
+  scores(ids, fromWeek) { return ids.length ? this.req(`/rest/v1/scores?client_id=in.(${ids.join(',')})&week=gte.${fromWeek}&select=client_id,week,score,parts`) : Promise.resolve([]); }
+  setPrizes(prizes) { return this.updateMe({ prizes }); }
+  rewards(month) { return this.req(`/rest/v1/rewards?coach_id=eq.${this.uid}&month=eq.${month}&select=*`); }
+  setReward(row) { return this.upsert('rewards', [{ coach_id: this.uid, ...row }], 'client_id,month'); }
   sent(fromIso) { return this.req(`/rest/v1/messages?coach_id=eq.${this.uid}&created_at=gte.${encodeURIComponent(fromIso)}&order=created_at.desc`); }
 }
 
@@ -103,6 +114,13 @@ export async function pushAll(cloud, S, mark = {}) {
   const lastFood = Math.max(0, ...(S.food?.log || []).map(e => e.at));
   const extra = { next_checkin: nextCheckin(S), diet_plan: S.food?.plan || null, notify: notifyLevel(S), scores: scoreSummary(allScores(S)), last_food: lastFood ? new Date(lastFood).toISOString().slice(0, 10) : null };
   try { await cloud.updateMe(extra); } catch (e) { console.warn('check-in/plan sync skipped:', e.message); }
+  // Leaderboard: this week's and last week's score (last week settles on Monday), nickname, last training day.
+  try {
+    const now = Date.now(), lastT = Math.max(0, ...(S.sessions || []).filter(s => !s.demo).map(s => s.at), ...(S.classes || []).map(c => c.at));
+    await cloud.updateMe({ nickname: S.profile?.nickname || null, board_hidden: !!S.profile?.boardHidden, last_train: lastT ? new Date(lastT).toISOString().slice(0, 10) : null });
+    const rows = [weekStart(now), weekStart(now) - 7 * 864e5].map(ws => { const r = weekScore(S, ws, now); return { client_id: uid, week: weekKey(ws), score: r.score, parts: r.parts, updated_at: new Date().toISOString() }; });
+    await cloud.upsert('scores', rows.filter(r => r.score > 0), 'client_id,week');
+  } catch (e) { console.warn('leaderboard sync skipped:', e.message); }
   await cloud.updateMe({
     ...(food ? { food_week: food } : {}),
     name: S.profile?.name || null, goal: S.profile?.goal || null, weekly_goal: S.profile?.weeklyGoal || null,

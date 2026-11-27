@@ -7,6 +7,7 @@ import { LIB } from './library.js';
 import { byId as programById } from './programs.js';
 import { EXERCISES, allRules } from './exercises.js';
 import { retotal, FOOD_CHOICES, FOODS } from './dietplan.js';
+import { initCoachExtra, loadBoard } from './coach-extra.js';
 import { scoreChips } from './scoreview.js';
 
 const $ = s => document.querySelector(s);
@@ -45,6 +46,9 @@ async function load() {
   // Demo: your own row first, so you can find yourself.
   const mine = state.cards.findIndex(c => c.id === LOCAL_ID); if (mine > 0) state.cards.unshift(...state.cards.splice(mine, 1));
   render();
+  if (!state.extra) { initCoachExtra({ state, cloud, toast }); state.extra = true; }
+  await loadBoard().catch(e => console.warn('board:', e.message));
+  $('#bcAud').dispatchEvent(new Event('change'));
 }
 
 function render() {
