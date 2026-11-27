@@ -316,3 +316,7 @@ drop policy if exists "coach manages rewards" on public.rewards;
 create policy "coach manages rewards" on public.rewards for all using (coach_id = auth.uid() and public.is_my_client(client_id)) with check (coach_id = auth.uid() and public.is_my_client(client_id));
 drop policy if exists "client reads own rewards" on public.rewards;
 create policy "client reads own rewards" on public.rewards for select using (client_id = auth.uid());
+
+-- Weekly report: the client's latest week-in-review snapshot and lifetime weight lifted (for the coach).
+alter table public.profiles add column if not exists week_report jsonb;
+alter table public.profiles add column if not exists lifetime_kg bigint;
