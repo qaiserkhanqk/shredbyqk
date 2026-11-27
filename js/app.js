@@ -239,7 +239,7 @@ function bindPlan() {
     const d = +b.dataset.day, i = S.plan.days.indexOf(d);
     i >= 0 ? S.plan.days.splice(i, 1) : S.plan.days.push(d);
     if (S.plan.days.length) S.profile.weeklyGoal = S.plan.days.length;
-    if (S.program && S.plan.days.length >= 3 && S.plan.days.length <= 5) setDays(S.plan.days.length, 'plan');
+    if (S.program && S.plan.days.length >= freq.MIN_DAYS && S.plan.days.length <= freq.MAX_DAYS) setDays(S.plan.days.length, 'plan');
     persist(); draw(); renderToday(); renderPrograms();
   };
   $('#planTime').value = S.plan.time; $('#planPlace').value = S.plan.place;
@@ -1860,7 +1860,7 @@ function progCard(p, rec) {
   return `<button type="button" role="listitem" class="prog-card big" data-prog="${p.id}" data-coll="${c?.key || 'yours'}">
     <span class="pgoal">${p.custom ? 'Yours' : esc(c?.name || p.goal)} · ${esc(p.level)}</span><b>${esc(p.name)}</b><p>${esc(progText(p))}</p>
     ${rec ? '<span class="rec-tag">Recommended for your goal</span>' : ''}
-    <span class="meta">${flex ? '3–5' : p.days} days/week · ~${progMins(v)} min · ${p.weeks} weeks${progEquip(p) ? ' · ' + progEquip(p) : ''}</span></button>`;
+    <span class="meta">${flex ? '3–6' : p.days} days/week · ~${progMins(v)} min · ${p.weeks} weeks${progEquip(p) ? ' · ' + progEquip(p) : ''}</span></button>`;
 }
 function weekDone() {
   const wk = brief.weekOf(Date.now());
@@ -1916,8 +1916,8 @@ function renderPrograms() {
 }
 $('#collChips').onclick = e => { const b = e.target.closest('[data-coll]'); if (!b) return; collFilter = b.dataset.coll; renderPrograms(); };
 let pickDays = {};
-// Starting days: the client's pick, else the number of weekdays they already train (3–5), else the program default.
-const startDays = p => { const known = S.plan?.days?.length || 0; return pickDays[p.id] || (known >= 3 && known <= 5 ? known : freq.defaultDaysFor(p)); };
+// Starting days: the client's pick, else the number of weekdays they already train (3–6), else the program default.
+const startDays = p => { const known = S.plan?.days?.length || 0; return pickDays[p.id] || (known >= freq.MIN_DAYS && known <= freq.MAX_DAYS ? known : freq.defaultDaysFor(p)); };
 function showProgram(id) {
   const on = S.program?.id === id, base = on ? baseProgram() : programById(id); if (!base) return;
   const flex = freq.canAdapt(base), n = flex ? (on ? S.program.days || base.days : startDays(base)) : base.days, p = daysView(base, n);
@@ -2499,7 +2499,7 @@ function chooseProgram(id) {
   S.program = { id, start: Date.now(), blockStart: Date.now(), block: 1, log: [], ...(freq.canAdapt(p) ? { days: nd } : {}) };
   if (!S.plan.days.length) { S.plan.days = defaultDays(nd); S.profile.weeklyGoal = nd; }
   persist(); drawObDays();
-  $('#obDaysNote').textContent = `QK picked ${p.name}: ${p.tagline} It's ${nd} days a week, so QK suggested days. Change them to fit your life${freq.canAdapt(p) ? ': pick 3, 4 or 5 and QK re-packs the program' : ''}.`;
+  $('#obDaysNote').textContent = `QK picked ${p.name}: ${p.tagline} It's ${nd} days a week, so QK suggested days. Change them to fit your life${freq.canAdapt(p) ? ': pick 3 to 6 and QK re-packs the program' : ''}.`;
   obStep(3);
 }
 const OB_ORDER = [1, 2, 3, 4, 5, 6, 0], OB_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];

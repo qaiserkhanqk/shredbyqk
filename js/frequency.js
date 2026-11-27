@@ -1,4 +1,4 @@
-// Days a week: the same program at 3, 4 or 5 sessions a week, and QK judging the right number from
+// Days a week: the same program at 3 to 6 sessions a week, and QK judging the right number from
 // what the lifter actually does. Pure functions, unit tested.
 //
 // Evidence: with weekly sets equal, training a muscle 1, 2 or 3+ times a week gives about the same growth
@@ -13,11 +13,12 @@ import { dayMinutes } from './warmup.js';
 /** Programs whose sessions can be re-packed. Circuits, sport, HYROX, plyometric and specialist blocks
  *  keep their own days because moving their pieces would break how they work. */
 export const FLEX = ['gainsEngine', 'powerPump', 'hypertrophyLab', 'platformPrep', 'strengthBuilder', 'massMonster', 'elitePhysique', 'gluteLab', 'dumbbellDen', 'bandStrong'];
-export const DAY_CHOICES = [3, 4, 5];
+export const DAY_CHOICES = [3, 4, 5, 6];
+export const MIN_DAYS = 3, MAX_DAYS = 6;
 export const canAdapt = p => !!p && FLEX.includes(p.id);
 /** The days a week a program starts on: 5, except beginner programs, which start on their own 3. */
 export const defaultDaysFor = p => (canAdapt(p) && p.level !== 'Beginner' ? 5 : p?.days);
-export const clampDays = n => Math.max(3, Math.min(5, Math.round(n) || 5));
+export const clampDays = n => Math.max(MIN_DAYS, Math.min(MAX_DAYS, Math.round(n) || 5));
 
 const LOWER = ['Quads', 'Hamstrings', 'Glutes', 'Calves', 'Adductors'];
 const UPPER = ['Chest', 'Back', 'Shoulders', 'Triceps', 'Biceps', 'Forearms'];
@@ -41,7 +42,7 @@ export function muscleSets(p, lib) {
  * @returns the program with `days: n`, a new `plan`, `adapted: { from, to, cut: [{ id, from, to }] }`;
  *          the program itself when it can't or needn't be adapted.
  */
-const MAX_MIN = { 3: 85, 4: 75, 5: 70 }; // longer sessions are normal when training fewer days
+const MAX_MIN = { 3: 85, 4: 75, 5: 70, 6: 65 }; // longer sessions are normal when training fewer days
 export function adapt(p, n, lib, { maxMinutes = MAX_MIN[n] || 75 } = {}) {
   if (!canAdapt(p) || !n || n === p.days || p.plan.length !== p.days) return p;
   // Units: a single exercise, or a superset/circuit group that moves as one.
@@ -80,7 +81,7 @@ export function adapt(p, n, lib, { maxMinutes = MAX_MIN[n] || 75 } = {}) {
     const lower = LOWER.includes(u.muscle), upper = UPPER.includes(u.muscle);
     const score = day => {
       const have = day.sets[u.muscle] || 0, region = lower ? day.lower - day.upper : upper ? day.upper - day.lower : 0;
-      return (clash(day, u) ? 1000 : 0) + Math.max(0, have + u.sets - MUSCLE_CAP) * 50 + have * 2 - Math.sign(region) * 4 + day.total * 0.6;
+      return (clash(day, u) ? 1000 : 0) + Math.max(0, have + u.sets - MUSCLE_CAP) * 50 + have * 2 - Math.sign(region) * 4 + day.total * 1.2;
     };
     add(days.reduce((best, day) => (score(day) < score(best) ? day : best)), u);
   }
@@ -145,7 +146,7 @@ export const weekOf = t => Math.floor((t - new Date(t).getTimezoneOffset() * 6e4
  *    last change), and at least `need` of them;
  *  - weeks with no sessions at all are treated as holiday or illness and skipped (up to `lookback` weeks);
  *  - every counted week below the plan → step down to the MOST they did in those weeks (never under 3);
- *    every counted week above the plan → step up to the LEAST they did (never over 5); anything mixed → no change.
+ *    every counted week above the plan → step up to the LEAST they did (never over 6); anything mixed → no change.
  * @param log [{ day, at }] program sessions, one per training day
  * @param o { current, since (program start or last change), hold (no judging before), now }
  * @returns null or { days, counts, dir: 'down'|'up' }
@@ -165,7 +166,7 @@ export function judgeDays(log, { current, since, hold = 0, now = Date.now(), nee
 /** Keep the weekdays someone chose and only add or remove days to reach `n` (Monday-first order). */
 export function fitWeekdays(days, n) {
   const order = d => (d + 6) % 7, have = [...new Set(days || [])].sort((a, b) => order(a) - order(b)).slice(0, n);
-  const spread = { 3: [1, 3, 5], 4: [1, 2, 4, 5], 5: [1, 2, 3, 4, 5] }[n] || [1, 2, 3, 4, 5, 6, 0];
+  const spread = { 3: [1, 3, 5], 4: [1, 2, 4, 5], 5: [1, 2, 3, 4, 5], 6: [1, 2, 3, 4, 5, 6] }[n] || [1, 2, 3, 4, 5, 6, 0];
   for (const d of [...spread, 1, 2, 3, 4, 5, 6, 0]) if (have.length < n && !have.includes(d)) have.push(d);
   return have.sort((a, b) => order(a) - order(b));
 }
@@ -175,7 +176,7 @@ export function usualDays(log, n, { now = Date.now(), weeks = 6 } = {}) {
   const from = now - weeks * WEEK, tally = [0, 0, 0, 0, 0, 0, 0];
   for (const l of log || []) if (l.at >= from) tally[new Date(l.at).getDay()]++;
   const picked = [1, 2, 3, 4, 5, 6, 0].filter(d => tally[d]).sort((a, b) => tally[b] - tally[a]).slice(0, n);
-  const spread = { 3: [1, 3, 5], 4: [1, 2, 4, 5], 5: [1, 2, 3, 4, 5] }[n] || [1, 3, 5];
+  const spread = { 3: [1, 3, 5], 4: [1, 2, 4, 5], 5: [1, 2, 3, 4, 5], 6: [1, 2, 3, 4, 5, 6] }[n] || [1, 3, 5];
   for (const d of spread) if (picked.length < n && !picked.includes(d)) picked.push(d);
   return picked.sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7));
 }

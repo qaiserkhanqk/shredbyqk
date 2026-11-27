@@ -811,7 +811,7 @@ button.row.food-hit { padding: 11px 0; }
 .more-head { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
 
 /* Days a week */
-.days-seg { display: grid; grid-template-columns: repeat(3, 1fr); align-self: stretch; }
+.days-seg { display: grid; grid-template-columns: repeat(4, 1fr); align-self: stretch; }
 .days-seg button { padding: 9px 6px; }
 #heroDaysNews, #daysNews { display: flex; flex-direction: column; gap: 6px; }
 #heroDaysNews[hidden], #daysNews[hidden] { display: none; }

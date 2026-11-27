@@ -362,7 +362,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
 
   // Days a week: pick 3, 4 or 5 on an adjustable program; QK re-packs it and judges the pattern itself.
   await p.goto('https://shred.local/'); await go('train'); await tap('#progStrip [data-prog=massMonster]'); await p.waitForTimeout(150);
-  check('days: Mass Monster starts on the 3 days this lifter already trains, with a 3/4/5 choice', (await p.$$('#rsheetBody [data-pdays]')).length === 3 && /3 days a week/.test(await p.textContent('#rsheetBody .data')), await p.textContent('#rsheetBody .data'));
+  check('days: Mass Monster starts on the 3 days this lifter already trains, with a 3–6 choice', (await p.$$('#rsheetBody [data-pdays]')).length === 4 && /3 days a week/.test(await p.textContent('#rsheetBody .data')), await p.textContent('#rsheetBody .data'));
   await p.click('[data-pdays="5"]'); await p.waitForTimeout(150);
   check('days: 5 days gives 5 sessions', (await p.$$('#rsheetBody .prog-day')).length === 5 && /5 days a week/.test(await p.textContent('#rsheetBody .data')));
   await p.click('[data-pdays="3"]'); await p.waitForTimeout(150);
