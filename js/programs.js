@@ -231,7 +231,8 @@ export function currentDay(prog, active) {
   const log = (active.log || []).slice(active.restartAt || 0), today = new Date().toDateString();
   const last = log[log.length - 1];
   if (last && new Date(last.at).toDateString() === today) { const i = last.day % prog.plan.length; return { index: i, day: prog.plan[i], doneToday: true, n: log.length }; }
-  const index = log.length ? (last.day + 1) % prog.plan.length : 0;
+  // A rescued day (today plus the next session's main lifts) moves the rotation past both.
+  const index = log.length ? ((last.merged ?? last.day) + 1) % prog.plan.length : 0;
   return { index, day: prog.plan[index], doneToday: false, n: log.length };
 }
 

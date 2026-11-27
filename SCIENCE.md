@@ -397,3 +397,34 @@ sets and pack them into fewer, longer sessions:
 - After a change it needs three new full weeks before judging again. The client is told why ("You trained
   3, 3, 3 days the last 3 weeks"), and one tap keeps the old days and pauses judging for 4 weeks.
 - Reminder days follow the weekdays the client actually trains on.
+
+## Making it personal (`js/personal.js`, `js/voicecmd.js`, `js/coach-ur.js`)
+
+All of this is plain logic that runs on the phone: no AI model and no server. The same situation always
+gives the same answer, and QK always says why it changed something.
+
+- **Readiness.** The 3-tap check before a workout covers sleep, soreness and energy, plus resting heart rate
+  if the client measured it today with the camera. Self-reported wellbeing tracks training stress better
+  than most objective markers (Saw et al. 2016, doi:10.1136/bjsports-2015-094758). A rough day takes 5–10%
+  off the weights and one set off the extras; main lifts keep their sets. QK never pushes past the plan on a
+  good day: that is the progression engine's job. If the morning "How do you feel?" card on Today was
+  answered, QK uses it instead of asking again.
+- **Equipment.** Exercises the client can't do with their kit are swapped for the closest alternative
+  (same movement first, then same main muscle), keeping sets and reps.
+- **Pain.** Loaded moves for a sore area (for example, overhead pressing and dips for a shoulder) are
+  swapped, and two gentle rehab moves are added at the start. This is not a diagnosis: the app tells
+  clients to see a physio or doctor for sharp pain, swelling, numbness or pain past two weeks.
+- **Likes and skips.** An exercise skipped twice in 4 weeks is swapped out from then on. Favourites (done
+  on 4+ days in 8 weeks) are kept when the monthly refresh rotates exercises.
+- **Where to start.** New lifters and those aged 50+ do one set fewer on the extras in month 1, and those
+  aged 50+ get a light week every 5 weeks instead of 7. These are conservative practical rules.
+- **Weak points.** A form fault in 3+ sets in 4 weeks with a known fix (for example, shifting to one side
+  in the squat leads to single-leg work), or a lift whose estimated 1RM hasn't moved in 6 weeks while the
+  others rose 3%+, adds one exercise next month and says why. If everything stalls together, nothing is
+  blamed on one lift.
+- **Missed sessions.** If the week can't fit the remaining sessions, today also gets the next session's main
+  lifts (one set lighter, within the time limit). Only days after the program started count as missed.
+- **Time per day, machine taken, voice and Urdu.** A per-weekday minute budget trims accessories first. "Machine
+  taken" swaps an exercise for today only. Voice commands are opt-in and use the phone's speech recognition
+  (on most Android phones Google turns the audio into text). Urdu covers short spoken cues only (counts,
+  sets, rest, go, done); a set summary with a form tip stays English so the tip is never lost.

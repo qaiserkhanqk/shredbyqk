@@ -1,4 +1,1 @@
-{ "name": "Shred by QK", "short_name": "Shred", "start_url": ".", "display": "standalone",
-  "background_color": "#F2F4EF", "theme_color": "#F2F4EF",
-  "icons": [{ "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }],
-  "shortcuts": [{ "name": "Calm now (Sukoon)", "short_name": "Calm now", "url": "./?calm=now", "icons": [{ "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }] }] }
+{"name": "Shred by QK", "short_name": "Shred", "start_url": ".", "display": "standalone", "background_color": "#F2F4EF", "theme_color": "#F2F4EF", "icons": [{"src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}], "shortcuts": [{"name": "Start today's workout", "short_name": "Workout", "url": "./?start=today", "icons": [{"src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml"}]}, {"name": "Calm now (Sukoon)", "short_name": "Calm now", "url": "./?calm=now", "icons": [{"src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml"}]}]}

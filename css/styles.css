@@ -816,3 +816,15 @@ button.row.food-hit { padding: 11px 0; }
 #heroDaysNews, #daysNews { display: flex; flex-direction: column; gap: 6px; }
 #heroDaysNews[hidden], #daysNews[hidden] { display: none; }
 #heroDaysNews p, #daysNews p { margin: 0; }
+
+/* Personalisation */
+.chip-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+.field.inline-field { display: grid; grid-template-columns: 52px 1fr; align-items: center; gap: 10px; flex-direction: row; }
+.setup-extra { flex-wrap: wrap; }
+.setup-extra button { flex: 1 1 auto; }
+.rq { display: flex; flex-direction: column; gap: 6px; }
+.rq .seg { align-self: stretch; }
+.ready-note { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); font-size: .88rem; border-left: 3px solid var(--good); }
+.ready-note.easy { border-left-color: var(--warn); }
+.ready-note.rest { border-left-color: var(--bad); }
+#rescueNews p { margin: 4px 0 0; }
