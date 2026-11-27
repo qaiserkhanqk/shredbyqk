@@ -117,3 +117,23 @@ Still not tested: real iPhone, Android or Mac Safari.
 New since the last run: `tests/onboarding-ui.cjs` (27) and `tests/cycle-ui-premenstrual.cjs` (10).
 
 Still not tested: real iPhone, Android or Mac Safari.
+
+## Re-run on 69f1862 (2026-11-27): the merged app (cycle tracking + food, Brain, Sukoon, Fitness Age, leaderboard, new sign-up)
+Chromium (the four test commands) passed in full: `npm test` 2,044, `npm run research:test` 510, `npm run test:e2e` 571 and `npm run research:e2e` 65, all with 0 failures.
+
+**WebKit 26.6 and Firefox 155** (each browser test file run separately: 22 files):
+
+| Browser | Result |
+|---|---|
+| WebKit | **582 ok, 6 failures.** 5 are the known plain-http dashboard checks; they pass in the labelled local-cookie mode (26, 14 and 20 checks), as on every run. 1 is the tap-along pulse (below). |
+| Firefox | **632 ok, 3 failures** (below). |
+
+**Every cycle-tracking, sign-up and premenstrual check passed in both browsers.** All 4 remaining failures are in features merged from `main`, which had only been tested in Chromium:
+
+| Failure | Browser | What it is |
+|---|---|---|
+| Tap-along pulse: "12 taps 750 ms apart → about 80 bpm" gave **76** | WebKit, Firefox | **A test timing issue, not an app error.** The test waits 750 ms *plus* the browser's time to register each click. In these browsers the real gap was about 790 ms, which is 76 bpm. The app measured the taps correctly. The test should compare with the actual tap times. |
+| "Set start: QK tells you what to do" | Firefox | **An environment limit.** Firefox here has no WebGL, so the camera coaching can't start; the test already notes this for the other camera checks. This check is not yet marked as needing WebGL. |
+| "Sukoon: recitation failure offers the passage on Quran.com" | Firefox | **A real gap.** When the recitation audio can't be decoded, Firefox reports a media-sink error (`NS_ERROR_DOM_MEDIA_MEDIASINK_ERR`) but never fires the audio element's `error` event. A probe showed the screen still on "Bismillah" after 6 s, in silence, with no Quran.com link. Sukoon's fallback relies on that event. Suggested fix: a timeout (if no audio plays within a few seconds, show the link). Not fixed yet. |
+
+Still not tested: real iPhone, Android or Mac Safari.
