@@ -275,10 +275,19 @@ const num = s => +String(s).replace(/[^\d]/g, '');
   check('choosing "eat 150 less" lowers the target by 150', kcalBefore - kcalAfter === 150, `${kcalBefore} → ${kcalAfter}`);
   check('next check-in is in two weeks', /Next check-in in 1[34] days/.test(await p.textContent('#foodWeight')));
   await p.$eval('#foodWeight', el => el.scrollIntoView()); await shot('7-weight');
+  // Scores on Today: shown with what unlocks them; tapping one explains it.
+  await p.click('.tabs [data-tab=today]'); await p.waitForTimeout(200);
+  const sc = await p.textContent('#scoreCard');
+  check('Today shows the score card (health, fitness age, four scores)', /Health score/.test(sc) && /Fitness age/.test(sc) && /Nutrition/.test(sc) && /Workout/.test(sc), sc.slice(0, 160));
+  await p.click('#scoreCard [data-score=nutrition]');
+  check('tapping a score shows why and the next step', /Next step:|Fix first:/.test(await p.textContent('#scoreCard')));
+  await p.$eval('#scoreCard', el => el.scrollIntoView()); await shot('8-scores');
+  await p.click('.tabs [data-tab=food]');
   // Coach dashboard (sample mode): this phone's food shows on its card.
   await p.goto('https://shred.local/coach.html'); await p.waitForTimeout(700);
   await p.click('.cd-row'); await p.waitForTimeout(200);
   check('coach dashboard shows the client\'s food week', /Food · last 7 days/.test(await p.textContent('#cdDetail')) && /QK suggested/.test(await p.textContent('#cdDetail')));
+  check('coach dashboard shows the client\'s scores', /Health/.test(await p.textContent('#cdDetail .cd-scores')));
   check('coach dashboard shows the client\'s diet plan', /Diet plan\s*[\d,]+ kcal/.test(await p.textContent('#cdDetail')), (await p.textContent('#cdDetail')).match(/Diet plan.{0,60}/)?.[0]);
   // QK edits the plan on the dashboard → the client's app shows it.
   check('dashboard shows the plan editor', !!(await p.$('#cdDetail .cd-plan input[data-amt]')));

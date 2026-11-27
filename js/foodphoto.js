@@ -18,8 +18,9 @@ export const PHOTO_CONFIG = {
   endpoint: '',
   // Optional live fallback search (FatSecret) on the same server, e.g. 'https://your-server/food-search'.
   searchEndpoint: '',
-  samples: 'auto', // the server asks the AI once, and twice more only when unsure (see tools/food-vision-server.mjs)
-  maxSide: 768, // a bigger image costs more and doesn't help the model count rotis
+  // One fast answer (~1–2 s); when it's unsure, a stronger model double-checks in the background (see the server).
+  samples: 'fast',
+  maxSide: 640, // smaller uploads faster on mobile data; plenty to count rotis and read a plate
 };
 
 // The catalogue the model must choose from, with what one serving means, so portions come back in our units.
@@ -103,16 +104,29 @@ async function postBusyAware(url, body, { wait = ms => new Promise(r => setTimeo
   }
 }
 
-export async function recognise(file, ctx = {}) {
+/**
+ * onRefined(result): called later, only if the fast answer was unsure and the double-check came back.
+ */
+export async function recognise(file, ctx = {}, onRefined = null) {
   if (!PHOTO_CONFIG.endpoint) throw new Error('no-endpoint');
   const { dataUrl, hash, quality } = await prepareImage(file);
   const key = hash + '|' + (ctx.hint || '');
   const hit = readCache()[key];
   if (hit) return { ...hit.result, cached: true, dataUrl, hash, quality };
   const r = await postBusyAware(PHOTO_CONFIG.endpoint, { image: dataUrl, hash, samples: PHOTO_CONFIG.samples, catalogue: catalogue(), hint: ctx.hint || '', plateCm: ctx.plateCm || null, usual: ctx.usual || [] });
-  const result = consensus((await r.json()).samples);
+  const body = await r.json(), first = body.samples;
+  const result = consensus(first);
   writeCache(key, result);
-  return { ...result, cached: false, dataUrl, hash, quality };
+  if (body.refine && PHOTO_CONFIG.samples === 'fast') {
+    // The quiet second opinion: majority of the fast answer and two from the stronger model.
+    postBusyAware(PHOTO_CONFIG.endpoint, { image: dataUrl, hash, samples: 'refine', catalogue: catalogue(), hint: ctx.hint || '', plateCm: ctx.plateCm || null, usual: ctx.usual || [] })
+      .then(x => x.json()).then(b => {
+        const better = consensus([...first, ...(b.samples || [])]);
+        writeCache(key, better);
+        onRefined?.({ ...better, refined: true, dataUrl, hash, quality });
+      }).catch(() => {});
+  }
+  return { ...result, cached: false, refining: !!body.refine, dataUrl, hash, quality };
 }
 
 /**
