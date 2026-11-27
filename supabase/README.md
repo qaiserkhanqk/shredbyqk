@@ -74,3 +74,29 @@ After that:
 - **Leaderboard.** Clients' apps send their weekly score when they sync. Ranking happens in the database, among the clients of the same coach. The board only ever shows a board name (nickname, else first name + initial, or "Anonymous") and points, never health details.
 - **Prizes.** On the dashboard, under Leaderboard, set the three prizes. At the end of the month, open "This month" and press **Record** on the top 3. Their app celebrates.
 - **Broadcasts.** On the dashboard, under "Send to everyone", pick a template or write your own message, choose who gets it, and press Send. The app shows it the next time it opens. With step 6 set up, the push job (now hourly) also sends it as a phone notification.
+
+## 8. Chat with QK, and Muhammad (re-run the schema)
+
+Clients tap **Message QK** on Today and type or talk, in any language. Muhammad, QK's assistant, replies straight
+away from what the app knows about them (goal, targets, food week, weight trend, diet plan, scores, check-in), in
+QK's style. Pain, injuries, medicine, pregnancy, eating problems, feeling unsafe, money and complaints go straight
+to QK: Muhammad says "QK will reply to you himself. I've forwarded your message to him." and the message shows under
+**Needs you** on the dashboard. QK reads every conversation on the dashboard, replies himself (Muhammad stays quiet
+while QK is chatting), marks things handled, and can switch Muhammad off for any client. Muhammad never says he's a
+person; if a client asks, he says he's QK's AI assistant and that QK reads every chat.
+
+1. Re-run `supabase/schema.sql` (adds the `chats` and `assistant_off` tables and their privacy rules).
+2. On the food server (tools/food-vision-server.mjs) set `SUPABASE_URL`, `SUPABASE_ANON_KEY` (to check who's asking)
+   and `SUPABASE_SERVICE_ROLE_KEY` (to read the client's profile and post Muhammad's reply), plus `GEMINI_API_KEY`.
+   The app calls `/chat` after each message (address in `js/cloud-config.js` → `CHAT`, or the photo server's).
+3. Safety net, for a message sent while the server was down: run `node tools/chat-assistant.mjs --watch` next to the
+   server (checks every 15 seconds).
+4. On the dashboard, under **How he answers**, write how you talk (Muhammad also learns from your own replies).
+
+Voice: the 🎤 button types what the client says (Urdu, English, Arabic, Hindi, Punjabi) and sends it. ▶ Play on any
+reply, or **Read replies aloud**, speaks it in Muhammad's voice: the server's `/chat-voice` (Gemini speech, voice
+`VOICE_NAME`, default Charon), or the phone's own voice in the message's language if the server has no voice.
+
+Cost (approximate Gemini list prices; check your plan): a reply uses about 1,500 tokens in and 100 out on Flash-Lite, roughly
+$0.0003, so 10,000 messages a month is about $3. A spoken reply (about 15 seconds of audio) is roughly $0.005, so
+2,000 played replies is about $10; the same reply played twice is cached.
