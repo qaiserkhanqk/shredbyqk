@@ -770,7 +770,7 @@ async function checkinNotice() {
   const title = 'Check-in day with QK', body = 'Weigh yourself before breakfast and enter it in Food. QK will read your two weeks and suggest your next step.';
   try {
     const reg = await navigator.serviceWorker?.getRegistration?.();
-    reg ? reg.showNotification(title, { body, icon: 'icons/icon.svg', tag: 'qk-checkin' }) : new Notification(title, { body, tag: 'qk-checkin' });
+    reg ? reg.showNotification(title, { body, icon: 'icons/icon-192.png', tag: 'qk-checkin' }) : new Notification(title, { body, tag: 'qk-checkin' });
     A.notifiedOn = today; ctx.persist();
   } catch {}
 }
