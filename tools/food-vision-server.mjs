@@ -4,7 +4,9 @@
 //
 //   ANTHROPIC_API_KEY=... node tools/food-vision-server.mjs          # Claude (default model claude-sonnet-5-5)
 //   OPENAI_API_KEY=...    node tools/food-vision-server.mjs          # OpenAI (set OPENAI_MODEL, default gpt-4o)
-//   GEMINI_API_KEY=...    node tools/food-vision-server.mjs          # Google Gemini (set GEMINI_MODEL, default gemini-2.5-flash)
+//   GEMINI_API_KEY=...    node tools/food-vision-server.mjs          # Google Gemini (set GEMINI_MODEL, default gemini-3.8-flash)
+//   OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai OPENAI_MODEL=gemini-3.8-flash OPENAI_API_KEY=<gemini key> …
+//                                                                     # Gemini through its OpenAI-compatible endpoint (Bearer key)
 //   FOOD_AI=gemini …                                                  # pick one when several keys are set
 // Gemini has a free tier, but on it Google may use what you send to improve its products: fine for
 // testing, switch to a paid key before real clients upload meal photos.
@@ -24,7 +26,7 @@ const PORT = +process.env.PORT || 8787;
 const ORIGIN = process.env.ALLOW_ORIGIN || '*';
 const KEYS = { anthropic: process.env.ANTHROPIC_API_KEY, openai: process.env.OPENAI_API_KEY, gemini: process.env.GEMINI_API_KEY };
 const PROVIDER = KEYS[process.env.FOOD_AI] ? process.env.FOOD_AI : ['anthropic', 'openai', 'gemini'].find(k => KEYS[k]) || null;
-const MODEL = { anthropic: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5', openai: process.env.OPENAI_MODEL || 'gpt-4o', gemini: process.env.GEMINI_MODEL || 'gemini-2.5-flash' }[PROVIDER];
+const MODEL = { anthropic: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5', openai: process.env.OPENAI_MODEL || 'gpt-4o', gemini: process.env.GEMINI_MODEL || 'gemini-3.8-flash' }[PROVIDER];
 const cache = new Map(); // hash → samples
 
 const RULES = `For each separate food:
@@ -111,7 +113,7 @@ async function askAnthropic({ image, text, ids }) {
 async function askOpenAI({ image, text, ids }) {
   const content = [{ type: 'text', text }];
   if (image) content.push({ type: 'image_url', image_url: { url: image } });
-  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+  const r = await fetch(`${process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'}/chat/completions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
     body: JSON.stringify({
@@ -155,8 +157,11 @@ async function askGemini({ image, text, ids }) {
 async function ask(job, samples) {
   const fn = { anthropic: askAnthropic, openai: askOpenAI, gemini: askGemini }[PROVIDER];
   const n = Math.min(5, Math.max(1, samples | 0));
-  const out = (await Promise.allSettled(Array.from({ length: n }, () => fn(job)))).filter(s => s.status === 'fulfilled' && s.value).map(s => s.value);
-  if (!out.length) throw new Error('every request failed');
+  const settled = await Promise.allSettled(Array.from({ length: n }, () => fn(job)));
+  const out = settled.filter(s => s.status === 'fulfilled' && s.value).map(s => s.value);
+  const err = settled.find(s => s.status === 'rejected')?.reason;
+  if (err) console.error(`${settled.filter(s => s.status === 'rejected').length}/${n} requests failed: ${err.message}`);
+  if (!out.length) throw new Error('every request failed: ' + (err?.message || 'empty answers'));
   return out;
 }
 const remember = (key, v) => { cache.set(key, v); if (cache.size > 500) cache.delete(cache.keys().next().value); return v; };
