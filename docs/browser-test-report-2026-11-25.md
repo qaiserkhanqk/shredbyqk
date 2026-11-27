@@ -107,7 +107,7 @@ Still not tested: real iPhone, Android or Mac Safari.
 ## Re-run on ed69ad6 (2026-11-27): sign-up, 18+ and premenstrual patterns
 **The version tested** adds the personalised sign-up (minimum age 18), the premenstrual pattern card, and the question budget.
 
-**Results** (each browser test file run separately: 23 files):
+**Results** (each browser test file run separately: 21 files):
 
 | Browser | Result |
 |---|---|
