@@ -18,7 +18,7 @@ export const PHOTO_CONFIG = {
   endpoint: '',
   // Optional live fallback search (FatSecret) on the same server, e.g. 'https://your-server/food-search'.
   searchEndpoint: '',
-  samples: 3,
+  samples: 'auto', // the server asks the AI once, and twice more only when unsure (see tools/food-vision-server.mjs)
   maxSide: 768, // a bigger image costs more and doesn't help the model count rotis
 };
 
@@ -92,17 +92,24 @@ function writeCache(hash, result) {
  * Photo → dishes. ctx: { hint: what the person said ("restaurant karahi"), plateCm: their usual plate,
  * usual: names of dishes they log most }. All three make the model's job easier and its answers steadier.
  */
+// When many people snap at once the server says "busy, try in N seconds": wait once (up to 12 s), then give up
+// politely (the app offers voice and search instead), so phones never hammer an overloaded server.
+async function postBusyAware(url, body, { wait = ms => new Promise(r => setTimeout(r, ms)) } = {}) {
+  for (let attempt = 0; ; attempt++) {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (r.ok) return r;
+    if (r.status === 503 && attempt === 0) { await wait(Math.min(12, +r.headers.get('Retry-After') || 5) * 1000 * (0.8 + Math.random() * 0.4)); continue; }
+    throw new Error(r.status === 503 ? 'busy' : 'server ' + r.status);
+  }
+}
+
 export async function recognise(file, ctx = {}) {
   if (!PHOTO_CONFIG.endpoint) throw new Error('no-endpoint');
   const { dataUrl, hash, quality } = await prepareImage(file);
   const key = hash + '|' + (ctx.hint || '');
   const hit = readCache()[key];
   if (hit) return { ...hit.result, cached: true, dataUrl, hash, quality };
-  const r = await fetch(PHOTO_CONFIG.endpoint, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image: dataUrl, hash, samples: PHOTO_CONFIG.samples, catalogue: catalogue(), hint: ctx.hint || '', plateCm: ctx.plateCm || null, usual: ctx.usual || [] }),
-  });
-  if (!r.ok) throw new Error('server ' + r.status);
+  const r = await postBusyAware(PHOTO_CONFIG.endpoint, { image: dataUrl, hash, samples: PHOTO_CONFIG.samples, catalogue: catalogue(), hint: ctx.hint || '', plateCm: ctx.plateCm || null, usual: ctx.usual || [] });
   const result = consensus((await r.json()).samples);
   writeCache(key, result);
   return { ...result, cached: false, dataUrl, hash, quality };
@@ -129,10 +136,7 @@ export function imageQuality(pixels, w, h) {
 /** Words the app's own parser didn't catch ("kadhi chawal ki plate") → dishes from the catalogue, via the server. */
 export async function askText(text) {
   if (!PHOTO_CONFIG.endpoint || !text.trim()) return [];
-  const r = await fetch(PHOTO_CONFIG.endpoint.replace(/food-vision$/, 'food-text'), {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, catalogue: catalogue() }),
-  });
-  if (!r.ok) throw new Error('server ' + r.status);
+  const r = await postBusyAware(PHOTO_CONFIG.endpoint.replace(/food-vision$/, 'food-text'), { text, catalogue: catalogue() });
   return consensus((await r.json()).samples).items.filter(i => i.dish);
 }
 
