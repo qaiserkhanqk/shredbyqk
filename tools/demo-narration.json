@@ -97,18 +97,54 @@
   },
   {
     "id": "17",
+    "step": "Brain",
+    "caption": "Brain: a score for how well you looked after your brain this week.",
+    "say": "And to keep your brain sharp, there's Brain. Your Brain score shows how well you looked after it this week."
+  },
+  {
+    "id": "18",
+    "step": "Speed Flash",
+    "caption": "Speed Flash: spot the car, find the star. The drill with long-term evidence.",
+    "say": "Speed Flash is the brain drill with twenty years of evidence behind it."
+  },
+  {
+    "id": "19",
+    "step": "Reflex games",
+    "caption": "Reflex games, the way F1 drivers train. Lights Out: react to the start.",
+    "say": "And reflex games, the way F1 drivers train. Lights out, and go!"
+  },
+  {
+    "id": "20",
+    "step": "Reflex games",
+    "caption": "Reaction Wall, like the Batak board: hit every light in 30 seconds.",
+    "say": "Hit every light you can in thirty seconds."
+  },
+  {
+    "id": "21",
+    "step": "Quran memory",
+    "caption": "Learn the Quran by heart: listen, fade the words, recite from memory.",
+    "say": "Learn the Quran by heart. Listen, fade the words, and recite from memory."
+  },
+  {
+    "id": "22",
+    "step": "Quran memory",
+    "caption": "Each verse comes back for review just before you'd forget it.",
+    "say": "And each verse comes back for review, just before you'd forget it."
+  },
+  {
+    "id": "23",
     "step": "Me",
     "caption": "Your progress, all in one place.",
     "say": "Your progress is all in one place."
   },
   {
-    "id": "18",
+    "id": "24",
     "step": "Me",
     "caption": "One tap sends QK your week. Text only, never video.",
     "say": "And with one tap, you send me your week, so I can coach you properly."
   },
   {
-    "id": "19",
+    "id": "25",
     "step": "Shred by QK",
     "caption": "Your coach in your pocket.",
     "say": "Shred. Your coach in your pocket. Let's get to work."

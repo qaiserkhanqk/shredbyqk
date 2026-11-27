@@ -106,7 +106,59 @@ export const GAMES = [
   { id: 'grid', name: 'Memory Grid', sub: 'Repeat the pattern. It grows each time you get it right.', minutes: 3 },
   { id: 'clash', name: 'Colour Clash', sub: 'Tap the ink, not the word. 45 seconds of focus.', minutes: 1 },
   { id: 'order', name: 'Verse Order', sub: 'Put the words of a verse you\'re learning back in order.', minutes: 2, quran: true },
+  // Reflex games: how F1 drivers and other athletes train reactions.
+  { id: 'lights', name: 'Lights Out', sub: 'Five red lights, then go. React to an F1 race start.', minutes: 1, reflex: true },
+  { id: 'batak', name: 'Reaction Wall', sub: 'Hit each light as it appears, 30 seconds. Like the Batak board.', minutes: 1, reflex: true },
+  { id: 'track', name: 'Tracker', sub: 'Follow 3 balls among 8 as they speed around.', minutes: 2, reflex: true },
 ];
+
+/* ---------- Reflex games ----------
+   Lights Out: the F1 start. 5 lights come on one a second, then all go out after a random 0.2–3 s hold.
+   Drivers react in about 0.2 s (measured by the car). A phone adds its own screen and touch delay (often 50–100 ms),
+   so compare with yourself, on the same phone. Tapping before lights out is a jump start. */
+export const LIGHTS = { starts: 5, gap: 1000, holdMin: 200, holdMax: 3000, minHuman: 100 };
+export const lightsHold = (rand = Math.random) => Math.round(LIGHTS.holdMin + rand() * (LIGHTS.holdMax - LIGHTS.holdMin));
+/** results: reaction ms per start, or null for a jump start. Under 100 ms counts as a guess (jump start). */
+export function lightsScore(results) {
+  const ok = results.filter(r => r != null && r >= LIGHTS.minHuman), jumps = results.length - ok.length;
+  const best = ok.length ? Math.min(...ok) : null, avg = ok.length ? Math.round(ok.reduce((a, b) => a + b, 0) / ok.length) : null;
+  const label = avg == null ? 'No clean start' : avg < 250 ? 'Pole position' : avg < 300 ? 'Front row' : avg < 360 ? 'Points finish' : 'Keep practising';
+  return { best, avg, jumps, label, score: avg == null ? 0 : Math.max(0, Math.round(1000 - avg) - jumps * 50) };
+}
+
+/** Reaction Wall (like the Batak board): 12 lights round the screen, one lit at a time. Hit as many as you can in 30 s. */
+export const BATAK = { seconds: 30, lights: 12 };
+export function batakNext(prev, rand = Math.random) {
+  let n; do n = Math.floor(rand() * BATAK.lights); while (n === prev);
+  return n;
+}
+
+/** Tracker (multiple-object tracking, like NeuroTracker): follow 3 of 8 balls. Speed goes up after a perfect round, down after a miss. */
+export const TRACK = { balls: 8, targets: 3, seconds: 8, startSpeed: 0.22, min: 0.08, max: 1.2, step: 1.15, rounds: 8, radius: 0.05 };
+export const trackNext = (speed, perfect) => Math.max(TRACK.min, Math.min(TRACK.max, perfect ? speed * TRACK.step : speed / TRACK.step));
+/** Ball positions in a unit square; speed in widths per second. */
+export function trackSetup(rand = Math.random) {
+  const balls = [];
+  while (balls.length < TRACK.balls) {
+    const x = TRACK.radius + rand() * (1 - 2 * TRACK.radius), y = TRACK.radius + rand() * (1 - 2 * TRACK.radius);
+    if (balls.some(b => Math.hypot(b.x - x, b.y - y) < TRACK.radius * 3)) continue;
+    const a = rand() * 2 * Math.PI; balls.push({ x, y, dx: Math.cos(a), dy: Math.sin(a), target: balls.length < TRACK.targets });
+  }
+  return balls;
+}
+/** Move every ball for dt seconds, bouncing off the walls; now and then a ball changes direction a little. */
+export function trackStep(balls, dt, speed, rand = Math.random) {
+  const r = TRACK.radius;
+  for (const b of balls) {
+    if (rand() < dt * 0.6) { const a = Math.atan2(b.dy, b.dx) + (rand() - 0.5) * 1.2; b.dx = Math.cos(a); b.dy = Math.sin(a); }
+    b.x += b.dx * speed * dt; b.y += b.dy * speed * dt;
+    if (b.x < r) { b.x = r; b.dx = Math.abs(b.dx); } if (b.x > 1 - r) { b.x = 1 - r; b.dx = -Math.abs(b.dx); }
+    if (b.y < r) { b.y = r; b.dy = Math.abs(b.dy); } if (b.y > 1 - r) { b.y = 1 - r; b.dy = -Math.abs(b.dy); }
+  }
+  return balls;
+}
+/** Tracker level 0–100 from the fastest speed with a perfect round. */
+export const trackLevel = speed => Math.round(Math.max(0, Math.min(100, 100 * Math.log(speed / TRACK.min) / Math.log(TRACK.max / TRACK.min))));
 /** Personal best per game, for the game cards. */
 export function bests(games = []) {
   const b = {};

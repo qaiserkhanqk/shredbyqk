@@ -136,5 +136,23 @@ check('distractors only once the flash is short', !B.speedTrial(300).distractors
   check('then a lesson', B.brainNext(S, [], NOW).kind === 'lesson');
 }
 
+// Reflex games
+{
+  const rand = seeded(9), holds = Array.from({ length: 200 }, () => B.lightsHold(rand));
+  check('lights out: hold after the 5th light is 0.2–3 s', holds.every(h => h >= 200 && h <= 3000));
+  const s = B.lightsScore([220, 240, null, 260, 50]);
+  check('lights out: average of clean starts; jump starts and sub-100 ms guesses counted', s.avg === 240 && s.best === 220 && s.jumps === 2 && s.label === 'Pole position');
+  check('lights out: no clean start → no score', B.lightsScore([null, null]).score === 0);
+  let prev = -1; const seq = Array.from({ length: 300 }, () => (prev = B.batakNext(prev, rand)));
+  check('reaction wall: never the same light twice in a row, all 12 used', seq.every((n, i) => i === 0 || n !== seq[i - 1]) && new Set(seq).size === 12);
+  const balls = B.trackSetup(seeded(4));
+  check('tracker: 8 balls, 3 targets, not overlapping', balls.length === 8 && balls.filter(x => x.target).length === 3);
+  for (let i = 0; i < 2000; i++) B.trackStep(balls, 0.02, 1.2, rand);
+  check('tracker: balls stay inside the box at top speed', balls.every(x => x.x >= B.TRACK.radius - 1e-9 && x.x <= 1 - B.TRACK.radius + 1e-9 && x.y >= B.TRACK.radius - 1e-9 && x.y <= 1 - B.TRACK.radius + 1e-9));
+  check('tracker: faster after a perfect round, slower after a miss, within limits', B.trackNext(0.3, true) > 0.3 && B.trackNext(0.3, false) < 0.3 && B.trackNext(1.2, true) === 1.2 && B.trackNext(0.08, false) === 0.08);
+  check('tracker level: slowest 0, fastest 100', B.trackLevel(B.TRACK.min) === 0 && B.trackLevel(B.TRACK.max) === 100);
+  check('7 games, 3 of them reflex games', B.GAMES.length === 7 && B.GAMES.filter(g => g.reflex).length === 3);
+}
+
 if (fails) { console.log(`\n${fails} failed`); process.exit(1); }
 console.log('\nbrain: all passed');
