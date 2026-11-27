@@ -193,6 +193,21 @@
     <div class="stack" id="quranMain"></div>
   </section>
 
+  <!-- WORKOUT COMPLETE -->
+  <div class="wdone" id="done" hidden role="dialog" aria-modal="true" aria-labelledby="doneBody">
+    <div class="done-confetti" id="doneConfetti" aria-hidden="true"></div>
+    <div class="done-card stack" id="doneBody"></div>
+    <div class="btn-row done-btns"><button type="button" class="ghost" id="doneShare">Share</button><button type="button" class="cta" id="doneClose">Continue</button></div>
+  </div>
+
+  <!-- WEEKLY REPORT -->
+  <section class="screen" id="report">
+    <button type="button" class="back" data-tabgo="progress">‹ Progress</button>
+    <div class="page-head"><div><span class="eyebrow">Your week in review</span><h1 class="display h1" id="rpRange">Last week</h1></div></div>
+    <div class="chip-wrap"><button type="button" class="chip on" data-rweek="last">Last week</button><button type="button" class="chip" data-rweek="this">This week so far</button></div>
+    <div class="stack" id="rpBody"></div>
+  </section>
+
   <!-- LEADERBOARD -->
   <section class="screen" id="board">
     <button type="button" class="back" data-tabgo="progress">‹ Progress</button>
@@ -476,6 +491,7 @@
       </div>
     </div>
 
+    <button type="button" class="card b-card" data-go="report"><span><span class="eyebrow">Weekly report</span><b class="display h2" style="display:block">Your week in review</b><span class="muted small" id="rpCardLine">Health, mind, training and kg lifted</span></span><span class="b-chev">›</span></button>
     <button type="button" class="card b-card" data-go="board"><span><span class="eyebrow">Leaderboard</span><b class="display h2" style="display:block"><span id="boardCardScore">0</span> points</b><span class="muted small" id="boardCardRank"></span></span><span class="b-chev">›</span></button>
 
     <div class="card stack" id="rewardsCard">

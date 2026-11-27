@@ -134,6 +134,8 @@ export async function pushAll(cloud, S, mark = {}) {
     await cloud.updateMe({ nickname: S.profile?.nickname || null, board_hidden: !!S.profile?.boardHidden, last_train: lastT ? new Date(lastT).toISOString().slice(0, 10) : null });
     const rows = [weekStart(now), weekStart(now) - 7 * 864e5].map(ws => { const r = weekScore(S, ws, now); return { client_id: uid, week: weekKey(ws), score: r.score, parts: r.parts, updated_at: new Date().toISOString() }; });
     await cloud.upsert('scores', rows.filter(r => r.score > 0), 'client_id,week');
+    const reps = Object.values(S.reports || {}).sort((a, b) => (a.week < b.week ? -1 : 1));
+    if (reps.length) await cloud.updateMe({ week_report: reps[reps.length - 1], lifetime_kg: Math.round(S.totals?.kg || 0) });
   } catch (e) { console.warn('leaderboard sync skipped:', e.message); }
   await cloud.updateMe({
     ...(food ? { food_week: food } : {}),

@@ -585,3 +585,52 @@ The app shows the five parts and the top ways to earn more this week.
 - **The score** is the average points a week over the month's weeks so far (weeks that start on a Monday in that month). It counts from each person's first week on the board, and weeks skipped after that count as 0. A steady trainer isn't overtaken by one big week, and someone who joins on the 15th can still win.
 - **"Points to pass" line:** under your score, e.g. "7 points to pass #2. One training day gets you there". One training day is worth 35 ÷ planned days. People see a small, reachable next step instead of the distance to #1.
 - **The weekly race** restarts every Monday as a fresh chance. Its #1 is the MVP, and the coach can shout them out with one tap. Monthly points are never reset on Monday.
+
+## Workout complete (`js/done-ui.js`, `js/volume.js`)
+After the last set of a guided workout, a full-screen summary shows before the cool-down offer:
+
+- workout number and minutes
+- **kg lifted**, counting up, with one fun comparison (e.g. "about 2 Suzuki Mehrans"; approximate weights, from a sack of atta to a blue whale)
+- sets, reps and clean-form % (camera sets only)
+- "+X% vs last time", shown only when it went up and only when the same exercises are compared like for like
+- personal bests with medals
+- milestones, and the next clean-rep tier
+- this week's and lifetime kg
+
+"See today's summary" on the Train tab shows it again. Share sends text only, never video or body photos.
+
+**Bests:**
+- **Heaviest weight:** above the heaviest earlier set.
+- **Strongest set:** estimated 1-rep max (Epley, as in progression.js) above the earlier best.
+- **More reps at the same top weight.**
+- The first time on an exercise is a baseline, not a best.
+
+**Why it looks like this:**
+- Tracking progress and having it recorded raises goal attainment (Harkin et al. 2016 meta-analysis, 138 trials, d = 0.40).
+- Hevy and Strong open finished workouts with a summary like this. Hevy marks PR sets with medals and uses "you lifted a car" comparisons.
+- Confetti and the vibration pattern are kept for real personal bests and milestones (workout 1, 5, 10, 25 … 1,000; 1, 5, 10 … tonnes in total), so they keep meaning something.
+- No "0 PRs" and no "beat last week" (research note: Strava's week-on-week volume snapshot pushes people to chase volume regardless of recovery).
+
+**Volume** = weight × reps per logged set, with the weight as entered (one dumbbell). Bodyweight sets add reps, not invented kg. Demo sets never count.
+
+**Storage and speed:**
+- `rollup()` keeps running totals in `S.totals`: lifetime, by week, by month, plus day detail for the last 400 days.
+- It reads only sets newer than the last one it saw. Tested: 20,000 sets (about 3 years) in about 40 ms, then under 1 ms per new set.
+- Each workout is saved as one small row in `S.workouts`.
+
+## Weekly report (`js/report.js`, `js/report-ui.js`)
+**When:** every Monday, last week (Monday to Sunday) is saved as a snapshot of under 400 bytes in `S.reports`, kept forever. A "QK remembers" card says "Your week in review is ready". The report is also on Progress, where "This week so far" works any day. The coach sees "Last week 3/3 days · 4.2 t · 1 PR", and the latest snapshot and lifetime kg go to the dashboard.
+
+**Order:**
+1. **Wins first,** always true and at most 4: hit the plan, new bests, kg lifted with a comparison, form, Fitness Age, good sleep, calm sessions, food.
+2. **Training:** days compared with their own plan, never with last week. Also kg lifted, sets, form and personal bests.
+3. **Health scores:** health, recovery, nutrition, workouts, activity and Fitness Age, from scores.js and fitnessage.js.
+4. **Sleep & mind:** morning-check averages (Hooper scale), stress, calm sessions, mornings checked.
+5. **Food:** the food report's top win and protein against target.
+6. **One focus for next week:** missed planned days, then morning check-ins, then sleep, then the weakest health score's fix, then the food focus.
+7. **Leaderboard points,** and a kg-by-week bar chart from the saved snapshots.
+
+**Why:**
+- Monday is a "fresh start", when people are most likely to begin goals (Dai, Milkman & Riis 2014). Whoop sends its weekly assessment on Monday.
+- One focus, not a list, follows MacroFactor's weekly check-in approach.
+- A missed week opens with "A quiet week happens…", never a broken streak. Rewarding a return after a miss raised gym visits by 27% in a 61,000-person megastudy (Milkman et al. 2021), and broken-streak messages lower re-engagement (Silverman & Barasch 2023).
