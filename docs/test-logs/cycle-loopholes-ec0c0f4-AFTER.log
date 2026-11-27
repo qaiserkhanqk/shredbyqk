@@ -18,4 +18,5 @@ ok   a gap that contains a pregnancy is not described as a long gap without peri
 ok   while marked as recently given birth or breastfeeding, a long time without periods is not compared with the 12-month definition
 ok   control: without a pregnancy, 13 months without a period is still described
 ok   control: …and spotting after it still raises the alert
-ALL PASS (20)
+ok   a gap that contains a pregnancy is listed but not used in the cycle figures
+ALL PASS (21)

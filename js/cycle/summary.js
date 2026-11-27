@@ -4,6 +4,7 @@
 //    switched on, situations marked, and ovulation-test (LH) results only while that research logging is on;
 //  • NO estimates or predictions, no pattern findings, no wearable or temperature data, no fertility content.
 // Days without an entry are unknown, never "none". Not a diagnosis and not clinically reviewed.
+import { pregnantSpans } from './checkins.js';
 import * as M from './model.js';
 import { isDate, diffDays } from './dates.js';
 
@@ -22,7 +23,11 @@ export function clinicianSummary(s, { today, months = 12 } = {}) {
   const from = monthsBefore(today, months), inWindow = d => d >= from && d <= today;
   const periods = [...s.periods].filter(p => inWindow(p.start)).sort((a, b) => a.start.localeCompare(b.start))
     .map(p => ({ start: p.start, end: p.end ?? null, days: p.end ? diffDays(p.start, p.end) + 1 : null }));
-  const cycles = M.cycles(s).filter(c => inWindow(c.start)).map(c => ({ start: c.start, nextStart: c.nextStart, length: c.length, usable: c.usable, reason: c.reason }));
+  // A gap that contains a pregnancy is listed, but it is not a cycle, so it is left out of the figures (fixed after ec0c0f4).
+  const spans = pregnantSpans(s), crosses = c => spans.some(p => c.start < p.to && c.nextStart > p.from);
+  const cycles = M.cycles(s).filter(c => inWindow(c.start)).map(c => crosses(c)
+    ? { start: c.start, nextStart: c.nextStart, length: c.length, usable: false, reason: 'This gap includes a pregnancy, so it is not a cycle.' }
+    : { start: c.start, nextStart: c.nextStart, length: c.length, usable: c.usable, reason: c.reason });
   const used = cycles.filter(c => c.usable).map(c => c.length), closed = periods.filter(p => p.days).map(p => p.days);
   const days = Object.entries(s.days).filter(([d]) => inWindow(d));
   const symptoms = Object.entries(M.CATEGORIES).filter(([k]) => M.categoryOn(s, k)).map(([k, c]) => {
