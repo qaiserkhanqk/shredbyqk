@@ -23,14 +23,31 @@ async function quran() {
   Q = await r.json();
   return Q;
 }
-const setById = id => Q?.sets.find(s => s.id === id);
+const extra = {}; // whole surahs from the reader, for memorising any surah (id "s<number>")
+const setById = id => Q?.sets.find(s => s.id === id) || extra[id];
+const pad3 = n => String(n).padStart(3, '0');
+const surahFiles = {};
+/** One surah of the full Quran (data/quran/NNN.json), cached. */
+export function loadSurah(n) {
+  return (surahFiles[n] ||= fetch(`data/quran/${pad3(n)}.json`).then(r => { if (!r.ok) throw new Error('surah ' + n); return r.json(); }).catch(e => { delete surahFiles[n]; throw e; }));
+}
+let indexP = null;
+export const quranIndex = () => (indexP ||= fetch('data/quran/index.json').then(r => r.json()).catch(e => { indexP = null; throw e; }));
+/** A memorisation set by id: the short-surah sets, or any whole surah loaded from the reader. */
+async function getSet(id) {
+  await quran();
+  if (setById(id)) return setById(id);
+  const m = /^s(\d+)$/.exec(id || ''); if (!m) return null;
+  const d = await loadSurah(+m[1]);
+  return (extra[id] = { id, s: d.s, name: d.name, meaning: d.meaning, arName: d.arName, ayahs: d.ayahs.map(({ a, ar, en }) => ({ a, ar, en })) });
+}
 const NICE = { 'Al-Faatiha': 'Al-Fatiha', 'Al-Ikhlaas': 'Al-Ikhlas', 'An-Naas': 'An-Nas', 'Al-Kaafiroon': 'Al-Kafirun', 'Al-Maa\'un': 'Al-Ma\'un', 'At-Takaathur': 'At-Takathur', 'Al-Qaari\'a': 'Al-Qari\'ah', 'Al-Aadiyaat': 'Al-\'Adiyat', 'Az-Zalzala': 'Az-Zalzalah', 'Ad-Dhuhaa': 'Ad-Duha', 'Quraish': 'Quraysh' };
 const nice = set => NICE[set.name] || set.name;
 const ref = (set, a) => `${set.s}:${a}`;
 
 /* ---------- Audio: one element, unlocked by the tap that starts it ---------- */
 let audio = null, audioStop = null;
-function playAyah(s, a, times = 1, onEnd) {
+export function playAyah(s, a, times = 1, onEnd) {
   stopAudio();
   audio ||= new Audio();
   const urls = ayahUrls(s, a, reciter());
@@ -41,7 +58,7 @@ function playAyah(s, a, times = 1, onEnd) {
   audioStop = () => { stopped = true; audio.pause(); };
   play();
 }
-function stopAudio() { audioStop?.(); audioStop = null; }
+export function stopAudio() { audioStop?.(); audioStop = null; }
 
 /* ---------- Overlay (dark session screen) ---------- */
 const ov = () => $('#brainPlay');
@@ -60,8 +77,8 @@ export function initBrain(c) {
     const a = e.target.closest('[data-brain]'); if (!a) return;
     const [act, arg] = a.dataset.brain.split(':');
     ({ speed: startSpeed, grid: startGrid, clash: startClash, lights: startLights, batak: startBatak, track: startTrack, order: () => startOrder(arg), lesson: () => openLesson(arg), recall: () => openRecall(arg),
-      review: startReview, learn: () => startLearn(arg), set: () => { openSet = arg; ctx.go('quran'); }, sets: () => { openSet = null; renderQuran(); },
-      listen: () => listenSet(arg), play: () => { const [sid, n] = arg.split('-'); const set = setById(sid); playAyah(set.s, +n); },
+      review: startReview, learn: () => startLearn(arg), set: () => { openSet = arg; getSet(arg).then(() => ctx.go('quran')).catch(() => ctx.toast('Couldn\'t load that surah. Check your connection.')); }, sets: () => { openSet = null; renderQuran(); },
+      listen: () => listenSet(arg), play: () => { const [sid, n] = arg.split('-'); const set = setById(sid); playAyah(set.s, +n); }, reader: () => ctx.go('reader'),
       next: () => doNext(), games: () => $('#brainGames')?.scrollIntoView({ behavior: 'smooth' }), quran: () => { openSet = null; ctx.go('quran'); } }[act] || (() => {}))();
   });
 }
@@ -109,6 +126,7 @@ export async function renderBrain() {
     <div id="reflexGames"><div class="card-head" style="padding:0 4px"><b>Reflex games</b><span class="muted small">how F1 drivers train</span></div>
       <div class="game-grid">${B.GAMES.filter(g => g.reflex).map(g => card(g)).join('')}</div></div>
     <button type="button" class="tile quran-tile" data-brain="quran"><span class="tile-ic quran-ic">${QURAN_IC}</span><span><b>Quran memory</b><span>${due ? `<strong>${due} verse${due === 1 ? '' : 's'} to review today.</strong> ` : ''}${learning.length ? `Learning ${learning.length} surah${learning.length === 1 ? '' : 's'}, ${learning.reduce((a, x) => a + x.p.memorised, 0)} verses memorised.` : 'Learn short surahs and Ayat al-Kursi: listen, fade the words, recite, review.'}</span></span></button>
+    <button type="button" class="tile" data-go="reader"><span class="tile-ic quran-ic">${QURAN_IC}</span><span><b>Read the Quran</b><span>All 114 surahs with translation and recitation.${ctx.S.reader?.last ? ` Continue: ${esc(ctx.S.reader.last.name)} ${ctx.S.reader.last.a}.` : ''}</span></span></button>
     <button type="button" class="tile" data-go="calm"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></span><span><b>Calm: Sukoon</b><span>Slow breathing, a recitation and a dua. Stress is what steals your focus.</span></span></button>
     ${lq.recall.length ? `<div class="card stack recall"><span class="eyebrow">Quick recall</span><p style="margin:0">Remember <b>${esc(lq.recall[0].title.toLowerCase())}</b>? Answering from memory makes it stick.</p><button class="ghost" type="button" data-brain="recall:${lq.recall[0].id}">Answer one question</button></div>` : ''}
     <div class="card stack"><div class="card-head"><b>Learn your brain</b><span class="muted small">${lq.read} of ${B.LESSONS.length} read</span></div>
@@ -418,7 +436,9 @@ async function startOrder(setId) {
   const b = brain();
   // Default: the surah being learned most recently, else Al-Fatiha.
   const recent = Object.entries(b.quran).sort((x, y) => (y[1].last || 0) - (x[1].last || 0))[0]?.[0].split(':')[0];
-  const set = setById(setId) || setById(recent) || Q.sets[0];
+  let set = null;
+  try { set = await getSet(setId) || await getSet(recent); } catch {}
+  set ||= Q.sets[0];
   const parts = set.ayahs.flatMap(a => B.chunks(B.words(a.ar)).map((ws, i, all) => ({ a: a.a, ws, part: all.length > 1 ? `${i + 1}/${all.length}` : '' })));
   let k = 0, firstTry = 0, total = 0, alive = true;
   overlayCleanup = () => { alive = false; };
@@ -463,12 +483,22 @@ export async function renderQuran() {
   const el = $('#quranMain'); if (!el) return;
   try { await quran(); } catch { el.innerHTML = '<p class="muted">Couldn\'t load the Quran text. Check your connection and try again.</p>'; return; }
   const b = brain(), due = B.dueCards(b.quran).length;
-  const set = openSet && setById(openSet);
+  let set = null;
+  try { set = openSet && await getSet(openSet); } catch {}
   if (!set) {
+    // Whole surahs started from the reader (not in the short-surah list).
+    const ids = [...new Set(Object.keys(b.quran).map(k => k.split(':')[0]))].filter(id => !Q.sets.some(x => x.id === id));
+    let extraHtml = '';
+    if (ids.length) {
+      let idx = null; try { idx = await quranIndex(); } catch {}
+      extraHtml = `<div class="card stack"><b>Also learning</b><div class="list">${ids.map(id => { const n = +id.slice(1), m = idx?.surahs[n - 1]; const started = Object.keys(b.quran).filter(k => k.startsWith(id + ':')).length; return `<button type="button" class="row q-row" data-brain="set:${id}"><span class="q-num num">${n}</span><div><b>${esc(m?.name || 'Surah ' + n)}</b> <span class="ar q-ar" dir="rtl">${esc((m?.arName || '').replace(/^سُورَةُ\s*/, ''))}</span><span class="q-sub small muted">${started} of ${m?.verses ?? '?'} verses started</span></div></button>`; }).join('')}</div></div>`;
+    }
     el.innerHTML = `
       <p class="muted" style="margin:0">Learn a verse at a time: listen, read along, fade the words away, recite from memory. Then review on a schedule so it stays.</p>
       ${due ? `<div class="card stack due-card"><b>${due} verse${due === 1 ? '' : 's'} to review today</b><p class="small muted" style="margin:0">Recite each one from memory, then check yourself.</p><button class="cta" type="button" data-brain="review">Review now</button></div>` : ''}
       <div class="list q-sets">${Q.sets.map(s => { const p = B.setProgress(s, b.quran); return `<button type="button" class="row q-row" data-brain="set:${s.id}"><span class="q-num num">${s.id === 'kursi' ? '2:255' : s.id === 'baqarah-end' ? '2:285' : s.s}</span><div><b>${esc(nice(s))}</b> <span class="ar q-ar" dir="rtl">${esc(s.arName.replace(/^سُورَةُ\s*/, ''))}</span><span class="q-sub small muted">${esc(s.meaning)} · ${s.ayahs.length} verse${s.ayahs.length === 1 ? '' : 's'}</span>${p.started ? `<span class="bs-bar q-bar"><i style="width:${Math.max(4, Math.round(100 * p.started / p.total))}%" class="started"></i><i style="width:${p.pct}%"></i></span>` : ''}</div><span class="r">${p.memorised ? `${p.memorised}/${p.total}` : p.started ? 'Learning' : ''}</span></button>`; }).join('')}</div>
+      ${extraHtml}
+      <button type="button" class="tile" data-brain="reader"><span class="tile-ic quran-ic">${QURAN_IC}</span><span><b>Read the full Quran</b><span>All 114 surahs with translation and recitation. Memorise any surah from there.</span></span></button>
       <details class="card"><summary><b>How the review schedule works</b></summary><div class="stack small" style="margin-top:10px">
         <p style="margin:0">Each time you recite a verse well from memory, its next review moves further away: 1 day, 3 days, a week, 2 weeks, a month and beyond. Stumble, and it comes back sooner. A verse counts as memorised after 4 good reviews.</p>
         <p style="margin:0">This is spaced repetition, the most reliable method for long-term memory, and the same idea as daily muraja'ah. The Prophet ﷺ said to keep reciting the Quran, because it slips away faster than a camel from its rope (Bukhari 5033, Muslim 791).</p>
@@ -508,9 +538,10 @@ function ayahHtml(a, level) {
   const ws = B.words(a.ar), f = B.fade(ws, level);
   return f.map(x => x.hidden ? `<span class="fl">${esc(B.cue(x.w))}</span>` : esc(x.w)).join(' ');
 }
-async function startLearn(id) {
-  await quran();
-  const set = setById(id); if (!set) return;
+async function startLearn(id, only) {
+  let set = null; try { set = await getSet(id); } catch {}
+  if (!set) return ctx.toast('Couldn\'t load that surah. Check your connection.');
+  if (only) { const a = set.ayahs.find(x => x.a === only); if (a) return practise(set, [a], 'learn'); }
   const b = brain();
   // Start with verses not yet learned; if all started, practise those due first, then the rest.
   const order = [...set.ayahs].sort((x, y) => { const cx = b.quran[B.cardId(set.id, x.a)], cy = b.quran[B.cardId(set.id, y.a)]; return (cx ? cx.due : -1) - (cy ? cy.due : -1); });
@@ -520,14 +551,20 @@ async function startLearn(id) {
   queue.sort((x, y) => x.a - y.a);
   practise(set, queue, 'learn');
 }
-function startReview() {
-  quran().then(() => {
-    const ids = B.dueCards(brain().quran);
-    if (!ids.length) return ctx.toast('Nothing to review today.');
-    const items = ids.map(id => { const [sid, a] = id.split(':'); const set = setById(sid); return set && { set, a: set.ayahs.find(x => x.a === +a) }; }).filter(Boolean);
-    practise(null, items, 'review');
-  });
+async function startReview() {
+  const ids = B.dueCards(brain().quran);
+  if (!ids.length) return ctx.toast('Nothing to review today.');
+  const items = [];
+  for (const id of ids) {
+    const [sid, a] = id.split(':');
+    let set = null; try { set = await getSet(sid); } catch {}
+    const ay = set?.ayahs.find(x => x.a === +a); if (ay) items.push({ set, a: ay });
+  }
+  if (!items.length) return ctx.toast('Couldn\'t load your verses. Check your connection.');
+  practise(null, items, 'review');
 }
+/** From the reader: memorise one verse (or the next verses) of any surah. */
+export function learnVerse(s, a) { return startLearn(`s${s}`, a); }
 function practise(set, list, mode) {
   let i = 0, level = mode === 'review' ? 3 : 0, revealed = false, done = 0;
   const item = () => mode === 'review' ? list[i] : { set, a: list[i] };

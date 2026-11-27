@@ -50,7 +50,10 @@ const seed = {
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, serviceWorkers: 'block', recordVideo: { dir: OUT, size: { width: 390, height: 844 } } });
   await ctx.route('https://shred.local/**', r => { let p = new URL(r.request().url()).pathname; if (p === '/') p = '/index.html'; const f = path.join(ROOT, p);
     if (!fs.existsSync(f)) return r.fulfill({ status: 404, body: '' }); r.fulfill({ status: 200, body: fs.readFileSync(f), headers: { 'content-type': T[path.extname(f)] || 'application/octet-stream' } }); });
-  for (const h of ['everyayah.com', 'verses.quran.com', 'verses.quran.foundation']) await ctx.route(`https://${h}/**`, r => r.abort());
+  // Recitation: a 2.5-second silent clip stands in for each verse, so the reader follows along in the recording.
+  const silent = path.join(OUT, 'silent.mp3');
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'lavfi', '-i', 'anullsrc=r=22050:cl=mono', '-t', '2.5', '-q:a', '9', silent]);
+  for (const h of ['everyayah.com', 'verses.quran.com', 'verses.quran.foundation']) await ctx.route(`https://${h}/**`, r => r.fulfill({ status: 200, body: fs.readFileSync(silent), headers: { 'content-type': 'audio/mpeg' } }));
   await ctx.addInitScript(s => { if (!localStorage.getItem('shred_qk_v1')) localStorage.setItem('shred_qk_v1', s); try { localStorage.setItem('qk_muted', '1'); localStorage.setItem('qk_demo', '1'); } catch {} }, JSON.stringify(seed));
   const p = await ctx.newPage();
   const t0 = Date.now(); // the video starts with the page
@@ -145,17 +148,23 @@ const seed = {
   await p.click('#prCheck'); await wait(1200); await p.click('[data-g=good]'); await wait(500);
   await p.click('#bpClose'); await wait(400); await p.click('[data-brain=sets]'); await wait(700);
   await narr('22', 3200); await shot('22-quran-review');
+  await tap('#quranMain [data-brain=reader]'); await wait(900);
+  await narr('23', 3000); await shot('23-reader-list');
+  await tap('#rdList [data-rd="open:18"]'); await wait(900);
+  await p.click('#rdPlayAll'); await wait(500);
+  await narr('24', 6500); await shot('24-reader-play');
+  await p.click('[data-rd=stop]'); await wait(300);
 
   // 6. Me
   await p.click('.tabs [data-tab=progress]'); await wait(700);
-  await narr('23', 2800); await shot('14-you');
+  await narr('25', 2800); await shot('14-you');
   await p.evaluate(() => document.querySelector('#sendWeek').scrollIntoView({ block: 'center', behavior: 'smooth' })); await wait(900);
   await p.evaluate(() => { navigator.share = undefined; navigator.clipboard.writeText = () => Promise.reject(new Error('demo')); });
   await p.click('#sendWeek'); await wait(600);
   await p.evaluate(() => document.querySelector('#weekText').scrollIntoView({ block: 'center', behavior: 'smooth' }));
-  await narr('24', 3500); await shot('15-send-week');
+  await narr('26', 3500); await shot('15-send-week');
   await p.click('.tabs [data-tab=today]'); await wait(500);
-  await narr('25', 3000);
+  await narr('27', 3000);
 
   const vid = await p.video().path(); await ctx.close(); await b.close();
   fs.renameSync(vid, path.join(OUT, 'demo.webm'));

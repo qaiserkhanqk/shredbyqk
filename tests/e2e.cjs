@@ -29,7 +29,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   const tap = async sel => { await p.$eval(sel, el => el.scrollIntoView({ block: 'center' })); await p.click(sel); };
   const go = async id => {
     if (id === 'body') { await go('today'); await p.click('#today [data-go=body]'); }
-    else if (['gait', 'scan', 'rehab', 'calm', 'vitals'].includes(id)) { await go('body'); await p.click(`#body [data-go=${id}]`); }
+    else if (['gait', 'scan', 'rehab', 'calm', 'vitals', 'reader'].includes(id)) { await go('body'); await p.click(`#body [data-go=${id}]`); }
     else await p.click(`.tabs [data-tab=${id}]`);
   };
   await p.goto('https://shred.local/');
@@ -280,6 +280,30 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await tap('[data-brain="lesson:plastic"]'); await p.click('[data-q="1"]');
   check('lesson: quiz marks the right answer', await p.isVisible('#lqBox .right'));
   await p.click('#lsDone');
+
+  // Quran reader: all 114 surahs, search, a long surah, bookmark, continue reading, memorise any verse.
+  await p.goto('https://shred.local/'); await p.waitForTimeout(500);
+  await go('body'); await p.click('#body [data-go=reader]'); await p.waitForTimeout(600);
+  check('reader: lists all 114 surahs', (await p.$$('#rdList .q-row')).length === 114);
+  await p.fill('#rdSearch', 'cave');
+  check('reader: search by meaning finds Al-Kahf', (await p.$$('#rdList .q-row')).length === 1 && /Al-Kahf/.test(await p.textContent('#rdList')));
+  await p.click('#rdList [data-rd="open:18"]'); await p.waitForTimeout(600);
+  check('reader: Al-Kahf shows 110 verses with the Basmala heading', (await p.$$('.rd-v')).length === 110 && await p.isVisible('.rd-basmala'));
+  await tap('[data-rd="mark:10"]');
+  await p.$eval('#rv-30', el => el.scrollIntoView({ block: 'start' })); await p.waitForTimeout(1600);
+  await tap('[data-rd="tr"]');
+  check('reader: translation can be hidden', !(await p.isVisible('#rv-30 .rd-en')));
+  await tap('[data-rd="tr"]');
+  await tap('[data-rd="learn:30"]');
+  check('reader: Memorise opens practice for that verse', /Al-Kahf · verse 30/.test(await p.textContent('#prBox')));
+  await p.click('#prNext'); await p.click('#prNext'); await p.click('#prNext'); await p.click('#prCheck'); await p.click('[data-g=good]');
+  await p.click('#prFin');
+  await p.click('#readerMain [data-rd=list]'); await p.waitForTimeout(400);
+  check('reader: continue reading where you left off, and the bookmark', /Al-Kahf · verse 3\d/.test(await p.textContent('.rd-continue')) && /18:10/.test(await p.textContent('.rd-marks')), await p.textContent('.rd-continue'));
+  await p.fill('#rdSearch', ''); await p.click('#rdList [data-rd="open:9"]'); await p.waitForTimeout(500);
+  check('reader: At-Tawbah has no Basmala heading', (await p.$$('.rd-basmala')).length === 0 && (await p.$$('.rd-v')).length === 129);
+  await go('today'); await tap('#today [data-go=brain]'); await tap('[data-brain=quran]'); await p.waitForTimeout(500);
+  check('quran memory: a verse memorised from the reader shows under Also learning', /Also learning/.test(await p.textContent('#quranMain')) && /Al-Kahf/.test(await p.textContent('#quranMain')));
 
   // 11. Body check: alertness test (shortened for the test run) and camera pulse with no finger
   await p.goto('https://shred.local/'); await p.waitForTimeout(600);

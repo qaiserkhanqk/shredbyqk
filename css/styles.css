@@ -1112,3 +1112,42 @@ body.no-scroll { overflow: hidden; }
 .g-batak .game-ic { background: linear-gradient(135deg, #E9B44C, #B9801A); }
 .g-track .game-ic { background: linear-gradient(135deg, #3E8E9E, #26606C); }
 .game-grid > :last-child:nth-child(odd) { grid-column: span 2; }
+
+/* Quran reader */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+#readerMain { --rd-size: 1; }
+.rd-continue { text-align: left; display: flex; flex-direction: column; gap: 4px; cursor: pointer; border-color: rgba(var(--z2-rgb), .35); background: linear-gradient(160deg, rgba(var(--z1-rgb), .14), var(--surface) 60%); color: var(--text); font: inherit; }
+.rd-marks { display: flex; flex-wrap: wrap; gap: 8px; }
+.rd-marks .chip { border: 1px solid var(--line); background: var(--surface-2); color: var(--text); border-radius: 999px; padding: 7px 12px; font: 600 .8rem var(--f-body); cursor: pointer; }
+.rd-num { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 10px; transform: rotate(45deg); background: rgba(var(--z1-rgb), .16); font-size: .78rem; }
+.rd-num { transform: none; border-radius: 50%; }
+.rd-arname { font-size: 1.25rem; color: var(--z2); white-space: nowrap; }
+.rd-head { text-align: center; align-items: center; }
+.rd-title { font-size: 2.3rem; line-height: 1.6; color: var(--z2); }
+.rd-tools { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.rd-tools .cta { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.rd-row { display: flex; gap: 8px; } .rd-row > * { flex: 1; }
+.ghost.sm { padding: 9px 10px; font-size: .88rem; }
+.ghost[aria-pressed="true"] { background: rgba(var(--z2-rgb), .14); border-color: var(--z2); color: var(--z2); }
+.rd-tools .field { text-align: left; }
+.rd-basmala { text-align: center; font-size: calc(1.7rem * var(--rd-size)); margin: 6px 0; color: var(--text); }
+.rd-verses { display: flex; flex-direction: column; }
+.rd-v { padding: 16px 4px; border-top: 1px solid var(--line); scroll-margin-top: 80px; }
+.rd-v:first-child { border-top: 0; }
+.rd-v.playing { background: rgba(var(--z1-rgb), .12); border-radius: var(--r-md); }
+.rd-ar { margin: 0 0 8px; font-size: calc(1.75rem * var(--rd-size)); line-height: 2.15; text-align: right; color: var(--text); }
+.rd-no { display: inline-grid; place-items: center; min-width: 1.6em; height: 1.6em; padding: 0 .2em; border-radius: 50%; border: 1.5px solid var(--z1); color: var(--z2); font-size: .55em; line-height: 1; vertical-align: middle; font-family: var(--f-body); }
+.rd-en { margin: 0 0 8px; color: var(--text-2); font-size: calc(.92rem * (1 + (var(--rd-size) - 1) * .5)); }
+.no-tr .rd-en { display: none; }
+.rd-acts { display: flex; align-items: center; gap: 8px; }
+.rd-ref { font-size: .74rem; color: var(--muted); margin-right: auto; }
+.rd-mem { font-size: .72rem; color: var(--good); margin-right: 4px; }
+.rd-b { height: 34px; min-width: 34px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--z2); display: inline-grid; place-items: center; cursor: pointer; padding: 0 10px; }
+.rd-b svg { width: 15px; height: 15px; }
+.rd-b.on { background: var(--z2); color: #fff; border-color: var(--z2); }
+.rd-b.on svg { fill: currentColor; }
+.rd-b.txt { font: 600 .78rem var(--f-body); }
+.rd-nav { display: flex; justify-content: space-between; gap: 10px; }
+.rd-nav > * { flex: 0 1 48%; }
+.rd-player { position: sticky; bottom: 96px; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-radius: 999px; background: var(--night); color: #ECF1EC; box-shadow: 0 10px 30px -10px rgba(0,0,0,.4); font-size: .88rem; }
+.rd-player .linkbtn { color: #9FD0B6; }
