@@ -28,11 +28,14 @@ import * as refresh from './refresh.js';
 import { CLOUD, cloudOn } from './cloud-config.js';
 import * as classes from './classes.js';
 import * as routines from './routines.js';
+import * as athletes from './athletes.js';
+import { analyseBowling, analyseLanding } from './sportsbio.js';
 import { Cloud, pushAll } from './sync.js';
-import { PROGRAMS, scheme as progScheme, weeklySets, currentDay, byId as builtinById, GOALS, pickProgram, defaultDays } from './programs.js';
+import { PROGRAMS, scheme as progScheme, weeklySets, currentDay, byId as builtinById, GOALS, pickProgram, defaultDays, COLLECTIONS, collectionOf } from './programs.js';
 import * as builder from './builder.js';
 import * as SS from './supersets.js';
 import * as warm from './warmup.js';
+import * as freq from './frequency.js';
 import { ExerciseDetector, PICK_LIST } from './detect.js';
 import { initCalm, renderCalm, startCalmNow } from './calm.js';
 import { WEIGHTED, lastLoad, weekSummary } from './share.js';
@@ -86,6 +89,7 @@ function tab(id) {
   const tabFor = ['body', 'gait', 'scan', 'rehab', 'calm', 'vitals'].includes(id) ? 'today' : id; // tools live under Today
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tabFor));
   if (id === 'today') renderToday();
+  if (id === 'train') renderPrograms();
   if (id === 'progress') { renderProgress(); renderLoad(); renderToday(); $('#youName').textContent = S.profile.name || 'You'; }
   if (id === 'rehab') renderRehab();
   if (id === 'calm') renderCalm();
@@ -106,7 +110,14 @@ document.addEventListener('click', e => {
 /* ---------- Today ---------- */
 const TODAY_DEFAULT = [['hipThrust', '4×10'], ['rdl', '3×10'], ['lunge', '3×12'], ['bandedWalk', '2×20']];
 // Today's workout: the next day of the active program, or the starter glute session.
-const activeProgram = () => { const d = S.program?.id ? programById(S.program.id) : null; return d && S.program.plan ? { ...d, plan: S.program.plan } : d; };
+const baseProgram = () => { const d = S.program?.id ? programById(S.program.id) : null; return d && S.program.plan ? { ...d, plan: S.program.plan } : d; };
+let adaptMemo = {};
+const daysView = (p, n) => {
+  if (!p || !n || !freq.canAdapt(p)) return p;
+  if (adaptMemo.plan === p.plan && adaptMemo.n === n && adaptMemo.id === p.id) return adaptMemo.out;
+  const out = freq.adapt(p, n, LIB); adaptMemo = { plan: p.plan, n, id: p.id, out }; return out;
+};
+const activeProgram = () => { const b = baseProgram(); return b ? daysView(b, S.program.days) : b; };
 const programDay = () => { const p = activeProgram(); return p ? currentDay(p, S.program) : null; };
 const capToday = () => (S.timeCap?.day === new Date().toDateString() ? S.timeCap.mins : null);
 // Rough count of warm-up sets for a day (heavy barbell lifts get about three).
@@ -175,7 +186,7 @@ function renderToday() {
 
   const p = S.plan || {};
   $('#sessionMeta').textContent = [p.time, p.place].filter(Boolean).join(' · ');
-  rollMonth();
+  rollMonth(); autoDays();
   const plan = planToday(), tgt = Object.fromEntries(plan.map(r => [r.id, r]));
   $('#todayList').innerHTML = todayItems().map(([k, sets]) => `<button type="button" class="ex-row" data-train="${k}" style="width:100%;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;cursor:pointer;padding-inline:0"><span class="pic">${icon(iconKey(k))}</span>
     <div><b>${esc(LIB[k].name)}</b>${LIB[k].pattern ? '<span class="tag">QK checks your form</span>' : '<span class="tag" style="color:var(--z3)">QK coaches your tempo</span>'}</div>
@@ -228,7 +239,8 @@ function bindPlan() {
     const d = +b.dataset.day, i = S.plan.days.indexOf(d);
     i >= 0 ? S.plan.days.splice(i, 1) : S.plan.days.push(d);
     if (S.plan.days.length) S.profile.weeklyGoal = S.plan.days.length;
-    persist(); draw(); renderToday();
+    if (S.program && S.plan.days.length >= 3 && S.plan.days.length <= 5) setDays(S.plan.days.length, 'plan');
+    persist(); draw(); renderToday(); renderPrograms();
   };
   $('#planTime').value = S.plan.time; $('#planPlace').value = S.plan.place;
   $('#planTime').onchange = e => { S.plan.time = e.target.value; persist(); draw(); renderToday(); };
@@ -290,9 +302,9 @@ const COACH = {
 };
 COACH.tempo.note = COACH.hold.note = 'A camera can\'t judge this movement reliably, so there\'s no form score. QK still coaches every rep with you.';
 
-let muscleFilter = 'All', searchQ = '';
+let muscleFilter = 'All', searchQ = '', libOpen = false;
 function renderTrain() {
-  renderPrograms(); renderClasses(); renderHome(); renderRecover();
+  renderPrograms(); renderClasses(); renderHome(); renderRecover(); renderAthleteBtn();
   $('#muscleChips').innerHTML = ['All', ...Object.keys(KINDS), ...MUSCLES, 'Rehab'].map(m => `<button type="button" class="mchip ${m === muscleFilter ? 'on' : ''}" data-muscle="${m}" aria-pressed="${m === muscleFilter}">${m}</button>`).join('');
   const q = searchQ.trim().toLowerCase();
   // Physio exercises live under their own Rehab filter so they don't clutter the gym library.
@@ -301,13 +313,16 @@ function renderTrain() {
   const cam = list.filter(x => x.pattern).length;
   $('#exSearch').placeholder = `Search ${LIBRARY.filter(x => !x.rehab).length} exercises, e.g. row, box jump, sled`;
   $('#exCount').textContent = `${list.length} exercise${list.length === 1 ? '' : 's'} · ${cam} with camera form check`;
+  const show = libOpen || !!q; $('#exGrid').hidden = $('#exCount').hidden = !show; $('#exOpen').hidden = show;
+  if (!show) return;
   $('#exGrid').innerHTML = list.map(x => x.id === 'hipThrust' && muscleFilter === 'All' && !q
     ? `<button type="button" class="ex-card feature" data-train="${x.id}"><div><span class="eyebrow" style="color:var(--z1)">Live form check</span><h2 class="display h2" style="margin:8px 0 6px">${x.name}</h2><span class="watch">QK watches: ${WATCH[x.pattern]}</span></div>${icon('hipThrust', 'fig')}</button>`
     : `<button type="button" class="ex-card" data-train="${x.id}">${icon(iconKey(x.id), 'fig')}<b>${esc(x.name)}</b>
         <span class="watch">${esc(x.muscles.slice(0, 2).join(' · '))} · ${esc(x.equipment)}</span>
         <span class="meta">${x.pattern ? '<span class="pill cam">Form check</span>' : `<span class="pill voice">${COACH[coachOf(x)].pill}</span>`}</span></button>`).join('') || '<p class="empty">No exercises match. Try another word.</p>';
 }
-$('#muscleChips').onclick = e => { const b = e.target.closest('[data-muscle]'); if (!b) return; muscleFilter = b.dataset.muscle; renderTrain(); };
+$('#muscleChips').onclick = e => { const b = e.target.closest('[data-muscle]'); if (!b) return; muscleFilter = b.dataset.muscle; libOpen = true; renderTrain(); };
+$('#exOpen').onclick = () => { libOpen = true; renderTrain(); };
 $('#exSearch').oninput = e => { searchQ = e.target.value; renderTrain(); };
 document.addEventListener('click', e => { const b = e.target.closest('[data-train]'); if (b) openSetup(b.dataset.train); });
 
@@ -395,11 +410,11 @@ async function startLive({ mode, source, file, auto = false }) {
   $('#repBig').hidden = mode !== 'form'; $('#trackChip').hidden = mode !== 'form'; $('#cueHint').hidden = mode !== 'form';
   $('#repNum').textContent = '0'; $('#repLbl').textContent = ex?.hold ? 'seconds' : 'reps'; $('#dots').innerHTML = ''; $('#cleanCt').textContent = '0 clean'; $('#vlKnob').style.left = '0%'; $('#vlTxt').textContent = 'fresh';
   $('#gSteps').textContent = '0'; $('#gProg').style.width = '0'; $('#gStepsLbl').textContent = mode === 'gait' ? 'Steps seen' : 'Time';
-  const testName = { rom: TEST.rom?.label || 'Measurement', gait: `Gait · ${gaitMode === 'run' ? 'running' : 'walking'}`, jump: 'Jump test', sls: 'Single-leg squat knee test', bodymap: 'Map my body' };
+  const testName = { rom: TEST.rom?.label || 'Measurement', gait: `Gait · ${gaitMode === 'run' ? 'running' : 'walking'}`, jump: 'Jump test', sls: 'Single-leg squat knee test', land: 'Landing test', bowl: 'Bowling action check', bodymap: 'Map my body' };
   $('#detectChip').hidden = !auto; $('#detectChip').classList.remove('found'); $('#detectAlt').hidden = true; $('#detectChange').hidden = true;
   $('#detectTxt').textContent = 'Start your exercise. I\'ll recognise it.';
   $('#liveEyebrow').textContent = auto ? 'Camera coach' : mode === 'form' ? ex.name : testName[mode];
-  $('#liveTitle').textContent = auto ? 'Start moving' : mode === 'form' ? `Set ${setsToday(exKey) + 1}${source === 'demo' ? ' · demo' : ''}` : (mode === 'bodymap' ? 'Stand still, side-on' : source === 'demo' ? 'Demo walker' : source === 'file' ? 'Analysing your video (precise mode)' : mode === 'gait' ? 'Walk naturally for 10 seconds' : mode === 'jump' ? 'Up to 3 jumps' : mode === 'rom' ? `${TEST.rom.secs} seconds` : 'Left leg first, then right');
+  $('#liveTitle').textContent = auto ? 'Start moving' : mode === 'form' ? `Set ${setsToday(exKey) + 1}${source === 'demo' ? ' · demo' : ''}` : (mode === 'bodymap' ? 'Stand still, side-on' : source === 'demo' ? 'Demo walker' : source === 'file' ? 'Analysing your video (precise mode)' : mode === 'gait' ? 'Walk naturally for 10 seconds' : mode === 'jump' ? 'Up to 3 jumps' : mode === 'rom' ? `${TEST.rom.secs} seconds` : mode === 'land' ? 'Step off and land, 3 times' : mode === 'bowl' ? 'Bowl one delivery' : 'Left leg first, then right');
   $('#endLive').textContent = mode === 'form' ? 'End set' : 'Stop';
   $('#flipCam').hidden = source !== 'camera';
   $('#calBtn').hidden = !(mode === 'form' && vbtOn() && source !== 'demo');
@@ -801,7 +816,7 @@ const showAngles = () => { try { return localStorage.getItem('qk_angles') === '1
 $('#readout').hidden = !showAngles();
 $('#anglesBtn').onclick = () => { const on = !showAngles(); try { localStorage.setItem('qk_angles', on ? '1' : '0'); } catch {} $('#readout').hidden = !on; $('#anglesBtn').textContent = on ? 'Hide angles' : 'Angles'; };
 $('#anglesBtn').textContent = showAngles() ? 'Hide angles' : 'Angles';
-$('#endLive').onclick = () => { if (!live) return; ['gait', 'jump', 'sls', 'rom'].includes(live.mode) ? finishTest() : endSet(); };
+$('#endLive').onclick = () => { if (!live) return; ['gait', 'jump', 'sls', 'rom', 'land', 'bowl'].includes(live.mode) ? finishTest() : endSet(); };
 $('#flipCam').onclick = () => { const m = live?.mode || 'form'; live && (live.done = true); facing = facing === 'user' ? 'environment' : 'user'; stopLive(); live = null; startLive({ mode: m, source: 'camera' }); };
 $('#doneBtn').onclick = () => { flow = null; stopRest(); keepAwake(false); $('#summary').hidden = true; tab('today'); };
 // After a camera set the phone is already placed, so the next set starts straight away.
@@ -972,6 +987,8 @@ const TEST = {
     // [seconds, step]. The demo athlete runs a faster timeline (BODYMAP_DEMO_STEPS in demo.js).
     steps: demo => demo ? BODYMAP_DEMO_STEPS : [[0, 'stand'], [5, 'toes'], [10, 'squat'], [25, 'reach'], [31, 'hinge'], [41, 'face'], [45, 'arms'], [51, 'fsquat']] },
   sls: { secs: 30, label: 'Record knee test (30 s)', minFps: 25, view: 'front', intro: () => 'Stand on your left leg and do five slow squats.' },
+  land: { secs: 12, label: 'Record 3 landings (12 s)', minFps: 25, view: 'front', intro: () => 'Step onto the box. Step off and land on both feet. Three times.' },
+  bowl: { secs: 8, label: 'Record a delivery (8 s)', minFps: 25, view: null, intro: () => 'Bowl when you\'re ready. Keep your whole body in frame.' },
 };
 $$('[data-gmode]').forEach(b => b.onclick = () => { gaitMode = b.dataset.gmode; $$('[data-gmode]').forEach(x => x.classList.toggle('on', x === b)); });
 $$('[data-test]').forEach(b => b.onclick = () => {
@@ -1074,7 +1091,8 @@ function finishTest() {
   if (mode === 'rom') { recorder2.finish({ mode, quality: q }); return finishRom(frames, q); }
   if (mode === 'bodymap') { recorder2.finish({ mode, quality: q }); return finishBodyMap(frames, demo); }
   const mPerPx = scaleFromHeight(frames.slice(0, 20), (S.profile.heightCm || 0) / 100);
-  const r = mode === 'gait' ? analyseGait(frames, { mode: gaitMode }) : mode === 'jump' ? analyseJumps(frames, { mPerPx }) : analyseSingleLegSquat(frames);
+  const r = mode === 'gait' ? analyseGait(frames, { mode: gaitMode }) : mode === 'jump' ? analyseJumps(frames, { mPerPx })
+    : mode === 'land' ? analyseLanding(frames) : mode === 'bowl' ? analyseBowling(frames, { arm: $('#bowlArm').value, view: $('#bowlView').value }) : analyseSingleLegSquat(frames);
   recorder2.finish({ mode, quality: q, result: summarise(mode, r) });
   const box = $('#gaitResult'); box.hidden = false;
   const qHTML = qualityHTML(q);
@@ -1095,6 +1113,13 @@ function finishTest() {
     if (!demo) { S.jumps.push({ at: Date.now(), cm: r.best.heightCm, fps: r.fps, quality: q.score }); persist(); }
     box.innerHTML = qHTML + jumpHTML(r, ready);
     say(`Best jump ${Math.round(r.best.heightCm)} centimetres.${ready ? ready.status === 'ready' ? ' You\'re ready to train hard today.' : ` That's ${Math.abs(ready.pct)} percent below your usual, so keep today lighter.` : ''}`, { id: 'jump_done_' + Date.now(), priority: 'high' });
+  } else if (mode === 'land' || mode === 'bowl') {
+    if (!r.ok) return fail(r.issues[0]);
+    const key = mode === 'land' ? 'landings' : 'bowls';
+    if (!demo) { (S[key] ||= []).push(mode === 'land' ? { at: Date.now(), L: r.L, R: r.R, asym: r.asym } : { at: Date.now(), view: r.view, frontLeg: r.frontLeg, kneeFfc: r.kneeFfc, kneeRelease: r.kneeRelease, sideBend: r.sideBend, fps: r.fps }); persist(); }
+    box.innerHTML = qHTML + bioHTML(mode, r);
+    const issue = r.findings.find(f => !f.ok);
+    say(`${mode === 'land' ? 'Landing test' : 'Bowling check'} done. ${issue ? issue.title + '. The fix is below.' : r.findings[0].title + '.'}`, { id: mode + '_done_' + Date.now(), priority: 'high' });
   } else {
     if (!r.ok) return fail(r.issues[0] || 'No single-leg squats found.');
     S.knees ||= [];
@@ -1106,7 +1131,7 @@ function finishTest() {
   tab('gait'); renderTestHistory(); box.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-const summarise = (mode, r) => mode === 'gait' ? { cadence: r.cadence, findings: r.findings?.map(f => f.title) } : mode === 'jump' ? { best: r.best, n: r.jumps?.length } : { legs: r.legs, asymmetry: r.asymmetry };
+const summarise = (mode, r) => mode === 'gait' ? { cadence: r.cadence, findings: r.findings?.map(f => f.title) } : mode === 'jump' ? { best: r.best, n: r.jumps?.length } : mode === 'land' ? { L: r.L, R: r.R, asym: r.asym } : mode === 'bowl' ? { view: r.view, frontLeg: r.frontLeg, kneeFfc: r.kneeFfc, kneeRelease: r.kneeRelease, sideBend: r.sideBend } : { legs: r.legs, asymmetry: r.asymmetry };
 function qualityHTML(q) {
   const cls = q.score >= 80 ? '' : q.score >= 60 ? 'mid' : 'low';
   return `<div class="card stack"><div class="quality"><span class="q ${cls}">Quality ${q.score}/100</span><span class="muted">${q.fps ? q.fps + ' fps · ' : ''}${q.issues.length ? 'see tips below' : 'good recording'}</span></div>${q.issues.length ? `<ul class="issues">${q.issues.map(i => `<li>${esc(i)}</li>`).join('')}</ul>` : ''}</div>`;
@@ -1121,6 +1146,16 @@ function jumpHTML(r, ready) {
     ${r.jumps.some(j => j.flagged) ? `<p class="muted small" style="margin:0">⚠ ${esc(r.jumps.find(j => j.flagged).flagged)}</p>` : ''}
     ${r.issues.length ? `<ul class="issues">${r.issues.map(i => `<li>${esc(i)}</li>`).join('')}</ul>` : ''}</div>`;
 }
+// Sports screens: the numbers, the findings and what the measure can and can't tell you.
+function bioHTML(mode, r) {
+  const m = (label, v, warn) => `<div class="metric ${warn ? 'warn' : ''}"><small>${label}</small><span class="num">${v}</span></div>`;
+  const metrics = mode === 'land' ? m('Left knee', `${r.L}°`, r.L > 10) + m('Right knee', `${r.R}°`, r.R > 10) + m('Difference', `${r.asym}°`, r.asym > 5)
+    : r.view === 'side' ? m('Knee at landing', `${r.kneeFfc}°`) + m('Knee at release', `${r.kneeRelease}°`, r.frontLeg === 'collapsing') + m('Front leg', r.frontLeg, r.frontLeg === 'collapsing')
+    : m('Side-bend at release', `${r.sideBend}°`, r.sideBend > 45);
+  return `<div class="card stack"><span class="eyebrow">${mode === 'land' ? 'Landing test · front view' : `Bowling action · ${r.view === 'side' ? 'side-on' : 'from behind'}${r.fps ? ` · ${r.fps} fps` : ''}`}</span>
+    <div class="metric-grid">${metrics}</div>${(r.issues || []).map(x => `<p class="muted small" style="margin:0">${esc(x)}</p>`).join('')}</div>
+    ${findingsHTML(r.findings.map(f => ({ ...f, why: f.detail, fix: [] })))}<p class="muted small" style="margin:0">Measured from a single camera (2D): angles are accurate in the plane the camera faces, and no forces are measured. A screen, not a diagnosis.</p>`;
+}
 function slsHTML(r) {
   const leg = (n, d) => d ? `<div class="metric ${d.meanFppa > 10 ? 'warn' : ''}"><small>${n} knee</small><span class="num">${d.meanFppa}°</span><small>inward drift · ${d.reps} reps · hip drop ${d.pelvicDrop}°</small></div>` : `<div class="metric warn"><small>${n} knee</small><span class="num">–</span><small>not recorded</small></div>`;
   return `<div class="card stack"><span class="eyebrow">Single-leg squat · front view</span>
@@ -1131,6 +1166,8 @@ function slsHTML(r) {
 function renderTestHistory() {
   const rows = testMode === 'gait' ? (S.gaits || []).map(g => [g.at, `${Math.round(g.cadence)} steps/min${g.strideCm ? ` · stride ${g.strideCm} cm` : ''}`])
     : testMode === 'jump' ? (S.jumps || []).map(j => [j.at, `${j.cm.toFixed(1)} cm`])
+    : testMode === 'land' ? (S.landings || []).map(l => [l.at, `L ${l.L}° · R ${l.R}°`])
+    : testMode === 'bowl' ? (S.bowls || []).map(b => [b.at, b.view === 'side' ? `Front leg ${b.frontLeg} · ${b.kneeFfc}°→${b.kneeRelease}°` : `Side-bend ${b.sideBend}°`])
     : (S.knees || []).map(k => [k.at, `L ${k.L ?? '–'}° · R ${k.R ?? '–'}°`]);
   $('#testHistory').hidden = !rows.length;
   $('#testHistoryList').innerHTML = rows.slice(-6).reverse().map(([at, t]) => `<div class="row"><div>${t}</div><time>${new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</time></div>`).join('');
@@ -1450,16 +1487,51 @@ const MONTH = 28 * 864e5;
 const inPlan = k => !!activeProgram()?.plan.some(d => d.items.some(it => it[0] === k));
 // Reps done cleanly in the last 4 weeks (form quality for the volume decision).
 const cleanRate = () => { const from = Date.now() - MONTH, xs = S.sessions.filter(x => x.at >= from && !x.demo && !x.guided && x.reps); const r = xs.reduce((a, x) => a + x.reps, 0); return r ? xs.reduce((a, x) => a + Math.min(x.good || 0, x.reps), 0) / r : 1; };
+// Days a week. `how`: 'auto' (QK judged it), 'manual' (the lifter chose), 'undo'.
+function setDays(n, how, extra = {}) {
+  const P = S.program, def = P && programById(P.id); if (!def || !freq.canAdapt(def)) return;
+  const from = P.days || def.days; if (n === from) return;
+  Object.assign(P, { days: n, daysSince: Date.now(), restartAt: (P.log || []).length }, extra);
+  if (S.plan && how !== 'plan') { S.plan.days = freq.usualDays(P.log, n); S.profile.weeklyGoal = n; }
+  persist();
+}
+function autoDays() {
+  const P = S.program, def = P && programById(P.id); if (!def || !freq.canAdapt(def)) return;
+  const cur = P.days || def.days, j = freq.judgeDays(P.log, { current: cur, since: P.daysSince || P.start, hold: P.daysHold || 0 });
+  if (!j) return;
+  setDays(j.days, 'auto', { daysNote: { from: cur, to: j.days, counts: j.counts, dir: j.dir, at: Date.now(), seen: false, planDays: [...(S.plan?.days || [])] } });
+  say(daysLine(S.program.daysNote, true), { id: 'days_' + j.days, priority: 'high' });
+  renderPrograms();
+}
+const daysLine = (n, spoken) => n.dir === 'down'
+  ? `${spoken ? 'I' : 'QK'} moved you to ${n.to} days a week. You trained ${n.counts.join(', ')} days the last ${n.counts.length} weeks. Same weekly sets for every muscle, packed into ${n.to} sessions.`
+  : `${spoken ? 'I' : 'QK'} moved you up to ${n.to} days a week. You trained ${n.counts.join(', ')} days the last ${n.counts.length} weeks. Same weekly sets, shorter sessions.`;
+function renderDaysNews() {
+  const n = S.program?.daysNote, show = n && !n.seen;
+  for (const box of [$('#daysNews'), $('#heroDaysNews')]) {
+    if (!box) continue;
+    box.hidden = !show; if (!show) continue;
+    box.innerHTML = `<b>Now ${n.to} days a week</b><p class="muted small">${esc(daysLine(n))}</p><div class="btn-row"><button class="ghost" type="button" data-daysundo>Keep ${n.from} days</button><button class="cta" type="button" data-daysok>Sounds good</button></div>`;
+  }
+}
+document.addEventListener('click', e => {
+  const ok = e.target.closest('[data-daysok]'), undo = e.target.closest('[data-daysundo]'), n = S.program?.daysNote;
+  if (!n || !(ok || undo)) return;
+  n.seen = true;
+  if (undo) { setDays(n.from, 'undo', { daysHold: Date.now() + 28 * 864e5 }); if (n.planDays?.length) S.plan.days = n.planDays; persist(); toast(`Kept ${n.from} days a week. QK won't change it for 4 weeks.`); }
+  persist(); renderToday(); renderPrograms();
+});
 function rollMonth() {
   const P = S.program, def = P?.id && programById(P.id); if (!def) return;
   P.blockStart ||= P.start; P.block ||= 1;
   if (Date.now() - P.blockStart < MONTH) return;
-  const nb = refresh.nextBlock(def, { block: P.block, plan: P.plan || def.plan }, { lib: LIB, avoid: S.prefs?.avoid || [], compliance: refresh.compliance(P, def.days), clean: cleanRate() });
+  const nb = refresh.nextBlock(def, { block: P.block, plan: P.plan || def.plan }, { lib: LIB, avoid: S.prefs?.avoid || [], compliance: refresh.compliance(P, P.days || def.days), clean: cleanRate() });
   Object.assign(P, { block: nb.block, plan: nb.plan, blockStart: Date.now(), news: { block: nb.block, changes: nb.changes, note: nb.note, seen: false } });
   persist();
   say(`Month ${nb.block} of ${def.name} is ready. ${nb.changes.length} new exercises, same formula. ${nb.note}`, { id: 'month_' + nb.block, priority: 'high' });
 }
 function renderNews() {
+  renderDaysNews();
   const n = S.program?.news, box = $('#planNews');
   if (!n || n.seen) { box.hidden = true; return; }
   box.hidden = false;
@@ -1482,7 +1554,7 @@ $('#swapBtn').onclick = () => {
 };
 $('#rsheetBody').addEventListener('click', e => {
   const b = e.target.closest('[data-swapto]'); if (!b) return;
-  const from = $('#rsheetBody').dataset.swapFrom, to = b.dataset.swapto, plan = activeProgram()?.plan; if (!from || !plan) return;
+  const from = $('#rsheetBody').dataset.swapFrom, to = b.dataset.swapto, plan = baseProgram()?.plan; if (!from || !plan) return;
   S.program.plan = refresh.swapIn(plan, from, to);
   (S.prefs ||= {}).avoid = [...new Set([...(S.prefs.avoid || []), from])];
   persist(); closeSheet(); renderToday(); renderPrograms();
@@ -1670,7 +1742,8 @@ $('#cpRound').onclick = () => { if (!cls) return; cls.score++; $('#cpScore').tex
 
 /* ---------- Workout builder ---------- */
 // Built programs live in S.customPrograms and behave exactly like the built-in ones.
-const programById = id => builtinById(id) || (S.customPrograms || []).find(p => p.id === id) || null;
+const programById = id => builtinById(id) || (S.customPrograms || []).find(p => p.id === id) || athleteProgram(id) || null;
+const athleteProgram = id => { const a = athletes.parseId(id); return a ? athletes.buildProgram(a.sport, a.role, a.phase, LIB) : null; };
 let bd = null, bdDay = 0;
 function openBuilder(p) {
   bd = p ? JSON.parse(JSON.stringify(p)) : builder.blank();
@@ -1733,6 +1806,39 @@ $('#rsheetBody').addEventListener('click', e => {
   if (del) { S.customPrograms = (S.customPrograms || []).filter(p => p.id !== del.dataset.progdel); persist(); closeSheet(); renderPrograms(); toast('Program deleted.'); }
 });
 
+/* ---------- Athletes: sport → position → season ---------- */
+function openAthlete(step = 'sport', pick = {}) {
+  if (step === 'sport') return openSheet(`<div><span class="eyebrow">Train for your sport</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Which sport?</h2></div>
+    <div class="sport-grid">${athletes.SPORTS.map(s => `<button type="button" data-sport="${s.id}"><b>${s.icon} ${esc(s.name)}</b><span class="muted small">${s.roles.length} positions</span></button>`).join('')}</div>
+    <p class="muted small" style="margin:0">More sports coming. Built from sport-science research for each position.</p>`);
+  const sp = athletes.sportById(pick.sport);
+  if (step === 'role') return openSheet(`<div><span class="eyebrow">${sp.icon} ${esc(sp.name)}</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Your position or style</h2></div>
+    <p class="muted small" style="margin:0">${esc(sp.intro)}</p>
+    <div class="role-list">${sp.roles.map(r => `<button type="button" data-role="${r.id}" data-rsport="${sp.id}"><b>${esc(r.name)}</b><span>${esc(r.desc)}</span></button>`).join('')}</div>`);
+  if (step === 'phase') return openSheet(`<div><span class="eyebrow">${sp.icon} ${esc(athletes.roleOf(sp.id, pick.role).name)}</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Where are you in the season?</h2></div>
+    <div class="phase-list">${athletes.PHASES.map(ph => `<button type="button" data-phase="${ph.id}" data-psport="${sp.id}" data-prole="${pick.role}"><b>${ph.name}</b><span>${ph.sub} · ${esc(sp.season[ph.id])}</span></button>`).join('')}</div>`);
+}
+$('#athleteBtn').onclick = () => openAthlete('sport');
+// Open a sport screen from an athlete programme.
+$('#rsheetBody').addEventListener('click', e => { const b = e.target.closest('[data-screen]'); if (!b) return; closeSheet(); tab('gait'); const t = document.querySelector(`[data-test="${b.dataset.screen}"]`); t?.click(); if (b.dataset.screen === 'gait') document.querySelector('[data-gmode=run]')?.click(); });
+$('#rsheetBody').addEventListener('click', e => {
+  const s1 = e.target.closest('[data-sport]'), r1 = e.target.closest('[data-role]'), p1 = e.target.closest('[data-phase]'), ph = e.target.closest('[data-athphase]');
+  if (s1) openAthlete('role', { sport: s1.dataset.sport });
+  else if (r1) openAthlete('phase', { sport: r1.dataset.rsport, role: r1.dataset.role });
+  else if (p1) { const id = `ath-${p1.dataset.psport}-${p1.dataset.prole}-${p1.dataset.phase}`; S.athlete = { sport: p1.dataset.psport, role: p1.dataset.prole, phase: p1.dataset.phase }; persist(); showProgram(id); }
+  else if (ph) {
+    const a = S.athlete || athletes.parseId(S.program?.id); if (!a) return;
+    const id = `ath-${a.sport}-${a.role}-${ph.dataset.athphase}`; S.athlete = { ...a, phase: ph.dataset.athphase };
+    // On this programme already: switch phase in place (keeps the training log).
+    if (athletes.parseId(S.program?.id)) { S.program = { id, start: Date.now(), blockStart: Date.now(), block: 1, log: [] }; renderToday(); renderPrograms(); toast(`Switched to ${athletes.PHASES.find(x => x.id === ph.dataset.athphase).name}.`); }
+    persist(); showProgram(id);
+  }
+});
+function renderAthleteBtn() {
+  const a = athletes.parseId(S.program?.id), sp = a && athletes.sportById(a.sport), r = a && athletes.roleOf(a.sport, a.role);
+  $('#athleteSub').textContent = r ? `On ${sp.name}: ${r.name} · ${athletes.PHASES.find(p => p.id === a.phase).name}. Tap to change.` : 'Cricket, football, MMA, boxing, padel, tennis, hockey, squash. Built for your position.';
+}
+
 /* ---------- Programs ---------- */
 // The program's rep target for an exercise on today's program day (feeds the progression engine).
 function programScheme(k) {
@@ -1744,28 +1850,107 @@ function logProgramDay(k) {
   const d = programDay(); if (!d || d.doneToday || !d.day.items.some(x => x[0] === k)) return;
   (S.program.log ||= []).push({ day: d.index, at: Date.now() }); persist();
 }
+// Train tab, program first: your program (or the pick), then every program grouped by goal.
+let collFilter = 'all';
+const progMins = p => Math.round(p.plan.reduce((a, dd) => a + warm.dayMinutes(dd.items, warmCount(dd.items)), 0) / p.plan.length);
+const progText = p => p.desc || p.tagline;
+const progEquip = p => p.home ? HOME_EQ[p.home] : p.custom || p.athlete ? '' : 'gym';
+function progCard(p, rec) {
+  const c = collectionOf(p.id), flex = freq.canAdapt(p), v = flex ? daysView(p, freq.defaultDaysFor(p)) : p;
+  return `<button type="button" role="listitem" class="prog-card big" data-prog="${p.id}" data-coll="${c?.key || 'yours'}">
+    <span class="pgoal">${p.custom ? 'Yours' : esc(c?.name || p.goal)} · ${esc(p.level)}</span><b>${esc(p.name)}</b><p>${esc(progText(p))}</p>
+    ${rec ? '<span class="rec-tag">Recommended for your goal</span>' : ''}
+    <span class="meta">${flex ? '3–5' : p.days} days/week · ~${progMins(v)} min · ${p.weeks} weeks${progEquip(p) ? ' · ' + progEquip(p) : ''}</span></button>`;
+}
+function weekDone() {
+  const wk = brief.weekOf(Date.now());
+  return (S.program?.log || []).filter(l => brief.weekOf(l.at) === wk).map(l => l.day);
+}
+function renderHero() {
+  const p = activeProgram(), box = $('#progHero');
+  if (!p) {
+    const recId = S.profile.goal ? pickProgram(S.profile.goal) : null, rec = recId && programById(recId);
+    box.innerHTML = `<div class="hero-prog pick"><span class="eyebrow">How it works</span><h2 class="display h2">Pick a month-long program</h2>
+      <p>QK plans every session and every weight. Press start and follow along. Each month you get a fresh block of the same type.</p>
+      ${rec ? `<button type="button" class="hero-rec" data-prog="${rec.id}"><span class="eyebrow">Recommended for your goal</span><b>${esc(rec.name)}</b><span>${esc(rec.tagline)}</span></button>` : ''}</div>`;
+    return;
+  }
+  const d = programDay(), done = weekDone(), mw = Math.min(4, Math.floor((Date.now() - (S.program.blockStart || S.program.start)) / (7 * 864e5)) + 1);
+  const items = d.day.items, mins = warm.dayMinutes(items, warmCount(items));
+  box.innerHTML = `<div class="hero-prog" data-coll="${collectionOf(p.id)?.key || 'yours'}">
+    <span class="eyebrow">Month ${S.program.block || 1} · week ${mw} of 4 · ${p.days} days a week</span>
+    <h2 class="display h2" id="heroName">${esc(p.name)}</h2>
+    <div class="news" id="heroDaysNews" hidden></div>
+    <p class="hero-sub">${esc(progText(p))}</p>
+    <div class="wk-row"><span class="wk-dots" aria-hidden="true">${Array.from({ length: p.days }, (_, i) => `<i class="${i < done.length ? 'on' : ''}"></i>`).join('')}</span><span class="small">${done.length} of ${p.days} sessions this week</span></div>
+    <div class="hero-next"><span class="eyebrow">${d.doneToday ? 'Done today ✓ · next time' : 'Today'}</span><b>${esc(d.day.name)}</b><span class="muted small">${esc(d.day.focus)} · ${items.length} exercises · about ${mins} min</span></div>
+    <button class="cta" type="button" id="heroStart">${d.doneToday ? 'See today\'s summary' : 'Start workout'}</button>
+    <div class="hero-days">${p.plan.map((dd, i) => `<button type="button" class="hero-day ${i === d.index && !d.doneToday ? 'next' : ''}" data-pday="${i}"><span class="n">${i + 1}</span><span><b>${esc(dd.name)}</b><span class="muted small">${esc(dd.focus)}</span></span><span class="tag">${done.includes(i) ? '✓' : i === d.index && !d.doneToday ? 'Next' : `${warm.dayMinutes(dd.items, warmCount(dd.items))} min`}</span></button>`).join('')}</div>
+    <button class="ghost" type="button" data-prog="${p.id}">Program details · change or stop</button></div>`;
+  renderDaysNews();
+  $('#heroStart').onclick = () => { if (programDay()?.doneToday) { tab('today'); return; } tab('today'); startFlow(); };
+}
+// One program day: what's in it, in order.
+function showDay(i) {
+  const p = activeProgram(), dd = p?.plan[i]; if (!dd) return;
+  const lb = SS.labels(dd.items), d = programDay();
+  openSheet(`<div><span class="eyebrow">${esc(p.name)} · session ${i + 1} of ${p.plan.length}</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.4rem">${esc(dd.name)}</h2></div>
+    <p class="muted small" style="margin:0">${esc(dd.focus)} · about ${warm.dayMinutes(dd.items, warmCount(dd.items))} min. QK runs the sessions in order and picks every weight.</p>
+    <div class="prog-day"><ol>${dd.items.map((it, ix) => `<li>${lb[ix] ? `<span class="ss">${lb[ix]}</span> ` : ''}${esc(LIB[it[0]]?.name || it[0])} <span>${it[1]} × ${esc(it[2])}${it[3] ? ` · rest ${it[3] < 120 ? it[3] + ' s' : it[3] / 60 + ' min'}` : ''}</span>${it[4] ? `<br><span class="muted small">${esc(it[4])}</span>` : ''}</li>`).join('')}</ol></div>
+    ${i === d.index && !d.doneToday ? '<button class="cta" type="button" id="dayStart">Start this workout</button>' : `<p class="muted small" style="margin:0">${i === d.index ? 'Done today ✓' : `Up next: ${esc(d.day.name)}.`}</p>`}`);
+  $('#dayStart')?.addEventListener('click', () => { closeSheet(); tab('today'); startFlow(); });
+}
+$('#progHero').addEventListener('click', e => { const day = e.target.closest('[data-pday]'), pr = e.target.closest('[data-prog]'); if (day) showDay(+day.dataset.pday); else if (pr) showProgram(pr.dataset.prog); });
 function renderPrograms() {
+  renderAthleteBtn(); renderHero();
   const act = activeProgram(), d = programDay();
   $('#progActive').textContent = act ? `On ${act.name} · ${d.doneToday ? 'today done ✓' : 'next: ' + d.day.name}` : '';
-  const all = [...(S.customPrograms || []), ...PROGRAMS];
-  const list = act ? [act, ...all.filter(p => p.id !== act.id)] : all;
-  $('#progStrip').innerHTML = list.map(p => `<button type="button" role="listitem" class="prog-card ${p.id === act?.id ? 'on' : ''}" data-prog="${p.id}">
-    <span class="pgoal">${p.custom ? 'Yours' : esc(p.goal)}${p.id === act?.id ? ` · month ${S.program.block || 1}` : ''}</span><b>${esc(p.name)}</b><p>${esc(p.tagline)}</p>
-    <span class="meta">${p.days} days/week · ${p.weeks} weeks · ~${Math.round(weeklySets(p))} sets/week · ${esc(p.level)}</span></button>`).join('');
+  $('#pickEyebrow').textContent = act ? 'Switch program' : 'Choose your program';
+  const mine = S.customPrograms || [], recId = !act && S.profile.goal ? pickProgram(S.profile.goal) : null;
+  const groups = [...(mine.length ? [{ key: 'yours', name: 'Yours', sub: 'Programs you built', list: mine }] : []), ...COLLECTIONS.map(c => ({ ...c, list: c.ids.map(builtinById) }))]
+    .map(g => ({ ...g, list: g.list.filter(p => p && p.id !== act?.id) })).filter(g => g.list.length);
+  if (collFilter !== 'all' && !groups.some(g => g.key === collFilter)) collFilter = 'all';
+  $('#collChips').innerHTML = [{ key: 'all', name: 'All' }, ...groups].map(g => `<button type="button" class="mchip ${g.key === collFilter ? 'on' : ''}" data-coll="${g.key}" aria-pressed="${g.key === collFilter}">${esc(g.name)}</button>`).join('');
+  $('#progStrip').innerHTML = groups.filter(g => collFilter === 'all' || g.key === collFilter)
+    .map(g => `<div class="coll-head"><b>${esc(g.name)}</b><span class="muted small">${esc(g.sub)}</span></div>${g.list.map(p => progCard(p, p.id === recId)).join('')}`).join('');
 }
+$('#collChips').onclick = e => { const b = e.target.closest('[data-coll]'); if (!b) return; collFilter = b.dataset.coll; renderPrograms(); };
+let pickDays = {};
+// Starting days: the client's pick, else the number of weekdays they already train (3–5), else the program default.
+const startDays = p => { const known = S.plan?.days?.length || 0; return pickDays[p.id] || (known >= 3 && known <= 5 ? known : freq.defaultDaysFor(p)); };
 function showProgram(id) {
-  const on = S.program?.id === id, p = on ? activeProgram() : programById(id); if (!p) return;
+  const on = S.program?.id === id, base = on ? baseProgram() : programById(id); if (!base) return;
+  const flex = freq.canAdapt(base), n = flex ? (on ? S.program.days || base.days : startDays(base)) : base.days, p = daysView(base, n);
+  const cuts = p.adapted?.cut || [];
+  const daysHTML = flex ? `<div class="seg days-seg" role="group" aria-label="Days a week">${freq.DAY_CHOICES.map(d => `<button type="button" data-pdays="${d}" class="${d === n ? 'on' : ''}" aria-pressed="${d === n}">${d} days</button>`).join('')}</div>
+    <p class="muted small" style="margin:0" id="daysWhy">${n === base.days ? `Built for ${base.days} days a week.` : `Re-packed from ${base.days} to ${n} days a week: the same weekly sets for each muscle${cuts.length ? ` (${cuts.length} accessor${cuts.length === 1 ? 'y' : 'ies'} one or two sets lighter to keep sessions a sensible length)` : ''}.`} If your weeks show a different pattern, QK adjusts this by itself and tells you.</p>` : '';
   openSheet(`<div><span class="eyebrow">${esc(p.goal)} · ${esc(p.level)}</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.4rem">${esc(p.name)}</h2></div>
-    <p style="margin:0">${esc(p.tagline)}</p>
+    <p style="margin:0">${esc(progText(p))}</p>
     <p class="muted small" style="margin:0"><b>How it works:</b> ${esc(p.method)} QK picks your weights from how each session went.</p>
-    <p class="data small" style="margin:0">${p.days} days a week · ${p.weeks} weeks · about ${Math.round(weeklySets(p))} working sets a week</p>
+    ${daysHTML}
+    <p class="data small" style="margin:0">${p.days} days a week · about ${progMins(p)} min a session · ${p.weeks} weeks · about ${Math.round(weeklySets(p))} working sets a week</p>
+    ${p.flag ? `<p class="ath-flag">⚠️ ${esc(p.flag)}</p>` : ''}
+    ${p.gaps ? `<p class="ath-gaps">Evidence note: ${esc(p.gaps)}</p>` : ''}
+    ${p.athlete ? `<div class="btn-row">${p.athlete.sport === 'cricket' && /^(fast|allrounder|spin)/.test(p.athlete.role) ? '<button class="ghost" type="button" data-screen="bowl">Check my bowling action</button>' : ''}<button class="ghost" type="button" data-screen="land">Landing test</button>${['football', 'hockey'].includes(p.athlete.sport) ? '<button class="ghost" type="button" data-screen="gait">Running form</button>' : ''}</div>` : ''}
+    ${p.athlete ? `<div class="seg" role="group" aria-label="Season phase">${athletes.PHASES.map(ph => `<button type="button" data-athphase="${ph.id}" class="${ph.id === p.athlete.phase ? 'on' : ''}">${ph.name}</button>`).join('')}</div>` : ''}
     ${p.plan.map(dd => { const lb = SS.labels(dd.items); return `<div class="prog-day"><h3>${esc(dd.name)} <span class="muted small">· ${esc(dd.focus)}</span></h3><ol>${dd.items.map((it, ix) => `<li>${lb[ix] ? `<span class="ss">${lb[ix]}</span> ` : ''}${esc(LIB[it[0]]?.name || it[0])} <span>${it[1]} × ${esc(it[2])}${it[3] ? ` · rest ${it[3] < 120 ? it[3] + ' s' : it[3] / 60 + ' min'}` : ''}</span>${it[4] ? `<br><span class="muted small">${esc(it[4])}</span>` : ''}</li>`).join('')}</ol></div>`; }).join('')}
     <div class="btn-row"><button class="ghost" type="button" data-progedit="${p.id}">${p.custom ? 'Edit' : 'Copy and edit'}</button>${p.custom && !on ? `<button class="ghost" type="button" data-progdel="${p.id}">Delete</button>` : ''}${on ? '<button class="ghost" type="button" data-progstop>Stop this program</button>' : ''}<button class="cta" type="button" data-progstart="${p.id}">${on ? 'Restart from day 1' : 'Start this program'}</button></div>`);
 }
 $('#progStrip').onclick = e => { const b = e.target.closest('[data-prog]'); if (b) showProgram(b.dataset.prog); };
 $('#rsheetBody').addEventListener('click', e => {
+  const b = e.target.closest('[data-pdays]'); if (!b) return;
+  const id = $('#rsheetBody [data-progstart]')?.dataset.progstart, n = +b.dataset.pdays; if (!id) return;
+  if (S.program?.id === id) { setDays(n, 'manual'); if (S.program.daysNote) S.program.daysNote.seen = true; persist(); renderToday(); renderPrograms(); toast(`${n} days a week. Same weekly sets, new sessions.`); }
+  else pickDays[id] = n;
+  showProgram(id);
+});
+$('#rsheetBody').addEventListener('click', e => {
   const st = e.target.closest('[data-progstart]'), sp = e.target.closest('[data-progstop]');
-  if (st) { S.program = { id: st.dataset.progstart, start: Date.now(), blockStart: Date.now(), block: 1, log: [] }; persist(); closeSheet(); renderPrograms(); renderToday(); const p = activeProgram(); toast(`${p.name} started. Day 1 is on your Today screen.`); say(`${p.name}. Let's go. Day one is ready on your Today screen.`, { priority: 'high' }); }
+  if (st) {
+    const sid = st.dataset.progstart, d0 = programById(sid), nd = freq.canAdapt(d0) ? startDays(d0) : undefined;
+    S.program = { id: sid, start: Date.now(), blockStart: Date.now(), block: 1, log: [], ...(nd ? { days: nd } : {}) };
+    if (nd && S.plan && S.plan.days.length !== nd) { S.plan.days = freq.fitWeekdays(S.plan.days, nd); S.profile.weeklyGoal = nd; }
+    persist(); closeSheet(); renderPrograms(); renderToday(); const p = activeProgram(); toast(`${p.name} started. Day 1 is on your Today screen.`); say(`${p.name}. Let's go. Day one is ready on your Today screen.`, { priority: 'high' }); }
   if (sp) { S.program = null; persist(); closeSheet(); renderPrograms(); renderToday(); toast('Program stopped.'); }
 });
 
@@ -2310,10 +2495,11 @@ $('#obGoals').onclick = e => {
 $('#obExp').onclick = e => { const b = e.target.closest('[data-exp]'); if (!b) return; S.profile.experience = b.dataset.exp; persist(); chooseProgram(pickProgram(obGoalKey, b.dataset.exp === 'new')); };
 function chooseProgram(id) {
   const p = programById(id); if (!p) return;
-  S.program = { id, start: Date.now(), blockStart: Date.now(), block: 1, log: [] };
-  if (!S.plan.days.length) { S.plan.days = defaultDays(p.days); S.profile.weeklyGoal = p.days; }
+  const nd = freq.defaultDaysFor(p);
+  S.program = { id, start: Date.now(), blockStart: Date.now(), block: 1, log: [], ...(freq.canAdapt(p) ? { days: nd } : {}) };
+  if (!S.plan.days.length) { S.plan.days = defaultDays(nd); S.profile.weeklyGoal = nd; }
   persist(); drawObDays();
-  $('#obDaysNote').textContent = `QK picked ${p.name}: ${p.tagline} It's ${p.days} days a week, so QK suggested days. Change them to fit your life.`;
+  $('#obDaysNote').textContent = `QK picked ${p.name}: ${p.tagline} It's ${nd} days a week, so QK suggested days. Change them to fit your life${freq.canAdapt(p) ? ': pick 3, 4 or 5 and QK re-packs the program' : ''}.`;
   obStep(3);
 }
 const OB_ORDER = [1, 2, 3, 4, 5, 6, 0], OB_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -2321,7 +2507,9 @@ function drawObDays() { $('#obDays').innerHTML = OB_ORDER.map(d => `<button type
 $('#obDays').onclick = e => { const b = e.target.closest('[data-day]'); if (!b) return; const d = +b.dataset.day, i = S.plan.days.indexOf(d); i >= 0 ? S.plan.days.splice(i, 1) : S.plan.days.push(d); if (S.plan.days.length) S.profile.weeklyGoal = S.plan.days.length; persist(); drawObDays(); };
 $('#obDone').onclick = $('#obSkip').onclick = () => finishWelcome();
 function finishWelcome() {
+  if (S.program && S.plan?.days.length) setDays(freq.clampDays(S.plan.days.length), 'plan');
   $('#welcome').hidden = true; bindPlan(); renderPrograms(); renderToday(); tab('today');
+  if (S.profile.goal === 'athlete' && !S.athlete) setTimeout(() => { tab('train'); openAthlete('sport'); }, 600);
   say(`${greeting(S.profile.name)} ${nudgeLine()}`, { id: 'greet', priority: 'high' });
 }
 // The website caches itself for offline use; the native app (native/README.md) ships its files inside, so it skips this.

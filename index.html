@@ -65,6 +65,7 @@
 
     <div class="card stack" id="qkPlan" hidden>
       <div class="card-head" style="margin:0"><div><span class="eyebrow" id="planEyebrow">QK's plan for today</span><h2 class="display h2" id="planTitle">Your weights are set</h2></div><button class="linkbtn" type="button" id="planListen" aria-label="Hear the plan"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Hear it</button></div>
+      <div class="news" id="daysNews" hidden></div>
       <div class="news" id="planNews" hidden><b id="newsTitle"></b><p class="muted small" id="newsNote"></p><ul id="newsList"></ul><button class="ghost" type="button" id="newsOk">Got it</button></div>
       <p class="muted small" style="margin:0" id="planSummary"></p>
       <div class="time-cap" id="planTime"><span id="planMins"></span><span class="tc-btns">Short on time? <button type="button" data-cap="30">30</button><button type="button" data-cap="45">45</button><button type="button" data-cap="60">60</button> min</span></div>
@@ -85,21 +86,30 @@
 
   <!-- TRAIN -->
   <section class="screen" id="train">
-    <div class="page-head"><div><span class="eyebrow">Form check</span><h1 class="display h1">What are we training?</h1></div></div>
-    <button type="button" class="cam-start" id="camCoach2"><span class="cam-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5zM1 5h15v14H1z"/></svg></span><span><b>Just start moving</b><span>Open the camera and do your exercise. QK recognises it and corrects you live.</span></span></button>
-    <div class="prog-head"><span class="eyebrow">Warm up, stretch &amp; recover</span></div>
-    <div class="prog-strip" id="recoverStrip" role="list"></div>
-    <div class="prog-head"><span class="eyebrow">At home · no gym needed</span></div>
-    <div class="prog-strip" id="homeStrip" role="list"></div>
+    <div class="page-head"><div><span class="eyebrow">Train</span><h1 class="display h1" id="trainTitle">Your program</h1></div></div>
+    <div id="progHero"></div>
+
+    <div class="prog-head" id="pickHead"><span class="eyebrow" id="pickEyebrow">Choose your program</span><span class="muted small" id="progActive"></span></div>
+    <div class="chips-scroll" id="collChips" role="group" aria-label="Program type"></div>
+    <div class="prog-list" id="progStrip" role="list"></div>
+    <button class="ghost build-btn" type="button" id="buildNew">+ Build your own program</button>
+
+    <div class="prog-head more-head"><span class="eyebrow">More ways to train</span></div>
+    <button type="button" class="cam-start athlete-start" id="athleteBtn"><span class="cam-ic">🏆</span><span><b>Train for your sport</b><span id="athleteSub">Cricket, football, MMA, boxing, padel, tennis, hockey, squash. Built for your position.</span></span></button>
     <div class="prog-head"><span class="eyebrow">Classes · QK runs them, any time</span></div>
     <div class="prog-strip" id="classStrip" role="list"></div>
-    <div class="prog-head"><span class="eyebrow">Programs</span><span class="muted small" id="progActive"></span></div>
-    <button class="ghost build-btn" type="button" id="buildNew">+ Build your own program</button>
-    <div class="prog-strip" id="progStrip" role="list"></div>
-    <label class="field"><span class="eyebrow">Search</span><input id="exSearch" type="search" placeholder="Search 84 exercises, e.g. row, squat, cable" autocomplete="off"></label>
+    <div class="prog-head"><span class="eyebrow">At home · no gym needed</span></div>
+    <div class="prog-strip" id="homeStrip" role="list"></div>
+    <div class="prog-head"><span class="eyebrow">Warm up, stretch &amp; recover</span></div>
+    <div class="prog-strip" id="recoverStrip" role="list"></div>
+
+    <div class="prog-head more-head"><span class="eyebrow">Single exercises</span><span class="muted small">Train one move with the camera</span></div>
+    <button type="button" class="cam-start" id="camCoach2"><span class="cam-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5zM1 5h15v14H1z"/></svg></span><span><b>Just start moving</b><span>Open the camera and do your exercise. QK recognises it and corrects you live.</span></span></button>
+    <label class="field"><span class="eyebrow">Search</span><input id="exSearch" type="search" placeholder="Search exercises, e.g. row, squat, cable" autocomplete="off"></label>
     <div class="chips-scroll" id="muscleChips" role="group" aria-label="Filter by muscle"></div>
-    <p class="muted small" style="margin:0" id="exCount"></p>
-    <div class="ex-grid" id="exGrid"></div>
+    <button class="ghost" type="button" id="exOpen">Browse all exercises</button>
+    <p class="muted small" style="margin:0" id="exCount" hidden></p>
+    <div class="ex-grid" id="exGrid" hidden></div>
   </section>
 
   <!-- FOOD -->
@@ -216,10 +226,12 @@
   <section class="screen" id="gait">
     <button type="button" class="back" data-back>‹ Tools</button>
     <div class="page-head"><div><span class="eyebrow">Movement tests</span><h1 class="display h1">Test how you move</h1></div></div>
-    <div class="mode-switch three" role="group" aria-label="Choose a test">
+    <div class="mode-switch five" role="group" aria-label="Choose a test">
       <button type="button" class="on" data-test="gait">Gait</button>
       <button type="button" data-test="jump">Jump</button>
       <button type="button" data-test="sls">Knee test</button>
+      <button type="button" data-test="land">Landing</button>
+      <button type="button" data-test="bowl">Bowling</button>
     </div>
 
     <div class="card stack" data-panel="gait">
@@ -250,6 +262,28 @@
         <li>Face the camera from 2–3 metres, phone at knee height. Whole legs in view, shorts or leggings.</li>
         <li>Stand on your left leg, other foot lifted. Do 5 slow squats to a comfortable depth.</li>
         <li>QK tells you when to switch. Then 5 on your right leg. 30 seconds in total.</li>
+      </ol>
+    </div>
+
+    <div class="card stack" data-panel="land" hidden>
+      <div><b>Landing test</b><p class="muted small" style="margin:4px 0 0">Measures how far each knee caves inward when you land, the ACL-injury risk sign footballers, hockey and racket players are screened for. Compares left and right.</p></div>
+      <ol class="steps">
+        <li>Face the camera from 2–3 metres, phone at knee height, whole legs in view.</li>
+        <li>Stand on a low box or step (about 30 cm). Step off and land on both feet, then stand tall.</li>
+        <li>Do 3 landings in 12 seconds. Slow-motion video gives the most precise result.</li>
+      </ol>
+    </div>
+
+    <div class="card stack" data-panel="bowl" hidden>
+      <div><b>Bowling action check</b><p class="muted small" style="margin:4px 0 0">Side-on: front-knee angle at front-foot contact and release (braced or collapsing). From behind: trunk side-bend at release, a back-injury risk factor in young fast bowlers.</p></div>
+      <div class="grid2">
+        <label class="field">Bowling arm<select id="bowlArm"><option value="R">Right</option><option value="L">Left</option></select></label>
+        <label class="field">Camera<select id="bowlView"><option value="side">Side-on (front leg)</option><option value="back">From behind (side-bend)</option></select></label>
+      </div>
+      <ol class="steps">
+        <li>Film in slow motion (120–240 fps) and upload it. Normal video is too slow to catch release.</li>
+        <li>Side-on: camera at hip height level with the crease, 8–10 m away, whole body in frame through the stride.</li>
+        <li>From behind: camera behind the bowling crease, in line with the stumps.</li>
       </ol>
     </div>
 
