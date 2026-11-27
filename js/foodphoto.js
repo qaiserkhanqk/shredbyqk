@@ -20,7 +20,9 @@ export const PHOTO_CONFIG = {
   searchEndpoint: '',
   // One fast answer (~1–2 s); when it's unsure, a stronger model double-checks in the background (see the server).
   samples: 'fast',
-  maxSide: 640, // smaller uploads faster on mobile data; plenty to count rotis and read a plate
+  maxSide: 640,
+  // Set by the app when the client is signed in: the server can require it (tools/food-vision-server.mjs).
+  getToken: () => null, // smaller uploads faster on mobile data; plenty to count rotis and read a plate
 };
 
 // The catalogue the model must choose from, with what one serving means, so portions come back in our units.
@@ -51,7 +53,7 @@ export function consensus(samples) {
   const items = [...by.values()].filter(g => g.servings.length >= need).sort((a, b) => a.order - b.order).map(g => ({
     dish: g.id.startsWith('other:') ? null : g.id,
     otherName: g.id.startsWith('other:') ? g.name : null,
-    servings: half(median(g.servings)),
+    servings: Math.min(10, half(median(g.servings))),
     meat: ['less', 'normal', 'more'].includes(mode(g.meat)) ? mode(g.meat) : 'normal',
     oil: ['less', 'normal', 'oily'].includes(mode(g.oil)) ? mode(g.oil) : 'normal',
     confidence: g.conf.reduce((a, b) => a + b, 0) / g.conf.length,
@@ -97,7 +99,8 @@ function writeCache(hash, result) {
 // politely (the app offers voice and search instead), so phones never hammer an overloaded server.
 async function postBusyAware(url, body, { wait = ms => new Promise(r => setTimeout(r, ms)) } = {}) {
   for (let attempt = 0; ; attempt++) {
-    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const token = PHOTO_CONFIG.getToken?.();
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) });
     if (r.ok) return r;
     if (r.status === 503 && attempt === 0) { await wait(Math.min(12, +r.headers.get('Retry-After') || 5) * 1000 * (0.8 + Math.random() * 0.4)); continue; }
     throw new Error(r.status === 503 ? 'busy' : 'server ' + r.status);
@@ -113,13 +116,13 @@ export async function recognise(file, ctx = {}, onRefined = null) {
   const key = hash + '|' + (ctx.hint || '');
   const hit = readCache()[key];
   if (hit) return { ...hit.result, cached: true, dataUrl, hash, quality };
-  const r = await postBusyAware(PHOTO_CONFIG.endpoint, { image: dataUrl, hash, samples: PHOTO_CONFIG.samples, catalogue: catalogue(), hint: ctx.hint || '', plateCm: ctx.plateCm || null, usual: ctx.usual || [] });
+  const r = await postBusyAware(PHOTO_CONFIG.endpoint, { image: dataUrl, samples: PHOTO_CONFIG.samples, hint: ctx.hint || '', plateCm: ctx.plateCm || null, usual: ctx.usual || [] });
   const body = await r.json(), first = body.samples;
   const result = consensus(first);
   writeCache(key, result);
   if (body.refine && PHOTO_CONFIG.samples === 'fast') {
     // The quiet second opinion: majority of the fast answer and two from the stronger model.
-    postBusyAware(PHOTO_CONFIG.endpoint, { image: dataUrl, hash, samples: 'refine', catalogue: catalogue(), hint: ctx.hint || '', plateCm: ctx.plateCm || null, usual: ctx.usual || [] })
+    postBusyAware(PHOTO_CONFIG.endpoint, { image: dataUrl, samples: 'refine', hint: ctx.hint || '', plateCm: ctx.plateCm || null, usual: ctx.usual || [] })
       .then(x => x.json()).then(b => {
         const better = consensus([...first, ...(b.samples || [])]);
         writeCache(key, better);
@@ -150,7 +153,7 @@ export function imageQuality(pixels, w, h) {
 /** Words the app's own parser didn't catch ("kadhi chawal ki plate") → dishes from the catalogue, via the server. */
 export async function askText(text) {
   if (!PHOTO_CONFIG.endpoint || !text.trim()) return [];
-  const r = await postBusyAware(PHOTO_CONFIG.endpoint.replace(/food-vision$/, 'food-text'), { text, catalogue: catalogue() });
+  const r = await postBusyAware(PHOTO_CONFIG.endpoint.replace(/food-vision$/, 'food-text'), { text });
   return consensus((await r.json()).samples).items.filter(i => i.dish);
 }
 

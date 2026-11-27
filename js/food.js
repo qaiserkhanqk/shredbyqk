@@ -107,7 +107,11 @@ export function initFood(c) {
   if (p.trainDays == null && ctx.S.plan?.days?.length) p.trainDays = ctx.S.plan.days.length; // from the training plan picked at sign-up
   for (const [id, key] of [['#tWeight', 'weightKg'], ['#tAge', 'age'], ['#tGoal', 'dietGoal'], ['#tJob', 'job'], ['#tTrain', 'trainDays'], ['#tNotify', 'notify']]) {
     const el = $(id); el.value = key === 'dietGoal' ? N.dietGoal(p) : p[key] ?? el.value;
-    el.onchange = () => { p[key] = el.value; ctx.persist(); renderFood(); };
+    el.onchange = () => {
+      // A new goal starts fresh: check-in calorie changes were for the old goal.
+      if (key === 'dietGoal' && p.dietGoal !== el.value && +p.kcalAdjust) { p.kcalAdjust = 0; adaptState().lastAt = Date.now(); ctx.toast('New goal: QK reset your check-in changes'); }
+      p[key] = el.value; ctx.persist(); renderFood();
+    };
   }
 }
 
@@ -288,7 +292,7 @@ function onSheetClick(e) {
   if (cur?.mode === 'place') return onPlaceClick(e);
   if (cur?.mode === 'scan') return;
   const st = e.target.closest('[data-step]');
-  if (st) { const b = cur.opts.menuBase || 1; cur.opts.servings = Math.max(0.5 * b, Math.min(20 * b, (cur.opts.servings || 1) + +st.dataset.step * b)); return renderSheetResult(); }
+  if (st) { const b = cur.opts.menuBase || 1, was = cur.opts.servings || 1; cur.opts.servings = Math.max(0.5 * b, Math.min(20 * b, was + +st.dataset.step * b)); if (cur.opts.grams) cur.opts.grams = Math.round(cur.opts.grams * cur.opts.servings / was); return renderSheetResult(); }
   const f = e.target.closest('[data-fam]');
   if (f) { // switch to another member of the family, keeping the portion
     const ref = { t: 'dish', id: f.dataset.fam }, keep = { servings: cur.opts.servings };
@@ -335,6 +339,7 @@ function addEntry(ref, opts, source, extra = {}) {
 }
 function editEntry(id) {
   const it = byId(id); if (!it) return;
+  if (!N.lookup(it.ref)) return ctx.toast('This food came from an online search and isn\'t stored on your phone. Remove it and search again to change it.');
   if (snap?.ids?.includes(id)) snap.touched = true; // their correction wins over QK's double-check
   const custom = it.name !== N.lookup(it.ref)?.name ? it.name : null; // a place item keeps its own name
   const weigh = it.source === 'photo' && it.ref.t === 'dish';
@@ -404,10 +409,11 @@ async function runPhoto(file, hint = null) {
   // Words typed or said before snapping ("restaurant karahi, 2 naan") go with the photo as a hint.
   if (hint === null) { hint = $('#foodSearch').value.trim(); if (hint) { $('#foodSearch').value = ''; renderResults(); } }
   box.hidden = false; box.innerHTML = '<div class="card snap-card"><b>Adding your meal…</b><p class="muted small" style="margin:6px 0 0">QK is naming each dish and counting portions.</p></div>';
+  const readId = uid(); // which read this is: a late double-check of an earlier read must not replace it
   try {
     const r = await recognise(file, { hint, plateCm: +F().plateCm || null, usual: usualDishes() }, better => {
       // QK's double-check came back. Swap it in only if it differs and they haven't touched the entries.
-      if (snap?.file !== file || snap.touched || sameRead(snapRead, better)) return;
+      if (snap?.file !== file || snap.readId !== readId || snap.touched || sameRead(snapRead, better)) return;
       removeEntries(snap.ids, true); place(better); ctx.toast('QK double-checked your plate and updated it');
     });
     let snapRead = r;
@@ -442,7 +448,7 @@ async function runPhoto(file, hint = null) {
     const tot = ids.map(byId).reduce((a, e) => a + e.kcal, 0);
     const share = needsShareCheck(r.scene, ids.map(byId).map(e => ({ kind: N.DISH[e.ref.id].kind, servings: e.opts.servings })), tot);
     snap = { file, hint, share, dataUrl: r.dataUrl, ids, quality: r.quality, unsure: r.agreement < 0.75 || r.items.some(i => i.confidence < 0.6), unknown: r.items.filter(i => !i.dish).map(i => i.otherName) };
-    snap.refining = !!r.refining;
+    snap.refining = !!r.refining; snap.readId = readId;
     renderFood(); renderSnap();
     box.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
   }
@@ -620,8 +626,9 @@ function renderPlan() {
   box.innerHTML = `<div class="card-head"><b>${tr('Your diet plan')}</b>${plan.byCoach ? '<span class="ftag">Edited by QK</span>' : `<button type="button" class="linkbtn" data-plan="edit">${tr('Change answers')}</button>`}</div>
     ${plan.byCoach && plan.note ? `<p class="qk-line" style="margin:0"><span class="eyebrow">QK</span> ${esc(plan.note)}</p>` : ''}
     <p class="muted small" style="margin:0">${chip('kcal', '')} · ${chip('protein', 'P')} · ${chip('carbs', 'C')} · ${chip('fat', 'F')}<br>Target ${fmt(t.kcal)} kcal · P ${t.protein} · C ${t.carbs} · F ${t.fat} g. Pick one option per meal: they're the same size.</p>
+    ${plan.short ? `<p class="small plan-short">${plan.short === 'kcal' ? 'This plan comes out short of your calories with the foods you picked.' : 'This plan is low on protein with the foods you picked.'} Tap <b>Change answers</b> and add a few more foods${plan.short === 'protein' ? ' (eggs, chicken, dahi, daal, whey)' : ''}, or ask QK to adjust it.</p>` : ''}
     ${stale ? `<div class="plan-stale"><span class="small">Your targets changed since this plan was made.</span><button type="button" class="ghost" data-plan="refresh">Update the amounts</button></div>` : ''}
-    ${plan.meals.map((m, mi) => `<div class="plan-meal"><div class="meal-head"><span class="eyebrow">${tr(m.name)}</span><span class="data small">${fmt(m.target.kcal)} kcal</span></div>
+    ${plan.meals.map((m, mi) => `<div class="plan-meal"><div class="meal-head"><span class="eyebrow">${esc(tr(m.name))}</span><span class="data small">${fmt(m.target.kcal)} kcal</span></div>
       ${m.options.map((o, oi) => `<div class="plan-opt"><div class="row"><b>${m.options.length > 1 ? `${'ABC'[oi]}. ` : ''}${esc(o.title)}</b><span class="data small">${fmt(o.total.kcal)} kcal · P ${r0(o.total.protein)}</span></div>
         <ul>${o.items.map(it => `<li><span>${esc(it.name)}</span><span class="data">${esc(it.amountLabel)}</span></li>`).join('')}</ul>
         <button type="button" class="ghost" data-plan="log" data-m="${mi}" data-o="${oi}">${tr('I ate this')}</button></div>`).join('') || '<p class="muted small">Nothing fits your answers for this meal. Try adding a few foods you like.</p>'}
@@ -706,7 +713,7 @@ function renderWeight() {
       ${chartSVG(ser)}
       <p class="muted small" style="margin:0">${ser.change != null ? `${fmtKg(ser.change)} in ${ser.days} days` : ''}${ser.sinceStart != null && wRange !== 'all' ? ` · ${fmtKg(ser.sinceStart)} since you started (${new Date(ser.startAt).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })})` : ''}</p>`
       : ws.length ? '<p class="muted small" style="margin:0">Your graph starts with your second weigh-in.</p>' : ''}
-    <div class="weigh"><label class="field">Weigh-in (kg)<input id="wkKg" type="number" inputmode="decimal" step="0.1" placeholder="${last ? last.kg : 'e.g. 72.5'}"></label><button type="button" class="ghost" id="wkSave">Save</button></div>
+    <div class="weigh"><label class="field">Weigh-in (${ctx.S.profile.unit === 'lb' ? 'lb' : 'kg'})<input id="wkKg" type="number" inputmode="decimal" step="0.1" placeholder="${last ? last.kg : 'e.g. 72.5'}"></label><button type="button" class="ghost" id="wkSave">Save</button></div>
     <p class="muted small" style="margin:0">${due ? '' : `Next check-in in ${daysToCheckin(ws, A)} day${daysToCheckin(ws, A) === 1 ? '' : 's'}. `}Step goal: <b>${fmt(stepGoal(A, avgStepsNow()))}</b> a day${t?.adjust ? ` · calories ${t.adjust > 0 ? '+' : '−'}${Math.abs(t.adjust)} from your check-ins` : ''}.
       <button type="button" class="linkbtn" id="wkCal">Add check-in reminders to my calendar</button></p>
     ${cycleHTML()}`;
@@ -724,13 +731,22 @@ function onWeightClick(e) {
   if (e.target.closest('#cyStart')) { (F().periods ||= []).push(Date.now()); ctx.persist(); ctx.toast('Noted. Only on your phone.'); return renderWeight(); }
   const r = e.target.closest('[data-range]'); if (r) { wRange = r.dataset.range; return renderWeight(); }
   if (e.target.closest('#wkSave')) {
-    const kg = +$('#wkKg').value;
-    if (!(kg > 25 && kg < 350)) return ctx.toast('Enter your weight in kg');
+    const lb = ctx.S.profile.unit === 'lb', raw = +$('#wkKg').value, kg = Math.round((lb ? raw / 2.2046 : raw) * 10) / 10;
+    if (!(kg > 25 && kg < 350)) return ctx.toast(`Enter your weight in ${lb ? 'lb' : 'kg'}`);
+    // A big jump from the last two weeks is usually a typo (or lb typed as kg): check before it moves the targets.
+    const recent = allWeights(ctx.S).filter(w => w.at > Date.now() - 14 * 864e5).slice(-3), ref = recent.length ? recent.reduce((a, w) => a + w.kg, 0) / recent.length : null;
+    if (ref && Math.abs(kg - ref) / ref > 0.05 && typeof confirm === 'function' && !confirm(`${kg} kg is ${Math.abs(Math.round((kg - ref) * 10) / 10)} kg ${kg > ref ? 'more' : 'less'} than your recent weigh-ins. Save it anyway?`)) return;
     F().weights.push({ at: Date.now(), kg }); ctx.S.profile.weightKg = kg; $('#tWeight').value = kg;
     decision = checkinDue(allWeights(ctx.S), adaptState()) ? currentDecision() : null;
     ctx.persist(); ctx.toast('Weight saved'); return renderFood();
   }
   const c = e.target.closest('[data-choice]');
+  if (c && decision && c.dataset.choice === 'undo') {
+    // Only weigh-ins typed here can be undone (body-scan weights belong to their scan).
+    const ws = F().weights; if (ws.length) ws.pop();
+    const last = allWeights(ctx.S).pop(); if (last) { ctx.S.profile.weightKg = last.kg; $('#tWeight').value = last.kg; }
+    decision = null; ctx.persist(); ctx.toast('Last weigh-in deleted'); return renderFood();
+  }
   if (c && decision) {
     const why = c.dataset.choice === 'period';
     if (why && !(F().periods || []).some(t => t > Date.now() - 10 * 864e5)) (F().periods ||= []).push(Date.now());

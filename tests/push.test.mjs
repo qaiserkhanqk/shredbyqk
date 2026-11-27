@@ -18,5 +18,14 @@ const DAY = 864e5, now = Date.UTC(2026, 10, 27, 9);
 const S = { food: { weights: [{ at: now - 20 * DAY, kg: 80 }], adapt: { lastAt: now - 10 * DAY } } };
 check('next check-in: 14 days after the last one', nextCheckin(S, now) === '2026-12-01', nextCheckin(S, now));
 check('overdue → today', nextCheckin({ food: { weights: [{ at: now - 30 * DAY, kg: 80 }], adapt: {} } }, now) === '2026-11-27');
+// A client who stopped opening the app: reminded once for that due date, not every day after.
+const lapsed = [{ id: 'z', name: 'Zain', next_checkin: '2026-10-01', notify: 'essential' }];
+const zsub = [{ client_id: 'z', endpoint: 'z1' }];
+const d1 = plan({ profiles: lapsed, subs: zsub, plans: [], day: '2026-11-27' });
+const d2 = plan({ profiles: lapsed, subs: [{ ...zsub[0], last_sent: '2026-11-27', last_checkin_for: '2026-10-01' }], plans: [], day: '2026-11-28' });
+check('lapsed client: one check-in reminder per due date, not daily', d1.length === 1 && d1[0].kind === 'checkin' && d1[0].due === '2026-10-01' && d2.length === 0);
+check('"Off" means off, even for QK\'s plan updates', plan({ profiles: [{ id: 'o', notify: 'off' }], subs: [{ client_id: 'o', endpoint: 'o1' }], plans: [{ client_id: 'o', updated_at: '2026-11-27T01:00:00Z' }], day }).length === 0);
+const never = nextCheckin({ food: { weights: [], adapt: {} } }, now);
+check('never weighed in → due today (so they get reminded)', never === '2026-11-27', never);
 console.log(fails ? `\n${fails} failed` : '\nall push checks pass');
 process.exit(fails ? 1 : 0);

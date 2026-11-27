@@ -32,23 +32,23 @@ const NUM = {
   aadha: 0.5, aadhi: 0.5, adha: 0.5, adhi: 0.5, half: 0.5, dedh: 1.5, dairh: 1.5, derh: 1.5, dhai: 2.5, adhai: 2.5, arhai: 2.5, dhaai: 2.5,
 };
 // Container units in grams, so "a plate of karahi" becomes 1½ katori.
-const UNIT = { liter: 1000, litre: 1000, l: 1000, ml: 1, g: 1, gm: 1, gram: 1, grams: 1, kg: 1000, katori: 200, katoray: 200, bowl: 250, plate: 300, cup: 160, cups: 160, glass: 250, glasses: 250, piyala: 250, pyala: 250, pyali: 160, pao: 250 };
+const UNIT = { liter: 1000, litre: 1000, l: 1000, ml: 1, g: 1, gm: 1, gram: 1, grams: 1, kg: 1000, kilo: 1000, kilos: 1000, mutthi: 30, muthi: 30, mutthee: 30, handful: 30, katori: 240, katoray: 240, bowl: 250, plate: 300, cup: 160, cups: 160, glass: 250, glasses: 250, piyala: 250, pyala: 250, pyali: 160, pao: 250 };
 const COUNT = new Set(['piece', 'pieces', 'pc', 'pcs', 'adad', 'slice', 'slices', 'number']);
 const FILLER = new Set(['from', 'at', 'se', 'say', 'wala', 'wali', 'walay', 'the', 'ke', 'ka', 'ki', 'of', 'and', 'aur', 'te', 'or', 'i', 'had', 'have', 'ate', 'eaten', 'drank', 'khaya', 'khayi', 'khai', 'khaye', 'piya', 'pi', 'pee', 'li', 'liya', 'mein', 'main', 'maine', 'mainay', 'nay', 'ne', 'some', 'kuch', 'thora', 'thori', 'my', 'me', 'for', 'today', 'aaj', 'subah', 'shaam', 'raat', 'dopehar', 'lunch', 'dinner', 'breakfast', 'nashta', 'nashte', 'snack', 'with', 'saath', 'bhi', 'ko', 'ka', 'aj', 'nashtay', 'nashtey', 'subha', 'subhah', 'kal', 'raat ko', 'khana', 'khane', 'khaana', 'mujhe', 'humne', 'hamne', 'yesterday', 'tonight', 'morning', 'evening', 'night', 'then', 'phir', 'also', 'tha', 'thi', 'hai', 'just', 'only', 'sirf', 'about', 'around', 'like']);
 // Extras on the side that aren't worth a separate entry (or are already in the dish, like sugar in chai).
-const SIDE = new Set(['sugar', 'cheeni', 'chini', 'chutney', 'achar', 'achaar', 'salt', 'namak', 'pepper', 'mirch', 'lemon', 'nimbu', 'ketchup', 'sauce', 'mayo', 'ice', 'baraf']);
+const SIDE = new Set(['nosugar', 'sugar', 'cheeni', 'chini', 'chutney', 'achar', 'achaar', 'salt', 'namak', 'pepper', 'mirch', 'lemon', 'nimbu', 'ketchup', 'sauce', 'mayo', 'ice', 'baraf']);
 // Words that describe rather than name; a dish matched only through one of these isn't a match.
 const ADJ = new Set(['green', 'sweet', 'hot', 'plain', 'white', 'black', 'special', 'fried', 'boiled', 'cold', 'fresh', 'spicy', 'masala', 'desi', 'homemade', 'ghar', 'gharelu', 'crispy']);
 // "seekh kebab paratha roll": the words before a wrapper are its filling, not another dish.
 const WRAPPER = ['roll', 'burger', 'sandwich', 'wrap', 'shawarma', 'pizza', 'paratha roll'];
 // Dishes sold as a pack of pieces: "4 nuggets" is ⅔ of a 6-piece box.
-const PACK = { nuggets: 6, wings: 6, gol_gappay: 6 };
+const PACK = { nuggets: 6, wings: 6, gol_gappay: 6, biscuits: 3 };
 const SIZE_WORDS = new Set(['small', 'medium', 'regular', 'large', 'chota', 'chhota', 'choti', 'bara', 'bada', 'bari', 'full', 'single', 'double']);
 // Everyday words dish names don't contain.
 const SAY = { chawal: 'plain rice', doodh: 'milk', milk: 'milk', bread: 'bread slice', toast: 'bread slice', egg: 'boiled egg', eggs: 'boiled egg', tea: 'chai', coke: 'cola', pepsi: 'cola', sprite: 'cola' };
 // What a bare word usually means at a Pakistani table (the most common version of the dish).
 const DEFAULT = { biryani: 'chicken_biryani', karahi: 'chicken_karahi', qorma: 'chicken_qorma', korma: 'chicken_qorma', pulao: 'chicken_pulao', samosa: 'samosa',
-  qeema: 'qeema', keema: 'qeema', chapati: 'roti', roti: 'roti', paratha: 'paratha', naan: 'naan', kebab: 'seekh_kebab', kabab: 'seekh_kebab', tikka: 'chicken_tikka',
+  pheekichai: 'chai_no_sugar', qeema: 'qeema', keema: 'qeema', chapati: 'roti', roti: 'roti', rotiyan: 'roti', rotian: 'roti', rotiya: 'roti', paratha: 'paratha', naan: 'naan', kebab: 'seekh_kebab', kabab: 'seekh_kebab', tikka: 'chicken_tikka',
   salan: 'chicken_salan', daal: 'daal_masoor', dal: 'daal_masoor', chawal: 'plain_rice', rice: 'plain_rice', anday: 'boiled_egg', anda: 'anda_fry', egg: 'boiled_egg',
   burger: 'zinger_burger', pizza: 'pizza_slice', lassi: 'sweet_lassi', halwa: 'suji_halwa', chane: 'cholay', chanay: 'cholay', sabzi: 'mix_sabzi', chai: 'chai',
   shawarma: 'shawarma', roll: 'paratha_roll', pakoray: 'pakora', fries: 'fries', omelette: 'omelette', saag: 'sarson_saag', machli: 'fish_curry', fish: 'fish_curry',
@@ -152,9 +152,23 @@ const one = id => ({ ref: { t: 'dish', id }, opts: {}, name: DISH[id].name });
 const norm = s => String(s).toLowerCase()
   .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
   .replace(/[؀-ۿ]+/g, w => URDU[w] ?? w)
+  .replace(/(\d),(\d)\b/g, '$1.$2') // "1,5 roti" (decimal comma)
+  .replace(/(\d+)\s+(\d+)\s*\/\s*(\d+)/g, (_, w, a, b) => ` ${+w + +a / +b} `) // "1 1/2 roti"
+  .replace(/(\d+)\s*([½¼])/g, (_, w, f) => ` ${+w + (f === '½' ? 0.5 : 0.25)} `) // "1½ naan"
   .replace(/(\d+)\s*\/\s*(\d+)/g, (_, a, b) => ` ${+a / +b} `).replace(/½/g, ' 0.5 ').replace(/¼/g, ' 0.25 ')
   .replace(/\b(\w+) and a half\b/g, (m, n) => (n in NUM || /^\d/.test(n)) ? ` ${(NUM[n] ?? +n) + 0.5} ` : m)
-  .replace(/\bek dedh\b/g, 'dedh').replace(/['’]/g, '').replace(/[^\p{L}\p{N}.,+&]+/gu, ' ').trim();
+  .replace(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)/g, (_, a, b) => ` ${(+a + +b) / 2} `) // "2-3 samosay"
+  .replace(/\bek dedh\b/g, 'dedh').replace(/['’]/g, '').replace(/[^\p{L}\p{N}.,+&]+/gu, ' ')
+  // "do se teen roti", "2-3 roti", "2 ya 3": a range is its middle, not a place called "Do".
+  .replace(/\b([a-z]+|\d+(?:\.\d+)?)\s+(?:se|say|sy|to|ya|-)\s+([a-z]+|\d+(?:\.\d+)?)\b/g, (m, a, b) => (isNum(a) && isNum(b) ? ` ${(numOf(a) + numOf(b)) / 2} ` : m))
+  // "do anday ka omelette": the number counts eggs, and one omelette is 2 eggs.
+  .replace(/\b([a-z]+|\d+(?:\.\d+)?)\s+(?:anday|ande|anda|eggs?)\s+(?:ka|ki|ke|wala|wali|walay)?\s*(omelette|omlet|amlet|amlate|omelet)\b/g, (m, n, o) => (isNum(n) ? ` ${Math.max(0.5, numOf(n) / 2)} ${o} ` : m))
+  // "chai bina cheeni", "without sugar": the side is dropped (the no-sugar chai is its own dish).
+  .replace(/\b(chai|tea)\s+(?:bina|without|no)\s+(?:cheeni|chini|shakar|sugar)\b|\b(?:sugar\s*free|pheeki)\s+(chai|tea)\b/g, ' pheekichai ')
+  .replace(/\b(?:bina|without|no)\s+(?:cheeni|chini|shakar|sugar)\b|\bsugar\s*free\b/g, ' nosugar ')
+  .replace(/\s+/g, ' ').trim();
+const isNum = w => w in NUM && w !== 'a' && w !== 'an' || /^\d+(\.\d+)?$/.test(w);
+const numOf = w => (w in NUM ? NUM[w] : +w);
 
 /** Split "do roti aur karahi, chai" into item phrases. */
 export function splitMeal(text) {
@@ -241,6 +255,11 @@ function parseMealPlain(text) {
       else if (unit && UNIT[unit] && unit !== d.serve && ['katori', 'bowl', 'plate', 'cup', 'glass', 'portion'].includes(d.serve) && UNIT[unit] !== d.cooked) {
         servings = Math.max(0.5, Math.round(amt * UNIT[unit] / d.cooked * 2) / 2);
       }
+      // "ek mutthi chane" is a handful of roasted chana, not a katori of cholay.
+      if (it.ref.id === 'cholay' && ['mutthi', 'muthi', 'mutthee', 'handful'].includes(unit) && DISH.roasted_chana) { items.push({ ref: { t: 'dish', id: 'roasted_chana' }, opts: { servings: amt }, name: DISH.roasted_chana.name, said: ph }); return; }
+      // Nothing, or an amount no one eats in one sitting ("100 roti" is a typo): leave it for the person to check.
+      if (!(servings > 0)) return;
+      if (servings > 20) { unknown.push(ph); return; }
       items.push({ ...it, opts: { ...it.opts, servings: (it.opts.servings || 1) * servings }, said: ph });
     });
   }

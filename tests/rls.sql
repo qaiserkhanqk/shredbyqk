@@ -88,6 +88,30 @@ do $$ begin update public.messages set body = 'edited'; perform pg_temp.check('c
 exception when others then perform pg_temp.check('client cannot rewrite a message', true); end $$;
 reset role;
 select pg_temp.check('message marked read', (select read_at is not null from public.messages));
+
+-- Switching coach: the old coach's plan goes, and the new coach can write one.
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+set role authenticated;
+select pg_temp.check('client switches to coach Z', public.join_coach('zzzzzz') = 'Z');
+reset role;
+select pg_temp.check('old coach''s plan removed on switch', (select count(*) from public.coach_plans where client_id = '00000000-0000-0000-0000-00000000000a') = 0);
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000c2');
+set role authenticated;
+insert into public.coach_plans (client_id, coach_id, plan, note) values ('00000000-0000-0000-0000-00000000000a', auth.uid(), '{"meals":[]}', 'from Z');
+select pg_temp.check('new coach can save a plan', (select note from public.coach_plans) = 'from Z');
+reset role;
+-- Back to coach Q for the leaderboard checks below.
+update public.profiles set coach_id = (select id from public.profiles where invite_code = 'QKTEST') where id = '00000000-0000-0000-0000-00000000000a';
+
+-- Invite codes can't be brute-forced: wrong codes return null and the 11th wrong try in an hour is refused.
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+set role authenticated;
+select pg_temp.check('wrong code → no match (null), no coach attached', public.join_coach('QK0000') is null and (select coach_id from public.profiles where id = auth.uid()) is null);
+do $$ begin for i in 1..9 loop perform public.join_coach('QK' || i); end loop; end $$;
+do $$ begin perform public.join_coach('qktest'); perform pg_temp.check('11th try in an hour is refused, even with the right code', false);
+exception when others then perform pg_temp.check('11th try in an hour is refused, even with the right code', sqlerrm like 'Too many tries%'); end $$;
+select pg_temp.check('client can''t read or clear the attempt log', (select count(*) from public.join_attempts) = 0);
+reset role;
 select pg_temp.check('anonymous visitors see nothing', not has_table_privilege('anon', 'public.sessions', 'select'));
 
 -- Leaderboard: client C also joins Q. Scores are shared as rank + board name + score only.

@@ -30,7 +30,7 @@ function fakeSupabase(route) {
   const q = k => u.searchParams.get(k) || '';
   const inList = k => (q(k).match(/^in\.\((.*)\)$/) || [, ''])[1].split(',').filter(Boolean);
   const mine = cid => cid === uid || DB.profiles[cid]?.coach_id === uid;
-  if (p === '/rest/v1/rpc/join_coach') { const c = Object.values(DB.profiles).find(x => x.invite_code === body.code.toUpperCase()); if (!c) return json(400, { message: 'No coach with that code' }); DB.profiles[uid].coach_id = c.id; return json(200, c.name); }
+  if (p === '/rest/v1/rpc/join_coach') { const c = Object.values(DB.profiles).find(x => x.invite_code === body.code.toUpperCase()); if (!c) return json(200, null); if (false) return json(400, { message: 'No coach with that code' }); DB.profiles[uid].coach_id = c.id; return json(200, c.name); }
   if (p === '/rest/v1/profiles' && req.method() === 'GET') { if (q('id')) return json(200, [DB.profiles[q('id').slice(3)]].filter(x => x && (x.id === uid || x.coach_id === uid))); return json(200, Object.values(DB.profiles).filter(x => x.coach_id === uid)); }
   if (p === '/rest/v1/profiles' && req.method() === 'PATCH') { const { role, invite_code, coach_id, ...ok } = body; Object.assign(DB.profiles[uid], ok); return json(204); }
   for (const t of ['sessions', 'events', 'checkins', 'food_days', 'places']) if (p === '/rest/v1/' + t) {

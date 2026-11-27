@@ -31,7 +31,7 @@ const ev = (weights, goal = 'lose', extra = {}) => evaluate({ weights, goal, tar
 const stalled = ev(series(80, 0));
 check('cutting but stalled → "paused", movement offered first', stalled.kind === 'stalled' && stalled.choices[0].id === 'steps', JSON.stringify(stalled.choices));
 check('stalled also offers eating a little less, and keeping it the same', stalled.choices.some(c => c.delta === -150) && stalled.choices.some(c => c.id === 'keep'));
-check('steps goal goes up by 2,000 (from at least 6,000)', stalled.choices[0].steps === 8000, stalled.choices[0].steps);
+check('steps goal goes up by 2,000 (from at least 8,000, the same goal the Activity score uses)', stalled.choices[0].steps === 10000, stalled.choices[0].steps);
 const good = ev(series(82, -0.6));
 check('losing at a healthy pace → progress, choice of less food OR more steps OR keep', good.kind === 'progress' && ['keep', 'steps', 'kcal'].every(id => good.choices.some(c => c.id === id)), JSON.stringify(good));
 check('progress message says how much was lost', /down \d+(\.\d)? kg over the last two weeks/.test(good.message), good.message);
@@ -51,7 +51,7 @@ const prof = { ...P }, A = {};
 applyChoice({ profile: prof, adapt: A, decision: good, choiceId: 'kcal', weight: 81, now: NOW });
 check('choosing "eat less" lowers the target by 100', N.targets(prof).kcal === T.kcal - 100 && A.lastAt === NOW && A.history.length === 1);
 applyChoice({ profile: prof, adapt: A, decision: stalled, choiceId: 'steps', now: NOW });
-check('choosing steps sets the step goal', A.stepGoal === 8000 && stepGoal(A, 3000) === 8000);
+check('choosing steps sets the step goal', A.stepGoal === 10000 && stepGoal(A, 3000) === 10000);
 check('total adjustment is capped at ±600', (() => { const q = { kcalAdjust: -580 }; applyChoice({ profile: q, adapt: {}, decision: stalled, choiceId: 'kcal' }); return q.kcalAdjust === -600; })());
 
 // Graph data
