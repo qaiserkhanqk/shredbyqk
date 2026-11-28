@@ -634,3 +634,32 @@ After the last set of a guided workout, a full-screen summary shows before the c
 - Monday is a "fresh start", when people are most likely to begin goals (Dai, Milkman & Riis 2014). Whoop sends its weekly assessment on Monday.
 - One focus, not a list, follows MacroFactor's weekly check-in approach.
 - A missed week opens with "A quiet week happens…", never a broken streak. Rewarding a return after a miss raised gym visits by 27% in a 61,000-person megastudy (Milkman et al. 2021), and broken-streak messages lower re-engagement (Silverman & Barasch 2023).
+
+## Camera accuracy (`js/angles.js`, `js/exercises.js`, `js/accuracy.js`)
+
+**What the evidence says a single phone camera can do.**
+- Rep counting from pose landmarks is about 97% accurate (1,513 videos, 12 exercises; Sousa 2026, doi:10.3390/jfmk11020162).
+- Side-view hip and knee angles are the most valid (meta-analysis, Scataglini 2024, doi:10.3390/s24113686). Front and rotation angles are not valid as measurements: MediaPipe knee valgus was about 19° off 3D, while the *change* from the start position was valid (Asaeda 2024, doi:10.1016/j.heliyon.2024.e36338).
+- Against marker-based motion capture, errors range from 0.2° to 28.6° (review of 53 studies, Yoma 2025, doi:10.1080/02640414.2025.2518359).
+- Heavier models are not automatically better: in one study the high-complexity model distorted the skeleton more (Ferraris 2026, doi:10.3390/s26041146).
+
+So QK's job is to be a trustworthy coach: count accurately, give the big side-view cues, flag the rest as checks, and say nothing when it can't see.
+
+**What changed, and why:**
+1. **Per-joint gate.** Each frame records how clearly the camera sees the joints the exercise is judged on: the clearer side for side-view lifts, and both sides for front-view lifts (`jointVisibility`, threshold 0.5). On unclear frames the rep is still counted but not judged. It never counts as clean or as a fault, and QK says "I couldn't see clearly". In one study, gating low-confidence frames raised squat-angle agreement from ICC 0.43 to 0.77 (Yue 2026, doi:10.2196/102399).
+2. **Front-view knee cave is a screening check, not a fault.** It is judged against the client's own standing knee/ankle-gap ratio, so a 20% drop from their own start. It is said once per set as "Worth a look on the replay", and never reduces the clean-rep score.
+3. **"Was QK right?"** One tap after each camera set: Spot on / Rep count off / That cue was wrong. Using − and + to fix the count records it too. Each answer is a label with numbers only (exercise, counted vs real reps, cue id, view, visibility), synced to `form_labels`. The coach dashboard shows:
+   - rep counts exactly right, and within one rep
+   - % of cues confirmed
+   - counting accuracy by exercise
+   - share of sets with unclear reps
+   - **cues to retune**: called wrong on 30%+ of 5+ sets
+
+   This is how the thresholds get tuned on real lifts (the step SCIENCE.md §13 called most important).
+4. **Effect-focused cues.** 15 body-focused cues were rewritten to point at the effect ("Pull the bar down to your collarbone", "Bend the bar into a smile"). External focus beats internal focus for performance (g = 0.26) and retention (g = 0.58) (Chua 2021 meta-analysis, doi:10.1037/bul0000335).
+5. **Visual feedback after every rep.** A bar per rep (height = range against the best rep in the set; green clean, amber fault, grey unclear) and a line such as "Rep 5 · full range · speed holding". Visual feedback beat verbal (g = 1.11 vs 0.47) in a 20-study meta-analysis (Weakley 2023, doi:10.1007/s40279-023-01877-2).
+6. **Adaptive smoothing (One Euro filter, Casiez et al. CHI 2012).** It smooths hard when a joint is still and lightly when it moves fast. Tested on the demo athletes: same reps and faults as before, jitter at rest more than halved, and no more lag on a fast descent than the old smoothing.
+7. **Setup check, a second into each set:** right view, head and feet in frame, not too far away (body at least 35% of the frame height), camera at 20 fps or more. QK says the first problem.
+8. **Personal range.** Each lifter's usual full range per exercise (median of clean reps, updated slowly) is kept. A set where every rep is a half rep is now caught as partial, not just reps short of that set's best.
+
+**Still true:** camera bar speed from the hips or wrists is not validated as m/s, so QK uses only its *change* within a set (velocity loss). Dedicated apps vary widely: Qwik VBT matched a transducer, while MyLift missed 175 of 589 reps (Renner 2024, doi:10.1371/journal.pone.0313919). No trial yet shows that camera form apps improve lifters' results; programming and consistency do. That's why the camera is optional and quick log is the default.

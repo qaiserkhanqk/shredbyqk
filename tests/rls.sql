@@ -216,5 +216,21 @@ select pg_temp.check('another client sees none of it', (select count(*) from pub
 select pg_temp.check('client cannot switch Muhammad off', (select count(*) from public.assistant_off) = 0);
 reset role;
 
+-- "Was QK right?" labels: the client's own, readable by their coach only.
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+set role authenticated;
+insert into public.form_labels (client_id, at, ex, counted, reps, cue, verdict) values (auth.uid(), now(), 'squat', 8, 9, 'sq_depth', 'count');
+do $$ begin insert into public.form_labels (client_id, at, ex, counted) values ('00000000-0000-0000-0000-00000000000d', now(), 'squat', 5); perform pg_temp.check('client cannot write labels for someone else', false);
+exception when others then perform pg_temp.check('client cannot write labels for someone else', true); end $$;
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000c1');
+set role authenticated;
+select pg_temp.check('coach reads their client''s accuracy labels', (select count(*) from public.form_labels) = 1);
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000c2');
+set role authenticated;
+select pg_temp.check('another coach sees no labels', (select count(*) from public.form_labels) = 0);
+reset role;
+
 select (case when ok then 'ok   ' else 'FAIL ' end) || name from pg_temp.results;
 select case when bool_and(ok) then 'rls: all pass' else 'rls: FAILED' end from pg_temp.results;

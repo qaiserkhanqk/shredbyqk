@@ -270,7 +270,7 @@ create or replace function public.board_name(p public.profiles) returns text lan
   select case when p.board_hidden then 'Anonymous'
     when coalesce(trim(p.nickname), '') <> '' then left(trim(p.nickname), 24)
     else coalesce(nullif(split_part(trim(coalesce(p.name, '')), ' ', 1), ''), 'Shredder')
-      || coalesce(' ' || nullif(upper(left(split_part(trim(coalesce(p.name, '')), ' ', 2), 1)), '') || '.', '') end $$;
+      || coalesce(' ' || nullif(regexp_replace(upper(left(split_part(trim(coalesce(p.name, '')), ' ', 2), 1)), '[^[:alpha:]]', '', 'g'), '') || '.', '') end $$;
 
 create or replace function public.leaderboard(wk date, months int default 0)
 returns table (rank bigint, name text, score bigint, me boolean, players bigint)
@@ -383,3 +383,19 @@ create table if not exists public.assistant_off (
 alter table public.assistant_off enable row level security;
 drop policy if exists "coach pauses assistant" on public.assistant_off;
 create policy "coach pauses assistant" on public.assistant_off for all using (coach_id = auth.uid() and public.is_my_client(client_id)) with check (coach_id = auth.uid() and public.is_my_client(client_id));
+
+-- "Was QK right?" labels: numbers only (exercise, counted vs real reps, the cue, view, joint visibility).
+-- The client writes their own; their coach reads them to see QK's real-world accuracy and which cues to retune.
+create table if not exists public.form_labels (
+  client_id uuid not null references public.profiles (id) on delete cascade,
+  at timestamptz not null,
+  ex text not null,
+  counted int, reps int, cue text, verdict text check (verdict in ('right', 'count', 'cue')),
+  view text, vis real, unsure int, model text,
+  primary key (client_id, at)
+);
+alter table public.form_labels enable row level security;
+drop policy if exists "own labels" on public.form_labels;
+create policy "own labels" on public.form_labels for all using (client_id = auth.uid()) with check (client_id = auth.uid());
+drop policy if exists "coach reads labels" on public.form_labels;
+create policy "coach reads labels" on public.form_labels for select using (public.is_my_client(client_id));

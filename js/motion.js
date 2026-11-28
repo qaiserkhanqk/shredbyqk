@@ -37,9 +37,11 @@ export class MotionTracker {
   }
 }
 
-export function romSummary(roms) {
+/** typical: this lifter's usual full range on this exercise (median of earlier clean reps), so a whole set of
+ *  half reps is still caught as partial. */
+export function romSummary(roms, typical = 0) {
   if (!roms.length) return { best: 0, partial: 0, cv: 0 };
-  const v = roms.map(r => r.rom), best = Math.max(...v), m = v.reduce((a, b) => a + b, 0) / v.length;
+  const v = roms.map(r => r.rom), best = Math.max(...v, typical * 0.95), m = v.reduce((a, b) => a + b, 0) / v.length;
   const sd = Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / v.length);
   return { best, partial: v.filter(x => x < best * 0.85).length, cv: m ? sd / m : 0 };
 }
