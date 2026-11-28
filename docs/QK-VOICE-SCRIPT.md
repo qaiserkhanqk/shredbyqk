@@ -2,7 +2,7 @@
 
 Two sets of recordings, both in QK's own voice. No AI.
 
-## 1. Demo video narration (19 lines, about 2 minutes)
+## 1. Demo video narration (27 lines, about 3 minutes)
 
 Record each line as its **own file**, named with its number first: `01.m4a`, `02.m4a` … (iPhone voice memos or WhatsApp voice notes are fine).
 
@@ -24,9 +24,17 @@ Record each line as its **own file**, named with its number first: `01.m4a`, `02
 | 14 | Sukoon | Then listen to a short recitation from the Quran. |
 | 15 | Sukoon | And finish with a dua from the Sunnah. |
 | 16 | Sukoon | Over time, you'll see what really calms you down. |
-| 17 | Me | Your progress is all in one place. |
-| 18 | Me | And with one tap, you send me your week, so I can coach you properly. |
-| 19 | Shred by QK | Shred. Your coach in your pocket. Let's get to work. |
+| 17 | Brain | And to keep your brain sharp, there's Brain. Your Brain score shows how well you looked after it this week. |
+| 18 | Speed Flash | Speed Flash is the brain drill with twenty years of evidence behind it. |
+| 19 | Reflex games | And reflex games, the way F1 drivers train. Lights out, and go! |
+| 20 | Reflex games | Hit every light you can in thirty seconds. |
+| 21 | Quran memory | Learn the Quran by heart. Listen, fade the words, and recite from memory. |
+| 22 | Quran memory | And each verse comes back for review, just before you'd forget it. |
+| 23 | Quran reader | And you can read the whole Quran here. All one hundred and fourteen surahs, with the translation. |
+| 24 | Quran reader | Press play and it follows along with the recitation. And it remembers where you stopped. |
+| 25 | Me | Your progress is all in one place. |
+| 26 | Me | And with one tap, you send me your week, so I can coach you properly. |
+| 27 | Shred by QK | Shred. Your coach in your pocket. Let's get to work. |
 
 **Tips**
 - Quiet room, phone about a hand's width from your mouth.

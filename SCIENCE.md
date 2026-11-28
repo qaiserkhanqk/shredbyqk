@@ -491,6 +491,10 @@ doi:10.1123/ijspp.2022-0268), so QK suggests training after iftar.
 
 **Memory Grid** (a Corsi-style spatial span) and **Colour Clash** (Stroop) are games. A review of over 130 studies found little evidence that brain games improve anything beyond the trained task (Simons et al., Psychological Science in the Public Interest, 2016), and the FTC fined Lumosity $2 million in 2016 for claiming otherwise. The app says this plainly.
 
+**Reflex games** copy how racing drivers train reactions. **Lights Out** is the F1 start: 5 lights, one a second, then a random 0.2–3 s hold before lights out; a tap before lights out, or under 100 ms after (faster than a real reaction), is a jump start. F1 drivers react in about 0.2–0.3 s at race starts, measured by the car (Formula1.com; McLaren). A phone adds screen and touch delay, so the app compares you with yourself. **Reaction Wall** is modelled on the Batak board drivers use for hand–eye speed and peripheral vision: 12 lights on a ring, one lit at a time, never the same twice in a row, 30 s. **Tracker** is 2-D multiple-object tracking, the task behind NeuroTracker: follow 3 of 8 balls for 8 s; speed ×1.15 after a perfect round, ÷1.15 after a miss; level = log position between 0.08 and 1.2 screen-widths a second. Evidence: driver use of Batak and light systems is anecdotal; NeuroTracker's F1 claims come from the vendor, and independent studies in athletes are mixed (baseline scores didn't predict season performance in varsity athletes, 2025; a soccer transfer result didn't replicate). The app presents them as fun reaction and focus practice, not as proven transfer.
+
+**Quran reader** (`js/reader.js`): the full text, bundled as one file per surah in `data/quran/` and built by `tools/fetch-quran.mjs` from api.alquran.cloud (Arabic: Tanzil Uthmani; English: Saheeh International, labelled as a translation of the meaning). The build refuses to write unless there are 114 surahs and 6,236 verses, the Arabic and English verse counts match, and the Basmala is found at the start of verse 1 of every surah except Al-Fatiha (where it is verse 1) and At-Tawbah (which has none); it is shown as a heading instead. `tests/quran.test.mjs` re-checks this and that the memorisation sets match the full text word for word. Files are cached by the service worker (cache-first), so a surah read once opens offline. Audio streams verse by verse from EveryAyah, falling back to Quran.com.
+
 **Quran memory** uses spaced review (Leitner boxes: 0, 1, 3, 7, 14, 30, 60, 120 days; "couldn't" → box 1, "with mistakes" → same box, "from memory" → next box; memorised after reaching box 4). Spaced retrieval is among the most reliable findings in learning research, and matches the tradition of muraja'ah. Practice fades the verse in steps (all words → the last third hidden → two-thirds → first-letter cues only), then the user recites, checks against the text and audio, and marks themselves. Self-marking can't check tajweed: the app suggests reciting to a teacher. Arabic text: Tanzil Uthmani via api.alquran.cloud (fetched by `tools/fetch-quran-hifz.mjs`, Basmala removed from verse 1 except Al-Fatiha); English: Saheeh International; audio: EveryAyah / Quran.com, the same reciters as Sukoon.
 
 **Brain score** (0–100, last 7 days) rewards the habits with evidence, not game points: Move 30% (training days, 3 = full), Sleep 20% (7–9.5 h average = full; left out if fewer than 2 mornings logged), Calm 15% (3 Sukoon sessions), Speed & games 20% (3 Speed Flash sessions; other games count half), Learn & remember 15% (3 days with a Quran review or lesson). It shows the lowest pillar's fix. It appears only after the first brain activity.
@@ -581,3 +585,52 @@ The app shows the five parts and the top ways to earn more this week.
 - **The score** is the average points a week over the month's weeks so far (weeks that start on a Monday in that month). It counts from each person's first week on the board, and weeks skipped after that count as 0. A steady trainer isn't overtaken by one big week, and someone who joins on the 15th can still win.
 - **"Points to pass" line:** under your score, e.g. "7 points to pass #2. One training day gets you there". One training day is worth 35 ÷ planned days. People see a small, reachable next step instead of the distance to #1.
 - **The weekly race** restarts every Monday as a fresh chance. Its #1 is the MVP, and the coach can shout them out with one tap. Monthly points are never reset on Monday.
+
+## Workout complete (`js/done-ui.js`, `js/volume.js`)
+After the last set of a guided workout, a full-screen summary shows before the cool-down offer:
+
+- workout number and minutes
+- **kg lifted**, counting up, with one fun comparison (e.g. "about 2 Suzuki Mehrans"; approximate weights, from a sack of atta to a blue whale)
+- sets, reps and clean-form % (camera sets only)
+- "+X% vs last time", shown only when it went up and only when the same exercises are compared like for like
+- personal bests with medals
+- milestones, and the next clean-rep tier
+- this week's and lifetime kg
+
+"See today's summary" on the Train tab shows it again. Share sends text only, never video or body photos.
+
+**Bests:**
+- **Heaviest weight:** above the heaviest earlier set.
+- **Strongest set:** estimated 1-rep max (Epley, as in progression.js) above the earlier best.
+- **More reps at the same top weight.**
+- The first time on an exercise is a baseline, not a best.
+
+**Why it looks like this:**
+- Tracking progress and having it recorded raises goal attainment (Harkin et al. 2016 meta-analysis, 138 trials, d = 0.40).
+- Hevy and Strong open finished workouts with a summary like this. Hevy marks PR sets with medals and uses "you lifted a car" comparisons.
+- Confetti and the vibration pattern are kept for real personal bests and milestones (workout 1, 5, 10, 25 … 1,000; 1, 5, 10 … tonnes in total), so they keep meaning something.
+- No "0 PRs" and no "beat last week" (research note: Strava's week-on-week volume snapshot pushes people to chase volume regardless of recovery).
+
+**Volume** = weight × reps per logged set, with the weight as entered (one dumbbell). Bodyweight sets add reps, not invented kg. Demo sets never count.
+
+**Storage and speed:**
+- `rollup()` keeps running totals in `S.totals`: lifetime, by week, by month, plus day detail for the last 400 days.
+- It reads only sets newer than the last one it saw. Tested: 20,000 sets (about 3 years) in about 40 ms, then under 1 ms per new set.
+- Each workout is saved as one small row in `S.workouts`.
+
+## Weekly report (`js/report.js`, `js/report-ui.js`)
+**When:** every Monday, last week (Monday to Sunday) is saved as a snapshot of under 400 bytes in `S.reports`, kept forever. A "QK remembers" card says "Your week in review is ready". The report is also on Progress, where "This week so far" works any day. The coach sees "Last week 3/3 days · 4.2 t · 1 PR", and the latest snapshot and lifetime kg go to the dashboard.
+
+**Order:**
+1. **Wins first,** always true and at most 4: hit the plan, new bests, kg lifted with a comparison, form, Fitness Age, good sleep, calm sessions, food.
+2. **Training:** days compared with their own plan, never with last week. Also kg lifted, sets, form and personal bests.
+3. **Health scores:** health, recovery, nutrition, workouts, activity and Fitness Age, from scores.js and fitnessage.js.
+4. **Sleep & mind:** morning-check averages (Hooper scale), stress, calm sessions, mornings checked.
+5. **Food:** the food report's top win and protein against target.
+6. **One focus for next week:** missed planned days, then morning check-ins, then sleep, then the weakest health score's fix, then the food focus.
+7. **Leaderboard points,** and a kg-by-week bar chart from the saved snapshots.
+
+**Why:**
+- Monday is a "fresh start", when people are most likely to begin goals (Dai, Milkman & Riis 2014). Whoop sends its weekly assessment on Monday.
+- One focus, not a list, follows MacroFactor's weekly check-in approach.
+- A missed week opens with "A quiet week happens…", never a broken streak. Rewarding a return after a miss raised gym visits by 27% in a 61,000-person megastudy (Milkman et al. 2021), and broken-streak messages lower re-engagement (Silverman & Barasch 2023).

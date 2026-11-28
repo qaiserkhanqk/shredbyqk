@@ -85,10 +85,12 @@ export function careSummary(S, now = Date.now()) {
   const fa = (S?.fitage || []).slice(-1)[0];
   if (fa) care.fitAge = { fa: fa.fitnessAge, age: fa.age, at: fa.at, ifStopped: fa.active ? ifStopped(fa) : null };
   if (S?.mindShare && now - S.mindShare.at < wk) care.mind = S.mindShare.answer;
-  return care.pain.length || care.rough7 || care.travel || care.ramadan || care.fitAge || care.mind ? care : null;
+  const lastRep = Object.values(S?.reports || {}).sort((x, y) => (x.week < y.week ? -1 : 1)).pop();
+  if (lastRep && now - Date.parse(lastRep.week) < 15 * D) care.week = { days: lastRep.days, planned: lastRep.planned, kg: lastRep.kg, prs: lastRep.prs };
+  return care.pain.length || care.rough7 || care.travel || care.ramadan || care.fitAge || care.mind || care.week ? care : null;
 }
 /** Short chips for the coach: "Sore: knee", "2 rough days", "Travelling", "Ramadan". */
-export const careChips = c => (c ? [...(c.pain?.length ? [`Sore: ${c.pain.join(', ')}`] : []), ...(c.rough7 ? [`${c.rough7} rough day${c.rough7 > 1 ? 's' : ''}`] : []), ...(c.travel ? ['Travelling'] : []), ...(c.ramadan ? ['Ramadan'] : []), ...(c.mind ? [c.mind === 'struggling' ? 'Asked for support' : 'Feeling low'] : []), ...(c.fitAge ? [`Fitness Age ${c.fitAge.fa} (${c.fitAge.fa - c.fitAge.age > 0 ? '+' : ''}${c.fitAge.fa - c.fitAge.age})`] : [])] : []);
+export const careChips = c => (c ? [...(c.pain?.length ? [`Sore: ${c.pain.join(', ')}`] : []), ...(c.rough7 ? [`${c.rough7} rough day${c.rough7 > 1 ? 's' : ''}`] : []), ...(c.travel ? ['Travelling'] : []), ...(c.ramadan ? ['Ramadan'] : []), ...(c.week ? [`Last week ${c.week.days}/${c.week.planned} days · ${c.week.kg >= 1000 ? (c.week.kg / 1000).toFixed(1) + ' t' : c.week.kg + ' kg'}${c.week.prs ? ` · ${c.week.prs} PR${c.week.prs > 1 ? 's' : ''}` : ''}`] : []), ...(c.mind ? [c.mind === 'struggling' ? 'Asked for support' : 'Feeling low'] : []), ...(c.fitAge ? [`Fitness Age ${c.fitAge.fa} (${c.fitAge.fa - c.fitAge.age > 0 ? '+' : ''}${c.fitAge.fa - c.fitAge.age})`] : [])] : []);
 
 /** Ready-made messages. {name} is the client's first name. */
 export const TEMPLATES = {

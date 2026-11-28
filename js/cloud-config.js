@@ -13,3 +13,9 @@ export const cloudOn = () => !!(CLOUD.url && CLOUD.anonKey);
 export const PUSH = {
   vapidPublicKey: '',
 };
+// Chat with QK: where the app asks Muhammad (QK's AI assistant) to answer, e.g. 'https://your-server/chat'.
+// Empty: the app uses the photo server's address with /chat; with neither, replies come from
+// `node tools/chat-assistant.mjs --watch` (see supabase/README.md).
+export const CHAT = {
+  endpoint: '',
+};

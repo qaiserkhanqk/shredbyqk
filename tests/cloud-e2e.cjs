@@ -9,7 +9,7 @@ let fails = 0;
 const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? '  — ' + detail : ''}`); if (!ok) fails++; };
 
 // Fake Supabase: the auth endpoints and the handful of REST calls the app makes, with the same privacy rules.
-const DB = { users: {}, profiles: {}, sessions: [], events: [], checkins: [], messages: [], food_days: [], places: [] };
+const DB = { users: {}, profiles: {}, sessions: [], events: [], checkins: [], messages: [], food_days: [], places: [], chats: [], off: [] };
 const COACH = 'coach-1'; DB.profiles[COACH] = { id: COACH, role: 'coach', name: 'QK', invite_code: 'QKTEST' };
 let tokenN = 0; const tokens = {};
 function fakeSupabase(route) {
@@ -42,6 +42,23 @@ function fakeSupabase(route) {
     if (req.method() === 'PATCH') { for (const id of inList('id')) { const m = DB.messages.find(x => x.id === +id && x.client_id === uid); if (m) m.read_at = body.read_at; } return json(204); }
     if (q('client_id')) return json(200, DB.messages.filter(m => m.client_id === uid && !m.read_at));
     return json(200, DB.messages.filter(m => m.coach_id === uid));
+  }
+  // Chat, with the same rules as supabase/schema.sql (tests/rls.sql checks the real ones).
+  if (p === '/rest/v1/chats') {
+    if (req.method() === 'POST') {
+      const me = DB.profiles[uid], ok = body.sender === 'client' ? body.client_id === uid && body.coach_id === me.coach_id : body.sender === 'coach' && body.coach_id === uid && DB.profiles[body.client_id]?.coach_id === uid;
+      if (!ok) return json(403, { message: 'RLS' });
+      DB.chats.push({ id: DB.chats.length + 1, ...body, flagged: null, handled_at: null, read_at: null, seen_by_coach_at: null, created_at: new Date().toISOString() }); return json(201);
+    }
+    if (req.method() === 'PATCH') { for (const id of inList('id')) { const m = DB.chats.find(x => x.id === +id && mine(x.client_id)); if (m) Object.assign(m, body); } return json(204); }
+    const ids = q('client_id').startsWith('eq.') ? [q('client_id').slice(3)] : inList('client_id');
+    let rows = DB.chats.filter(r => ids.includes(r.client_id) && mine(r.client_id));
+    return json(200, q('order').endsWith('desc') ? [...rows].reverse() : rows);
+  }
+  if (p === '/rest/v1/assistant_off') {
+    if (req.method() === 'POST') { for (const r of [].concat(body)) if (r.coach_id === uid && DB.profiles[r.client_id]?.coach_id === uid) DB.off.push(r); return json(201); }
+    if (req.method() === 'DELETE') { DB.off = DB.off.filter(r => r.client_id !== q('client_id').slice(3)); return json(204); }
+    return json(200, DB.off.filter(r => r.coach_id === uid));
   }
   return json(404, { message: 'not faked: ' + p });
 }
@@ -96,6 +113,42 @@ function fakeSupabase(route) {
   const caption = await c.textContent('[data-coach-caption]').catch(() => '');
   check('client: QK reads the coach\'s message out', /Message from QK\. Huge first session, Sara!/.test(caption) || /QK: Huge first session/.test(await c.textContent('#toast')), caption);
   check('server: message marked read', !!DB.messages[0].read_at);
+  // Chat: Sara messages QK; Muhammad (tools/chat-assistant.mjs, with a stand-in model) answers from her profile.
+  const { answer } = await import('../tools/chat-assistant.mjs');
+  const db = {
+    history: async id => DB.chats.filter(r => r.client_id === id).slice(-30), profile: async id => DB.profiles[id], coach: async id => DB.profiles[id],
+    paused: async id => DB.off.some(r => r.client_id === id), examples: async () => [DB.messages[0]?.body].filter(Boolean),
+    post: async row => { DB.chats.push({ id: DB.chats.length + 1, ...row, created_at: new Date().toISOString() }); },
+    flag: async (ids, reason) => ids.forEach(i => (DB.chats.find(r => r.id === i).flagged = reason)),
+  };
+  let prompt = null;
+  const ai = async p => { prompt = p; return '{"reply":"Sara, 2 ande nashte mein aur daal ki ek katori lunch pe: protein pura.","handover":false}'; };
+  await c.click('.tabs [data-tab=today]'); await c.waitForTimeout(200);
+  check('client: Message QK on Today once connected', await c.isVisible('#chatCard'));
+  await c.click('#chatCard'); await c.fill('#chatText', 'protein kaise pura karun?'); await c.click('#chatForm .cta'); await c.waitForTimeout(500);
+  check('server: the message is stored for QK', DB.chats.length === 1 && DB.chats[0].sender === 'client' && DB.chats[0].coach_id === COACH);
+  check('Muhammad answers', (await answer('client-0', { db, ai })).kind === 'reply');
+  check('Muhammad knew her profile and QK\'s own words', /Name: sara/i.test(prompt.system) && /Race Ready|raceReady/.test(prompt.system) && /Huge first session/.test(prompt.system));
+  await c.waitForTimeout(3500);
+  check('client: the reply appears by itself, signed Muhammad', /Muhammad\s*Sara, 2 ande/.test(await c.textContent('#chatThread')), (await c.textContent('#chatThread')).slice(-120));
+  await c.fill('#chatText', 'kamar mein dard hai'); await c.click('#chatForm .cta'); await c.waitForTimeout(500);
+  check('back pain → handed to QK', (await answer('client-0', { db, ai })).kind === 'handover' && DB.chats.find(r => r.body === 'kamar mein dard hai').flagged === 'Pain or injury');
+  await c.waitForTimeout(3500);
+  check('client: "QK aap ko khud reply karein ge"', /QK aap ko khud reply karein ge/.test(await c.textContent('#chatThread')));
+  await c.click('#chatClose');
+  // QK: the dashboard shows it needs him; he replies, it's handled, Sara sees it.
+  await k.reload(); await k.waitForTimeout(1000);
+  check('coach: inbox says it needs you', /1 needs you/.test(await k.textContent('#ccCount')) && /Pain or injury/.test(await k.textContent('#ccInbox')));
+  await k.click('#ccInbox .cc-row'); await k.waitForTimeout(300);
+  check('coach: opening it marks Sara\'s messages seen', DB.chats.filter(r => r.sender === 'client').every(r => r.seen_by_coach_at));
+  await k.fill('#ccReply', 'Sara, aaj rest karo, kal call karte hain.'); await k.click('#ccSend'); await k.waitForTimeout(400);
+  check('server: QK\'s reply stored, the flag handled', DB.chats.some(r => r.sender === 'coach' && /aaj rest karo/.test(r.body)) && !!DB.chats.find(r => r.flagged).handled_at);
+  check('Muhammad stays quiet while QK is chatting', (await answer('client-0', { db: { ...db, history: async () => [...DB.chats, { id: 99, sender: 'client', body: 'ok thanks', created_at: new Date().toISOString() }] }, ai })).why === 'QK is chatting');
+  await k.click('#ccOff'); await k.waitForTimeout(300);
+  check('coach: Muhammad switched off for Sara', DB.off.length === 1 && DB.off[0].client_id === 'client-0');
+  await c.click('#chatCard'); await c.waitForTimeout(600);
+  check('client: sees QK\'s own reply', /QK\s*Sara, aaj rest karo/.test(await c.textContent('#chatThread')));
+  check('client: replies marked read', DB.chats.filter(r => r.sender !== 'client').every(r => r.read_at));
   check('no JavaScript errors', !errs.length, errs.join(' | '));
   await b.close();
   console.log(fails ? `${fails} FAILED` : 'cloud e2e: ALL PASS'); process.exit(fails ? 1 : 0);

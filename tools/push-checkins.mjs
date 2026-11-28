@@ -4,7 +4,7 @@
 //   2. Plan updates: when QK edited a client's diet plan on the dashboard, they get "QK updated your plan".
 //   3. Only for clients who chose "a gentle nudge too": one reminder after 3 quiet days, at most weekly.
 //   4. Two weeks without training: "Your Fitness Age went up", at most every two weeks (needs a Fitness Age test).
-//   5. QK's broadcasts from the dashboard: sent within the hour (the hourly run sends only these).
+//   5. QK's broadcasts from the dashboard, and QK's chat replies: sent within the hour (the hourly run sends only these).
 // Never more than one notification per client per day (see plan()).
 // Runs from .github/workflows/push.yml (no server needed), or by hand:
 //   SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… VAPID_PUBLIC_KEY=… VAPID_PRIVATE_KEY=… VAPID_SUBJECT=mailto:you@… node tools/push-checkins.mjs
@@ -85,7 +85,10 @@ async function main() {
   const vapid = { publicKey: E.VAPID_PUBLIC_KEY, privateKey: E.VAPID_PRIVATE_KEY, subject: E.VAPID_SUBJECT || 'mailto:coach@shredbyqk.app' };
   // Broadcasts first (every run); the daily reminders only on the morning and evening runs.
   const msgs = await get('/rest/v1/messages?kind=eq.broadcast&pushed_at=is.null&select=id,client_id,title,body&limit=5000').catch(() => []);
-  const bjobs = broadcastJobs({ messages: msgs, subs, profiles });
+  // QK's chat replies the client hasn't seen: one "QK replied" per client (the latest), sent within the hour.
+  const replies = await get('/rest/v1/chats?sender=eq.coach&pushed_at=is.null&read_at=is.null&order=created_at.desc&select=id,client_id,body&limit=2000').catch(() => []);
+  const latest = [...new Map(replies.map(r => [r.client_id, r])).values()].reverse();
+  const bjobs = broadcastJobs({ messages: [...msgs, ...latest.map(r => ({ id: 'c' + r.id, client_id: r.client_id, title: 'QK replied', body: r.body.slice(0, 140) }))], subs, profiles });
   const jobs = E.PUSH_ONLY === 'broadcasts' ? [] : plan({ profiles, subs, plans, day });
   let sent = 0, gone = 0;
   for (const j of bjobs) {
@@ -94,6 +97,7 @@ async function main() {
     else if (st >= 200 && st < 300) sent++;
   }
   if (msgs.length) await patch(`/rest/v1/messages?id=in.(${msgs.map(m => m.id).join(',')})`, { pushed_at: new Date().toISOString() });
+  if (replies.length) await patch(`/rest/v1/chats?id=in.(${replies.map(m => m.id).join(',')})`, { pushed_at: new Date().toISOString() });
   for (const j of jobs) {
     const st = await send(j.sub, j.msg, vapid).catch(e => { console.warn(e.message); return 0; });
     if (st === 404 || st === 410) { gone++; await fetch(`${base}/rest/v1/push_subs?endpoint=eq.${encodeURIComponent(j.sub.endpoint)}`, { method: 'DELETE', headers: H }); continue; }

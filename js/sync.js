@@ -63,6 +63,10 @@ export class Cloud {
   leaderboard(week, months = 0) { return this.req('/rest/v1/rpc/leaderboard', { method: 'POST', body: { wk: week, months } }); }
   prizes() { return this.req('/rest/v1/rpc/my_prizes', { method: 'POST', body: {} }); }
   myRewards() { return this.req(`/rest/v1/rewards?client_id=eq.${this.uid}&select=month,place,prize,given_at&order=month.desc`); }
+  /* ---- chat with QK (Muhammad, QK's AI assistant, answers straight away; QK reads everything) ---- */
+  chat(limit = 60) { return this.req(`/rest/v1/chats?client_id=eq.${this.uid}&order=created_at.desc&limit=${limit}&select=id,sender,body,created_at,read_at`).then(r => (r || []).reverse()); }
+  sendChat(body, coachId) { return this.req('/rest/v1/chats', { method: 'POST', body: { client_id: this.uid, coach_id: coachId, sender: 'client', body: String(body).slice(0, 2000) }, headers: { Prefer: 'return=minimal' } }); }
+  chatRead(ids) { return ids.length ? this.req(`/rest/v1/chats?id=in.(${ids.join(',')})`, { method: 'PATCH', body: { read_at: new Date().toISOString() }, headers: { Prefer: 'return=minimal' } }) : Promise.resolve(); }
   markRead(ids) { return ids.length ? this.req(`/rest/v1/messages?id=in.(${ids.join(',')})`, { method: 'PATCH', body: { read_at: new Date().toISOString() }, headers: { Prefer: 'return=minimal' } }) : Promise.resolve(); }
 
   /* ---- coach ---- */
@@ -81,6 +85,16 @@ export class Cloud {
   setPrizes(prizes) { return this.updateMe({ prizes }); }
   rewards(month) { return this.req(`/rest/v1/rewards?coach_id=eq.${this.uid}&month=eq.${month}&select=*`); }
   setReward(row) { return this.upsert('rewards', [{ coach_id: this.uid, ...row }], 'client_id,month'); }
+  /** Coach: every client's chat since a date (oldest first). */
+  chats(ids, fromIso) { return ids.length ? this.req(`/rest/v1/chats?client_id=in.(${ids.join(',')})&created_at=gte.${encodeURIComponent(fromIso)}&order=created_at.asc&limit=5000`) : Promise.resolve([]); }
+  reply(clientId, body) { return this.req('/rest/v1/chats', { method: 'POST', body: { client_id: clientId, coach_id: this.uid, sender: 'coach', body: String(body).slice(0, 2000) }, headers: { Prefer: 'return=minimal' } }); }
+  handled(ids) { return ids.length ? this.req(`/rest/v1/chats?id=in.(${ids.join(',')})`, { method: 'PATCH', body: { handled_at: new Date().toISOString() }, headers: { Prefer: 'return=minimal' } }) : Promise.resolve(); }
+  seen(ids) { return ids.length ? this.req(`/rest/v1/chats?id=in.(${ids.join(',')})`, { method: 'PATCH', body: { seen_by_coach_at: new Date().toISOString() }, headers: { Prefer: 'return=minimal' } }) : Promise.resolve(); }
+  assistantOff() { return this.req(`/rest/v1/assistant_off?coach_id=eq.${this.uid}&select=client_id`).then(r => (r || []).map(x => x.client_id)); }
+  setAssistantOff(clientId, off) {
+    return off ? this.upsert('assistant_off', [{ client_id: clientId, coach_id: this.uid }], 'client_id')
+      : this.req(`/rest/v1/assistant_off?client_id=eq.${clientId}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+  }
   sent(fromIso) { return this.req(`/rest/v1/messages?coach_id=eq.${this.uid}&created_at=gte.${encodeURIComponent(fromIso)}&order=created_at.desc`); }
 }
 
@@ -120,6 +134,8 @@ export async function pushAll(cloud, S, mark = {}) {
     await cloud.updateMe({ nickname: S.profile?.nickname || null, board_hidden: !!S.profile?.boardHidden, last_train: lastT ? new Date(lastT).toISOString().slice(0, 10) : null });
     const rows = [weekStart(now), weekStart(now) - 7 * 864e5].map(ws => { const r = weekScore(S, ws, now); return { client_id: uid, week: weekKey(ws), score: r.score, parts: r.parts, updated_at: new Date().toISOString() }; });
     await cloud.upsert('scores', rows.filter(r => r.score > 0), 'client_id,week');
+    const reps = Object.values(S.reports || {}).sort((a, b) => (a.week < b.week ? -1 : 1));
+    if (reps.length) await cloud.updateMe({ week_report: reps[reps.length - 1], lifetime_kg: Math.round(S.totals?.kg || 0) });
   } catch (e) { console.warn('leaderboard sync skipped:', e.message); }
   await cloud.updateMe({
     ...(food ? { food_week: food } : {}),

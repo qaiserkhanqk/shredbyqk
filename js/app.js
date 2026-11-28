@@ -42,16 +42,21 @@ import * as freq from './frequency.js';
 import { ExerciseDetector, PICK_LIST } from './detect.js';
 import { initCalm, renderCalm, startCalmNow } from './calm.js';
 import { initBrain, renderBrain, renderQuran } from './brainui.js';
+import { initReader, renderReader, leaveReader } from './reader.js';
 import { WEIGHTED, lastLoad, weekSummary } from './share.js';
 import { initVitals, renderVitals } from './vitals.js';
 import { initFitAge, renderFitAge } from './fitage-ui.js';
 import { initBoard, renderBoard, renderBoardCard } from './board-ui.js';
+import { initDone, showDone } from './done-ui.js';
+import { initReport, renderReport, weeklyTick } from './report-ui.js';
+import * as volume from './volume.js';
 import * as mind from './mind.js';
 import { vitalNotes } from './hr.js';
 import { nextStep } from './today.js';
 import { initFood, renderFood } from './food.js';
 import { enablePush } from './push.js';
 import { renderScores } from './scoreview.js';
+import { initChat, checkReplies, renderCard as renderChatCard } from './chatui.js';
 import { sanitizePlan } from './dietplan.js';
 import { PHOTO_CONFIG } from './foodphoto.js';
 import { landmarksFrom, analyse, render, navyBodyFat, bfCategory, stanceProblem } from './bodyscan.js';
@@ -73,8 +78,13 @@ ErrorLog.install();
 initCalm({ S, persist: () => persist(), toast: m => toast(m) });
 initVitals({ S, persist: () => persist(), toast: m => toast(m) });
 initBrain({ S, persist: () => persist(), toast: m => toast(m), go: id => tab(id) });
+initReader({ S, persist: () => persist(), toast: m => toast(m) });
 initFitAge({ S, persist: () => persist(), toast: m => toast(m), say: (t, o) => say(t, o) });
 initBoard({ S, persist: () => persist(), toast: m => toast(m), cloud: () => cloud, sync: () => syncNow() });
+initDone({ S, persist: () => persist(), toast: m => toast(m), say: (t, o) => say(t, o), lib: LIB, unit: () => unit(), toUnit: prog.toUnit,
+  rewardsLine: () => { const p = rewards.progress(rewards.lifetimeClean(S.sessions, isHoldId)); return p.next ? `${p.left} clean reps to ${p.next.name}` : null; } });
+initReport({ S, persist: () => persist(), lib: LIB, say: (t, o) => say(t, o) });
+setTimeout(() => { try { if (weeklyTick()) renderToday(); } catch (e) { console.warn('weekly report:', e); } }, 1200);
 initFood({ S, persist: () => persist(), toast: m => toast(m), rehab: () => !!S.rehab?.active });
 const recorder2 = new SessionRecorder();
 const bar = new BarTracker();
@@ -106,7 +116,7 @@ function mountOrbs() {
 function tab(id) {
   $$('.screen').forEach(s => s.classList.toggle('on', s.id === id));
   const tabFor = id === 'cycle' && !$('#cycleTabBtn').hidden ? 'cycle'
-    : ['body', 'gait', 'scan', 'rehab', 'calm', 'vitals', 'fitage', 'brain', 'quran', 'cycle'].includes(id) ? 'today' : id === 'board' ? 'progress' : id; // tools live under Today
+    : ['body', 'gait', 'scan', 'rehab', 'calm', 'vitals', 'fitage', 'brain', 'quran', 'reader', 'cycle'].includes(id) ? 'today' : ['board', 'report'].includes(id) ? 'progress' : id; // tools live under Today
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tabFor));
   if (id === 'today') renderToday();
   if (id === 'train') renderPrograms();
@@ -117,8 +127,11 @@ function tab(id) {
   if (id === 'vitals') renderVitals();
   if (id === 'brain') renderBrain();
   if (id === 'quran') renderQuran();
+  if (id !== 'reader') leaveReader();
+  if (id === 'reader') renderReader();
   if (id === 'fitage') renderFitAge();
   if (id === 'board') renderBoard();
+  if (id === 'report') renderReport();
   if (id === 'food') renderFood();
   if (id === 'scan') $('#hipWrap').hidden = S.profile.sex === 'male';
   if (id === 'body') { const first = { recover: 'rehab', calm: 'calm' }[S.profile.focus]; const t = first && $(`#body [data-go=${first}]`); if (t) $('#body .page-head').after(t); }
@@ -1555,8 +1568,13 @@ function nextInFlow(first) {
   stopRest(); $('#summary').hidden = true; $('#flowNext').hidden = true;
   if (!k) {
     const trained = flow.items; flow = null; voiceListen(false); keepAwake(false); tab('today'); renderToday();
+    if (showDone({ then: () => cooldownOffer(trained) })) return;
     say('Workout done. Every set is logged and your next session is already planned. Cool-down stretch? Six minutes.', { id: 'flow_done', priority: 'high' });
     toast('Workout done ✓ Next session is planned.');
+    cooldownOffer(trained);
+    return;
+  }
+  function cooldownOffer(trained) {
     const st = routines.stretchFor(trained, LIB);
     openSheet(`<div><span class="eyebrow">Workout done ✓</span><h2 class="display h2" id="rsheetTitle" style="margin-top:6px;font-size:1.3rem">Cool-down stretch · ${classes.minutes(st)} min</h2></div>
       <div class="rq"><span class="small">How was today's workout?</span><div class="seg" id="feelSeg">${[['easy', 'Too easy'], ['right', 'Just right'], ['hard', 'Too hard']].map(([v, l]) => `<button type="button" data-feelr="${v}">${l}</button>`).join('')}</div></div>
@@ -1615,7 +1633,7 @@ async function checkReminder() {
   const title = `Time to train${S.profile.name ? ', ' + S.profile.name : ''}`;
   try {
     const reg = await navigator.serviceWorker?.getRegistration?.();
-    reg ? reg.showNotification(title, { body, icon: 'icons/icon.svg', tag: 'qk-train' }) : new Notification(title, { body, tag: 'qk-train' });
+    reg ? reg.showNotification(title, { body, icon: 'icons/icon-192.png', tag: 'qk-train' }) : new Notification(title, { body, tag: 'qk-train' });
     (S.prog ||= {}).notifiedOn = new Date().toDateString(); persist();
   } catch {}
 }
@@ -1708,6 +1726,7 @@ $('#rsheetBody').addEventListener('click', e => {
 const cloud = cloudOn() ? new Cloud({ url: CLOUD.url, anonKey: CLOUD.anonKey, session: S.cloud?.session || null, onSession: s => { (S.cloud ||= {}).session = s; persist(); } }) : null;
 let syncing = false;
 PHOTO_CONFIG.getToken = () => cloud?.session?.access_token || null; // lets the photo server check it's a real client
+initChat({ cloud, S, persist, toast }); // Message QK (Muhammad, QK's AI assistant, replies straight away)
 async function syncNow() {
   if (!cloud?.signedIn || !S.cloud?.coach || syncing || !navigator.onLine) return;
   syncing = true;
@@ -1724,10 +1743,12 @@ async function syncNow() {
       msgs.forEach((m, i) => setTimeout(() => { const t = m.title ? `${m.title}. ${m.body}` : m.body; say(m.kind === 'broadcast' ? t : `Message from ${from}. ${t}`, { id: 'coachmsg_' + m.id, priority: 'high' }); toast(`${m.kind === 'broadcast' ? m.title || from : from}: ${m.body}`); }, 1500 + i * 6000));
       await cloud.markRead(msgs.map(m => m.id));
     }
+    await checkReplies();
   } catch (e) { if (e.status === 401) { S.cloud.session = null; persist(); renderCoachLink(); } }
   finally { syncing = false; }
 }
 function renderCoachLink() {
+  renderChatCard();
   const card = $('#coachLink'); card.hidden = !cloud; if (!cloud) return;
   const signed = cloud.signedIn, coach = S.cloud?.coach;
   $('#clStep1').hidden = signed; $('#clStep2').hidden = true; $('#clStep3').hidden = !signed || !!coach; $('#clOut').hidden = !signed;
@@ -2043,7 +2064,7 @@ function renderHero() {
     <div class="hero-days">${p.plan.map((dd, i) => `<button type="button" class="hero-day ${i === d.index && !d.doneToday ? 'next' : ''}" data-pday="${i}"><span class="n">${i + 1}</span><span><b>${esc(dd.name)}</b><span class="muted small">${esc(dd.focus)}</span></span><span class="tag">${done.includes(i) ? '✓' : i === d.index && !d.doneToday ? 'Next' : `${warm.dayMinutes(dd.items, warmCount(dd.items))} min`}</span></button>`).join('')}</div>
     <button class="ghost" type="button" data-prog="${p.id}">Program details · change or stop</button></div>`;
   renderDaysNews();
-  $('#heroStart').onclick = () => { if (programDay()?.doneToday) { tab('today'); return; } tab('today'); startFlow(); };
+  $('#heroStart').onclick = () => { if (programDay()?.doneToday) { if (!showDone({ replay: true })) tab('today'); return; } tab('today'); startFlow(); };
 }
 // One program day: what's in it, in order.
 function showDay(i) {
@@ -2150,7 +2171,7 @@ function renderRewards() {
 
 function renderProgress() {
   renderRewards(); renderStrength(); renderWeak();
-  const sets = S.sessions.filter(s => s.reps && !s.guided && !s.manual).slice(-12);
+  const sets = S.sessions.filter(s => s.reps && !s.guided && !s.manual && s.good != null).slice(-12);
   const scores = sets.map(s => Math.round(s.good / s.reps * 100));
   $('#pfScore').textContent = scores.length ? scores[scores.length - 1] + '%' : '–';
   $('#pfDelta').textContent = scores.length >= 2 ? `${scores[scores.length - 1] - scores[0] >= 0 ? '+' : ''}${scores[scores.length - 1] - scores[0]} pts` : '';
@@ -2951,6 +2972,8 @@ document.addEventListener('click', e => {
     tab('train');
   } else if (kind === 'fitage') {
     tab('fitage');
+  } else if (kind === 'report') {
+    tab('report');
   } else if (kind === 'mind') {
     (S.mind ||= []).push({ at: now, answer: a });
     const r = mind.reply(a, S, now); S.mindReply = { at: now, ...r };
