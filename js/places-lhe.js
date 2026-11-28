@@ -56,7 +56,7 @@ export const LHE_PLACES = [
     I('Chocolate Swiss roll', 'cream_roll'), I('Bakarkhani', 'bakarkhani')]),
   P('layers-lhe', 'Layers Bakeshop', 'Lahore', 'Allama Iqbal Town; Johar Town; Model Town; DHA and more (also other cities)', 'https://www.foodpanda.pk/restaurant/mf1t/layers-bakeshop-allama-iqbal-town', [
     I('Nutella-filled chocolate chunk cookie', 'chocolate_chip_cookie', { servings: 1.5 }), I('Triple chocolate cookie', 'chocolate_chip_cookie', { servings: 1.5 }),
-    I('Milky malt cake (slice)', 'cake_slice', { servings: 1.2 }), I('Three milk cake (slice)', 'cake_slice', { servings: 1.3 }), I('Brownie', 'brownie'), I('Cupcake', 'cake_slice')]),
+    I('Milky malt cake (slice)', 'cake_slice', { servings: 1.2 }), I('Three milk cake (slice)', 'cake_slice', { servings: 1.3 }), I('Brownie', 'brownie'), I('Cupcake', 'cupcake')]),
   P('sweet-creme-lhe', 'Sweet Creme', 'Lahore', 'Gulberg; Cantt; Mumtaz Market; Raiwind Road', 'https://www.foodpanda.pk/restaurant/arns/sweet-creme-gulberg', [
     I('Super cup', 'ice_cream'), I('Molten lava with vanilla base', 'lava_cake', { servings: 1.3 }), I('Brownie with vanilla base', 'brownie', { servings: 1.4 }),
     I('Super Sonic super fudge loaded sundae', 'sundae'), I('Oreo blizzard', 'ice_cream', { servings: 2 })]),

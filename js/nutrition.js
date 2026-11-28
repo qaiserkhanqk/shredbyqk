@@ -131,6 +131,10 @@ export const ING = {
   miso: ['Miso paste', 198, 12.8, 26.5, 6, 5.4],
   tofu: ['Tofu', 76, 8.1, 1.9, 4.8, 0.3],
   squid: ['Squid (calamari), raw', 92, 15.6, 3.1, 1.4, 0],
+  liver: ['Liver, raw (chicken / goat kaleji)', 125, 18.5, 1.3, 4.9, 0], // SR chicken liver 119 / 16.9 / 0.7 / 4.8, lamb liver 139 / 20.4 / 1.8 / 5.0: the mean
+  quail: ['Quail, meat and skin, raw', 192, 19.6, 0, 12.1, 0],
+  shrimp: ['Shrimp / prawns, raw', 85, 20.1, 0, 0.5, 0], // FoodData Central 'Crustaceans, shrimp, raw'
+  jam: ['Jam (fruit preserves)', 278, 0.4, 68.9, 0.1, 1.1],
 };
 const FATS = { oil: 'Oil', ghee: 'Ghee', butter: 'Butter' };
 
@@ -410,7 +414,7 @@ export const DISHES = [
   D('granola_yogurt', 'Granola with yogurt (parfait)', 'granola parfait yogurt bowl yoghurt granola muesli', 'sweet', 'bowl', 260, null, [['granola', 50], ['greekYogurt', 150], ['honey', 10], ['berries', 50]], NOFAT), // café parfaits 300-450 kcal
   D('cereal_milk', 'Cereal with milk (cornflakes)', 'cereal cornflakes corn flakes cereal milk', 'sweet', 'bowl', 245, null, [['cornflakes', 40], ['milk', 200], ['sugar', 5]], NOFAT), // 40 g flakes + 200 ml whole milk ≈ 280
   D('peanut_butter_toast', 'Peanut butter toast (2 slices)', 'peanut butter toast pb toast peanut butter sandwich', 'bread', 'serving', 88, null, [['bread', 56], ['peanutButter', 32]], NOFAT), // 2 slices (SR) + 2 tbsp peanut butter (SR) ≈ 340
-  D('muffin', 'Muffin (blueberry / chocolate)', 'muffin muffins blueberry muffin chocolate muffin cupcake', 'sweet', 'muffin', 115, null, [['maida', 45], ['sugar', 25], ['egg', 15], ['milk', 20], ['berries', 15]], F('oil', 16, 16, 16)), // FNDDS blueberry muffin 377 kcal/100 g; Starbucks 360 (113 g)
+  D('muffin', 'Muffin (blueberry / chocolate)', 'muffin muffins blueberry muffin chocolate muffin', 'sweet', 'muffin', 115, null, [['maida', 45], ['sugar', 25], ['egg', 15], ['milk', 20], ['berries', 15]], F('oil', 16, 16, 16)), // FNDDS blueberry muffin 377 kcal/100 g; Starbucks 360 (113 g)
   D('cinnamon_roll', 'Cinnamon roll', 'cinnamon roll cinnamon bun cinnabon', 'sweet', 'roll', 120, null, [['maida', 50], ['sugar', 25], ['milk', 20], ['egg', 8], ['creamCheese', 10]], F('butter', 15, 15, 15)), // FNDDS frosted cinnamon roll 372 kcal/100 g
   D('banana_bread', 'Banana bread (slice)', 'banana bread banana loaf banana cake', 'sweet', 'slice', 100, null, [['maida', 30], ['banana', 35], ['sugar', 20], ['egg', 10], ['nuts', 5]], F('butter', 10, 10, 10)), // FNDDS banana bread 326 kcal/100 g
   // Mains
@@ -473,19 +477,45 @@ export const DISHES = [
   D('matcha_latte', 'Matcha latte', 'matcha matcha latte green tea latte', 'drink', 'cup', 350, null, [['milk', 250], ['sugar', 15]], NOFAT), // Starbucks grande matcha latte 2% 240
   D('iced_tea', 'Iced tea (sweetened)', 'iced tea ice tea peach iced tea lemon iced tea', 'drink', 'glass', 400, null, [['sugar', 32]], NOFAT), // bottled/café iced tea ~30 kcal/100 ml
   D('smoothie', 'Smoothie (fruit and yogurt)', 'smoothie smoothies fruit smoothie berry smoothie mango smoothie banana smoothie', 'drink', 'glass', 420, null, [['banana', 80], ['mango', 80], ['berries', 60], ['dahi', 120], ['milk', 60], ['honey', 15]], NOFAT), // café smoothies (16 oz) 250-350 kcal
+  // Restaurant and street menus: Lahore/Karachi BBQ and tawa, Peshawari namak mandi, street snacks, Asian and café
+  // starters, bakery. Restaurant plates as served; each line names the reference it was checked against.
+  D('kaleji', 'Kaleji (liver)', 'kaleji kalegi kaleja kalaiji kalji liver tawa kaleji karahi kaleji mutton kaleji chicken kaleji کلیجی', 'curry', 'plate', 250, ['liver', 220], [['onion', 40], ['tomato', 60], ['spices', 8]], F('oil', 18, 28, 35)), // ~150 g cooked liver in masala; SR braised liver 165-190 kcal/100 g + tawa oil ≈ 220 kcal/100 g
+  D('batair', 'Batair (2 quail, fried)', 'batair bateer batera bater batteir quail quails fried quail batair fry بٹیر', 'fried', 'plate', 160, ['quail', 180], [['maida', 8], ['spices', 4]], F('oil', 8, 11, 14)), // 2 small dressed birds ~90 g edible each; SR quail cooked 227 kcal/100 g, fried in a coating ≈ 290
+  D('tawa_chicken', 'Tawa chicken (plate)', 'tawa chicken tava chicken chicken tawa tawa murgh', 'curry', 'plate', 250, ['chicken', 200], [['tomato', 50], ['onion', 30], ['capsicum', 20], ['spices', 8]], F('oil', 18, 28, 35)), // boneless chicken in dry tawa masala; ≈ 200 kcal/100 g, under karahi (KHAN 2019 240) as less oil stays in a dry masala
+  D('white_karahi', 'White karahi (chicken, creamy)', 'white karahi white chicken karahi safaid karahi safed karahi cream karahi creamy karahi', 'curry', 'portion', 300, ['chicken', 160], [['dahi', 40], ['cream', 35], ['milk', 20], ['spices', 8]], F('oil', 22, 34, 42)), // per person; karahi build with cream and yogurt for tomato ≈ 220 kcal/100 g (KHAN 2019 karahi 240)
+  D('lamb_tikka', 'Lamb tikka (plate)', 'namak mandi tikka peshawari tikka mutton tikka', 'bbq', 'plate', 245, ['lamb', 340], [['spices', 2]], F('ghee', 4, 7, 10)), // salted lamb chunks with dumba fat, plate ~250 g; SR lamb broiled lean and fat 294 kcal/100 g + tail fat ≈ 340
+  D('mutton_rosh', 'Rosh (mutton stew)', 'rosh roash mutton rosh lamb rosh namkeen rosh peshawari rosh', 'curry', 'portion', 330, ['lamb', 180], [['onion', 40], ['tomato', 20], ['spices', 3]], F('ghee', 10, 15, 20)), // per person: meat on the bone in a salted broth with dumba fat ≈ 170 kcal/100 g (CoFID lamb stew 130-180)
+  D('reshmi_kebab', 'Reshmi kebab (2)', 'reshmi kebab reshmi kabab', 'bbq', 'serving', 180, ['chickenMince', 200], [['cream', 20], ['egg', 10], ['onion', 10], ['spices', 4]], F('butter', 4, 8, 10)), // creamy chicken mince seekh, ~90 g each; ≈ 240 kcal/100 g (CoFID chicken kofta 200-250)
+  D('gola_kebab', 'Gola kebab (2)', 'gola kebab gola kabab gola kabob gola kebabs gola kababs', 'bbq', 'serving', 150, ['beefMince', 190], [['onion', 10], ['spices', 4]], F('ghee', 3, 6, 8)), // Karachi soft beef mince kebab, ~75 g each; ≈ 310 kcal/100 g, like seekh_kebab (CoFID kofta 290)
+  D('behari_boti', 'Bihari kebab (plate)', 'bihari boti behari boti behari kebab behari kabab bihari kabab bihari behari', 'bbq', 'plate', 190, ['beef', 240], [['dahi', 20], ['spices', 6]], F('oil', 8, 14, 18)), // thin beef strips in papaya-yogurt-mustard oil marinade; SR beef chuck cooked 250-280 kcal/100 g + basting ≈ 290
+  D('cheese_naan', 'Cheese naan', 'cheese naan cheese wala naan cheese bread naan', 'bread', 'naan', 190, null, [['maida', 96], ['dahi', 10], ['milk', 14], ['sugar', 3], ['mozzarella', 40], ['cheese', 15]], F('butter', 8, 10, 12)), // naan dough + 55 g cheese ≈ 330 kcal/100 g (Turkish/desi cheese naan 550-700 kcal)
+  D('kachori', 'Kachori (khasta)', 'kachori kachauri kachouri kachori khasta kachori dal kachori daal kachori', 'fried', 'kachori', 70, null, [['maida', 32], ['moong', 10], ['spices', 2]], F('oil', 11, 13, 15)), // INDB khasta kachori counts all frying oil (713 kcal/100 g); absorbed oil like our samosa ≈ 390 kcal/100 g
+  D('aloo_tikki', 'Aloo tikki (2, with chutney)', 'aloo tikki alu tikki aloo ki tikki potato tikki tikki aloo cutlet potato cutlet', 'fried', 'plate', 160, null, [['potato', 130], ['maida', 10], ['peas', 10], ['spices', 3], ['ketchup', 30]], F('oil', 10, 14, 18)), // 2 shallow-fried patties ~60 g + chutney; ≈ 190 kcal/100 g (FNDDS potato patty 180-230)
+  D('hot_sour_soup', 'Hot and sour soup', 'hot sour soup hot n sour soup hot and sour soup', 'side', 'bowl', 300, ['chicken', 25], [['egg', 15], ['makki', 8], ['mixedVeg', 30], ['soySauce', 15], ['ketchup', 10], ['sugar', 2], ['spices', 3]], F('oil', 0, 1, 2)), // INDB 32, FNDDS 39 kcal/100 g; Pakistani-Chinese bowl ≈ 130
+  D('dynamite_shrimp', 'Dynamite shrimp (starter)', 'dynamite shrimp dynamite shrimps dynamite prawn dynamite prawns bang bang shrimp dynamite', 'fried', 'plate', 210, ['shrimp', 150], [['maida', 25], ['mayo', 40], ['ketchup', 10]], F('oil', 12, 16, 20)), // battered shrimp in spicy mayo; US chain dynamite / bang bang shrimp starters 600-850 kcal
+  D('prawn_tempura', 'Prawn tempura (6)', 'tempura prawn tempura shrimp tempura ebi tempura tempura prawns', 'fried', 'plate', 150, ['shrimp', 120], [['maida', 30], ['egg', 5], ['soySauce', 15]], F('oil', 10, 14, 18)), // 6 large prawns; FNDDS battered fried shrimp ~240 kcal/100 g, ~55-60 kcal a piece
+  D('bao', 'Bao buns (2)', 'bao bao bun bao buns gua bao chicken bao beef bao steamed bun', 'fastfood', 'plate', 200, ['chicken', 80], [['maida', 70], ['sugar', 5], ['milk', 15], ['mayo', 10], ['cabbage', 20], ['ketchup', 10]], F('oil', 5, 8, 10)), // 2 steamed buns with crispy chicken; chain bao (Wagamama, Bao London) 200-260 kcal a bun
+  D('pide', 'Pide (cheese / qeema boat bread)', 'pide pida turkish pide pide bread kiymali pide kasarli pide', 'bread', 'piece', 290, ['beefMince', 50], [['maida', 110], ['egg', 10], ['mozzarella', 50], ['tomato', 20], ['onion', 15], ['capsicum', 15]], F('butter', 8, 12, 15)), // one Turkish pide ~290 g; FatSecret / Turkish TürKomp pide 240-280 kcal/100 g
+  D('scones', 'Scones (2, cream and jam)', 'scone scones scones with cream and jam', 'sweet', 'plate', 175, null, [['maida', 70], ['sugar', 10], ['milk', 30], ['egg', 8], ['cream', 30], ['jam', 25]], F('butter', 18, 18, 18)), // 2 scones ~60 g (CoFID plain scone 362 kcal/100 g) + 30 g cream + 25 g jam ≈ 620
+  D('cupcake', 'Cupcake (frosted)', 'cupcake cupcakes cup cake frosted cupcake', 'sweet', 'cupcake', 75, null, [['maida', 18], ['sugar', 25], ['egg', 8], ['milk', 8]], F('butter', 14, 14, 14)), // sponge + buttercream; FNDDS frosted cupcake 370-410 kcal/100 g
+  D('macarons', 'Macarons (3)', 'macaron macarons french macarons macaroon macaroons french macaroons parisian macarons', 'sweet', 'serving', 45, null, [['nuts', 12], ['sugar', 20], ['eggWhite', 8]], F('butter', 5, 5, 5)), // ~15 g each, 400-450 kcal/100 g (Ladurée ~70 kcal a macaron)
+  D('cold_brew', 'Cold brew', 'cold brew coldbrew', 'drink', 'cup', 350, null, [['espresso', 60]], NOFAT, { topping: ['milk', 30, 'Splash of milk'] }), // Starbucks grande cold brew 5 kcal black
+  D('pastry', 'Pastry (slice)', 'pastry pastries chocolate pastry black forest pastry black forest pineapple pastry', 'sweet', 'slice', 95, null, [['maida', 20], ['sugar', 18], ['egg', 12], ['cream', 15], ['chocolate', 5], ['milk', 15]], F('oil', 3, 3, 3)), // bakery cream pastry; INDB black forest / chocolate pastry 233-243, USDA frosted chocolate cake ~370 kcal/100 g: ≈ 285
 ];
 export const DISH = Object.fromEntries(DISHES.map(d => [d.id, d]));
 const fam = (name, ids) => FAM(name, ids.map(id => DISH[id]));
-fam('Bread', ['roti', 'khubz', 'kerala_parotta', 'khameer', 'regag', 'chapati_thin', 'tandoori_roti', 'naan', 'garlic_naan', 'roghni_naan', 'kulcha', 'taftan', 'sheermal', 'paratha', 'lachha_paratha', 'aloo_paratha', 'anda_paratha', 'puri', 'makki_roti', 'bakarkhani', 'bread_slice']);
+fam('Bread', ['roti', 'khubz', 'kerala_parotta', 'khameer', 'regag', 'chapati_thin', 'tandoori_roti', 'naan', 'garlic_naan', 'roghni_naan', 'kulcha', 'taftan', 'sheermal', 'paratha', 'lachha_paratha', 'aloo_paratha', 'anda_paratha', 'puri', 'makki_roti', 'bakarkhani', 'bread_slice', 'cheese_naan']);
 fam('Rice', ['plain_rice', 'zeera_rice', 'matar_pulao', 'chicken_pulao', 'beef_pulao', 'chicken_biryani', 'mutton_biryani', 'khichdi']);
 fam('Daal', ['daal_masoor', 'daal_moong', 'daal_chana', 'daal_mash', 'daal_makhani', 'rajma', 'cholay']);
-fam('Chicken salan', ['chicken_karahi', 'chicken_handi', 'chicken_qorma', 'chicken_salan', 'chicken_jalfrezi', 'butter_chicken']);
-fam('Mutton and beef', ['mutton_karahi', 'mutton_qorma', 'aloo_gosht', 'palak_gosht', 'nihari', 'haleem', 'qeema', 'qeema_matar']);
-fam('Kebab', ['seekh_kebab', 'chapli_kebab', 'shami_kebab']);
+fam('Chicken salan', ['chicken_karahi', 'chicken_handi', 'chicken_qorma', 'chicken_salan', 'chicken_jalfrezi', 'butter_chicken', 'white_karahi', 'tawa_chicken']);
+fam('Mutton and beef', ['mutton_karahi', 'mutton_qorma', 'aloo_gosht', 'palak_gosht', 'nihari', 'haleem', 'qeema', 'qeema_matar', 'kaleji']);
+fam('Kebab', ['seekh_kebab', 'chapli_kebab', 'shami_kebab', 'reshmi_kebab', 'gola_kebab', 'behari_boti']);
+fam('Namak mandi', ['lamb_tikka', 'lamb_sajji', 'mutton_chops', 'mutton_rosh', 'batair']);
+fam('Fried snacks', ['samosa', 'keema_samosa', 'kachori', 'aloo_tikki', 'pakora']);
 fam('Chicken tikka', ['chicken_tikka', 'chicken_tikka_chest', 'chicken_boti', 'malai_boti']);
 fam('Pizza', ['pizza_slice', 'cheesy_pizza_slice']);
 fam('Pasta', ['creamy_pasta', 'spaghetti_bolognese', 'pasta_arrabbiata', 'mac_and_cheese', 'lasagna', 'chicken_parmesan']);
-fam('Asian (café)', ['chow_mein', 'chilli_chicken', 'ramen', 'pad_thai', 'teriyaki_chicken_rice', 'thai_green_curry', 'dumplings', 'sushi_roll', 'poke_bowl']);
+fam('Asian (café)', ['chow_mein', 'chilli_chicken', 'ramen', 'pad_thai', 'teriyaki_chicken_rice', 'thai_green_curry', 'dumplings', 'sushi_roll', 'poke_bowl', 'bao', 'prawn_tempura']);
 fam('Burger', ['zinger_burger', 'mighty_zinger', 'beef_burger', 'chicken_burger', 'anda_shami_burger', 'bun_kebab']);
 fam('Fried chicken', ['fried_chicken', 'broast', 'nuggets', 'wings']);
 fam('Mithai', ['mithai', 'laddu', 'gulab_jamun', 'sohan_halwa']);
@@ -494,15 +524,15 @@ fam('Breakfast (café)', ['pancakes', 'waffles', 'french_toast', 'eggs_benedict'
 fam('Sandwiches and wraps', ['club_sandwich', 'grilled_sandwich', 'panini', 'sub_6', 'chicken_wrap', 'doner_kebab', 'hot_dog']);
 fam('Mexican', ['burrito', 'tacos', 'quesadilla', 'nachos']);
 fam('Café mains', ['steak', 'grilled_chicken_meal', 'roast_chicken', 'peri_peri_chicken', 'grilled_fish', 'fish_and_chips', 'lamb_shank', 'risotto']);
-fam('Starters (café)', ['fried_calamari', 'mozzarella_sticks', 'onion_rings', 'garlic_bread']);
+fam('Starters (café)', ['fried_calamari', 'mozzarella_sticks', 'onion_rings', 'garlic_bread', 'dynamite_shrimp']);
 fam('Salads', ['salad', 'caesar_salad', 'greek_salad']);
-fam('Soups', ['corn_soup', 'tomato_soup', 'cream_soup', 'miso_soup', 'tom_yum']);
-fam('Desserts (café)', ['cheesecake', 'brownie', 'tiramisu', 'lava_cake', 'creme_brulee', 'crepe', 'sundae', 'cake_slice', 'chocolate_chip_cookie', 'muffin', 'cinnamon_roll', 'banana_bread', 'croissant', 'donut']);
+fam('Soups', ['corn_soup', 'tomato_soup', 'cream_soup', 'miso_soup', 'tom_yum', 'hot_sour_soup']);
+fam('Desserts (café)', ['cheesecake', 'brownie', 'tiramisu', 'lava_cake', 'creme_brulee', 'crepe', 'sundae', 'cake_slice', 'chocolate_chip_cookie', 'muffin', 'cinnamon_roll', 'banana_bread', 'croissant', 'donut', 'pastry', 'cupcake', 'scones', 'macarons']);
 fam('Gulf rice', ['chicken_mandi', 'lamb_mandi', 'chicken_machboos', 'lamb_machboos', 'fish_machboos', 'chicken_kabsa', 'chelo_rice']);
 fam('Arabic grill', ['shish_tawook', 'mixed_grill', 'koobideh_kebab', 'joojeh_kebab']);
-fam('Manakish', ['manakish_zaatar', 'manakish_cheese', 'manakish_meat']);
+fam('Manakish', ['manakish_zaatar', 'manakish_cheese', 'manakish_meat', 'pide']);
 fam('Mezze', ['hummus', 'mutabbal', 'labneh', 'foul_medames', 'fattoush', 'tabbouleh', 'falafel']);
-fam('Coffee', ['latte', 'cappuccino', 'flat_white', 'spanish_latte', 'iced_latte', 'caramel_macchiato', 'frappuccino', 'iced_capp', 'coffee_cream_sugar', 'americano', 'espresso', 'mocha', 'hot_chocolate', 'matcha_latte']);
+fam('Coffee', ['latte', 'cappuccino', 'flat_white', 'spanish_latte', 'iced_latte', 'caramel_macchiato', 'frappuccino', 'iced_capp', 'coffee_cream_sugar', 'americano', 'espresso', 'mocha', 'hot_chocolate', 'matcha_latte', 'cold_brew']);
 fam('Lassi and drinks', ['chai', 'chai_no_sugar', 'karak_chai', 'sugarcane_juice', 'sweet_lassi', 'salted_lassi', 'milkshake', 'smoothie', 'mint_lemonade', 'bubble_tea', 'iced_tea', 'cola']);
 export const family = d => (d?.fam ? DISHES.filter(x => x.fam === d.fam) : []);
 

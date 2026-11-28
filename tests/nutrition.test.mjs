@@ -1,6 +1,6 @@
 // Desi nutrition engine and photo consensus. Run: node tests/nutrition.test.mjs
 const SAUCES = new Set(['toum']); // oil-based sauces are legitimately denser than any cooked dish
-const BLACK = new Set(['americano']); // black coffee is ~2 kcal/100 g
+const BLACK = new Set(['americano', 'cold_brew']); // black coffee is ~2 kcal/100 g
 import * as N from '../js/nutrition.js';
 import { INDB } from '../js/foods-indb.js';
 import { consensus } from '../js/foodphoto.js';
@@ -133,6 +133,17 @@ check('broken samples are ignored', consensus([null, { error: 'x' }, s([it('chai
   check('"cheesecake" → cheesecake, "brownie" → brownie, "americano" → americano',
     top('cheesecake').ref.id === 'cheesecake' && top('brownie').ref.id === 'brownie' && top('americano').ref.id === 'americano');
   check('every dish sits in at most one family; new families exist', ['Breakfast (café)', 'Pasta', 'Salads', 'Desserts (café)', 'Mexican', 'Asian (café)'].every(f => N.DISHES.some(d => d.fam === f)));
+}
+{ // Restaurant-menu dishes (BBQ, Peshawari, street, Asian starters, bakery) land where references put them.
+  const range = (id, lo, hi) => { const v = kcal(id, { style: 'restaurant' }); check(`${N.DISH[id].name}: ${lo}–${hi} kcal`, v >= lo && v <= hi, Math.round(v) + ''); };
+  const per100 = (id, lo, hi) => { const e = N.estimateDish(N.DISH[id], { style: 'restaurant' }), v = e.kcal / e.grams * 100; check(`${N.DISH[id].name}: ${lo}–${hi} kcal/100 g`, v >= lo && v <= hi, Math.round(v) + ''); };
+  range('kaleji', 450, 650); range('lamb_tikka', 700, 950); range('reshmi_kebab', 350, 500); range('gola_kebab', 400, 550);
+  range('cheese_naan', 520, 720); range('hot_sour_soup', 90, 180); range('dynamite_shrimp', 550, 850); range('prawn_tempura', 280, 420);
+  range('scones', 500, 750); range('macarons', 160, 230); range('pastry', 220, 340); range('kachori', 200, 320);
+  per100('hot_sour_soup', 30, 60); per100('pastry', 230, 370); per100('cupcake', 340, 420); per100('white_karahi', 180, 250);
+  check('cold brew is black coffee (< 10 kcal) until milk is added', kcal('cold_brew', {}) < 10 && kcal('cold_brew', { topping: true }) > kcal('cold_brew', {}) + 10);
+  check('"cupcake" no longer lands on the muffin', top('cupcake').ref.id === 'cupcake' && !/cupcake/.test(N.DISH.muffin.alias));
+  check('new kebabs and Peshawari dishes have families', ['reshmi_kebab', 'gola_kebab', 'behari_boti'].every(id => N.DISH[id].fam === 'Kebab') && N.DISH.lamb_tikka.fam === N.DISH.lamb_sajji.fam);
 }
 
 console.log(fails ? `\n${fails} FAILED` : '\nall nutrition checks passed');
