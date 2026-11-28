@@ -687,7 +687,11 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('dashboard: untick someone → one fewer selected', /^(\d+) of (\d+)/.exec(await p.textContent('#bcCount'))[1] === String(+/^(\d+)/.exec(cntBefore)[1] - 1), `${cntBefore} → ${await p.textContent('#bcCount')}`);
   await p.selectOption('#bcAud', 'noopen'); await p.selectOption('#bcAway', '90'); await p.waitForTimeout(100);
   check('dashboard: "hasn\'t opened the app for 3 months" works too', /selected/.test(await p.textContent('#bcCount')));
-  check('dashboard: opens on the month board (the prize one), QK can record the top 3', (await p.$$('#cbList .b-row')).length >= 5 && (await p.$$('#cbList [data-award]')).length === 3);
+  // Ties share a rank (1, 2, 2, 4), and "this phone"'s score depends on earlier tests, so the number of
+  // top-3 rows varies: expect one Record button per row ranked 1–3 (at least 3), none below.
+  const board = await p.$$eval('#cbList .b-row', rows => rows.map(r => ({ rank: /^\d+$/.test(r.querySelector('.b-rank').textContent.replace('#', '')) ? +r.querySelector('.b-rank').textContent.replace('#', '') : ['🥇', '🥈', '🥉'].indexOf(r.querySelector('.b-rank').textContent) + 1, award: !!r.querySelector('[data-award]') })));
+  const top3 = board.filter(r => r.rank >= 1 && r.rank <= 3);
+  check('dashboard: opens on the month board (the prize one), QK can record the top 3', board.length >= 5 && top3.length >= 3 && board.every(r => r.award === (r.rank >= 1 && r.rank <= 3)), JSON.stringify(board));
   await p.click('[data-cbrange=week]'); await p.waitForTimeout(100);
   check('dashboard: week view offers a weekly MVP shout-out', await p.isVisible('#cbMvp'));
   await p.click('#cbMvp'); await p.waitForTimeout(150);
