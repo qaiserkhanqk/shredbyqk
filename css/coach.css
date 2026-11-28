@@ -87,3 +87,13 @@ body.coach-page { background: var(--ink); color: var(--text); min-height: 100vh;
 /* On the dashboard QK is "me": the client's messages sit on the left, QK's on the right. */
 .cc-thread .chat-msg.client { align-self: flex-start; background: var(--surface-2); color: inherit; border-radius: 16px 16px 16px 4px; }
 .cc-thread .chat-msg.coach { border-radius: 16px 16px 4px 16px; }
+
+/* Squad · Biomechanics Lab */
+.cd-squad { margin-top: 18px; }
+.sq-flag { margin: 0; padding: 8px 10px; border-radius: 10px; border-left: 3px solid var(--warn); background: var(--surface-2); font-size: .85rem; }
+.sq-row { display: grid; grid-template-columns: 1.6fr 2fr .6fr .6fr; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); font-size: .85rem; }
+.sq-row.me { background: rgba(47, 117, 104, .08); border-radius: 8px; }
+.sq-bar { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.sq-bar i { display: block; height: 100%; background: #2F7568; border-radius: 99px; }
+.sq-out { font-size: .7rem; color: #fff; background: var(--warn); border-radius: 5px; padding: 1px 5px; }
+.sq-chart { width: 100%; height: 100px; }

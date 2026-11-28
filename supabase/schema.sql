@@ -399,3 +399,29 @@ drop policy if exists "own labels" on public.form_labels;
 create policy "own labels" on public.form_labels for all using (client_id = auth.uid()) with check (client_id = auth.uid());
 drop policy if exists "coach reads labels" on public.form_labels;
 create policy "coach reads labels" on public.form_labels for select using (public.is_my_client(client_id));
+
+-- ============ Athlete Biomechanics Lab: squads ============
+-- A coach's athletes (they don't need an app account) and their 3D Lab results (summaries only, never video).
+create table if not exists public.athletes (
+  id uuid primary key default gen_random_uuid(),
+  coach_id uuid not null references public.profiles (id) on delete cascade,
+  name text not null check (char_length(name) between 1 and 80),
+  team text, position text, height_cm int, notes text,
+  created_at timestamptz not null default now()
+);
+alter table public.athletes enable row level security;
+drop policy if exists "coach owns athletes" on public.athletes;
+create policy "coach owns athletes" on public.athletes for all using (coach_id = auth.uid()) with check (coach_id = auth.uid());
+create table if not exists public.lab_tests (
+  id bigint generated always as identity primary key,
+  coach_id uuid not null references public.profiles (id) on delete cascade,
+  athlete_id uuid not null references public.athletes (id) on delete cascade,
+  at timestamptz not null default now(),
+  preset text, cameras int, summary jsonb not null
+);
+create index if not exists lab_tests_athlete on public.lab_tests (athlete_id, at desc);
+alter table public.lab_tests enable row level security;
+drop policy if exists "coach owns lab tests" on public.lab_tests;
+create policy "coach owns lab tests" on public.lab_tests for all
+  using (coach_id = auth.uid())
+  with check (coach_id = auth.uid() and exists (select 1 from public.athletes a where a.id = athlete_id and a.coach_id = auth.uid()));

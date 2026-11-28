@@ -1,8 +1,8 @@
 // 3D Lab: a synthetic athlete with known 3D angles, "filmed" by two virtual cameras (side + front, different
 // resolutions, zoom and placement, the front camera started 0.5 s late, with pixel jitter). The lab must find the
 // sync and recover the true angles.
-import { reconstruct, motionLag, resample, clapTime, measure, report, toCSV, summary, facingSign, LANDMARK as L } from '../js/lab3d.js';
-import { pose, film } from '../js/lab-demo.js';
+import { reconstruct, reconstructMulti, syncAll, motionLag, resample, clapTime, measure, report, toCSV, summary, facingSign, LANDMARK as L } from '../js/lab3d.js';
+import { pose, film, demoVideos4 } from '../js/lab-demo.js';
 
 let fail = 0;
 const check = (name, ok, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${ok ? '' : ' ' + extra}`); if (!ok) fail++; };
@@ -53,6 +53,22 @@ check('no overlap → a clear message', threw);
 
 check('CSV export: header + one row per frame', toCSV(rec, plain).split('\n').length === rec.frames.length + 1);
 check('history summary: no video or frames kept', !('frames' in summary(plain, { athlete: 'Test' })) && summary(plain, { athlete: 'Test' }).rows.length > 3);
+
+// ---- Four cameras: side-right, front, side-left, back; each started at a different moment; a side camera can't
+// see the far-side limbs well (extra noise, low visibility). Four cameras should measure the hidden leg far better.
+{
+  const V = demoVideos4({});
+  const sync = syncAll(V);
+  check(`4 cameras: each synced to the first (found ${sync.lags.map(l => l.toFixed(2)).join(', ')} s)`, [0, 0.5, 1.2, 0.8].every((x, i) => Math.abs(sync.lags[i] - x) <= 1 / 60 + 1e-9), JSON.stringify(sync));
+  const views = V.map((v, i) => ({ ...v, lag: sync.lags[i] }));
+  const err = rec => { const e = rec.frames.map(f => Math.abs(measure(f.P).kneeL - pose(f.t).k)); return e.reduce((a, b) => a + b, 0) / e.length; };
+  const two = err(reconstructMulti([views[0], views[1]], { heightM: 1.75 })), four = err(reconstructMulti(views, { heightM: 1.75 }));
+  check(`4 cameras: the leg hidden from one side camera is measured better (left knee error ${two.toFixed(1)}° with 2 → ${four.toFixed(1)}° with 4)`, four < two * 0.6 && four < 3, `${two} → ${four}`);
+  check('4 cameras: works with 3 as well', err(reconstructMulti(views.slice(0, 3), { heightM: 1.75 })) < two);
+  let threw = ''; try { reconstructMulti([views[0], views[2]]); } catch (e) { threw = e.message; }
+  check('4 cameras: two side cameras alone → asks for a front or back camera', /front or back/.test(threw));
+  check('4 cameras: clap sync when every video has a clap', JSON.stringify(syncAll(V, { claps: [2.0, 1.5, 0.8, 1.2] }).lags) === JSON.stringify([0, 0.5, 1.2, 0.8]));
+}
 
 if (fail) { console.log(`\n${fail} failed`); process.exit(1); }
 console.log('\n3D lab: all passed');

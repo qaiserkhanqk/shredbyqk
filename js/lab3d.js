@@ -80,30 +80,59 @@ function scaleFor(frames, heightM, aspect) {
  * Axes: X = athlete's left, Y = up, Z = forward. Origin: between the ankles on the floor, first frame.
  */
 export function reconstruct(side, front, { heightM = 1.75, sideW = 1, sideH = 1, frontW = 1, frontH = 1, back = false, lag = 0, hz = 60 } = {}) {
-  const A = resample(side, hz), B = resample(front.map(f => ({ ...f, t: f.t + lag })), hz);
-  const t0 = Math.max(A[0].t, B[0].t), t1 = Math.min(A[A.length - 1].t, B[B.length - 1].t);
-  if (!(t1 - t0 > 0.5)) throw new Error('The two videos overlap by less than half a second. Record them at the same time and clap at the start.');
+  return reconstructMulti([{ pos: 'side', frames: side, w: sideW, h: sideH, lag: 0 }, { pos: back ? 'back' : 'front', frames: front, w: frontW, h: frontH, lag }], { heightM, hz });
+}
+
+/**
+ * 2–4 cameras. views: [{ pos: 'sideL' | 'sideR' | 'side' | 'front' | 'back', frames, w, h, lag }], lag = seconds to
+ * add to that camera's times to match the first camera. Needs at least one side camera (depth) and one front or back
+ * camera (left/right). With more cameras every point is a weighted average: each camera's visibility for it, and a
+ * side camera counts the limbs on its own side fully and the far-side (partly hidden) limbs at a third. So with a
+ * camera on each side, both legs are measured by the camera that can actually see them.
+ */
+const LEFT = i => i >= 11 && i % 2 === 1, RIGHT = i => i >= 12 && i % 2 === 0;
+export function reconstructMulti(views, { heightM = 1.75, hz = 60 } = {}) {
+  const sides = views.filter(v => /^side/.test(v.pos)), fronts = views.filter(v => v.pos === 'front' || v.pos === 'back');
+  if (!sides.length || !fronts.length) throw new Error('Needs at least one side-on camera and one front or back camera.');
+  const R = views.map(v => ({ ...v, F: resample(v.frames.map(f => ({ ...f, t: f.t + (v.lag || 0) })), hz) }));
+  const t0 = Math.max(...R.map(v => v.F[0].t)), t1 = Math.min(...R.map(v => v.F[v.F.length - 1].t));
+  if (!(t1 - t0 > 0.5)) throw new Error('The videos overlap by less than half a second. Record them at the same time and clap at the start.');
   const pick = (F, t) => F[Math.min(F.length - 1, Math.max(0, Math.round((t - F[0].t) * hz)))];
-  // Pixel aspect: normalised x is a fraction of width, y of height. Work in "height units" for both axes.
-  const sA = scaleFor(A, heightM, 1), xA = sideW / sideH, xB = frontW / frontH, fwd = facingSign(A);
-  // Front camera scale: make its vertical match the side camera's vertical (the axis both cameras share).
-  const pairs = [];
-  for (let t = t0; t <= t1; t += 1 / hz) { const a = pick(A, t).lm, b = pick(B, t).lm; pairs.push([Math.abs(midY(a, L.lAn, L.rAn) - a[L.nose].y), Math.abs(midY(b, L.lAn, L.rAn) - b[L.nose].y)]); }
-  const sB = sA * median(pairs.map(([a, b]) => a / (b || 1)));
-  const sideX = fwd, frontX = back ? 1 : -1; // front view: the athlete's left is on image-right → mirror
-  const a0 = pick(A, t0).lm, b0 = pick(B, t0).lm;
-  const zO = (a0[L.lAn].x + a0[L.rAn].x) / 2, xO = (b0[L.lAn].x + b0[L.rAn].x) / 2, yA = midY(a0, L.lAn, L.rAn), yB = midY(b0, L.lAn, L.rAn);
+  const ext = lm => Math.abs(midY(lm, L.lAn, L.rAn) - lm[L.nose].y);
+  const ref = R.find(v => /^side/.test(v.pos)), sRef = scaleFor(ref.F, heightM, 1);
+  for (const v of R) {
+    v.aspect = (v.w || 1) / (v.h || 1);
+    const ratios = [];
+    for (let t = t0; t <= t1; t += 1 / hz) ratios.push(ext(pick(ref.F, t).lm) / (ext(pick(v.F, t).lm) || 1));
+    v.s = v === ref ? sRef : sRef * median(ratios);
+    v.sign = /^side/.test(v.pos) ? facingSign(v.F) : v.pos === 'back' ? -1 : 1; // front: athlete's left is image-right
+    const l0 = pick(v.F, t0).lm; v.h0 = (l0[L.lAn].x + l0[L.rAn].x) / 2; v.y0 = midY(l0, L.lAn, L.rAn);
+    v.near = v.pos === 'sideL' ? LEFT : v.pos === 'sideR' ? RIGHT : null;
+  }
   const out = [];
   for (let t = t0; t <= t1 + 1e-9; t += 1 / hz) {
-    const a = pick(A, t).lm, b = pick(B, t).lm;
-    const P = a.map((pa, i) => {
-      const pb = b[i], va = pa.v ?? 1, vb = pb.v ?? 1;
-      const ya = (yA - pa.y) * sA, yb = (yB - pb.y) * sB, w = va + vb || 1;
-      return { x: frontX * -(pb.x - xO) * xB * sB, y: (ya * va + yb * vb) / w, z: sideX * (pa.x - zO) * xA * sA, v: Math.min(va, vb) };
+    const now = R.map(v => ({ v, lm: pick(v.F, t).lm }));
+    const P = now[0].lm.map((_, i) => {
+      let x = 0, wx = 0, z = 0, wz = 0, y = 0, wy = 0, vis = 1;
+      for (const { v, lm } of now) {
+        const p = lm[i], vi = p.v ?? 1, h = v.sign * (p.x - v.h0) * v.aspect * v.s, yy = (v.y0 - p.y) * v.s;
+        const w = vi * (v.near && (LEFT(i) || RIGHT(i)) && !v.near(i) ? 0.35 : 1);
+        if (/^side/.test(v.pos)) { z += h * w; wz += w; } else { x += h * w; wx += w; }
+        y += yy * w; wy += w; vis = Math.min(vis, vi);
+      }
+      return { x: wx ? x / wx : 0, y: wy ? y / wy : 0, z: wz ? z / wz : 0, v: vis };
     });
     out.push({ t: t - t0, P });
   }
-  return { frames: out, info: { hz, duration: t1 - t0, scale: { side: sA, front: sB }, facing: fwd, back, lag } };
+  return { frames: out, info: { hz, duration: t1 - t0, cameras: views.map(v => v.pos), scale: Object.fromEntries(R.map(v => [v.pos, v.s])) } };
+}
+
+/** Line every camera up with the first: clap times when all have one, else the movement. Returns lags (seconds). */
+export function syncAll(views, { claps = null, hz = 60 } = {}) {
+  if (claps && claps.every(c => c != null)) return { how: 'clap', lags: claps.map(c => claps[0] - c), r: 1 };
+  const ref = resample(views[0].frames, hz), out = [0]; let worst = 1;
+  for (const v of views.slice(1)) { const m = motionLag(ref, resample(v.frames, hz), { hz }); out.push(m.lag); worst = Math.min(worst, m.r); }
+  return { how: 'motion', lags: out, r: worst };
 }
 
 /* ---------- 4. 3D measurements ---------- */

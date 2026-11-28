@@ -239,19 +239,24 @@
     <details class="card" open><summary><b>How to film (2 minutes)</b></summary>
       <ol class="small lab-steps">
         <li>Two cameras: two phones, or a phone and a DJI. Both on tripods at hip height, 3–5 m from the athlete, at 60 fps or more if they can.</li>
-        <li>Camera A side-on. Camera B in front (or behind), so the two are about 90° apart.</li>
-        <li>Press record on both, then <b>clap once</b> where both can hear it. That lines the videos up.</li>
+        <li>One camera side-on and one in front (or behind), about 90° apart. With four: add the other side and the back, so every limb has a camera that sees it.</li>
+        <li>Press record on every camera, then <b>clap once</b> where all can hear it. That lines the videos up.</li>
         <li>The athlete does the movement: 3–5 squats, landings, deliveries or kicks, whole body in view the whole time.</li>
-        <li>Load both videos below. They are analysed on this device and never uploaded.</li>
+        <li>Load the videos below. They are analysed on this device and never uploaded. Only the results are saved to the athlete.</li>
       </ol>
       <p class="muted small" style="margin:0">Four separate videos from four angles at different times are four flat views, not 3D. 3D needs the same moment from two cameras.</p>
     </details>
     <div class="card stack">
       <div class="grid2"><label class="field">Athlete<input id="labName" autocomplete="off"></label><label class="field">Height (cm)<input id="labHeight" type="number" inputmode="numeric" min="100" max="230"></label></div>
       <div class="grid2"><label class="field">Movement<select id="labPreset"></select></label><label class="field" id="labArmWrap" hidden>Bowling arm<select id="labArm"><option value="R">Right</option><option value="L">Left</option></select></label></div>
-      <label class="field">Camera A: side-on video<input id="labSide" type="file" accept="video/*"></label>
-      <label class="field">Camera B: front or back video<input id="labFront" type="file" accept="video/*"></label>
-      <label class="check"><input type="checkbox" id="labBack"> Camera B was behind the athlete</label>
+      <div class="lab-cams"><span class="eyebrow">Videos: 2 to 4, at least one side and one front or back</span>
+        <label class="field">Side, athlete's right<input id="labCamSideR" data-pos="sideR" type="file" accept="video/*"></label>
+        <label class="field">Front<input id="labCamFront" data-pos="front" type="file" accept="video/*"></label>
+        <label class="field">Side, athlete's left (optional)<input id="labCamSideL" data-pos="sideL" type="file" accept="video/*"></label>
+        <label class="field">Back (optional)<input id="labCamBack" data-pos="back" type="file" accept="video/*"></label>
+        <p class="muted small" style="margin:0">Four cameras: each side camera sees its own side's limbs clearly, so nothing is hidden.</p>
+      </div>
+      <label class="field" id="labSquadWrap" hidden>Squad athlete<select id="labSquad"></select></label>
       <label class="check"><input type="checkbox" id="labFast"> Faster analysis (a little less precise)</label>
       <div class="btn-row"><button type="button" class="ghost" id="labDemo">Try the demo</button><button type="button" class="cta" id="labGo">Analyse in 3D</button></div>
       <p class="muted small" id="labStatus" hidden></p>

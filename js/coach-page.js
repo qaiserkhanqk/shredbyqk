@@ -9,6 +9,7 @@ import { EXERCISES, allRules } from './exercises.js';
 import { retotal, FOOD_CHOICES, FOODS } from './dietplan.js';
 import { cleanProfile } from './clean.js';
 import { initCoachExtra, loadBoard, loadAccuracy } from './coach-extra.js';
+import { initSquad, loadSquad } from './coach-squad.js';
 import { scoreChips } from './scoreview.js';
 import { initCoachChat, loadChats, chatHTML } from './coach-chat.js';
 
@@ -48,10 +49,11 @@ async function load() {
   // Demo: your own row first, so you can find yourself.
   const mine = state.cards.findIndex(c => c.id === LOCAL_ID); if (mine > 0) state.cards.unshift(...state.cards.splice(mine, 1));
   render();
-  if (!state.extra) { initCoachExtra({ state, cloud, toast }); initCoachChat({ state, cloud, toast, render, select: id => { state.sel = id; render(); } }); state.extra = true; }
+  if (!state.extra) { initCoachExtra({ state, cloud, toast }); initSquad({ state, cloud, toast }); initCoachChat({ state, cloud, toast, render, select: id => { state.sel = id; render(); } }); state.extra = true; }
   await loadChats().catch(e => console.warn('chats:', e.message));
   await loadBoard().catch(e => console.warn('board:', e.message));
   await loadAccuracy().catch(e => console.warn('accuracy:', e.message));
+  await loadSquad().catch(e => console.warn('squad:', e.message));
   $('#bcAud').dispatchEvent(new Event('change'));
 }
 
