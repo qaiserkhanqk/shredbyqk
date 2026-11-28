@@ -11,6 +11,10 @@ let goalId = 'anxiety';
 const tones = new SukoonTones();
 let run = null; // the live session
 let player = null; // one audio element, unlocked during the Begin tap and reused for every verse
+/** If no recitation has started this long after a verse begins (and the phone isn't waiting for her tap), she is
+ *  offered the passage on Quran.com. Some browsers (Firefox, 2026-11-27) never report an undecodable file as an error,
+ *  which left her in silence. A UI choice, not a measured value. */
+export const STALL_MS = 8000;
 
 function unlockPlayer() {
   player ||= new Audio();
@@ -202,25 +206,34 @@ function playAyah() {
   try { if (globalThis.MediaMetadata) navigator.mediaSession.metadata = new MediaMetadata({ title: it.basmala ? 'Bismillah' : `${SURAH[it.s]} ${it.s}:${it.a}`, artist: RECITERS.find(r => r.id === run.p.reciter)?.name || '', album: 'Sukoon' }); } catch {}
   const a = run.audio = player ||= new Audio();
   let src = 0;
+  const idx = run.idx, me = run;
+  // Safety net: nothing playing after STALL_MS (and not waiting for her tap) → the Quran.com fallback.
+  const arm = () => { clearTimeout(me.stall); me.stall = setTimeout(() => { if (run === me && run.step === 'listen' && run.idx === idx && run.audio === a) giveUp(); }, STALL_MS); };
+  const giveUp = () => {
+    clearTimeout(me.stall); a.onerror = a.onended = a.onplaying = null;
+    try { a.pause(); } catch {}
+    showLinks('Couldn\'t load the recitation. Check your internet, or open it on Quran.com and tap Next when you\'re done.');
+  };
+  a.onplaying = () => clearTimeout(me.stall);
   const load = () => { a.src = it.urls[src]; a.play().catch(blocked); };
   // The phone refused to start sound without a tap: ask for one instead of skipping the recitation.
   const blocked = err => {
     if (err?.name !== 'NotAllowedError' || !run || run.step !== 'listen') return;
+    clearTimeout(me.stall); // waiting for her tap, not stalled
     $('#calmLinks').innerHTML = '<button class="cta" type="button" id="calmPlay"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Play recitation</button>';
-    $('#calmPlay').onclick = () => { $('#calmLinks').innerHTML = ''; a.play().catch(() => {}); };
+    $('#calmPlay').onclick = () => { $('#calmLinks').innerHTML = ''; arm(); a.play().catch(() => {}); };
   };
-  a.onended = () => { run.idx++; playAyah(); };
+  a.onended = () => { clearTimeout(me.stall); run.idx++; playAyah(); };
   // If one audio server can't be reached, try the next; after the last, link to Quran.com.
   a.onerror = () => {
     if (++src < it.urls.length) return load();
-    a.onerror = a.onended = null;
-    showLinks('Couldn\'t load the recitation. Check your internet, or open it on Quran.com and tap Next when you\'re done.');
+    giveUp();
   };
-  load();
+  arm(); load();
 }
 
 function dua() {
-  if (run.audio) { run.audio.onended = run.audio.onerror = null; run.audio.pause(); }
+  clearTimeout(run.stall); if (run.audio) { run.audio.onended = run.audio.onerror = run.audio.onplaying = null; run.audio.pause(); }
   tones.stop(2);
   const { g } = run, d = g.dua;
   setStep('dua', `${g.name} · step 3 of 3`, 'Make dua');
@@ -237,7 +250,7 @@ function next() {
 function finish(early) {
   if (!run) return;
   cancelAnimationFrame(run.raf);
-  if (run.audio) { run.audio.onended = run.audio.onerror = null; run.audio.pause(); }
+  clearTimeout(run.stall); if (run.audio) { run.audio.onended = run.audio.onerror = run.audio.onplaying = null; run.audio.pause(); }
   tones.stop(1.5);
   try { run.lock?.release(); } catch {}
   const r = run; run = null;
