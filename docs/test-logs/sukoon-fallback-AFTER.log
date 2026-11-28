@@ -1,0 +1,24 @@
+# chromium
+browser: chromium 153.0.8010.12
+ok   recitation never starts and never reports an error: within 12 s she is offered the passage on Quran.com
+ok   …with a plain message saying it could not load
+ok   control: when the recitation is playing, no fallback appears (no false alarm)
+ok   control: when the phone needs a tap to start sound, the "Play recitation" button stays (no fallback over it)
+ok   no JavaScript errors
+ALL PASS (5)
+# webkit
+browser: webkit 26.6
+ok   recitation never starts and never reports an error: within 12 s she is offered the passage on Quran.com
+ok   …with a plain message saying it could not load
+ok   control: when the recitation is playing, no fallback appears (no false alarm)
+ok   control: when the phone needs a tap to start sound, the "Play recitation" button stays (no fallback over it)
+ok   no JavaScript errors
+ALL PASS (5)
+# firefox
+browser: firefox 155.0
+ok   recitation never starts and never reports an error: within 12 s she is offered the passage on Quran.com
+ok   …with a plain message saying it could not load
+ok   control: when the recitation is playing, no fallback appears (no false alarm)
+ok   control: when the phone needs a tap to start sound, the "Play recitation" button stays (no fallback over it)
+ok   no JavaScript errors
+ALL PASS (5)
