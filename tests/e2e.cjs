@@ -140,22 +140,103 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.click('#safetyGo');
   check('rehab: safety screen requires every answer', /answer every/.test(await p.textContent('#safetyMsg')));
   await answerAll(); await p.click('#safetyGo');
-  await p.fill('#act0', 'Walking downstairs'); await p.click('#startPlan');
-  check('rehab: programme starts at phase 1 with exercises', /Phase 1 of 3/.test(await p.textContent('#rehabActive')) && (await p.$$('#rehabActive [data-train]')).length >= 4);
+  check('rehab: assessment step follows the safety check', /Step 2 of 3/.test(await p.textContent('#rsheetBody')));
+  await p.fill('#act0', 'Walking downstairs');
+  await p.click('#aSettle [data-v=nextDay]'); await p.click('#seePlan');
+  const planText = await p.textContent('#rsheetBody');
+  check('rehab: plan shows a gentle start for pain lasting to the next day', /Step 3 of 3/.test(planText) && /Gentle start/.test(planText) && /2\/10/.test(planText), planText.slice(0, 200));
+  check('rehab: plan never promises a cure and says no clinician checked it', !/cure|guarantee/i.test(planText) && /no clinician has checked it/.test(planText));
+  await p.click('#startPlan');
+  check('rehab: programme starts at phase 1 with exercises', /phase 1 of 3/i.test(await p.textContent('#rehabActive')) && (await p.$$('#rehabActive [data-train]')).length >= 4);
+  check('rehab: gentle start takes a set off (wall sit 5×30 s → 4×30 s)', /4×30 s/.test(await p.textContent('#rehabActive')));
   await p.click('#checkinRehab'); await p.click('#saveCheckin');
   check('rehab: check-in gives a traffic light', /On track|Hold the load|Ease off/.test(await p.textContent('#rehabActive')));
+  check("rehab: second check-in the same day updates instead of adding", /Update today's check-in/.test(await p.textContent('#checkinRehab')));
+  await p.click('#checkinRehab'); await p.click('#saveCheckin');
+  check('rehab: two check-ins in one day count as one day', /1\/3 days checked in/.test(await p.textContent('#rehabActive')));
+  check('rehab: programme log records the start', /Start:/.test(await p.textContent('#rehabActive')));
+  check('rehab: a diagnosed condition is not held in phase 1', !/stays in phase 1/.test(await p.textContent('#rehabActive')));
+  check('rehab: no clinic wording on the programme screen', !/clinic notes|patient file|care plan|treatment/i.test(await p.textContent('#rehabActive')));
   check('rehab: phase criteria listed and not yet met', (await p.$$('#rehabActive .crit')).length >= 3 && !(await p.$('#nextPhase')));
   await p.click('#rehabActive [data-romtest=kneeFlexion]'); await p.click('#rsheetBody [data-side]'); await p.waitForTimeout(6000);
   check('rehab: camera measurement starts', await p.isVisible('#live') && /Knee bend/.test(await p.textContent('#liveEyebrow')));
   await p.click('#endLive'); await p.waitForTimeout(800);
   check('rehab: no-person measurement refused safely', await p.isVisible('#rehabActive'));
+  check('rehab: failed measurement asks camera or movement', /Was it the camera, or the movement\?/.test(await p.textContent('#rsheetBody')));
+  await p.click('#rfCant');
+  check("rehab: \"couldn't do it\" is written to the programme log", /couldn't do the movement/.test(await p.textContent('#rehabActive')));
   await go('today');
   check('today: next step is the rehab session', /Rehab · phase 1/.test(await p.textContent('#nextEyebrow')) && /Start rehab/.test(await p.textContent('#nextCta')), await p.textContent('#nextEyebrow'));
   await p.click('#nextBtn'); await p.click('#endPlan'); await p.click('#endYes');
+  // 6b. Camera movement check (knee): every step skipped, so the plan shows what was skipped and starts the general programme.
+  await p.click('[data-area=Knee]'); await p.click('[data-screen=Knee]');
+  check('movement check: safety screen has no "diagnosed?" question', !(await p.$('#flagList [data-i=dx]')));
+  await answerAll(); await p.click('#safetyGo');
+  check('movement check: 4 steps', /Step 2 of 4/.test(await p.textContent('#rsheetBody')));
+  await p.click('#actHints [data-hint=Stairs]');
+  check('movement check: tapping an activity fills it in', (await p.inputValue('#act0')) === 'Stairs');
+  await p.click('#seePlan');
+  check('movement check: first test is the left knee bend', /1 of 5/.test(await p.textContent('#rsheetBody')) && /Knee bend · left/.test(await p.textContent('#rsheetBody')));
+  await p.click('#scrPain'); for (let i = 0; i < 4; i++) await p.click('#scrCant');
+  const scrPlan = await p.textContent('#rsheetBody');
+  check('movement check: plan lists what could not be done and names no diagnosis', /Step 4 of 4/.test(scrPlan) && /too painful to do/.test(scrPlan) && /couldn't get into position/.test(scrPlan) && !/ACL|meniscus|patellofemoral|tear/i.test(scrPlan));
+  check("movement check: tests not done → gentle start and physio advised", /Gentle start/.test(scrPlan) && /See a physio before going further/.test(scrPlan));
+  await p.click('#startPlan');
+  check('movement check: general knee programme starts', /Knee pain \(movement check\)/.test(await p.textContent('#rehabTitle')) && /phase 1 of 3/i.test(await p.textContent('#rehabActive')));
+
+  check('movement check: held in phase 1 until a physio has assessed', /until a physio has assessed you/.test(await p.textContent('#rehabActive')));
+
+  // Phone on the limb: fake the motion sensor. Thigh flat (90° from vertical), shin 30° behind vertical → 120° knee bend.
+  await p.click('#rehabActive [data-romtest=kneeFlexion]');
+  check('sensor: phone-on-limb is offered first for the knee bend, with no accuracy claim', await p.isVisible('#romSensor') && /phone on your leg/.test(await p.textContent('#romSensor')) && !/accurate/i.test(await p.textContent('#rsheetBody')));
+  // Allow motion sensors the way a person taps "Allow" (Chromium asks before sending devicemotion readings).
+  // Chromium's grant replaces the origin's permissions, so camera and microphone are listed too or later camera checks fail.
+  if (b.browserType().name() === 'chromium') await ctx.grantPermissions(['accelerometer', 'gyroscope', 'magnetometer', 'camera', 'microphone'], { origin: 'https://shred.local' });
+  await p.click('#romSensor'); await p.click('#snGo');
+  await p.evaluate(async () => {
+    const g = 9.81, r = d => d * Math.PI / 180, wait = ms => new Promise(res => setTimeout(res, ms));
+    const emit = async (deg, ms, wobble = 0) => { const end = performance.now() + ms; let i = 0; while (performance.now() < end) { const d = deg + (wobble ? Math.sin(i++) * wobble : 0); window.dispatchEvent(new DeviceMotionEvent('devicemotion', { accelerationIncludingGravity: { x: 0, y: g * Math.cos(r(d)), z: g * Math.sin(r(d)) } })); await wait(16); } };
+    for (let t = 0; t < 3; t++) { await emit(90, 2300); await emit(30, 400, 40); await emit(-30 - t, 2300); await emit(30, 400, 40); }
+  });
+  await p.waitForTimeout(400);
+  const sensorLog = await p.textContent('#rehabActive');
+  check('sensor: three tries saved as a phone-on-limb knee bend of about 120°', /Knee bend: 12[0-2](\.\d)? degrees( \(left\))?, phone on limb/.test(sensorLog), (sensorLog.match(/Knee bend:[^.]*\./) || [''])[0] + ' | sheet: ' + (await p.isVisible('#snStatus') ? await p.textContent('#snTry') + ' / ' + await p.textContent('#snStatus') : 'closed'));
+  check('sensor: measurement row says phone on limb', /phone on limb/.test(sensorLog));
+
+  // Strength check and overall rating.
+  await p.click('#rehabActive [data-strength=slSitToStand]'); await p.fill('#stReps', '8'); await p.click('#stSave');
+  check('strength: single-leg sit-to-stand saved for the injured side', /L 8 · R – reps/.test(await p.textContent('#rehabActive')));
+  await p.click('#rateOverall'); await p.evaluate(() => { const s = document.querySelector('#sane'); s.value = '60'; s.dispatchEvent(new Event('input')); }); await p.click('#rateSave');
+  check('rating: overall rating shows 60% of normal', /60%/.test(await p.textContent('#rehabActive')));
+
+  // Clinician mode: set up a PIN, confirm a diagnosis, check it is logged and on the report.
+  await p.click('#clinicianBtn');
+  await p.fill('#cName', 'Sara Ahmed'); await p.fill('#cPin', '4829'); await p.fill('#cPin2', '4829'); await p.click('#cSave');
+  check('clinician: panel opens after setup', /Clinician mode · Sara Ahmed/.test(await p.textContent('#rsheetBody')));
+  await p.fill('#clDynL', '18'); await p.fill('#clDynR', '25'); await p.click('#clDynSave');
+  check('clinician: dynamometer reading saved', /Dynamometer reading saved/.test(await p.textContent('#rsheetBody')));
+  await p.fill('#clValRef', '118'); await p.click('#clValSave');
+  check('clinician: goniometer pair saved; no summary or study export below 5 pairs', /Pair saved/.test(await p.textContent('#rsheetBody')) && /summary appears after 5 pairs/.test(await p.textContent('#rsheetBody')) && !(await p.$('#clValCsv')));
+  await p.selectOption('#clCond', 'pfp'); await p.click('#clDx');
+  check('clinician: confirming a diagnosis switches the programme', /front of the knee/.test(await p.textContent('#rehabTitle')));
+  await p.click('#clPh');
+  check('clinician: setting a phase without a reason is refused', /reason/i.test(await p.textContent('#clMsg')));
+  await p.click('#clDone');
+  check('clinician: programme shows who confirmed it', /confirmed by Sara Ahmed/i.test(await p.textContent('#rehabActive')));
+  await p.click('#clinicianBtn'); await p.fill('#cPin', '0000'); await p.click('#cOpen');
+  check('clinician: wrong PIN refused', /Wrong PIN/.test(await p.textContent('#cMsg')));
+  await p.click('#rsheet', { position: { x: 5, y: 5 } }).catch(() => {});
+  await p.evaluate(() => { document.querySelector('#rsheet').hidden = true; });
+  await p.click('#shareReport');
+  const rep = await p.textContent('#rsheetBody');
+  check('report: shows the programme, the clinician and the disclaimer', /Progress report/.test(rep) && /Sara Ahmed/.test(rep) && /not a diagnosis/i.test(rep));
+  check('report: shows the method and strength, and says accuracy is not yet tested', /phone on limb/.test(rep) && /Strength/.test(rep) && /not yet been tested/.test(rep));
+  await p.evaluate(() => { document.querySelector('#rsheet').hidden = true; });
+  await p.click('#endPlan'); await p.click('#endYes');
   await p.click('[data-area="Lower back"]'); await p.click('[data-cond=lbp]');
   await answerAll(0); await p.click('#safetyGo');
   const alertText = await p.textContent('#rsheetBody');
-  check('rehab: cauda equina red flag → emergency advice with 999', /Get emergency help now/.test(alertText) && /999/.test(alertText));
+  check('rehab: cauda equina red flag → emergency advice with the local number', /Get emergency help now/.test(alertText) && /998|999|911/.test(alertText));
   await p.click('#stopOk');
 
   // 7. Readiness, load and Studio

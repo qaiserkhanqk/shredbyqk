@@ -1217,3 +1217,36 @@ body.no-scroll { overflow: hidden; }
   #lab .btn-row { display: none; }
 }
 .role-list button.on { outline: 2px solid var(--z1); outline-offset: -2px; }
+
+/* Rehab: plan, programme, movement check, clinician mode, report */
+.clinic-steps { margin: 0; padding: 0; list-style: none; counter-reset: step; display: grid; gap: 10px; }
+.clinic-steps li { counter-increment: step; display: grid; grid-template-columns: 28px 1fr; column-gap: 10px; font-size: .88rem; }
+.clinic-steps li::before { content: counter(step); grid-row: span 2; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: .78rem; background: rgba(var(--z1-rgb), .16); color: var(--z2); }
+.clinic-steps span { color: var(--muted); font-size: .8rem; }
+.careplan { display: flex; flex-direction: column; gap: 6px; padding: 14px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-2); }
+.cp-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: .88rem; }
+.cp-row span:first-child { color: var(--muted); }
+.patient-file { border-top: 3px solid var(--z1); }
+.file-facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-weight: 700; font-size: .85rem; }
+.file-facts small { display: block; font-weight: 600; font-size: .7rem; color: var(--muted); }
+@media (max-width: 380px) { .file-facts { grid-template-columns: repeat(2, 1fr); } }
+.notes { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.note-row { display: grid; grid-template-columns: 52px 1fr; gap: 8px; }
+.note-row small { color: var(--muted); font-size: .74rem; padding-top: 2px; }
+.screen-card { border-color: rgba(var(--z1-rgb), .55); background: linear-gradient(135deg, rgba(var(--z1-rgb), .1), transparent), var(--surface); }
+.findings { margin: 4px 0 0; padding-left: 0; list-style: none; display: grid; gap: 6px; }
+.findings .pill { margin-right: 4px; }
+.cl-block { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-md); }
+.cl-block select, .cl-block input, .cl-block textarea { background: var(--surface-2); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 10px; font: inherit; }
+.report-preview { border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px; background: var(--surface-2); max-height: 50vh; overflow: auto; }
+.report h3 { margin: 0; font-size: 1.05rem; } .report h4 { margin: 12px 0 4px; font-size: .9rem; }
+.report p, .report li { font-size: .85rem; } .report ul { margin: 0; padding-left: 18px; }
+.rp { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.rp th, .rp td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+#reportPrint { display: none; }
+@media print {
+  body.printing-report > *:not(#reportPrint) { display: none !important; }
+  body.printing-report #reportPrint { display: block !important; color: #000; background: #fff; padding: 16px; }
+  body.printing-report #reportPrint .muted { color: #444; }
+  body.printing-report .rp th, body.printing-report .rp td { border-color: #ccc; }
+}

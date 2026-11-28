@@ -47,12 +47,12 @@ check('pain: 7/10 during → red', painLight({ during: 7, after: 6 }, 3).light =
   const base = { startedAt: now - 20 * day, phaseStartedAt: now - 20 * day, checkins: [], tests: [], psfs: [], kneeTests: [], injured: 'R' };
   let e = evaluatePhase(c, 0, base, now);
   check('ACL phase 1: blocked with no data', !e.allMet, e.items.filter(i => !i.met).map(i => i.label).join(' | '));
-  const ok = { ...base, checkins: [1, 2, 3].map(k => ({ at: now - k * day, during: 2, after: 2, nextMorning: 1 })), tests: [{ at: now, test: 'kneeExtension', value: 2 }, { at: now, test: 'kneeFlexion', value: 118 }] };
+  const ok = { ...base, checkins: [1, 2, 3].map(k => ({ at: now - k * day, during: 2, after: 2, nextMorning: 1 })), tests: [{ at: now, test: 'kneeExtension', side: 'R', value: 2 }, { at: now, test: 'kneeFlexion', side: 'R', value: 118 }] };
   e = evaluatePhase(c, 0, ok, now);
   check('ACL phase 1: passes when straight, 118° bend, pain ≤3, 2+ weeks', e.allMet, e.items.map(i => `${i.met ? '✓' : '✗'} ${i.label}`).join(' | '));
   const early = { ...ok, phaseStartedAt: now - 5 * day };
   check('ACL phase 1: still blocked if under the minimum time', !evaluatePhase(c, 0, early, now).allMet);
-  const rts = { ...ok, phaseStartedAt: now - 70 * day, checkins: [1, 2, 3].map(k => ({ at: now - k * day, during: 0, after: 0, nextMorning: 0 })),
+  const rts = { ...ok, surgeryAt: now - 300 * day, phaseStartedAt: now - 70 * day, checkins: [1, 2, 3].map(k => ({ at: now - k * day, during: 0, after: 0, nextMorning: 0 })),
     tests: [{ at: now, test: 'hop', side: 'L', value: 150 }, { at: now, test: 'hop', side: 'R', value: 128 }, { at: now, test: 'landingFPPA', L: 6, R: 8 }], psfs: [{ at: now, score: 9.3 }] };
   e = evaluatePhase(c, 3, rts, now);
   check('ACL return to sport: hop LSI 85% blocks (needs 90%)', !e.allMet && e.items.some(i => /90%/.test(i.label) && !i.met && i.detail === '85%'), e.items.map(i => `${i.met ? '✓' : '✗'} ${i.label} (${i.detail})`).join(' | '));
