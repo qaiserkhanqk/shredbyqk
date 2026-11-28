@@ -210,7 +210,10 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.click('#romSensor'); await p.click('#snGo');
   await p.evaluate(async () => {
     const g = 9.81, r = d => d * Math.PI / 180, wait = ms => new Promise(res => setTimeout(res, ms));
-    const emit = async (deg, ms, wobble = 0) => { const end = performance.now() + ms; let i = 0; while (performance.now() < end) { const d = deg + (wobble ? Math.sin(i++) * wobble : 0); window.dispatchEvent(new DeviceMotionEvent('devicemotion', { accelerationIncludingGravity: { x: 0, y: g * Math.cos(r(d)), z: g * Math.sin(r(d)) } })); await wait(16); } };
+    // 2026-11-28: desktop WebKit refuses to construct a DeviceMotionEvent ("Illegal constructor"), which stopped the
+    // whole WebKit run here. There the same readings go on a plain "devicemotion" event; phones send the real event.
+    const motion = init => { try { return new DeviceMotionEvent('devicemotion', init); } catch { return Object.assign(new Event('devicemotion'), init); } };
+    const emit = async (deg, ms, wobble = 0) => { const end = performance.now() + ms; let i = 0; while (performance.now() < end) { const d = deg + (wobble ? Math.sin(i++) * wobble : 0); window.dispatchEvent(motion({ accelerationIncludingGravity: { x: 0, y: g * Math.cos(r(d)), z: g * Math.sin(r(d)) } })); await wait(16); } };
     for (let t = 0; t < 3; t++) { await emit(90, 2300); await emit(30, 400, 40); await emit(-30 - t, 2300); await emit(30, 400, 40); }
   });
   await p.waitForTimeout(400);

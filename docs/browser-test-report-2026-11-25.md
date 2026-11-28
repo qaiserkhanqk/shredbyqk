@@ -170,3 +170,14 @@ Chromium: `npm test` 2,324 and `npm run test:e2e` 636, 0 failures; `npm run rese
 Main app test (`tests/e2e.cjs`): **WebKit 263 ok, 0 failures; Firefox 262 ok, 0 failures, two runs in a row.**
 
 Still not tested: real iPhone, Android or Mac Safari.
+
+## Re-run on the merge with main 09b5655 (2026-11-28): main already holds the cycle branch
+`main` combined this branch on 2026-11-28 (40dbef2). After merging `main` back in: Chromium `npm test` 2,559,
+`npm run test:e2e` 670, `npm run research:test` 510 and `npm run research:e2e` 65, all 0 failures. Main app test
+(`tests/e2e.cjs`): Chromium 296, **Firefox 295 and WebKit 295, all 0 failures**.
+
+On `main`, the WebKit run stopped part-way at the new rehab sensor check: desktop WebKit refuses to construct a
+`DeviceMotionEvent` in the test ("Illegal constructor"). The test now puts the same readings on a plain `devicemotion`
+event there; phones send the real event, and the app code is unchanged.
+
+Still not tested: real iPhone, Android or Mac Safari.
