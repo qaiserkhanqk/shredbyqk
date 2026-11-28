@@ -512,7 +512,7 @@ async function startLive({ mode, source, file, auto = false }) {
   engine = null; fb = null; smooth.reset(); motion.reset(); fx.reset(); hud.reset(); comp = null; recorder = null; $('#trackChip').innerHTML = '<i></i>Finding you…'; $('#trackChip').classList.remove('on'); $('#faultBanner').hidden = true;
   $('#formMeters').hidden = mode !== 'form'; $('#gaitMeters').hidden = mode === 'form';
   $('#repBig').hidden = mode !== 'form'; $('#trackChip').hidden = mode !== 'form'; $('#cueHint').hidden = mode !== 'form';
-  $('#repNum').textContent = '0'; $('#repLbl').textContent = ex?.hold ? 'seconds' : 'reps'; $('#dots').innerHTML = ''; $('#cleanCt').textContent = '0 clean'; $('#vlKnob').style.left = '0%'; $('#vlTxt').textContent = 'fresh';
+  $('#repNum').textContent = '0'; $('#repLbl').textContent = ex?.hold ? 'seconds' : 'reps'; $('#dots').innerHTML = ''; $('#repLine').textContent = ''; $('#repLine').className = 'rep-line'; $('#cleanCt').textContent = '0 clean'; $('#vlKnob').style.left = '0%'; $('#vlTxt').textContent = 'fresh';
   $('#gSteps').textContent = '0'; $('#gProg').style.width = '0'; $('#gStepsLbl').textContent = mode === 'gait' ? 'Steps seen' : 'Time';
   const testName = { rom: TEST.rom?.label || 'Measurement', gait: `Gait · ${gaitMode === 'run' ? 'running' : 'walking'}`, jump: 'Jump test', sls: 'Single-leg squat knee test', land: 'Landing test', bowl: 'Bowling action check', bodymap: 'Map my body' };
   $('#detectChip').hidden = !auto; $('#detectChip').classList.remove('found'); $('#detectAlt').hidden = true; $('#detectChange').hidden = true;
@@ -809,7 +809,7 @@ function adoptExercise(res, t, replay) {
   live.held = 0; live.goodHeld = 0; live.lastT = null; live.lastSec = null; live.wrong = 0;
   const ex = curEx();
   $('#liveEyebrow').textContent = ex.name; $('#liveTitle').textContent = `Set ${setsToday(exKey) + 1}`;
-  $('#repLbl').textContent = ex.hold ? 'seconds' : 'reps'; $('#repNum').textContent = '0'; $('#dots').innerHTML = ''; $('#cleanCt').textContent = '0 clean';
+  $('#repLbl').textContent = ex.hold ? 'seconds' : 'reps'; $('#repNum').textContent = '0'; $('#dots').innerHTML = ''; $('#repLine').textContent = ''; $('#repLine').className = 'rep-line'; $('#cleanCt').textContent = '0 clean';
   $('#detectChip').classList.add('found'); $('#detectTxt').textContent = `${res.label} ✓`; $('#faultBanner').hidden = true; live.badUntil = 0;
   $('#detectAlt').hidden = !res.alt; if (res.alt) $('#detectAlt').textContent = `Or ${res.alt.label.toLowerCase()}?`;
   $('#detectChange').hidden = false;
