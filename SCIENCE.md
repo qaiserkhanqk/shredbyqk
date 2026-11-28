@@ -707,3 +707,26 @@ That proves the maths. **Real-world accuracy must be measured** on 10–20 athle
 **Privacy:** videos are read on the device and never uploaded. History keeps only the summary (athlete, movement, key numbers, flags), never video or frames. CSV export gives every frame's 3D points and measurements, for physios or other software.
 
 **Not 3D:** four videos from four angles recorded at different times are four 2D views of four different reps. 3D needs the same moment from at least two cameras.
+
+### Four cameras and the squad (`js/lab3d.js` reconstructMulti/syncAll, `js/squad.js`, `js/coach-squad.js`)
+
+**Four cameras: side-right, front, side-left, back.** Every point is a weighted average across cameras:
+- each camera's visibility for that point
+- a side camera counts its own side's limbs fully and the far-side (partly hidden) limbs at 0.35
+- depth comes from the side cameras, left/right from the front and back cameras, and height from all of them
+
+Each camera's scale is matched to the first side camera's vertical. Each camera is synced to the first by clap (when every video has one) or by the movement.
+
+Tested on the synthetic athlete with far-side limbs hidden (±45 px noise, visibility 0.35) and the cameras started 0, 0.5, 1.2 and 0.8 s apart:
+- sync found exactly for all four
+- left-knee error fell from **5.9° with two cameras to 1.3° with four**
+- three cameras also beat two
+- two side cameras alone are refused, because without a front or back view there is no left/right
+
+**Squad dashboard (coach.html):**
+- **Athletes:** belong to the coach (`athletes` table) and don't need an app account.
+- **Saving tests:** run the 3D Lab in the app on a laptop signed in as the coach, pick the athlete under "Squad athlete", and the summary saves to `lab_tests`. Only that coach can see or write them (privacy-tested).
+- **Roster:** by team and position, flagged athletes first.
+- **Per athlete:** each measurement over time.
+- **Squad comparison:** each athlete's latest value, the squad mean ± SD, change since their first test, and anyone more than 1.5 SD from the squad (with 4+ athletes) marked "look": a reason to look closer, never a verdict.
+- **CSV:** one row per test, every measurement, for physios and sports scientists.

@@ -100,3 +100,11 @@ reply, or **Read replies aloud**, speaks it in Muhammad's voice: the server's `/
 Cost (approximate Gemini list prices; check your plan): a reply uses about 1,500 tokens in and 100 out on Flash-Lite, roughly
 $0.0003, so 10,000 messages a month is about $3. A spoken reply (about 15 seconds of audio) is roughly $0.005, so
 2,000 played replies is about $10; the same reply played twice is cached.
+
+## 8. Squad · Biomechanics Lab (re-run the schema)
+Re-run `supabase/schema.sql`. It adds the `athletes` and `lab_tests` tables, which only you can read or write.
+
+1. On the dashboard, open **Squad → Add an athlete** for each player (name, team, position, height).
+2. On a laptop, open the app and sign in with your coach email (Today → Profile → Your coach → sign in; don't enter an invite code).
+3. Open Tools → **3D Lab** and pick the player under **Squad athlete**.
+4. Load the 2–4 videos and press Analyse. The results appear on the dashboard under Squad.

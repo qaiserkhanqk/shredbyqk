@@ -90,6 +90,22 @@
         </details>
       </section>
     </div>
+    <section class="card stack cd-squad" id="cdSquad">
+      <div class="card-head" style="margin:0"><div><span class="eyebrow">QK Athlete Biomechanics Lab</span><h2 class="display h2">Squad</h2></div><span class="muted small" id="sqCount"></span></div>
+      <div class="cd-tools"><select id="sqTeam" aria-label="Team"></select><button type="button" class="ghost" id="sqCsv">Export squad data (CSV)</button></div>
+      <div class="cd-grid">
+        <div class="cd-list" id="sqList" role="list"></div>
+        <aside class="card cd-detail stack" id="sqDetail">
+        </aside>
+      </div>
+      <div class="cd-tools"><label class="field">Movement<select id="sqPreset"></select></label><label class="field">Measurement<select id="sqMetric"></select></label></div>
+      <details><summary><b>Add an athlete</b></summary>
+        <div class="grid2" style="margin-top:10px"><label class="field">Name<input id="sqName" maxlength="80"></label><label class="field">Team<input id="sqTeamIn" placeholder="U19, Senior, Football…"></label>
+          <label class="field">Position<input id="sqPos" placeholder="Fast bowler, Forward…"></label><label class="field">Height (cm)<input id="sqH" type="number" inputmode="numeric"></label></div>
+        <button type="button" class="cta" id="sqAdd" style="margin-top:8px">Add to squad</button>
+        <p class="muted small" style="margin:6px 0 0">Athletes don't need the app. Test them with the app's 3D Lab on a laptop signed in as you: pick them under "Squad athlete" and results save here.</p>
+      </details>
+    </section>
   </section>
 </main>
 <div class="toast" id="toast" hidden></div>
