@@ -256,7 +256,9 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('reaction wall: counts hits', /5 hits/.test(await p.textContent('#bkEnd')));
   await p.click('#bkFin');
   await tap('[data-brain=track]'); await p.click('#tkGo'); await p.waitForSelector('#tkBox.pick', { timeout: 10000 });
-  for (const i of [0, 1, 2]) await p.click(`.tk-b[data-b="${i}"]`, { force: true });
+  // Balls can end up overlapping (they don't collide), so a coordinate click may hit the wrong one.
+  // Dispatch the click on each target element directly; trackSetup makes the first TRACK.targets balls the targets.
+  for (const i of [0, 1, 2]) await p.$eval(`.tk-b[data-b="${i}"]`, el => el.click());
   await p.waitForSelector('#tkFin', { timeout: 8000 });
   check('tracker: picking the 3 followed balls gives a tracking level', /Tracking level \d+/.test(await p.textContent('#tkEnd')) && /1 of 1 rounds perfect/.test(await p.textContent('#tkEnd')));
   await p.click('#tkFin');
