@@ -59,6 +59,11 @@ export class Cloud {
   }
   opened() { return this.req('/rest/v1/events', { method: 'POST', body: { client_id: this.uid, kind: 'open' }, headers: { Prefer: 'return=minimal' } }); }
   unread() { return this.req(`/rest/v1/messages?client_id=eq.${this.uid}&read_at=is.null&order=created_at.asc&select=id,kind,title,body,created_at`); }
+  /* ---- coach: squad and 3D Lab tests ---- */
+  athletes() { return this.req(`/rest/v1/athletes?coach_id=eq.${this.uid}&select=*&order=name.asc`); }
+  addAthlete(a) { return this.req('/rest/v1/athletes', { method: 'POST', body: { coach_id: this.uid, ...a }, headers: { Prefer: 'return=representation' } }).then(r => r?.[0]); }
+  labTests() { return this.req(`/rest/v1/lab_tests?coach_id=eq.${this.uid}&select=*&order=at.asc&limit=5000`); }
+  saveLabTest(athleteId, summary) { return this.req('/rest/v1/lab_tests', { method: 'POST', body: { coach_id: this.uid, athlete_id: athleteId, at: new Date(summary.at || Date.now()).toISOString(), preset: summary.preset, cameras: summary.cameras || 2, summary }, headers: { Prefer: 'return=minimal' } }); }
   /** Leaderboard: this week's (or, with months = 1, this month's) top 50 plus my own row. */
   leaderboard(week, months = 0) { return this.req('/rest/v1/rpc/leaderboard', { method: 'POST', body: { wk: week, months } }); }
   prizes() { return this.req('/rest/v1/rpc/my_prizes', { method: 'POST', body: {} }); }

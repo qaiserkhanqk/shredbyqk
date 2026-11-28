@@ -83,8 +83,8 @@ initBoard({ S, persist: () => persist(), toast: m => toast(m), cloud: () => clou
 initDone({ S, persist: () => persist(), toast: m => toast(m), say: (t, o) => say(t, o), lib: LIB, unit: () => unit(), toUnit: prog.toUnit,
   rewardsLine: () => { const p = rewards.progress(rewards.lifetimeClean(S.sessions, isHoldId)); return p.next ? `${p.left} clean reps to ${p.next.name}` : null; } });
 initReport({ S, persist: () => persist(), lib: LIB, say: (t, o) => say(t, o) });
-initLab({ S, persist: () => persist(), toast: m => toast(m), say: (t, o) => say(t, o) });
-$('#labDemo').onclick = async () => { const { demoVideos } = await import('./lab-demo.js'); const d = demoVideos(); if (!$('#labName').value) $('#labName').value = 'Demo athlete'; window.__qkLab.analyse(d.side, d.front); };
+initLab({ S, persist: () => persist(), toast: m => toast(m), say: (t, o) => say(t, o), cloud: () => cloud });
+$('#labDemo').onclick = async () => { const { demoVideos4 } = await import('./lab-demo.js'); if (!$('#labName').value) $('#labName').value = 'Demo athlete'; window.__qkLab.analyse(demoVideos4()); };
 setTimeout(() => { try { if (weeklyTick()) renderToday(); } catch (e) { console.warn('weekly report:', e); } }, 1200);
 initFood({ S, persist: () => persist(), toast: m => toast(m), rehab: () => !!S.rehab?.active });
 const recorder2 = new SessionRecorder();
