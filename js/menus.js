@@ -33,16 +33,16 @@ const R = { style: 'restaurant', styleKnown: true }, S = { style: 'shaadi', styl
 // values yet; the Punjab Food Authority asked them to in 2023). Each says where it's from. Gathered from
 // the chains' nutrition pages and PDFs in Nov 2026; re-check the URL before relying on one.
 const O = (kcal, protein, carbs, fat, source, url) => ({ kcal, protein, carbs, fat, source, url });
-const MCD_SG = 'McDonald\'s Singapore', KFC_UK = 'KFC UK (Mar 2025)';
+const MCD_SG = 'McDonald\'s Singapore', KFC_UK = 'KFC UK (Nov 2026)';
 export const PLACES = [
   // International chains
   { id: 'kfc', name: 'KFC', type: 'Chain', items: [
-    I('Zinger Burger', 'zinger_burger', R, O(420, 25.8, 40.9, 17.6, KFC_UK, 'https://www.kfc.co.uk/nutrition-allergens')),
+    I('Zinger Burger', 'zinger_burger', R, O(468, 23, 43, 22, KFC_UK, 'https://www.kfc.co.uk/nutrition-allergens')),
     I('Mighty Zinger', 'mighty_zinger', R), I('Krunch Burger', 'zinger_burger', { ...R, servings: 0.8 }),
     I('Hot & Crispy chicken (1 piece)', 'fried_chicken', R),
-    I('Hot Wings (6)', 'wings', R, O(540, 29.4, 22.2, 37.2, KFC_UK + ', 6 × 90 kcal', 'https://www.kfc.co.uk/nutrition-allergens')),
-    I('Popcorn chicken (regular)', 'nuggets', R, O(285, 17.6, 17.6, 16.2, KFC_UK, 'https://www.kfc.co.uk/nutrition-allergens')),
-    I('Nuggets (6)', 'nuggets', R), I('Fries (regular)', 'fries', R, O(245, 3.7, 38.1, 9.2, KFC_UK, 'https://www.kfc.co.uk/nutrition-allergens')),
+    I('Hot Wings (6)', 'wings', R, O(546, 29.4, 22.8, 37.2, KFC_UK + ', 6 × 91 kcal', 'https://www.kfc.co.uk/nutrition-allergens')),
+    I('Popcorn chicken (regular)', 'nuggets', R, O(307, 18, 18, 18, KFC_UK, 'https://www.kfc.co.uk/nutrition-allergens')),
+    I('Nuggets (6)', 'nuggets', R), I('Fries (regular)', 'fries', R, O(261, 3.1, 38, 9.8, KFC_UK, 'https://www.kfc.co.uk/nutrition-allergens')),
     I('Fries (large)', 'fries', { ...R, servings: 1.5 }), I('Twister / wrap', 'shawarma', R), I('Soft drink (regular)', 'cola', { servings: 1.1 }) ] },
   { id: 'mcdonalds', name: "McDonald's", type: 'Chain', items: [
     I('Big Mac', 'beef_burger', R, O(558, 28, 48, 28, MCD_SG, 'https://www.mcdonalds.com.sg/food-menu/big-mac')),
