@@ -62,5 +62,12 @@ check('graph: 3 months shows only recent ones', m3.pts.length < 10 && m3.pts.len
 check('graph: change and since-start are reported', m3.change < 0 && all.sinceStart === -15.6, `${m3.change} ${all.sinceStart}`);
 check('calendar reminder repeats every two weeks', /RRULE:FREQ=WEEKLY;INTERVAL=2/.test(weighInIcs(NOW)));
 
+{ // Ramadan: no cut, and the dip isn't progress.
+  const now = Date.parse('2026-03-10T08:00:00Z'), D = 864e5;
+  const weights = [16, 12, 8, 4, 0].map(d => ({ at: now - d * D, kg: 80 + d * 0.08 }));
+  const r = evaluate({ weights, goal: 'lose', target: { kcal: 2000, floor: 1500 }, adapt: {}, avgSteps: 7000, now, ramadan: true });
+  check('Ramadan check-in: no calorie change offered', r.kind === 'ramadan' && r.choices.every(c => !c.delta), JSON.stringify(r));
+  check('Ramadan check-in says the drop mostly comes back', /comes back after Eid/.test(r.message));
+}
 console.log(fails ? `\n${fails} failed` : '\nall check-in checks pass');
 process.exit(fails ? 1 : 0);

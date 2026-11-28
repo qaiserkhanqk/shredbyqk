@@ -7,7 +7,7 @@
 //  - Add a place: clients add their own dhaba or cart; each item is tied to a dish model.
 //  - Water taps, weigh-ins, and QK's weekly report (js/weekly.js).
 import * as N from './nutrition.js';
-import { recognise, PHOTO_CONFIG, needsShareCheck } from './foodphoto.js';
+import { recognise, PHOTO_CONFIG, needsShareCheck, readMenuKcal } from './foodphoto.js';
 import { searchPlaces, allPlaces, itemNutrition, suggestDish } from './menus.js';
 import { weekReport, reportText, waterGoal, dayKey } from './weekly.js';
 import { parseMeal, looksLikeMeal, bestTranscript } from './foodtext.js';
@@ -20,11 +20,14 @@ import { t as tr, setLang, getLang, translate } from './food-ur.js';
 import { readSignals, engagement, cycle, notifyLevel } from './signals.js';
 import { allWeights, checkinDue, daysToCheckin, evaluate, applyChoice, weighInIcs, weightSeries, RANGES, stepGoal } from './adapt.js';
 import { makePlan, planGap, DIETS, AVOID, LIKES, LIKE_LABELS, DEFAULT_ANSWERS } from './dietplan.js';
+import { usualMeals, copyOf, saveMeal, findSaved, sharedCount, splitShared, isShared, extrasFor, proteinNudge, fibreTarget, mealFor, timeFor, MEALS, RAMADAN_MEALS, labelOf, EXTRAS, PROTEIN_IDEAS } from './foodquick.js';
+import { ramadanOn } from './personal.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const r0 = v => Math.round(v), fmt = v => r0(v).toLocaleString('en');
 const uid = () => Math.random().toString(36).slice(2, 10);
+const dayKeyOf = t => { const x = new Date(t); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
 
 let ctx; // { S, persist, toast, rehab: () => bool }
 let cur = null; // the sheet: { mode: 'food'|'place', ref, opts, name, official, onSave, saveLabel }
@@ -33,6 +36,15 @@ let mealPending = null, aiExtra = null, pendingPhoto = null; // parsed sentence 
 let wRange = '3m', decision = null; // weight chart range; the check-in being answered
 let planDraft = null; // questionnaire answers being edited, or null when the plan is showing
 let snap = null; // the last photo added: { dataUrl, ids, unsure, unknown, setting }
+let viewDays = 0; // 0 = today, 1 = yesterday… (log and copy earlier days)
+const DAYMS = 864e5;
+const ramadan = () => ramadanOn(ctx.S.profile);
+const nowMeal = () => mealFor(Date.now(), ramadan());
+const mealList = () => ramadan() ? RAMADAN_MEALS : MEALS;
+const viewT = () => Date.now() - viewDays * DAYMS; // a moment on the day being looked at
+const dayName = d => d === 0 ? 'Today' : d === 1 ? 'Yesterday' : new Date(Date.now() - d * DAYMS).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+// Fibre per entry (older entries didn't store it).
+const fibreOf = e => e.fibre ?? (e.fibre = N.lookup(e.ref) ? (N.estimate(e.ref, e.opts || {}).fibre || 0) : 0);
 
 const F = () => {
   const f = (ctx.S.food ||= { log: [], prefs: {}, style: 'home' });
@@ -50,6 +62,8 @@ export function initFood(c) {
     const m = e.target.closest('[data-menu]');
     if (m) { const [pid, i] = m.dataset.menu.split('|'); const place = allPlaces(F().places).find(p => p.id === pid); return openMenuItem(place, place.items[+i]); }
     const b = e.target.closest('[data-ref]'); if (b) return openSheet(JSON.parse(b.dataset.ref));
+    const sv = e.target.closest('[data-saved]');
+    if (sv) { const m = (F().meals || []).find(x => x.id === sv.dataset.saved); if (m) { logItems(m.items, 'saved'); $('#foodSearch').value = ''; renderResults(); ctx.toast(`${m.name} added`); } return; }
     if (e.target.closest('#addPlaceBtn')) openPlaceSheet($('#foodSearch').value);
     if (e.target.closest('#mealAskAI')) {
       const q = $('#foodSearch').value, left = parseMeal(q).unknown.join(', ');
@@ -71,7 +85,20 @@ export function initFood(c) {
   // From Today: switch to Food and open the camera in the same tap (browsers need the tap for the file picker).
   const sm = $('#snapMeal'); if (sm) sm.onclick = () => { $('.tabs [data-tab=food]').click(); snapIt(); };
   $('#foodPhoto').onchange = e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) runPhoto(f); };
+  $('#foodQuick').onclick = onQuickClick;
+  $('#foodDayNav').onclick = e => { const b = e.target.closest('[data-day]'); if (!b) return; viewDays = Math.max(0, Math.min(6, viewDays + +b.dataset.day)); renderFood(); };
+  $('#foodLog').onchange = e => {
+    const sh = e.target.closest('[data-sharemeal]');
+    if (sh) { shareMeal(sh.dataset.sharemeal, +sh.value); return; }
+    if (e.target.id === 'dayIncomplete') { const k = dayKeyOf(viewT()); (F().incomplete ||= {})[k] = e.target.checked; if (!e.target.checked) delete F().incomplete[k]; ctx.persist(); renderWeek(); ctx.toast(e.target.checked ? 'Got it: this day won\'t count in your averages' : 'This day counts again'); }
+  };
   $('#foodLog').onclick = e => {
+    const x = e.target.closest('[data-extra]');
+    if (x) { const [id, meal] = x.dataset.extra.split('|'), ex = EXTRA_BY_ID[id]; if (ex) { addEntry(ex.ref, { ...defaultOpts(ex.ref) }, 'extra', { meal, at: lastAtOf(meal) }); renderFood(); ctx.toast(`${N.DISH[ex.ref.id].name} added`); } return; }
+    const sm = e.target.closest('[data-savemeal]');
+    if (sm) { const its = dayItems().filter(i => i.meal === sm.dataset.savemeal); const name = typeof prompt === 'function' ? prompt('Name this meal (e.g. Ammi\'s daal chawal)', labelOf(its)) : labelOf(its); if (name === null) return; const m = saveMeal(name, its); if (m) { (F().meals ||= []).unshift(m); F().meals = F().meals.slice(0, 40); ctx.persist(); renderFood(); ctx.toast(`Saved. Search “${m.name}” or tap it on Food.`); } return; }
+    const cp = e.target.closest('[data-copy]');
+    if (cp) { const meal = cp.dataset.copy || null, its = copyOf(F().log, viewDays, meal || null, Date.now()); const back = viewDays; viewDays = 0; logItems(its, 'copy', !meal); renderFood(); ctx.toast(meal ? `${meal} copied to today` : `${dayName(back)} copied to today`); return; }
     const del = e.target.closest('[data-del]');
     if (del) return removeEntries([del.dataset.del]);
     const ed = e.target.closest('[data-edit]'); if (ed) editEntry(ed.dataset.edit);
@@ -81,6 +108,8 @@ export function initFood(c) {
   if (canSyncSteps()) syncSteps(F().steps).then(n => { if (n) { ctx.persist(); renderFood(); } }).catch(() => {});
   $('#foodToday').onclick = e => {
     if (e.target.closest('#stepsSync')) { syncSteps(F().steps).then(() => { ctx.persist(); renderFood(); }).catch(() => ctx.toast('Allow Shred to read steps in your health app')); return; }
+    const pi = e.target.closest('[data-pidea]');
+    if (pi) { const i = PROTEIN_BY_ID[pi.dataset.pidea]; if (i) { addEntry(i.ref, { ...defaultOpts(i.ref), ...i.opts }, 'idea'); renderFood(); ctx.toast(`${i.label} added`); } return; }
     const w = e.target.closest('[data-water]');
     if (w) { const k = dayKey(Date.now()), W = F().water; W[k] = Math.max(0, (W[k] || 0) + +w.dataset.water); ctx.persist(); renderFood(); }
   };
@@ -89,12 +118,29 @@ export function initFood(c) {
   setInterval(checkinNotice, 30 * 60e3); document.addEventListener('visibilitychange', () => { if (!document.hidden) checkinNotice(); });
   $('#calInfo').onclick = e => { if (e.target.closest('#calExport')) download('shred-food-accuracy.csv', studyCSV(F().log), 'text/csv'); };
   loadSaved();
+  // Opened from the "Log a meal" shortcut (the camera needs a tap) or with a photo shared from the gallery.
+  const fq = new URLSearchParams(location.search).get('food');
+  if (fq === 'snap') setTimeout(() => { const b = $('#foodPhotoBtn'); b?.classList.add('pulse-once'); b?.focus(); }, 300);
+  if (fq === 'shared') openShared();
   setLang(F().lang); applyLang();
   $('#foodLang').onclick = () => { F().lang = getLang() === 'ur' ? 'en' : 'ur'; setLang(F().lang); ctx.persist(); applyLang(); renderFood(); };
   $('#foodVoice').onclick = startVoice;
   $('#foodScan').onclick = openScanSheet;
   $('#foodSheet').onclick = e => { if (e.target.id === 'foodSheet') closeSheet(); };
   $('#foodSheetBody').onclick = onSheetClick;
+  $('#foodSheetBody').addEventListener('change', async e => {
+    if (e.target.id !== 'fsMenuPhoto' || !cur?.menuKey) return;
+    const f = e.target.files?.[0]; e.target.value = ''; if (!f) return;
+    const btn = $('#fsMenuSnap'); if (btn) btn.textContent = 'Reading…';
+    try {
+      const r = await readMenuKcal(f, cur.itemName || cur.name || '');
+      if (!cur?.menuKey) return;
+      if (!r.kcal) { ctx.toast('No calories found for this item on the photo. Type the number instead.'); if (btn) btn.textContent = '📷 Snap menu'; return; }
+      $('#fsMenuKcal').value = r.kcal; $('#fsMenuKcal').dispatchEvent(new Event('input', { bubbles: true }));
+      ctx.toast(`Read ${r.kcal} kcal for ${r.name}. Check it matches the menu.`);
+    } catch { ctx.toast('Couldn\'t read the menu. Type the number instead.'); }
+    if ($('#fsMenuSnap')) $('#fsMenuSnap').textContent = '📷 Snap menu';
+  });
   $('#foodSheetBody').oninput = e => {
     if (e.target.id === 'fsGrams') { cur.opts.grams = Math.max(1, +e.target.value || 0); renderSheetResult(); }
     if (e.target.id === 'fsWeighed') { const g = +e.target.value; cur.weighedG = g > 0 ? g : null; if (g > 0) cur.opts.grams = g; else delete cur.opts.grams; renderSheetResult(); }
@@ -117,7 +163,8 @@ export function initFood(c) {
 
 /* ---------- Today ---------- */
 export function renderFood() {
-  const p = ctx.S.profile, t = N.targets(p), d = N.dayTotals(F().log);
+  const p = ctx.S.profile, t = N.targets(p), d = N.dayTotals(F().log, viewT()), today = viewDays === 0;
+  const fibre = d.items.reduce((a, e) => a + fibreOf(e), 0), pn = today && t ? proteinNudge(t.protein - d.protein, Date.now(), F().noIdeas || []) : null;
   const bar = (label, v, goal, unit) => {
     const pct = goal ? Math.min(100, v / goal * 100) : 0;
     return `<div class="mbar"><div class="row"><span>${label}</span><span class="data">${fmt(v)}${goal ? ` / ${fmt(goal)}` : ''} ${unit}</span></div><i><b style="width:${pct}%"></b></i></div>`;
@@ -127,19 +174,21 @@ export function renderFood() {
   const glasses = F().water[dayKey(Date.now())] || 0, wGoal = waterGoal(+p.weightKg, trainedToday);
   $('#foodToday').innerHTML = `
     <div class="food-sum">
-      <div><span class="eyebrow">${tr('Eaten today')}</span><div class="kbig num">${fmt(d.kcal)}<small> kcal</small></div>
+      <div><span class="eyebrow">${today ? tr('Eaten today') : `Eaten · ${esc(dayName(viewDays))}`}</span><div class="kbig num">${fmt(d.kcal)}<small> kcal</small></div>
         ${d.items.length ? `<p class="muted small" style="margin:2px 0 0">${tr('Likely')} <span class="data">${fmt(d.low)}–${fmt(d.high)}</span> kcal</p>` : ''}</div>
       ${t ? `<div class="left"><span class="eyebrow">${tr(left >= 0 ? 'Left' : 'Over')}</span><div class="num ${left >= 0 ? '' : 'over'}">${fmt(Math.abs(left))}</div><span class="muted small data">/ ${fmt(t.kcal)}</span></div>` : ''}
     </div>
     ${t ? bar(tr('Calories'), d.kcal, t.kcal, 'kcal') : ''}
     ${bar(tr('Protein'), d.protein, t?.protein, 'g')}
+    ${pn ? `<div class="pnudge"><span class="small"><b>${tr('Protein left')} ${pn.left} g.</b> ${tr('One tap:')}</span><div class="chips-scroll">${pn.ideas.map(i => `<button type="button" class="mchip" data-pidea="${i.id}">${esc(i.label)} · ${i.protein} g</button>`).join('')}</div></div>` : ''}
     <div class="grid2">${bar(tr('Carbs'), d.carbs, t?.carbs, 'g')}${bar(tr('Fat'), d.fat, t?.fat, 'g')}</div>
-    <div class="water"><div><span class="eyebrow">${tr('Water')}</span><div class="glasses" aria-label="${glasses} of ${wGoal} glasses">${Array.from({ length: Math.max(wGoal, glasses) }, (_, i) => `<i class="${i < glasses ? 'on' : ''}"></i>`).join('')}</div>
+    ${bar(tr('Fibre'), fibre, t ? fibreTarget(t.kcal) : fibreTarget(2000), 'g')}
+    ${today ? `<div class="water"><div><span class="eyebrow">${tr('Water')}</span><div class="glasses" aria-label="${glasses} of ${wGoal} glasses">${Array.from({ length: Math.max(wGoal, glasses) }, (_, i) => `<i class="${i < glasses ? 'on' : ''}"></i>`).join('')}</div>
       <span class="muted small"><span class="data">${glasses} / ${wGoal}</span> ${tr('glasses')}${trainedToday ? ` (${tr('training day')})` : ''}</span></div>
       <div class="water-btns"><button type="button" class="iconbtn" data-water="-1" aria-label="Remove a glass">−</button><button type="button" class="iconbtn plus" data-water="1" aria-label="Add a glass of water">+</button></div></div>
     <div class="water steps"><div><span class="eyebrow">${tr('Steps today')}</span><span class="muted small">${tr(canSyncSteps() ? 'From your phone’s health app' : 'From your phone’s health app or watch')}</span></div>
       ${canSyncSteps() ? `<div class="water-btns"><b class="num">${fmt(F().steps[dayKey(Date.now())] || 0)}</b><button type="button" class="ghost" id="stepsSync">Sync</button></div>`
-        : `<input id="stepsToday" type="number" inputmode="numeric" placeholder="e.g. 6500" value="${F().steps[dayKey(Date.now())] || ''}" aria-label="Steps today">`}</div>
+        : `<input id="stepsToday" type="number" inputmode="numeric" placeholder="e.g. 6500" value="${F().steps[dayKey(Date.now())] || ''}" aria-label="Steps today">`}</div>` : ''}
     ${t ? '' : '<p class="muted small" style="margin:0">Add your weight and age under <b>Your targets</b> to see how much to eat.</p>'}
     ${welcomeBack()}`;
   const cal = factors(F().log), sum = studySummary(F().log);
@@ -150,13 +199,25 @@ export function renderFood() {
 
   const L = d.items.slice().sort((a, b) => a.at - b.at);
   const meals = [...new Set(L.map(e => e.meal))];
-  $('#foodLog').innerHTML = L.length ? meals.map(m => {
+  $('#foodDayTitle').textContent = today ? tr('Today’s food') : `${dayName(viewDays)}’s food`;
+  $('#foodDayNav').innerHTML = `<button type="button" class="iconbtn" data-day="1" ${viewDays >= 6 ? 'disabled' : ''} aria-label="Day before">‹</button><button type="button" class="iconbtn" data-day="-1" ${today ? 'disabled' : ''} aria-label="Next day">›</button>`;
+  // "Anything else?" after the meal just logged (today, within 3 hours): what photos and memory miss most.
+  const lastMeal = today && L.length && Date.now() - L[L.length - 1].at < 3 * 3600e3 ? L[L.length - 1].meal : null;
+  $('#foodLog').innerHTML = (L.length ? meals.map(m => {
     const its = L.filter(e => e.meal === m), k = its.reduce((s, e) => s + e.kcal, 0);
-    return `<div class="meal-head"><span class="eyebrow">${tr(m)}</span><span class="data small">${fmt(k)} kcal</span></div>` + its.map(e => `
+    const shared = its.filter(e => isShared(e.ref)), by = shared[0]?.opts?.sharedBy || 1;
+    const tools = `<div class="meal-tools">${shared.length ? `<label class="small">Shared? <select data-sharemeal="${esc(m)}" aria-label="How many people shared the ${esc(m.toLowerCase())}">${[1, 2, 3, 4, 5, 6, 8].map(n => `<option value="${n}" ${n === by ? 'selected' : ''}>${n === 1 ? 'Just me' : n + ' people'}</option>`).join('')}</select></label>` : ''}
+      <button type="button" class="linkbtn" data-savemeal="${esc(m)}">Save meal</button>${today ? '' : `<button type="button" class="linkbtn" data-copy="${esc(m)}">Copy to today</button>`}</div>`;
+    const extras = m === lastMeal ? extrasFor(its, m) : [];
+    return `<div class="meal-head"><span class="eyebrow">${tr(m)}</span><span class="data small">${fmt(k)} kcal</span></div>${tools}` + its.map(e => `
       <div class="row"><button type="button" class="food-hit" data-edit="${e.id}" aria-label="Change ${esc(e.name)}"><div><b>${esc(e.name)}</b><div class="muted small">${e.source === 'photo' ? '<span class="ftag">Photo</span> ' : ''}${esc(e.label)} · P ${r0(e.protein)} · C ${r0(e.carbs)} · F ${r0(e.fat)} g</div></div>
         <span class="r data">${fmt(e.kcal)}</span></button>
-        <button type="button" class="linkbtn del" data-del="${e.id}" aria-label="Remove ${esc(e.name)}">✕</button></div>`).join('');
-  }).join('') : '<p class="muted small" style="margin:0">Nothing logged yet. Snap your meal, or search a dish or a place.</p>';
+        <button type="button" class="linkbtn del" data-del="${e.id}" aria-label="Remove ${esc(e.name)}">✕</button></div>`).join('')
+      + (extras.length ? `<div class="extras"><span class="small muted">${tr('Anything else?')}</span><div class="chips-scroll">${extras.map(x => `<button type="button" class="mchip" data-extra="${x.id}|${esc(m)}">${esc(tr(x.label))}</button>`).join('')}</div></div>` : '');
+  }).join('') : `<p class="muted small" style="margin:0">${today ? 'Nothing logged yet. Snap your meal, or search a dish or a place.' : `Nothing logged for ${esc(dayName(viewDays))}. Anything you add now goes on this day.`}</p>`)
+    + (!today ? `<div class="day-tools">${L.length ? '<button type="button" class="ghost" data-copy="">Copy this whole day to today</button>' : ''}
+      <label class="cc-toggle small"><input type="checkbox" id="dayIncomplete" ${F().incomplete?.[dayKeyOf(viewT())] ? 'checked' : ''}> I didn't log everything this day (leave it out of my averages)</label></div>` : '');
+  renderQuick();
   renderWeight();
   renderPlan();
   renderWeek();
@@ -174,11 +235,15 @@ function renderResults() {
     if (m.items.length) {
       const extra = aiExtra?.q === q ? aiExtra.items : [];
       if (extra.length) m.unknown = [];
-      mealPending = [...m.items, ...extra].map(it => ({ ...it, opts: { ...defaultOpts(it.ref), ...it.opts } }));
+      // "hum 4 the" / "shared with 3": the pot dishes are divided, rotis and kebabs stay theirs.
+      const people = sharedCount(q);
+      mealPending = splitShared([...m.items, ...extra].map(it => ({ ...it, opts: { ...defaultOpts(it.ref), ...it.opts } })), people);
+      mealPending.people = people;
       const kc = it => it.official ? it.official.kcal * (it.opts.servings || 1) / (it.official.base || 1) : N.estimate(it.ref, it.opts).kcal;
       const tot = mealPending.reduce((a, it) => a + kc(it), 0);
       mealCard = `<div class="meal-card"><span class="eyebrow">${tr('Log this meal')}</span>
         <div class="list">${mealPending.map(it => `<div class="row"><div><b>${esc(it.name)}</b><div class="muted small">${esc(N.serveLabel(N.DISH[it.ref.id], it.opts.servings))}</div></div><span class="r data">${fmt(kc(it))}</span></div>`).join('')}</div>
+        ${mealPending.people > 1 ? `<p class="muted small" style="margin:0">Shared by ${mealPending.people}: dishes from the pot are divided by ${mealPending.people}; rotis and pieces you counted are yours.</p>` : ''}
         ${m.unknown.length ? `<p class="muted small" style="margin:0">Didn’t catch: ${m.unknown.map(esc).join(', ')}${PHOTO_CONFIG.endpoint ? ` · <button type="button" class="linkbtn" id="mealAskAI">Ask QK’s AI</button>` : ''}</p>` : ''}
         <button type="button" class="cta" id="mealAddAll">${tr('Add all')} · ${fmt(tot)} kcal</button></div>`;
     }
@@ -203,7 +268,8 @@ function renderResults() {
     clearTimeout(fsTimer);
     fsTimer = setTimeout(() => searchFatSecret(PHOTO_CONFIG.searchEndpoint, q.trim()).then(list => { fsCache = { q, list }; if ($('#foodSearch').value === q) renderResults(); }).catch(() => {}), 450);
   }
-  box.innerHTML = mealCard + `${menuRows || foodRows || prodRows || fsRows ? `<div class="list">${prodRows}${menuRows}${foodRows}${fsRows}</div>` : `<p class="muted small" style="margin:0">No match for “${esc(q)}”. Try the Urdu or Hindi name, or the main ingredient.</p>`}
+  const savedRows = findSaved(F().meals, q).map(m => `<button type="button" class="row food-hit" data-saved="${esc(m.id)}"><div><b>${esc(m.name)}</b><div class="muted small"><span class="ftag place">Your saved meal</span> ${esc(labelOf(m.items))}</div></div><span class="r data">${fmt(m.kcal)} kcal</span></button>`).join('');
+  box.innerHTML = mealCard + `${savedRows || menuRows || foodRows || prodRows || fsRows ? `<div class="list">${savedRows}${prodRows}${menuRows}${foodRows}${fsRows}</div>` : `<p class="muted small" style="margin:0">No match for “${esc(q)}”. Try the Urdu or Hindi name, or the main ingredient.</p>`}
     <button type="button" class="ghost full add-place" id="addPlaceBtn">+ Add a place or menu item</button>`;
 }
 
@@ -258,9 +324,13 @@ function renderSheet() {
   }
   if (cur.weigh) html += `<label class="field">Weighed it? Plate contents in grams (optional)<input id="fsWeighed" type="number" inputmode="decimal" placeholder="e.g. 260" value="${cur.weighedG || ''}"></label>
     <p class="muted small fq-why" style="margin-top:-6px">Weigh a few photo meals and QK learns your portion sizes, so every photo after that is closer.</p>`;
-  if (cur.menuKey) html += `<label class="field">${tr('Menu shows calories?')} (optional)<input id="fsMenuKcal" type="number" inputmode="numeric" placeholder="e.g. 550" value="${cur.official?.fromMenu ? cur.official.kcal : ''}"></label>
+  if (cur.menuKey) html += `<div class="menu-kcal"><label class="field">${tr('Menu shows calories?')} (optional)<input id="fsMenuKcal" type="number" inputmode="numeric" placeholder="e.g. 550" value="${cur.official?.fromMenu ? cur.official.kcal : ''}"></label>${PHOTO_CONFIG.endpoint ? `<button type="button" class="ghost" id="fsMenuSnap" aria-label="Snap the menu to read the calories">📷 Snap menu</button><input type="file" accept="image/*" capture="environment" id="fsMenuPhoto" hidden>` : ''}</div>`;
+  if (cur.menuKey) html += `
     <p class="muted small fq-why" style="margin-top:-6px">In the UAE, chain menus must show calories. Type the number and QK uses it, for you now and next time. QK reviews it too.</p>`;
-  html += `<div id="fsResult"></div><button type="button" class="cta" id="fsSave">${esc(tr(cur.saveLabel || 'Add to ' + N.mealOf().toLowerCase()))}</button>`;
+  // Which meal (logging lunch at 7 pm, or yesterday's dinner): one tap, defaults to now.
+  cur.meal ||= nowMeal();
+  if (!cur.noMeal) html += `<div class="fq"><span class="eyebrow">${tr('Which meal?')}${viewDays ? ` · ${esc(dayName(viewDays))}` : ''}</span>${seg('meal', mealList().map(m => ({ id: m, label: m })), cur.meal)}</div>`;
+  html += `<div id="fsResult"></div><button type="button" class="cta" id="fsSave">${esc(tr(cur.saveLabel || 'Add to ' + cur.meal.toLowerCase()))}</button>`;
   $('#foodSheetBody').innerHTML = html;
   const top = $('#fsTop'); if (top) top.onchange = () => { cur.opts.topping = top.checked; renderSheetResult(); };
   const on = $('#foodSheetBody .fam .on'); if (on) on.parentElement.scrollLeft = on.offsetLeft - 16;
@@ -291,6 +361,7 @@ function renderSheetResult() {
 function onSheetClick(e) {
   if (cur?.mode === 'place') return onPlaceClick(e);
   if (cur?.mode === 'scan') return;
+  if (e.target.closest('#fsMenuSnap')) return $('#fsMenuPhoto')?.click();
   const st = e.target.closest('[data-step]');
   if (st) { const b = cur.opts.menuBase || 1, was = cur.opts.servings || 1; cur.opts.servings = Math.max(0.5 * b, Math.min(20 * b, was + +st.dataset.step * b)); if (cur.opts.grams) cur.opts.grams = Math.round(cur.opts.grams * cur.opts.servings / was); return renderSheetResult(); }
   const f = e.target.closest('[data-fam]');
@@ -301,7 +372,9 @@ function onSheetClick(e) {
   }
   const b = e.target.closest('.fseg [data-v]');
   if (b) {
-    const key = b.closest('.fseg').dataset.key; cur.opts[key] = b.dataset.v;
+    const key = b.closest('.fseg').dataset.key;
+    if (key === 'meal') { cur.meal = b.dataset.v; b.closest('.fseg').querySelectorAll('button').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }); const sv = $('#fsSave'); if (sv && !cur.saveLabel) sv.textContent = tr('Add to ' + cur.meal.toLowerCase()); return; }
+    cur.opts[key] = b.dataset.v;
     if (key === 'style') cur.opts.styleKnown = true;
     b.closest('.fseg').querySelectorAll('button').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); });
     return renderSheetResult();
@@ -316,7 +389,7 @@ function onSheetClick(e) {
       if (N.DISH[ref.id].topping) pr.topping = opts.topping;
     }
     if (cur.menuKey && cur.official?.fromMenu) (F().menuKcal ||= {})[cur.menuKey] = { kcal: cur.official.kcal, place: cur.placeName, item: cur.itemName, dish: ref.id, at: Date.now() };
-    const save = cur.onSave, extra = { name: cur.name, official: cur.official, weighedG: cur.weighedG };
+    const save = cur.onSave, extra = { name: cur.name, official: cur.official, weighedG: cur.weighedG, meal: cur.meal };
     if (save) save({ ...opts }, ref, extra); else { addEntry(ref, opts, cur.place ? 'place' : 'search', extra); ctx.toast('Added'); $('#foodSearch').value = ''; renderResults(); }
     ctx.persist(); closeSheet(); renderFood();
   }
@@ -328,10 +401,13 @@ function entryFrom(ref, opts, extra = {}) {
   if (extra.official) { const n = itemNutrition({ official: extra.official }), k = (opts.servings || 1) / (extra.official.base || 1); e = { kcal: n.kcal * k, protein: n.protein * k, carbs: n.carbs * k, fat: n.fat * k, low: n.low * k, high: n.high * k }; }
   const label = opts.menuBase ? `${N.fmtN((opts.servings || 1) / opts.menuBase)} ×` : ref.t === 'dish' ? N.serveLabel(hit.food, (opts.servings || 1)) + (opts.style && N.hasFatChoice(hit.food) && !extra.name ? ` · ${N.STYLES.find(s => s.id === opts.style).label.toLowerCase()}` : '')
     : ref.t === 'indb' ? `${N.fmtN(opts.servings || 1)} × ${hit.food[7] || 'serving'}` : ref.t === 'bc' && !opts.grams ? `${N.fmtN(opts.servings || 1)} × ${hit.food.servingLabel || hit.food.servingG + ' g'}` : `${r0(opts.grams)} g`;
-  return { ref, opts: { ...opts }, name: extra.name || hit.name, official: extra.official || undefined, label, kcal: e.kcal, protein: e.protein, carbs: e.carbs, fat: e.fat, low: e.low, high: e.high };
+  return { ref, opts: { ...opts }, name: extra.name || hit.name, official: extra.official || undefined, label, kcal: e.kcal, protein: e.protein, carbs: e.carbs, fat: e.fat, fibre: e.fibre || 0, low: e.low, high: e.high };
 }
 function addEntry(ref, opts, source, extra = {}) {
-  const e = { id: uid(), at: Date.now(), meal: N.mealOf(), source, ...entryFrom(ref, opts, extra), ...(extra.photo ? { photo: extra.photo } : {}) };
+  // The meal it belongs to and when: now, or the meal and day the client picked (logging later or for yesterday).
+  const meal = extra.meal || nowMeal();
+  const at = extra.at ?? (viewDays || meal !== nowMeal() ? timeFor(meal, viewDays, Date.now(), ramadan()) : Date.now());
+  const e = { id: uid(), at, meal, source, ...entryFrom(ref, opts, extra), ...(extra.photo ? { photo: extra.photo } : {}) };
   F().log.push(e);
   if (F().log.length > 3000) F().log.splice(0, F().log.length - 3000);
   ctx.persist();
@@ -345,10 +421,12 @@ function editEntry(id) {
   const weigh = it.source === 'photo' && it.ref.t === 'dish';
   openSheet(it.ref, it.opts, (o, ref, extra) => {
     if (ref.id !== it.ref.id) { delete it.photoG; delete it.weighedG; } // a different dish: the photo estimate no longer applies
-    Object.assign(it, entryFrom(ref, o, extra), { id: it.id, at: it.at, meal: it.meal });
+    const days = Math.round((new Date(dayKeyOf(Date.now())) - new Date(dayKeyOf(it.at))) / DAYMS);
+    const meal = extra.meal || it.meal, at = meal === it.meal ? it.at : timeFor(meal, days, Date.now(), ramadan());
+    Object.assign(it, entryFrom(ref, o, extra), { id: it.id, at, meal });
     if (weigh && ref.id === it.ref.id) { if (extra.weighedG) it.weighedG = extra.weighedG; else delete it.weighedG; }
     ctx.persist(); renderFood(); renderSnap();
-  }, 'Save', { name: custom, official: it.official, weigh, weighedG: it.weighedG });
+  }, 'Save', { name: custom, official: it.official, weigh, weighedG: it.weighedG, meal: it.meal });
 }
 function removeEntries(ids, quiet = false) {
   const L = F().log;
@@ -439,7 +517,10 @@ async function runPhoto(file, hint = null) {
       // Learned from this person's weighings: e.g. the camera reads their katori 20% small.
       const k = portionFactor(F().log, N.DISH[i.dish].kind), servings = Math.max(0.5, Math.round(i.servings * k * 2) / 2);
       const opts = { ...defaultOpts(ref), servings, meat: i.meat, oil: i.oil, style, styleKnown: !!pr.style, portionSd: k === 1 ? 0.3 : 0.2 };
-      const e = addEntry(ref, opts, 'photo', { photo: photoId });
+      // A photo picked from the gallery was taken earlier: log it when it was taken (today or yesterday).
+      const taken = file?.lastModified, ago = taken ? Date.now() - taken : 0;
+      const when = !viewDays && ago > 20 * 60e3 && ago < 36 * 3600e3 ? { at: taken, meal: mealFor(taken, ramadan()) } : {};
+      const e = addEntry(ref, opts, 'photo', { photo: photoId, ...when });
       e.photoServings = i.servings; e.photoG = N.estimate(ref, { ...opts, servings: i.servings }).grams; // the raw photo estimate, for calibration
       if (i.alternative && N.DISH[i.alternative]) e.alt = i.alternative;
       return e.id;
@@ -522,7 +603,7 @@ function showNoEndpoint() {
 function report() {
   const S = ctx.S, f = F();
   const weights = [...f.weights, ...(S.scans || []).filter(s => s.weight).map(s => ({ at: s.at, kg: +s.weight }))];
-  return weekReport({ log: f.log, water: f.water, steps: f.steps, weights, sessions: S.sessions || [], profile: S.profile, rehab: !!ctx.rehab?.() });
+  return weekReport({ log: f.log, water: f.water, steps: f.steps, weights, sessions: S.sessions || [], profile: S.profile, rehab: !!ctx.rehab?.(), incomplete: f.incomplete || {} });
 }
 function renderWeek() {
   const r = report(), el = $('#foodWeek');
@@ -681,7 +762,7 @@ const avgStepsNow = () => { const v = Object.entries(F().steps).filter(([k]) => 
 const adaptState = () => (F().adapt ||= {});
 function currentDecision() {
   const p = ctx.S.profile;
-  return evaluate({ weights: allWeights(ctx.S), goal: N.dietGoal(p), target: N.targets(p), adapt: adaptState(), avgSteps: avgStepsNow(), rehab: !!ctx.rehab?.(),
+  return evaluate({ weights: allWeights(ctx.S), goal: N.dietGoal(p), target: N.targets(p), adapt: adaptState(), avgSteps: avgStepsNow(), rehab: !!ctx.rehab?.(), ramadan: ramadan(),
     signals: readSignals(ctx.S), female: p.sex === 'female' && !!F().cycleOn });
 }
 function chartSVG(ser) {
@@ -780,4 +861,63 @@ function welcomeBack() {
   const e = engagement(ctx.S);
   if (e.daysSinceFood == null || e.daysSinceFood < 3 || N.dayTotals(F().log).items.length) return '';
   return `<p class="qk-line" style="margin:0"><span class="eyebrow">QK</span> Good to see you${ctx.S.profile.name ? ', ' + esc(ctx.S.profile.name.split(' ')[0]) : ''}. No catching up needed: just snap your next meal and we carry on from today.</p>`;
+}
+
+/* ---------- Fewer taps: your usual meals, saved meals, copy, extras ---------- */
+const EXTRA_BY_ID = Object.fromEntries(EXTRAS.map(x => [x.id, x])), PROTEIN_BY_ID = Object.fromEntries(PROTEIN_IDEAS.map(x => [x.id, x]));
+const dayItems = () => N.dayTotals(F().log, viewT()).items;
+const lastAtOf = meal => { const its = dayItems().filter(e => e.meal === meal); return its.length ? Math.max(...its.map(e => e.at)) + 1000 : undefined; };
+/** Log several items at once (a usual meal, a saved meal, yesterday's lunch). keepMeals: copy a day meal by meal. */
+function logItems(items, source, keepMeals = false) {
+  const meal = nowMeal();
+  for (const it of items) if (N.lookup(it.ref)) addEntry(it.ref, { ...it.opts }, source, { name: it.name !== N.lookup(it.ref)?.name ? it.name : null, official: it.official, meal: keepMeals ? it.meal : (viewDays ? it.meal || meal : meal) });
+  ctx.persist();
+}
+/** Everyone shared the pot: divide this meal's shared dishes (karahi, biryani, daal) by n; rotis stay theirs. */
+function shareMeal(meal, n) {
+  for (const e of dayItems().filter(x => x.meal === meal && isShared(x.ref))) {
+    const whole = e.opts.wholeServings || e.opts.servings || 1, o = { ...e.opts, wholeServings: whole, sharedBy: n, servings: Math.round(whole / n * 100) / 100 };
+    if (n === 1) { o.servings = whole; delete o.sharedBy; delete o.wholeServings; }
+    Object.assign(e, entryFrom(e.ref, o, { name: e.name !== N.lookup(e.ref)?.name ? e.name : null, official: e.official }), { id: e.id, at: e.at, meal: e.meal });
+  }
+  ctx.persist(); renderFood(); ctx.toast(n > 1 ? `Split ${n} ways: karahi, rice and daal divided; your rotis stay yours` : 'Back to all yours');
+}
+let usualCache = [];
+function renderQuick() {
+  const box = $('#foodQuick'); if (!box) return;
+  if (viewDays) { box.hidden = true; return; }
+  const meal = nowMeal(), log = F().log;
+  usualCache = usualMeals(log, meal, Date.now(), 4);
+  const y = copyOf(log, 1, meal, Date.now()), ySig = y.map(i => i.ref.id).sort().join();
+  const showY = y.length && !usualCache.some(u => u.items.map(i => i.ref.id).sort().join() === ySig) && !dayItems().some(e => e.meal === meal);
+  const saved = (F().meals || []).slice(0, 4);
+  const iftar = ramadan() && meal === 'Iftar' ? ['dates', 'pakora', 'samosa', 'fruit_chaat'].filter(id => N.DISH[id]) : [];
+  if (!usualCache.length && !showY && !saved.length && !iftar.length) { box.hidden = true; box.innerHTML = ''; return; }
+  box.hidden = false;
+  box.innerHTML = `<span class="eyebrow">${tr('One tap')} · ${esc(tr(meal))}</span>
+    <div class="chips-scroll quick-chips">${usualCache.map((u, i) => `<button type="button" class="mchip" data-qusual="${i}">${esc(u.label)}${u.kcal ? ` · ${fmt(u.kcal)}` : ''}</button>`).join('')}
+      ${showY ? `<button type="button" class="mchip" data-qyest="1">${tr('Same as yesterday')} · ${esc(labelOf(y))}</button>` : ''}
+      ${saved.map(m => `<button type="button" class="mchip saved" data-qsaved="${esc(m.id)}">★ ${esc(m.name)} · ${fmt(m.kcal)}</button>`).join('')}
+      ${iftar.map(id => `<button type="button" class="mchip" data-qref="${id}">+ ${esc(N.DISH[id].name)}</button>`).join('')}</div>`;
+}
+function onQuickClick(e) {
+  const u = e.target.closest('[data-qusual]'), y = e.target.closest('[data-qyest]'), sv = e.target.closest('[data-qsaved]'), r = e.target.closest('[data-qref]');
+  if (u) { const it = usualCache[+u.dataset.qusual]; if (it) { logItems(it.items, 'usual'); ctx.toast(`${it.label} added`); } }
+  else if (y) { logItems(copyOf(F().log, 1, nowMeal(), Date.now()), 'copy'); ctx.toast('Same as yesterday, added'); }
+  else if (sv) { const m = (F().meals || []).find(x => x.id === sv.dataset.qsaved); if (m) { logItems(m.items, 'saved'); ctx.toast(`${m.name} added`); } }
+  else if (r) { const ref = { t: 'dish', id: r.dataset.qref }; addEntry(ref, defaultOpts(ref), 'quick'); ctx.toast(`${N.DISH[ref.id].name} added`); }
+  else return;
+  renderFood();
+}
+
+/** A photo shared to Shred (manifest share_target → sw.js): read it like a snapped photo, timed when it was taken. */
+async function openShared() {
+  try {
+    const c = await caches.open('qk-shared'), r = await c.match('shared-meal'); if (!r) return;
+    await c.delete('shared-meal');
+    const blob = await r.blob(), taken = +r.headers.get('x-taken') || Date.now();
+    history.replaceState(null, '', location.pathname);
+    if (!PHOTO_CONFIG.endpoint) return showNoEndpoint();
+    runPhoto(new File([blob], 'shared.jpg', { type: blob.type || 'image/jpeg', lastModified: taken }));
+  } catch {}
 }

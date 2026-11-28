@@ -306,6 +306,43 @@ const num = s => +String(s).replace(/[^\d]/g, '');
   await p.goto('https://shred.local/'); await p.click('.tabs [data-tab=food]'); await p.waitForTimeout(300);
   const fp = await p.textContent('#foodPlan');
   check('client app shows QK\'s plan and note', /Edited by QK/.test(fp) && /More protein at breakfast/.test(fp), fp.slice(0, 120));
+  // Fewer taps: your usual meals, yesterday, copy, save, shared plates, extras, fibre.
+  await p.click('.tabs [data-tab=food]'); await p.waitForTimeout(200);
+  check('Fibre bar on Food', /Fibre/.test(await p.textContent('#foodToday')));
+  const slot = await p.evaluate(async () => (await import('/js/foodquick.js')).mealFor(Date.now()));
+  if (slot !== 'Snack') {
+    check(`"One tap" usual ${slot} offered from the past week`, !(await p.$eval('#foodQuick', el => el.hidden)) && /One tap/.test(await p.textContent('#foodQuick')), await p.textContent('#foodQuick'));
+    const before = await p.evaluate(() => JSON.parse(localStorage.getItem('shred_qk_v1')).food.log.length);
+    await p.click('#foodQuick [data-qusual="0"]'); await p.waitForTimeout(200);
+    check('one tap logs the whole usual meal', (await p.evaluate(() => JSON.parse(localStorage.getItem('shred_qk_v1')).food.log.length)) > before);
+    check('"Anything else?" extras after the meal', /Anything else\?/.test(await p.textContent('#foodLog')));
+    await p.click('#foodLog [data-extra^="chai|"], #foodLog [data-extra]'); await p.waitForTimeout(200);
+  }
+  await p.click('#foodDayNav [data-day="1"]'); await p.waitForTimeout(200);
+  check('‹ shows yesterday\'s food', /Yesterday’s food/.test(await p.textContent('#foodDayTitle')) && /Paratha|paratha/.test(await p.textContent('#foodLog')));
+  await p.check('#dayIncomplete'); await p.waitForTimeout(100);
+  check('"I didn\'t log everything" marks the day', await p.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('shred_qk_v1')).food.incomplete || {}).length === 1));
+  await p.uncheck('#dayIncomplete');
+  p.once('dialog', d => d.accept("Ammi's lunch"));
+  await p.click('#foodLog [data-savemeal="Lunch"]'); await p.waitForTimeout(200);
+  const todayBefore = await p.evaluate(async () => { const N = await import('/js/nutrition.js'); return N.dayTotals(JSON.parse(localStorage.getItem('shred_qk_v1')).food.log).items.length; });
+  await p.click('#foodLog [data-copy="Lunch"]'); await p.waitForTimeout(200);
+  const todayAfter = await p.evaluate(async () => { const N = await import('/js/nutrition.js'); return N.dayTotals(JSON.parse(localStorage.getItem('shred_qk_v1')).food.log).items.length; });
+  check('copy yesterday\'s lunch to today (karahi + roti)', todayAfter === todayBefore + 2 && /Today’s food/.test(await p.textContent('#foodDayTitle')), `${todayBefore} → ${todayAfter}`);
+  await p.fill('#foodSearch', 'ammi'); await p.waitForTimeout(150);
+  check('saved meal found in search', /Ammi's lunch/.test(await p.textContent('#foodResults')) && /Your saved meal/.test(await p.textContent('#foodResults')));
+  await p.fill('#foodSearch', 'hum 4 the, karahi aur 2 roti'); await p.waitForTimeout(150);
+  check('"hum 4 the": karahi divided by 4, rotis stay yours', /Shared by 4/.test(await p.textContent('#foodResults')) && /2 roti/i.test(await p.textContent('#foodResults')), (await p.textContent('#foodResults')).slice(0, 200));
+  await p.fill('#foodSearch', '');
+  const sel = await p.$('#foodLog [data-sharemeal]');
+  if (sel) { const k0 = await p.textContent('#foodToday .kbig'); await sel.selectOption('3'); await p.waitForTimeout(200); check('"Shared? 3 people" lowers the meal', (await p.textContent('#foodToday .kbig')) !== k0, `${k0} → ${await p.textContent('#foodToday .kbig')}`); }
+  // Which meal: log lunch late
+  await p.fill('#foodSearch', 'roti'); await p.click('#foodResults [data-ref*=\'"roti"\']'); await p.waitForTimeout(100);
+  check('sheet asks which meal', /Which meal\?/.test(await p.textContent('#foodSheetBody')));
+  await p.click('#foodSheetBody .fseg[data-key="meal"] [data-v="Breakfast"]');
+  check('save button follows the meal', /breakfast/i.test(await p.textContent('#fsSave')));
+  await p.click('#fsSave'); await p.waitForTimeout(150);
+  check('the roti went to breakfast', await p.evaluate(() => { const l = JSON.parse(localStorage.getItem('shred_qk_v1')).food.log; return l[l.length - 1].meal === 'Breakfast'; }));
   // Chat: the client messages QK (preview mode on this phone); Muhammad answers or hands over to QK.
   await p.click('.tabs [data-tab=today]'); await p.waitForTimeout(200);
   check('Today shows Message QK (voice or text, any language)', /Message QK/.test(await p.textContent('#chatCard')) && /any language/.test(await p.textContent('#chatCard')));

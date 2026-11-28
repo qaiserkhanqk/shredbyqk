@@ -663,3 +663,70 @@ So QK's job is to be a trustworthy coach: count accurately, give the big side-vi
 8. **Personal range.** Each lifter's usual full range per exercise (median of clean reps, updated slowly) is kept. A set where every rep is a half rep is now caught as partial, not just reps short of that set's best.
 
 **Still true:** camera bar speed from the hips or wrists is not validated as m/s, so QK uses only its *change* within a set (velocity loss). Dedicated apps vary widely: Qwik VBT matched a transducer, while MyLift missed 175 of 589 reps (Renner 2024, doi:10.1371/journal.pone.0313919). No trial yet shows that camera form apps improve lifters' results; programming and consistency do. That's why the camera is optional and quick log is the default.
+
+## 3D Lab: two cameras (`js/lab3d.js`, `js/lab-ui.js`, `js/lab-demo.js`)
+
+**Method: the two-camera orthogonal setup of sports biomechanics.**
+- Camera A films side-on, which gives depth (Z, forward) and height (Y).
+- Camera B films from the front or back, which gives left/right (X) and height (Y).
+- Each landmark seen by both cameras at the same moment becomes one 3D point, with Y averaged and weighted by each camera's visibility.
+- **Scale:** the athlete's height (nose-to-ankle ≈ 88% of stature, from the tallest 20% of frames). The second camera is scaled so its vertical matches the first, because vertical is the axis both cameras share.
+- **No calibration object.** Assumptions: cameras about 90° apart, level, 3–5 m away (so perspective is small), whole body in view.
+
+**Why two cameras.** One camera can't see depth. Combining views roughly halved the error compared with guessing 3D from one camera (Dill 2024, doi:10.3390/s24237772). Three synced cameras reached about 6.4° mean angle error against Vicon, and 4.6° with per-subject correction (Chen 2026, doi:10.3390/s26216773). Markerless and marker-based systems are still not interchangeable (Amdi 2026, doi:10.1080/02640414.2026.2760586). So the lab is coaching and screening grade, and says so on screen.
+
+**Sync:**
+- **Clap first:** the loudest moment in each video's audio (more than 30× the median energy, first 12 s).
+- **Otherwise the movement:** the hip-height signal of one video is slid over the other's (±4 s, needs 1 s+ overlap). Repeated reps match at several offsets one rep apart, so among the top peaks (within 0.02) the smallest offset wins, because both cameras start within seconds of each other. A match under 80% tells the user to clap next time.
+
+**Measurements (3D):**
+- knee, hip and elbow bend (0 = straight)
+- trunk lean (sagittal) and side-bend (frontal)
+- pelvis and shoulder rotation about the vertical, and hip–shoulder separation (only possible in 3D)
+- frontal-plane knee alignment (positive = knee inside the hip–ankle line)
+- left–right differences (flagged at 10°+ and 10%+)
+
+**Movements:**
+- **Squat / landing:** values at the deepest point. Knee-in of 10°+ is a screening flag (Hewett 2005).
+- **Cricket fast bowling:**
+  - Release is when the bowling hand is highest.
+  - Elbow straightening in the last 0.15 s before release is compared with the ICC's 15° line, always labelled "screening only: official tests use accredited labs".
+  - Side-bend at release over 45° is flagged (Bayne 2016).
+  - Shoulder-line rotation range is linked to mixed-action back injury (Elliott 2000).
+- **Sprint, football kick, any movement:** min, max and range.
+
+**Tested on a synthetic athlete with known 3D angles** (`tests/lab3d.test.mjs`, 16 checks). It is filmed by two virtual cameras with different resolutions, zoom and placement, ±1.5 px jitter, and the front camera started 0.5 s late. Results:
+- sync found exactly (0.500 s)
+- knee bend within 1.1° on average (worst 5.8°)
+- hip–shoulder separation range 61° vs 60° true
+- knee-in seen and flagged, straight knees not flagged
+- asymmetry flagged
+
+That proves the maths. **Real-world accuracy must be measured** on 10–20 athletes against a known reference before claims are made to a team.
+
+**Privacy:** videos are read on the device and never uploaded. History keeps only the summary (athlete, movement, key numbers, flags), never video or frames. CSV export gives every frame's 3D points and measurements, for physios or other software.
+
+**Not 3D:** four videos from four angles recorded at different times are four 2D views of four different reps. 3D needs the same moment from at least two cameras.
+
+### Four cameras and the squad (`js/lab3d.js` reconstructMulti/syncAll, `js/squad.js`, `js/coach-squad.js`)
+
+**Four cameras: side-right, front, side-left, back.** Every point is a weighted average across cameras:
+- each camera's visibility for that point
+- a side camera counts its own side's limbs fully and the far-side (partly hidden) limbs at 0.35
+- depth comes from the side cameras, left/right from the front and back cameras, and height from all of them
+
+Each camera's scale is matched to the first side camera's vertical. Each camera is synced to the first by clap (when every video has one) or by the movement.
+
+Tested on the synthetic athlete with far-side limbs hidden (±45 px noise, visibility 0.35) and the cameras started 0, 0.5, 1.2 and 0.8 s apart:
+- sync found exactly for all four
+- left-knee error fell from **5.9° with two cameras to 1.3° with four**
+- three cameras also beat two
+- two side cameras alone are refused, because without a front or back view there is no left/right
+
+**Squad dashboard (coach.html):**
+- **Athletes:** belong to the coach (`athletes` table) and don't need an app account.
+- **Saving tests:** run the 3D Lab in the app on a laptop signed in as the coach, pick the athlete under "Squad athlete", and the summary saves to `lab_tests`. Only that coach can see or write them (privacy-tested).
+- **Roster:** by team and position, flagged athletes first.
+- **Per athlete:** each measurement over time.
+- **Squad comparison:** each athlete's latest value, the squad mean ± SD, change since their first test, and anyone more than 1.5 SD from the squad (with 4+ athletes) marked "look": a reason to look closer, never a verdict.
+- **CSV:** one row per test, every measurement, for physios and sports scientists.

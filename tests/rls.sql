@@ -232,5 +232,23 @@ set role authenticated;
 select pg_temp.check('another coach sees no labels', (select count(*) from public.form_labels) = 0);
 reset role;
 
+-- Squad: coach Q's athletes and 3D Lab results; nobody else sees them.
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000c1');
+set role authenticated;
+insert into public.athletes (id, coach_id, name, team, position) values ('00000000-0000-0000-0000-0000000000a1', auth.uid(), 'Test Bowler', 'U19', 'Fast bowler');
+insert into public.lab_tests (coach_id, athlete_id, preset, cameras, summary) values (auth.uid(), '00000000-0000-0000-0000-0000000000a1', 'bowling', 4, '{"rows": []}');
+select pg_temp.check('coach adds an athlete and saves a 3D test', (select count(*) from public.lab_tests) = 1 and (select count(*) from public.athletes) = 1);
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000c2');
+set role authenticated;
+select pg_temp.check('another coach sees none of your squad or its tests', (select count(*) from public.athletes) = 0 and (select count(*) from public.lab_tests) = 0);
+do $$ begin insert into public.lab_tests (coach_id, athlete_id, summary) values (auth.uid(), '00000000-0000-0000-0000-0000000000a1', '{}'); perform pg_temp.check('another coach cannot add tests to your athlete', false);
+exception when others then perform pg_temp.check('another coach cannot add tests to your athlete', true); end $$;
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+set role authenticated;
+select pg_temp.check('a client sees no squad data', (select count(*) from public.athletes) = 0 and (select count(*) from public.lab_tests) = 0);
+reset role;
+
 select (case when ok then 'ok   ' else 'FAIL ' end) || name from pg_temp.results;
 select case when bool_and(ok) then 'rls: all pass' else 'rls: FAILED' end from pg_temp.results;

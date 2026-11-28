@@ -432,10 +432,8 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('reaction wall: counts hits', /5 hits/.test(await p.textContent('#bkEnd')));
   await p.click('#bkFin');
   await tap('[data-brain=track]'); await p.click('#tkGo'); await p.waitForSelector('#tkBox.pick', { timeout: 10000 });
-  // 2026-11-28: each followed ball is tapped as that element. The balls finish in random places and can overlap, so a tap
-  // at a ball's centre could land on another ball drawn on top (failed now and then, seen in Firefox); the scoring being
-  // checked is unchanged.
-  for (const i of [0, 1, 2]) await p.dispatchEvent(`.tk-b[data-b="${i}"]`, 'click');
+  // The balls may overlap: click the exact element, not a screen point (a point can land on another ball).
+  for (const i of [0, 1, 2]) await p.$eval(`.tk-b[data-b="${i}"]`, el => el.click());
   await p.waitForSelector('#tkFin', { timeout: 8000 });
   check('tracker: picking the 3 followed balls gives a tracking level', /Tracking level \d+/.test(await p.textContent('#tkEnd')) && /1 of 1 rounds perfect/.test(await p.textContent('#tkEnd')));
   await p.click('#tkFin');
@@ -854,6 +852,14 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.click('[data-rweek=this]'); await p.waitForTimeout(200);
   const rt = await p.textContent('#report');
   check('weekly report: wins, training with kg lifted, health, sleep & mind, one focus', /Wins/.test(rt) && /kg lifted|tonnes lifted/.test(rt) && /Your health/.test(rt) && /Sleep & mind/.test(rt) && /Next week, one thing/.test(rt), rt.slice(0, 300));
+  // 3D Lab: the demo athlete filmed by two cameras → synced, 3D skeleton, measurements and flags.
+  await go('body'); await tap('[data-go=lab]'); await p.waitForTimeout(200);
+  check('3D lab: filming guide, four camera slots, and "four separate videos are not 3D"', (await p.$$('.lab-cams input[type=file]')).length === 4 && /not 3D/.test(await p.textContent('#lab')));
+  await tap('#labDemo'); await p.waitForTimeout(800);
+  const lt = await p.textContent('#labResult');
+  check('3D lab: demo → synced, 3D measurements and flags', await p.isVisible('#labResult') && /4 cameras\. Synced by the movement \(Front \+0\.50 s/.test(lt) && /Knee bend, left/.test(lt) && /Knees moving in/.test(lt), lt.slice(0, 300));
+  check('3D lab: skeleton drawn and turnable', await p.evaluate(() => { const c = document.querySelector('#labCanvas'); return c.width > 0 && c.getContext('2d').getImageData(0, 0, c.width, c.height).data.some(x => x); }));
+  check('3D lab: saved to the athlete history (no video)', await p.evaluate(() => { const l = JSON.parse(localStorage.getItem('shred_qk_v1')).lab || []; return l.length >= 1 && !('frames' in l[l.length - 1]); }));
   // Coach dashboard demo: this phone's training is the first client.
   await p.goto('https://shred.local/coach.html'); await p.waitForTimeout(700);
   check('dashboard demo: your own training is the first client, with sample clients', /\(this phone\)/.test(await p.textContent('.cd-row')) && (await p.$$('.cd-row')).length >= 7, (await p.textContent('.cd-row')).replace(/\s+/g, ' '));
@@ -876,6 +882,15 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('dashboard: week view offers a weekly MVP shout-out', await p.isVisible('#cbMvp'));
   await p.click('#cbMvp'); await p.waitForTimeout(150);
   check('dashboard: MVP shout-out fills the notification', /MVP is .+ with \d+ points/.test(await p.inputValue('#bcBody')), await p.inputValue('#bcBody'));
+  // Squad dashboard: sample squad + this phone's 3D Lab tests; trends, squad comparison, add an athlete.
+  await p.waitForTimeout(300);
+  check('squad: roster with tests and flags (flagged athletes first)', (await p.$$('#sqList [data-ath]')).length >= 6 && /flag/.test(await p.textContent('#sqList')), await p.textContent('#sqCount'));
+  check('squad: this phone\'s 3D Lab test appears as an athlete', /\(this phone\)/.test(await p.textContent('#sqList')));
+  await p.click('#sqList [data-ath="a1"]'); await p.waitForTimeout(150);
+  const sd = await p.textContent('#sqDetail');
+  check('squad: athlete trend and squad comparison for their movement', /over time/.test(sd) && /Squad comparison/.test(sd) && /Squad average/.test(sd) && (await p.$$('#sqDetail .sq-chart')).length === 1, sd.slice(0, 200));
+  await p.click('#cdSquad details summary'); await p.fill('#sqName', 'New Bowler'); await p.fill('#sqTeamIn', 'U19'); await p.click('#sqAdd'); await p.waitForTimeout(150);
+  check('squad: add an athlete', /New Bowler/.test(await p.textContent('#sqList')));
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();
   console.log(fails ? `${fails} FAILED` : 'ALL PASS'); process.exit(fails ? 1 : 0);

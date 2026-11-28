@@ -42,17 +42,18 @@ const ADJ = new Set(['green', 'sweet', 'hot', 'plain', 'white', 'black', 'specia
 // "seekh kebab paratha roll": the words before a wrapper are its filling, not another dish.
 const WRAPPER = ['roll', 'burger', 'sandwich', 'wrap', 'shawarma', 'pizza', 'paratha roll'];
 // Dishes sold as a pack of pieces: "4 nuggets" is ⅔ of a 6-piece box.
-const PACK = { nuggets: 6, wings: 6, gol_gappay: 6, biscuits: 3 };
+const PACK = { nuggets: 6, wings: 6, gol_gappay: 6, biscuits: 3, pancakes: 2, tacos: 2, dumplings: 6, sushi_roll: 8, mozzarella_sticks: 6 };
 const SIZE_WORDS = new Set(['small', 'medium', 'regular', 'large', 'chota', 'chhota', 'choti', 'bara', 'bada', 'bari', 'full', 'single', 'double']);
 // Everyday words dish names don't contain.
 const SAY = { chawal: 'plain rice', doodh: 'milk', milk: 'milk', bread: 'bread slice', toast: 'bread slice', egg: 'boiled egg', eggs: 'boiled egg', tea: 'chai', coke: 'cola', pepsi: 'cola', sprite: 'cola' };
 // What a bare word usually means at a Pakistani table (the most common version of the dish).
 const DEFAULT = { biryani: 'chicken_biryani', karahi: 'chicken_karahi', qorma: 'chicken_qorma', korma: 'chicken_qorma', pulao: 'chicken_pulao', samosa: 'samosa',
-  pheekichai: 'chai_no_sugar', qeema: 'qeema', keema: 'qeema', chapati: 'roti', roti: 'roti', rotiyan: 'roti', rotian: 'roti', rotiya: 'roti', paratha: 'paratha', naan: 'naan', kebab: 'seekh_kebab', kabab: 'seekh_kebab', tikka: 'chicken_tikka',
+  pheekichai: 'chai_no_sugar', icecream: 'ice_cream', qeema: 'qeema', keema: 'qeema', chapati: 'roti', roti: 'roti', rotiyan: 'roti', rotian: 'roti', rotiya: 'roti', paratha: 'paratha', naan: 'naan', kebab: 'seekh_kebab', kabab: 'seekh_kebab', tikka: 'chicken_tikka',
   salan: 'chicken_salan', daal: 'daal_masoor', dal: 'daal_masoor', chawal: 'plain_rice', rice: 'plain_rice', anday: 'boiled_egg', anda: 'anda_fry', egg: 'boiled_egg',
   burger: 'zinger_burger', pizza: 'pizza_slice', lassi: 'sweet_lassi', halwa: 'suji_halwa', chane: 'cholay', chanay: 'cholay', sabzi: 'mix_sabzi', chai: 'chai',
   shawarma: 'shawarma', roll: 'paratha_roll', pakoray: 'pakora', fries: 'fries', omelette: 'omelette', saag: 'sarson_saag', machli: 'fish_curry', fish: 'fish_curry',
-  puri: 'puri', rajma: 'rajma', raita: 'raita', milk: 'milk_glass', doodh: 'milk_glass', bread: 'bread_slice', kela: 'banana', seb: 'apple', aam: 'mango', khajoor: 'dates', haleem: 'haleem', nihari: 'nihari', dahi: 'dahi', kheer: 'kheer' };
+  puri: 'puri', rajma: 'rajma', raita: 'raita', milk: 'milk_glass', doodh: 'milk_glass', bread: 'bread_slice', kela: 'banana', seb: 'apple', aam: 'mango', khajoor: 'dates', haleem: 'haleem', nihari: 'nihari', dahi: 'dahi', kheer: 'kheer',
+  salad: 'salad', chips: 'fries', soup: 'corn_soup', pasta: 'creamy_pasta' };
 
 import { skeleton, exact, near, rawLev } from './fuzzy.js';
 export { skeleton };
@@ -158,12 +159,17 @@ const norm = s => String(s).toLowerCase()
   .replace(/(\d+)\s*\/\s*(\d+)/g, (_, a, b) => ` ${+a / +b} `).replace(/½/g, ' 0.5 ').replace(/¼/g, ' 0.25 ')
   .replace(/\b(\w+) and a half\b/g, (m, n) => (n in NUM || /^\d/.test(n)) ? ` ${(NUM[n] ?? +n) + 0.5} ` : m)
   .replace(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)/g, (_, a, b) => ` ${(+a + +b) / 2} `) // "2-3 samosay"
+  // Dishes whose name has "and" / "with" in it, so the split doesn't make two dishes of them.
+  .replace(/\bfish\s+(?:and|n|&|aur)\s+chips\b/g, 'fish chips').replace(/\bmac(?:aroni)?\s+(?:and|n|&)\s+cheese\b/g, 'mac cheese')
+  .replace(/\bbagels?\s+(?:with|and|&)\s+cream\s+cheese\b/g, 'bagel cream cheese')
+  .replace(/\b(cereal|cornflakes|corn\s+flakes|oats|oatmeal|porridge|granola)\s+(?:with|and|&|aur)\s+(milk|doodh|yogh?urt|dahi)\b/g, (m, a, b) => a === 'granola' || !/milk|doodh/.test(b) ? ' granola yogurt ' : /cereal|flakes/.test(a) ? ' cereal milk ' : ' oatmeal ')
   .replace(/\bek dedh\b/g, 'dedh').replace(/['’]/g, '').replace(/[^\p{L}\p{N}.,+&]+/gu, ' ')
   // "do se teen roti", "2-3 roti", "2 ya 3": a range is its middle, not a place called "Do".
   .replace(/\b([a-z]+|\d+(?:\.\d+)?)\s+(?:se|say|sy|to|ya|-)\s+([a-z]+|\d+(?:\.\d+)?)\b/g, (m, a, b) => (isNum(a) && isNum(b) ? ` ${(numOf(a) + numOf(b)) / 2} ` : m))
   // "do anday ka omelette": the number counts eggs, and one omelette is 2 eggs.
   .replace(/\b([a-z]+|\d+(?:\.\d+)?)\s+(?:anday|ande|anda|eggs?)\s+(?:ka|ki|ke|wala|wali|walay)?\s*(omelette|omlet|amlet|amlate|omelet)\b/g, (m, n, o) => (isNum(n) ? ` ${Math.max(0.5, numOf(n) / 2)} ${o} ` : m))
   // "chai bina cheeni", "without sugar": the side is dropped (the no-sugar chai is its own dish).
+  .replace(/\bice[\s-]?creams?\b/g, ' icecream ') // "ice" alone is a side (ice in a drink), "ice cream" is a dessert
   .replace(/\b(chai|tea)\s+(?:bina|without|no)\s+(?:cheeni|chini|shakar|sugar)\b|\b(?:sugar\s*free|pheeki)\s+(chai|tea)\b/g, ' pheekichai ')
   .replace(/\b(?:bina|without|no)\s+(?:cheeni|chini|shakar|sugar)\b|\bsugar\s*free\b/g, ' nosugar ')
   .replace(/\s+/g, ' ').trim();
@@ -250,7 +256,7 @@ function parseMealPlain(text) {
       const d = DISH[it.ref.id], amt = share < 1 ? amount * share : i === 0 ? amount : 1; // "2 halwa puri": the number goes with the first
       let servings = amt;
       if (unit && ['liter', 'litre', 'l', 'ml', 'g', 'gm', 'gram', 'grams', 'kg'].includes(unit)) servings = Math.round(amt * UNIT[unit] / d.cooked * 4) / 4;
-      else if (PACK[d.id] && !unit && amt >= 2) servings = Math.round(amt / PACK[d.id] * 100) / 100; // "4 nuggets" = 4 of a 6-piece box
+      else if (PACK[d.id] && (!unit || unit === 'piece') && amt >= 2) servings = Math.round(amt / PACK[d.id] * 100) / 100; // "4 nuggets" = 4 of a 6-piece box
       // A container: convert by weight to this dish's serving ("ek katori dahi" = 200 g of a 150 g serving).
       else if (unit && UNIT[unit] && unit !== d.serve && ['katori', 'bowl', 'plate', 'cup', 'glass', 'portion'].includes(d.serve) && UNIT[unit] !== d.cooked) {
         servings = Math.max(0.5, Math.round(amt * UNIT[unit] / d.cooked * 2) / 2);

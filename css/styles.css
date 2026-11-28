@@ -1217,6 +1217,19 @@ body.no-scroll { overflow: hidden; }
 .rd-nav > * { flex: 0 1 48%; }
 .rd-player { position: sticky; bottom: 96px; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-radius: 999px; background: var(--night); color: #ECF1EC; box-shadow: 0 10px 30px -10px rgba(0,0,0,.4); font-size: .88rem; }
 .rd-player .linkbtn { color: #9FD0B6; }
+/* ---------- Fewer taps on Food ---------- */
+.quick-card { gap: 8px; }
+.quick-chips { display: flex; gap: 8px; flex-wrap: nowrap; }
+.mchip.saved { border-style: dashed; }
+.day-head { display: flex; justify-content: space-between; align-items: center; }
+.day-nav { display: flex; gap: 6px; }
+.day-nav .iconbtn[disabled] { opacity: .35; }
+.meal-tools { display: flex; gap: 12px; align-items: center; justify-content: flex-end; flex-wrap: wrap; margin: -4px 0 4px; font-size: .8rem; }
+.meal-tools select { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: inherit; font: inherit; padding: 2px 4px; }
+.extras, .pnudge { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 10px; }
+.day-tools { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.pulse-once { animation: chatpulse .8s 3; }
+.menu-kcal { display: flex; gap: 8px; align-items: flex-end; } .menu-kcal .field { flex: 1; }
 .wm-mark { width: 26px; height: 26px; margin-right: 7px; flex: none; }
 
 /* Camera accuracy */
@@ -1227,3 +1240,17 @@ body.no-scroll { overflow: hidden; }
 #dots { display: flex; align-items: flex-end; gap: 3px; height: 28px; }
 #dots i { width: 7px; min-height: 6px; border-radius: 3px; background: var(--good); transition: height .25s; }
 #dots i.f { background: var(--warn); } #dots i.u { background: var(--muted); opacity: .6; }
+
+/* 3D Lab */
+.lab-steps { margin: 10px 0 8px; padding-left: 1.2em; display: grid; gap: 6px; }
+.lab-canvas { width: 100%; height: 340px; border-radius: 14px; background: var(--surface-2); touch-action: none; cursor: grab; }
+.lab-row { display: grid; grid-template-columns: 2.2fr 1fr 1fr 1.2fr; gap: 8px; padding: 7px 0; border-top: 1px solid var(--line); font-size: .85rem; }
+.lab-row.head { font-weight: 700; color: var(--muted); border-top: 0; }
+#labHistory .lab-row { grid-template-columns: 2fr 1fr 1fr; }
+#labScrub { flex: 3; }
+@media print {
+  body * { visibility: hidden; }
+  #lab .lab-result, #lab .lab-result *, #lab .page-head, #lab .page-head * { visibility: visible; }
+  #lab .lab-result { position: absolute; top: 60px; left: 0; right: 0; }
+  #lab .btn-row { display: none; }
+}
