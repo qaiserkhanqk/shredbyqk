@@ -458,10 +458,16 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.waitForSelector('#mTap:not([hidden])', { timeout: 12000 }).catch(() => {});
   check('camera pulse: after 8 s with no finger, explains and offers tap-along', await p.isVisible('#mTap') && /finger|dark/i.test(await p.textContent('#mStatus')), await p.textContent('#mStatus'));
   await p.click('#mTap');
+  // 2026-11-28: the browser's own tap times are recorded, because the gap between taps is the 750 ms wait PLUS the
+  // time each click takes, which is longer in WebKit and Firefox (the old check expected 80 bpm and failed there with
+  // a correct 76). The app must match the pulse those taps really give, to within 1 bpm, and the taps must really
+  // have been about 750 ms apart (70-82 bpm).
+  await p.evaluate(() => { window.__taps = []; document.querySelector('#tpArea').addEventListener('pointerdown', e => window.__taps.push(e.timeStamp), true); });
   for (let i = 0; i < 12; i++) { await p.click('#tpArea'); await p.waitForTimeout(750); }
   await p.waitForSelector('#tpDone:not([hidden])', { timeout: 12000 }).catch(() => {});
   const tapBpm = parseInt(await p.textContent('#tpCount'));
-  check('tap-along pulse: 12 taps 750 ms apart → about 80 bpm', Math.abs(tapBpm - 80) <= 3, `${tapBpm}`);
+  const expectBpm = await p.evaluate(() => { const t = window.__taps, g = t.slice(1).map((x, i) => x - t[i]).sort((a, b) => a - b); return Math.round(60000 / g[g.length >> 1]); });
+  check('tap-along pulse: 12 taps about 750 ms apart → the pulse those taps give (±1 bpm)', Math.abs(tapBpm - expectBpm) <= 1 && expectBpm >= 70 && expectBpm <= 82, `app ${tapBpm}, taps ${expectBpm}`);
   await p.click('#tpDone');
   check('tap-along pulse: saved to Body check', /\d+ bpm/.test(await p.textContent('#vHrLast')));
   await tap('#vHr'); await p.waitForTimeout(1500); await p.click('#mCancel');
@@ -522,7 +528,8 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('progression: first weighted set asks for a starting weight', /First time/.test(await p.textContent('#rxLine')), await p.textContent('#rxLine'));
   await p.click('#startCam'); await p.waitForTimeout(1500);
   const spoken = await p.textContent('[data-coach-caption]');
-  check('set start: QK tells you what to do ("Bar close to your shins ... Brace, and go.")', /Bar close to your shins/.test(spoken) && /Brace, and go/.test(spoken), spoken);
+  // 2026-11-28: needs WebGL, like the other camera checks (the camera coaching can't start without it; see the note above).
+  if (webgl) check('set start: QK tells you what to do ("Bar close to your shins ... Brace, and go.")', /Bar close to your shins/.test(spoken) && /Brace, and go/.test(spoken), spoken);
   check('no "NSCA" anywhere on screen', !/NSCA/.test(await p.textContent('body')));
   await p.click('#endLive'); await p.waitForTimeout(400);
   if (await p.isVisible('#doneBtn')) await p.click('#doneBtn');
