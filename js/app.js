@@ -22,6 +22,9 @@ import { HipThrustDemo, WalkDemo, DEMO_W, DEMO_H } from './demo.js';
 import { landmarksFrom, analyse, render, navyBodyFat, bfCategory, stanceProblem } from './bodyscan.js';
 import { initCycle, renderCycle } from './cycle/ui.js';
 import { readFlags, setFlag } from './cycle/flags.js';
+import { initAthlete, renderAthlete, finishAthlete, gatesFor, ATHLETE_MODES, bindUploads } from './athlete/ui.js';
+import { TESTS as ATH_TESTS } from './athlete/sports.js';
+import { SCREENS as LAB_SCREENS } from './athlete/lab.js';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -79,13 +82,14 @@ function renderHub() {
 /* ---------- Navigation ---------- */
 function tab(id) {
   $$('.screen').forEach(s => s.classList.toggle('on', s.id === id));
-  const tabFor = ['gait', 'scan', 'rehab', 'cycle'].includes(id) ? 'body' : id;
+  const tabFor = ['gait', 'scan', 'rehab', 'cycle', 'athlete'].includes(id) ? 'body' : id;
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tabFor));
   if (id === 'today') renderToday();
   if (id === 'progress') { renderProgress(); renderLoad(); renderToday(); $('#youName').textContent = S.profile.name || 'You'; }
   if (id === 'rehab') renderRehab();
   if (id === 'body') renderHub();
   if (id === 'cycle') renderCycle();
+  if (id === 'athlete') renderAthlete();
   if (id === 'scan') $('#hipWrap').hidden = S.profile.sex === 'male';
   window.scrollTo(0, 0);
 }
@@ -259,10 +263,10 @@ const PATTERN_ICON = { bench: 'pushUp', dip: 'press', fly: 'press', row: 'rdl', 
 const iconKey = id => { const p = LIB[id]?.pattern; return p ? (ICONS[p] ? p : PATTERN_ICON[p]) : 'band'; };
 let muscleFilter = 'All', searchQ = '';
 function renderTrain() {
-  $('#muscleChips').innerHTML = ['All', ...MUSCLES, 'Rehab'].map(m => `<button type="button" class="mchip ${m === muscleFilter ? 'on' : ''}" data-muscle="${m}" aria-pressed="${m === muscleFilter}">${m}</button>`).join('');
+  $('#muscleChips').innerHTML = ['All', ...MUSCLES, 'Athlete', 'Rehab'].map(m => `<button type="button" class="mchip ${m === muscleFilter ? 'on' : ''}" data-muscle="${m}" aria-pressed="${m === muscleFilter}">${m}</button>`).join('');
   const q = searchQ.trim().toLowerCase();
   // Physio exercises live under their own Rehab filter so they don't clutter the gym library.
-  const list = LIBRARY.filter(x => (muscleFilter === 'Rehab' ? x.rehab : !x.rehab && (muscleFilter === 'All' || x.muscles.includes(muscleFilter))) && (!q || `${x.name} ${x.muscles.join(' ')} ${x.equipment}`.toLowerCase().includes(q)));
+  const list = LIBRARY.filter(x => (muscleFilter === 'Rehab' ? x.rehab : muscleFilter === 'Athlete' ? x.athletic : !x.rehab && !x.athletic && (muscleFilter === 'All' || x.muscles.includes(muscleFilter))) && (!q || `${x.name} ${x.muscles.join(' ')} ${x.equipment}`.toLowerCase().includes(q)));
   const cam = list.filter(x => x.pattern).length;
   $('#exCount').textContent = `${list.length} exercise${list.length === 1 ? '' : 's'} · ${cam} with camera form check`;
   $('#exGrid').innerHTML = list.map(x => x.id === 'hipThrust' && muscleFilter === 'All' && !q
@@ -305,20 +309,21 @@ let live = null, fb = null, engine = null, stream = null, recorder = null, chunk
 const smooth = new Smoother(0.55);
 const motion = new MotionTracker();
 
-async function startLive({ mode, source, file }) {
+async function startLive({ mode, source, file, opts = {} }) {
   $('#setup').hidden = true; $('#summary').hidden = true; $('#live').hidden = false;
   $('#tempoRing').hidden = true;
   const ex = mode === 'form' ? curEx() : null;
-  live = { mode, source, frames: [], t0: null, lost: 0, wrong: 0, demo: null, done: false, steps: 0, mPerPx: null, standFrames: [], times: [] };
+  live = { mode, source, opts, timeScale: 1, gates: [], frames: [], t0: null, lost: 0, wrong: 0, demo: null, done: false, steps: 0, mPerPx: null, standFrames: [], times: [] };
   bar.reset(); recorder2.start({ kind: mode, exercise: mode === 'form' ? exKey : undefined, gaitMode: mode === 'gait' ? gaitMode : undefined, source, loadKg: mode === 'form' ? parseFloat($('#loadKg').value) || null : undefined });
   engine = null; fb = null; smooth.reset(); motion.reset();
   $('#formMeters').hidden = mode !== 'form'; $('#gaitMeters').hidden = mode === 'form';
   $('#repBig').hidden = mode !== 'form'; $('#cueHint').hidden = mode !== 'form';
   $('#repNum').textContent = '0'; $('#repLbl').textContent = ex?.hold ? 'seconds' : 'reps'; $('#dots').innerHTML = ''; $('#cleanCt').textContent = '0 clean'; $('#vlKnob').style.left = '0%'; $('#vlTxt').textContent = 'fresh';
   $('#gSteps').textContent = '0'; $('#gProg').style.width = '0';
-  const testName = { rom: TEST.rom?.label || 'Measurement', gait: `Gait · ${gaitMode === 'run' ? 'running' : 'walking'}`, jump: 'Jump test', sls: 'Single-leg squat knee test' };
+  const testName = { rom: TEST.rom?.label || 'Measurement', gait: `Gait · ${gaitMode === 'run' ? 'running' : 'walking'}`, jump: 'Jump test', sls: 'Single-leg squat knee test',
+    ...Object.fromEntries(ATHLETE_MODES.map(m => [m, (m.startsWith('lab_') ? LAB_SCREENS[m.slice(4)].name : ATH_TESTS[m === 'bowl' ? 'bowlKnee' : m].name) + (m === 'slHop' ? (opts.side === 'R' ? ' · right' : ' · left') : '')])) };
   $('#liveEyebrow').textContent = mode === 'form' ? ex.name : testName[mode];
-  $('#liveTitle').textContent = mode === 'form' ? `Set ${setsToday(exKey) + 1}${source === 'demo' ? ' · demo' : ''}` : (source === 'demo' ? 'Demo walker' : source === 'file' ? 'Analysing your video (precise mode)' : mode === 'gait' ? 'Walk naturally for 10 seconds' : mode === 'jump' ? 'Up to 3 jumps' : mode === 'rom' ? `${TEST.rom.secs} seconds` : 'Left leg first, then right');
+  $('#liveTitle').textContent = mode === 'form' ? `Set ${setsToday(exKey) + 1}${source === 'demo' ? ' · demo' : ''}` : (source === 'demo' ? 'Demo walker' : source === 'file' ? 'Analysing your video (precise mode)' : mode === 'gait' ? 'Walk naturally for 10 seconds' : mode === 'jump' ? 'Up to 3 jumps' : ATHLETE_MODES.includes(mode) ? 'Athlete Combine' : mode === 'rom' ? `${TEST.rom.secs} seconds` : 'Left leg first, then right');
   $('#endLive').textContent = mode === 'form' ? 'End set' : 'Stop';
   $('#flipCam').hidden = source !== 'camera';
   $('#calBtn').hidden = !(mode === 'form' && vbtOn() && source !== 'demo');
@@ -334,7 +339,14 @@ async function startLive({ mode, source, file }) {
       canvas.width = DEMO_W; canvas.height = DEMO_H;
     } else {
       video.hidden = false;
-      if (source === 'file') { video.srcObject = null; video.src = URL.createObjectURL(file); video.loop = false; video.playbackRate = 1; }
+      if (source === 'file') {
+        video.srcObject = null; video.src = URL.createObjectURL(file); video.loop = false;
+        // Slow-motion files play slowed down: media time runs N× real time, so divide it back.
+        // Real-time files of timing tests play at half speed so the pose model sees more frames.
+        const slow = $(ATHLETE_MODES.includes(mode) ? '#athSlow' : '#gaitSlow');
+        live.timeScale = +(slow?.value || 1) || 1;
+        video.playbackRate = live.timeScale === 1 && mode !== 'form' ? 0.5 : 1;
+      }
       else {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error('nocam');
         // Tests ask for 60 fps: event timing (jump flight, foot contacts) gets twice as precise.
@@ -350,6 +362,13 @@ async function startLive({ mode, source, file }) {
       live.model = source === 'file' ? 'heavy' : mode === 'form' ? liveModelName() : 'full';
       live.lm = await getVideoLandmarker(live.model);
       $('#status').textContent = '';
+      const prompts = gatesFor(mode);
+      if (prompts.length) { // cone positions are tapped on the video before timing starts
+        if (source === 'file') { video.pause(); video.currentTime = 0; }
+        await tapGates(prompts);
+        if (!live) return;
+        if (source === 'file') await video.play();
+      }
     }
   } catch (err) {
     console.warn(err);
@@ -381,7 +400,7 @@ function loop(now) {
     px = live.demo.frame(now); live.demo.drawScene(ctx);
   } else if (video.readyState >= 2 && video.videoWidth) {
     if (canvas.width !== video.videoWidth) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
-    const ts = live.source === 'file' ? video.currentTime * 1000 : now;
+    const ts = live.source === 'file' ? video.currentTime * 1000 / live.timeScale : now;
     if (ts > lastTs || live.source === 'camera') {
       lastTs = ts; t = live.source === 'file' ? ts : now;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -512,7 +531,7 @@ function stopLive() {
   if (live) live.done = true;
 }
 
-$('#endLive').onclick = () => { if (!live) return; ['gait', 'jump', 'sls', 'rom'].includes(live.mode) ? finishTest() : endSet(); };
+$('#endLive').onclick = () => { if (!live) return; ['gait', 'jump', 'sls', 'rom', ...ATHLETE_MODES].includes(live.mode) ? finishTest() : endSet(); };
 $('#flipCam').onclick = () => { const m = live?.mode || 'form'; live && (live.done = true); facing = facing === 'user' ? 'environment' : 'user'; stopLive(); live = null; startLive({ mode: m, source: 'camera' }); };
 $('#doneBtn').onclick = () => { stopRest(); $('#summary').hidden = true; tab('today'); };
 $('#nextSet').onclick = () => { stopRest(); $('#summary').hidden = true; openSetup(exKey); };
@@ -598,7 +617,23 @@ const TEST = {
   gait: { secs: 10, label: 'Record 10 seconds', minFps: 25, view: null, intro: () => gaitMode === 'run' ? 'Start running at an easy pace. Recording starts after the countdown.' : 'Walk naturally. Recording starts after the countdown.' },
   jump: { secs: 15, label: 'Record jumps (15 s)', minFps: 50, view: 'side', intro: () => 'Hands on hips. Stand still for a second, then jump as high as you can. Three jumps with a short rest.' },
   sls: { secs: 30, label: 'Record knee test (30 s)', minFps: 25, view: 'front', intro: () => 'Stand on your left leg and do five slow squats.' },
+  // Athlete Combine
+  cmj: { secs: 15, minFps: 50, view: 'side', intro: () => 'Hands on hips. Stand still for a second, then jump as high as you can. Three jumps.' },
+  slHop: { secs: 15, minFps: 50, view: 'side', intro: () => `On your ${live?.opts?.side === 'R' ? 'right' : 'left'} leg. Hands on hips, stand still, then jump straight up. Three jumps.` },
+  hops: { secs: 12, minFps: 50, view: 'side', intro: () => 'Hands on hips. Stand still for a second, then ten fast, high hops. Spend as little time on the ground as you can.' },
+  nordic: { secs: 15, minFps: 25, view: 'side', intro: () => 'Kneel upright, side-on to me. Lower forward as slowly as you can.' },
+  bowl: { secs: 12, minFps: 50, view: 'side', intro: () => 'Bowl at full pace. Your last strides and follow-through must be in view.' },
+  fly10: { secs: 15, minFps: 50, view: 'side', intro: () => 'Go.' },
+  s505: { secs: 15, minFps: 50, view: 'side', intro: () => 'Go.' },
+  ...Object.fromEntries(Object.entries(LAB_SCREENS).map(([id, sc]) => ['lab_' + id, { secs: 12, minFps: sc.minFps, view: sc.view === 'side' ? 'side' : 'front', intro: () => sc.how[1] || 'Go.' }])),
 };
+const JUMP_JOINTS = [23, 24, 25, 26, 27, 28, 29, 30, 31, 32];
+function tapGates(prompts) {
+  return new Promise(res => {
+    live.gateWait = { prompts, res };
+    $('#viewport').classList.add('calibrating'); $('#status').textContent = prompts[0];
+  });
+}
 $$('[data-gmode]').forEach(b => b.onclick = () => { gaitMode = b.dataset.gmode; $$('[data-gmode]').forEach(x => x.classList.toggle('on', x === b)); });
 $$('[data-test]').forEach(b => b.onclick = () => {
   testMode = b.dataset.test;
@@ -617,6 +652,7 @@ function testFrame(px, ctx, t) {
   live.frames.push({ t, px }); recorder2.push(t, px);
   if (live.mode === 'gait') { footTrails.L.push(px[31], 1); footTrails.R.push(px[32], 1); footTrails.L.draw(ctx); footTrails.R.draw(ctx); }
   drawPose(ctx, px, { color: '#45c3ff' });
+  if (live.gates.length) { ctx.save(); ctx.strokeStyle = '#d8e66c'; ctx.lineWidth = 3; ctx.setLineDash([10, 8]); live.gates.forEach(x => { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, ctx.canvas.height); ctx.stroke(); }); ctx.restore(); }
   const cfg = TEST[live.mode], el = (t - (live.source === 'file' ? 0 : live.t0)) / 1000;
   if (live.source !== 'file') {
     $('#gProg').style.width = Math.min(100, el / cfg.secs * 100) + '%';
@@ -632,14 +668,25 @@ function testFrame(px, ctx, t) {
 
 function finishTest() {
   if (!live) return;
-  const { frames, mode, source } = live, demo = source === 'demo';
+  const { frames, mode, source } = live, demo = source === 'demo', live0 = live;
   const w = $('#overlay').width, h = $('#overlay').height;
   stopLive(); $('#live').hidden = true; live = null;
   footTrails.L.reset(); footTrails.R.reset();
   const cfg = TEST[mode];
   // Quality gate first: a bad recording gives a bad answer, so say what to fix instead.
-  const q = demo ? { ok: true, score: 100, issues: [], fps: 30 } : assessQuality(frames, { w, h, minFps: cfg.minFps, view: cfg.view, viewOf, joints: mode === 'jump' ? [23, 24, 25, 26, 27, 28, 29, 30, 31, 32] : undefined });
+  const q = demo ? { ok: true, score: 100, issues: [], fps: 30 } : assessQuality(frames, { w, h, minFps: cfg.minFps, view: cfg.view, viewOf, joints: ['jump', 'cmj', 'slHop', 'hops'].includes(mode) ? JUMP_JOINTS : undefined });
   if (mode === 'rom') { recorder2.finish({ mode, quality: q }); return finishRom(frames, q); }
+  if (ATHLETE_MODES.includes(mode)) {
+    recorder2.finish({ mode, quality: q });
+    // Sprints cross the frame, so a partly visible body is expected: only the frame rate matters there.
+    const moving = ['fly10', 's505', 'bowl', 'lab_bowlSide', 'lab_bowlBehind', 'lab_sprint', 'lab_punch', 'lab_lunge'].includes(mode);
+    const out = !moving && q.score < 40 ? { ok: false, say: 'The recording quality was too low. ' + (q.issues[0] || ''), html: `${qualityHTML(q)}<div class="card"><b>No result yet</b></div>` }
+      : finishAthlete(mode, frames, moving ? { issues: q.issues.filter(i => /fps|frame rate/i.test(i)) } : q, { side: live0.opts?.side, gates: live0.gates });
+    tab('athlete');
+    const box = $('#athleteResult'); box.hidden = false; box.innerHTML = out.html; box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    say(out.say, { id: 'ath_done_' + Date.now(), priority: 'high' });
+    return;
+  }
   const mPerPx = scaleFromHeight(frames.slice(0, 20), (S.profile.heightCm || 0) / 100);
   const r = mode === 'gait' ? analyseGait(frames, { mode: gaitMode }) : mode === 'jump' ? analyseJumps(frames, { mPerPx }) : analyseSingleLegSquat(frames);
   recorder2.finish({ mode, quality: q, result: summarise(mode, r) });
@@ -845,6 +892,16 @@ $('#calBtn').onclick = () => {
   $('#status').textContent = 'Tap the TOP edge of a 45 cm plate';
 };
 $('#viewport').addEventListener('click', e => {
+  if (live?.gateWait) {
+    const c = $('#overlay'), r = c.getBoundingClientRect();
+    const k = Math.min(r.width / c.width, r.height / c.height), ox = (r.width - c.width * k) / 2;
+    let x = e.clientX - r.left; if ($('#viewport').classList.contains('mirror')) x = r.width - x;
+    live.gates.push((x - ox) / k);
+    const w = live.gateWait;
+    if (live.gates.length < w.prompts.length) { $('#status').textContent = w.prompts[live.gates.length]; return; }
+    live.gateWait = null; $('#viewport').classList.remove('calibrating'); $('#status').textContent = '';
+    return w.res();
+  }
   if (!live?.calPts) return;
   const c = $('#overlay'), r = c.getBoundingClientRect();
   const k = Math.min(r.width / c.width, r.height / c.height), ox = (r.width - c.width * k) / 2, oy = (r.height - c.height * k) / 2;
@@ -1523,6 +1580,11 @@ $('#studioExport').onclick = async () => { const data = await exportClips(); if 
 function applyCycleFlag() { const on = readFlags().cycleTracking; $('#cycleTile').hidden = !on; $('#flagCycle').checked = on; }
 $('#flagCycle').onchange = e => { setFlag('cycleTracking', e.target.checked); applyCycleFlag(); };
 initCycle({ root: $('#cycleRoot'), toast });
+
+/* ---------- Athlete Combine (js/athlete/) ---------- */
+initAthlete({ $, esc, S, persist, say, tab, toast,
+  startTest: (mode, source, file, opts) => { if (source === 'file' && !file) return; startLive({ mode, source, file, opts }); } });
+bindUploads();
 
 /* ---------- Boot ---------- */
 applyCycleFlag(); mountOrbs(); bindPlan(); bindProfile(); renderTrain(); renderToday(); applyMute(); renderTestHistory();

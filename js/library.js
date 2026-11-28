@@ -166,6 +166,38 @@ export const LIBRARY = [
   X('calfStretch', 'Calf Stretch', ['Calves'], 'Wall', null, { rehab: true, hold: 30, guide: 'Hands on a wall, the back leg straight with the heel down. Lean in until you feel a stretch. Then repeat with the back knee bent.' }),
   X('plantarStretch', 'Plantar Fascia Stretch', ['Calves'], 'Bodyweight', null, { rehab: true, hold: 30, guide: 'Sit, cross the foot over your knee, pull your toes back towards you until you feel a stretch under the arch. First thing in the morning helps most.' }),
   X('towelHeelRaise', 'High-load Heel Raise (towel under toes)', ['Calves'], 'Step', 'calf', { rehab: true, setup: 'Side-on to the camera, toes on a rolled towel on a step. 3 seconds up, 2 at the top, 3 down.' }),
+
+  // ---- Athlete exercises (used by the Athlete Combine plans; athletic: true groups them) ----
+  // Speed & agility
+  X('accelSprint', 'Acceleration Sprint (10–20 m)', ['Full body', 'Quads', 'Glutes'], 'None', null, { athletic: true, guide: 'From a split stance, push hard for 10 to 20 metres with a forward lean. Full effort, walk back, rest at least 60 seconds. Quality over quantity: stop when you slow down.' }),
+  X('flyingSprint', 'Flying Sprint (build-up + 10–20 m)', ['Full body', 'Hamstrings'], 'None', null, { athletic: true, guide: 'Build up over 20 metres, then hit top speed for 10 to 20 metres. Tall posture, fast arms. Rest 2 to 3 minutes between runs.' }),
+  X('repeatSprint', 'Repeated Sprints', ['Full body'], 'None', null, { athletic: true, guide: 'Sprint 20 to 30 metres, jog back slowly, go again every 20 to 30 seconds. Builds the ability to sprint again and again in a match.' }),
+  X('aSkip', 'A-Skip', ['Full body', 'Calves'], 'None', null, { athletic: true, guide: 'Skip forward, driving one knee up to hip height and striking the ground under your hips. Stay tall, quick ground contacts.' }),
+  X('shuttle505', '5-0-5 Turns', ['Full body', 'Quads'], 'Cones', null, { athletic: true, guide: 'Sprint to a line 5 metres away, plant, turn and sprint back. Turn off both feet across sets. Full effort, full rest.' }),
+  X('decelDrill', 'Deceleration Drill', ['Quads', 'Glutes'], 'None', null, { athletic: true, guide: 'Sprint 10 metres and stop dead within 3 steps, hips low, chest up, knee over the toes. Then try it on one leg.' }),
+  X('sideShuffle', 'Lateral Shuffle', ['Glutes', 'Quads'], 'Cones', null, { athletic: true, guide: 'Low athletic stance, shuffle 5 metres each way without your feet crossing or clicking together. Push off the outside foot.' }),
+  X('ghosting', 'Squash Ghosting', ['Full body', 'Quads'], 'Court', null, { athletic: true, guide: 'From the T, move to each corner, lunge and play a shadow shot, then push back to the T. Work for 30 to 45 seconds, rest the same.' }),
+  // Jumps & plyometrics
+  X('pogoHop', 'Pogo Hops', ['Calves', 'Full body'], 'None', null, { athletic: true, guide: 'Bounce on the balls of your feet with stiff ankles and straight legs. Spend as little time on the ground as possible.' }),
+  X('boxJump', 'Box Jump', ['Quads', 'Glutes', 'Full body'], 'Box', null, { athletic: true, guide: 'Swing your arms, jump onto the box and land softly in a half squat. Step down, don\'t jump down. Full rest between jumps.' }),
+  X('broadJump', 'Broad Jump', ['Glutes', 'Quads', 'Full body'], 'None', null, { athletic: true, guide: 'Swing your arms and jump forward as far as you can. Stick the landing for 2 seconds with knees over the toes.' }),
+  X('lateralBound', 'Lateral Bound', ['Glutes', 'Quads'], 'None', null, { athletic: true, guide: 'Push off one leg sideways and land on the other. Stick the landing for 2 seconds, knee over the middle toes, then bound back.' }),
+  // Strength, power & trunk
+  X('trapBarJump', 'Trap Bar Jump', ['Quads', 'Glutes', 'Full body'], 'Trap bar', null, { athletic: true, guide: 'Light trap bar (about 20 to 30% of your deadlift). Dip and jump as high as you can, land softly. 3 to 5 reps, full rest.' }),
+  X('medBallRotThrow', 'Med Ball Rotational Throw', ['Core', 'Full body'], 'Med ball', null, { athletic: true, guide: 'Side-on to a wall, load your back hip, then turn hard and throw the ball into the wall. Hips lead, arms follow. Both sides.' }),
+  X('medBallSlam', 'Med Ball Slam', ['Full body', 'Core'], 'Med ball', null, { athletic: true, guide: 'Lift the ball overhead on your toes, then slam it into the floor as hard as you can, hinging at the hips.' }),
+  X('landminePress', 'Landmine Press', ['Shoulders', 'Chest', 'Core'], 'Barbell', null, { athletic: true, guide: 'Half-kneeling or split stance, press the end of the bar up and forward. Ribs down, no leaning back.' }),
+  X('copenhagen', 'Copenhagen Plank', ['Core', 'Glutes'], 'Bench', null, { athletic: true, hold: 20, guide: 'Side plank with your top leg on a bench (knee on it to start, foot when stronger). Lift your hips and hold.' }),
+  X('sledPush', 'Sled Push', ['Quads', 'Glutes', 'Full body'], 'Sled', null, { athletic: true, guide: 'Arms straight on the poles, body leaning forward. Drive with short, powerful steps for 10 to 20 metres.' }),
+  X('deadHang', 'Dead Hang', ['Forearms', 'Back'], 'Pull-up bar', null, { athletic: true, hold: 30, guide: 'Hang from a bar with straight arms, shoulders gently active. Hold as long as you can with a good grip.' }),
+  X('towelHang', 'Towel Pull-up Hang', ['Forearms', 'Back', 'Biceps'], 'Pull-up bar', null, { athletic: true, hold: 20, guide: 'Loop two towels over the bar and hang from them. Builds the grip used for gripping kit and opponents.' }),
+  X('turkishGetUp', 'Turkish Get-up', ['Shoulders', 'Core', 'Full body'], 'Kettlebell', null, { athletic: true, guide: 'Lying with a kettlebell pressed up, stand up step by step keeping your arm vertical and eyes on the bell, then reverse it. Slow.' }),
+  X('sprawl', 'Sprawl', ['Full body', 'Core'], 'Bodyweight', null, { athletic: true, guide: 'From a fighting stance, shoot your legs back and drop your hips to the floor, then snap back up to stance. Fast.' }),
+  X('lateralLunge', 'Lateral Lunge', ['Glutes', 'Quads'], 'Bodyweight', null, { athletic: true, guide: 'Step wide to the side, sit your hips back over that foot with the other leg straight, then push back to standing.' }),
+  // Conditioning
+  X('tempoRun', 'Tempo Runs', ['Full body'], 'None', null, { athletic: true, guide: 'Run 100 metres at about 70% of top speed, walk 50 metres, repeat. Builds aerobic fitness without sprint fatigue.' }),
+  X('intervalRun', 'Interval Runs (15 s on / 15 s off)', ['Full body'], 'None', null, { athletic: true, guide: 'Run hard for 15 seconds, rest 15 seconds, for blocks of 6 to 10 minutes. High-intensity aerobic work for team sports.' }),
+  X('bikeIntervals', 'Bike Intervals', ['Full body', 'Quads'], 'Bike', null, { athletic: true, guide: 'On an air bike or spin bike: 30 seconds hard, 30 seconds easy, or rounds that match your fight or game. Low impact on the legs.' }),
 ];
 
 export const LIB = Object.fromEntries(LIBRARY.map(x => [x.id, x]));

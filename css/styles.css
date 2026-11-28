@@ -497,3 +497,9 @@ button.float-chip { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .screen { animation: none; } }
 .bubble-who { display: inline-flex; align-items: center; gap: 8px; }
 #rehabTitle { font-size: 1.3rem; max-width: 13ch; }
+
+/* Athlete Combine */
+.tile.on { outline: 2px solid var(--z1); outline-offset: -2px; }
+.linkish { background: none; border: 0; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+#athleteRoot details > summary::-webkit-details-marker { display: none; }
+#athleteRoot input[type=number] { min-width: 0; }
