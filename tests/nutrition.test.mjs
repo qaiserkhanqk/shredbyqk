@@ -1,5 +1,6 @@
 // Desi nutrition engine and photo consensus. Run: node tests/nutrition.test.mjs
 const SAUCES = new Set(['toum']); // oil-based sauces are legitimately denser than any cooked dish
+const BLACK = new Set(['americano']); // black coffee is ~2 kcal/100 g
 import * as N from '../js/nutrition.js';
 import { INDB } from '../js/foods-indb.js';
 import { consensus } from '../js/foodphoto.js';
@@ -19,7 +20,7 @@ for (const d of N.DISHES) {
       if (Math.abs(atw - e.kcal) / e.kcal > 0.12) bad.push(`${d.id} atwater ${Math.round(atw)} vs ${Math.round(e.kcal)}`);
       // Energy density should be possible for cooked food (water-rich drinks to fried snacks).
       const per100 = e.kcal / e.grams * 100;
-      if (per100 < 5 || per100 > (SAUCES.has(d.id) ? 700 : 520)) bad.push(`${d.id} ${Math.round(per100)} kcal/100 g`);
+      if (per100 < (BLACK.has(d.id) ? 1 : 5) || per100 > (SAUCES.has(d.id) ? 700 : 520)) bad.push(`${d.id} ${Math.round(per100)} kcal/100 g`);
     }
     if (d.fat.home > d.fat.restaurant || d.fat.restaurant > d.fat.shaadi) bad.push(d.id + ' fat order');
   } catch (e) { bad.push(d.id + ': ' + e.message); }
@@ -109,7 +110,7 @@ check('portion is the median, not the mean', c.items[0].servings === 1);
 check('oil cue is the majority', c.items[0].oil === 'oily');
 check('agreement reported', c.agreement > 0.6 && c.agreement < 1);
 check('same samples → same consensus', JSON.stringify(consensus([s([it('nihari', 1)]), s([it('nihari', 1)])])) === JSON.stringify(consensus([s([it('nihari', 1)]), s([it('nihari', 1)])])));
-check('unknown dish ids become "other" names', consensus([s([it('sushi_roll', 2, { other_name: 'Sushi' })])]).items[0].otherName === 'Sushi');
+check('unknown dish ids become "other" names', consensus([s([it('beef_wellington', 2, { other_name: 'Beef Wellington' })])]).items[0].otherName === 'Beef Wellington');
 check('two piles of the same dish are added', consensus([s([it('roti', 1), it('roti', 2)])]).items[0].servings === 3);
 check('broken samples are ignored', consensus([null, { error: 'x' }, s([it('chai', 1)])]).items[0].dish === 'chai');
 
@@ -119,6 +120,19 @@ check('broken samples are ignored', consensus([null, { error: 'x' }, s([it('chai
   check('protein within 35% of kcal', t.protein * 4 <= t.kcal * 0.35 + 4);
   const lean = N.targets({ sex: 'male', age: 30, heightCm: 180, weightKg: 80, job: 'desk', trainDays: 4, dietGoal: 'lose' });
   check('normal weight keeps 2 g/kg on a cut', lean.protein === 160, lean.protein);
+}
+
+{ // Western café and restaurant dishes land where published values put them (restaurant style, one serving).
+  const range = (id, lo, hi) => { const v = kcal(id, { style: 'restaurant' }); check(`${N.DISH[id].name}: ${lo}–${hi} kcal`, v >= lo && v <= hi, Math.round(v) + ''); };
+  range('cheesecake', 300, 480); range('fish_and_chips', 700, 1100); range('steak', 400, 700); range('pancakes', 420, 560);
+  range('english_breakfast', 750, 1050); range('spaghetti_bolognese', 600, 850); range('caesar_salad', 400, 700); range('brownie', 300, 450);
+  range('latte', 150, 250); range('mocha', 230, 380); range('sushi_roll', 250, 450); range('lamb_shank', 750, 1100); range('creme_brulee', 300, 420);
+  range('doner_kebab', 550, 900); range('crepe', 400, 600); range('bubble_tea', 250, 450); range('tom_yum', 80, 250);
+  check('americano < 20 kcal, espresso < 10', kcal('americano', {}) < 20 && kcal('espresso', {}) < 10);
+  check('a splash of milk in the americano is counted', kcal('americano', { topping: true }) > kcal('americano', {}) + 10);
+  check('"cheesecake" → cheesecake, "brownie" → brownie, "americano" → americano',
+    top('cheesecake').ref.id === 'cheesecake' && top('brownie').ref.id === 'brownie' && top('americano').ref.id === 'americano');
+  check('every dish sits in at most one family; new families exist', ['Breakfast (café)', 'Pasta', 'Salads', 'Desserts (café)', 'Mexican', 'Asian (café)'].every(f => N.DISHES.some(d => d.fam === f)));
 }
 
 console.log(fails ? `\n${fails} FAILED` : '\nall nutrition checks passed');

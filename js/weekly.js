@@ -68,7 +68,8 @@ export function weekReport(o) {
   // A day counts once it looks fully logged; half-logged days would make every average look low.
   // Two or more meals logged counts even when the total is low, so real under-eating still shows up.
   const target = t ? t.kcal : 2000;
-  const full = keys.filter(k => {
+  // Days the client marked "I didn't log everything" never count: a half-logged day isn't a low-calorie day.
+  const full = keys.filter(k => !o.incomplete?.[k]).filter(k => {
     const kc = byDay[k].reduce((a, e) => a + e.kcal, 0), meals = new Set(byDay[k].map(e => e.meal)).size;
     return kc >= target * 0.45 || (meals >= 2 && kc >= target * 0.25);
   });
@@ -162,6 +163,13 @@ export function weekReport(o) {
   if (week.meatDays === 0 && week.eggDays === 0 && A.dairy < 250) report.notes.push('Vitamin B12 is found almost only in animal foods. If you mostly eat vegetarian, ask your doctor about checking B12.');
   const act = activityFromSteps(steps, trainDays.size);
   if (act && p.activity && act !== p.activity) report.notes.push(`Your steps and training suggest “How active” should be ${({ low: 'Train 1–2 days', mid: 'Train 3–5 days', high: 'Train 6–7 days or a physical job' })[act]}. Change it under Your targets for a more accurate calorie target.`);
+  // Weekdays vs Fri–Sun: weekend eating often undoes the week (Racette 2008). Only said when the gap is real.
+  const we = stats.filter(s => [0, 5, 6].includes(new Date(s.k + 'T12:00').getDay())), wd = stats.filter(s => ![0, 5, 6].includes(new Date(s.k + 'T12:00').getDay()));
+  if (we.length && wd.length >= 2) {
+    const av = a => a.reduce((x, s) => x + s.kcal, 0) / a.length, gap = av(we) - av(wd);
+    if (gap >= 300) { report.weekend = { weekday: Math.round(av(wd) / 10) * 10, weekend: Math.round(av(we) / 10) * 10 };
+      report.notes.push(`Weekdays about ${fmt(report.weekend.weekday)} kcal, Fri–Sun about ${fmt(report.weekend.weekend)}${A.outShare > 0.3 ? `, with ${Math.round(A.outShare * 100)}% of your calories from eating out` : ''}. Planning one weekend meal ahead closes most of that gap.`); }
+  }
   if (A.unknownShare > 0.4) report.notes.push('Many of your foods came from the recipe list, so the veg and dairy counts may be partial.');
 
   // Real maintenance from the scale: what you ate, minus what the weight change says you stored.

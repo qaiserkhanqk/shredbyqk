@@ -31,6 +31,10 @@ const fast = await Promise.all(Array.from({ length: 20 }, () => fetch(`${base}/f
 check('"fast": one answer back, with refine:true only when unsure', fast.every(b => b.samples.length === 1 && typeof b.refine === 'boolean') && fast.some(b => b.refine) && fast.some(b => !b.refine));
 const fixed = checkAnswer({ items: [{ dish: 'Chicken Karahi', alternative: 'naan' }, { dish: 'pizza_margherita_xl', alternative: 'nope' }] }, ids);
 check('answers mapped onto real dishes; unknown ones become "other" with their name', fixed.items[0].dish === 'chicken_karahi' && fixed.items[0].alternative === 'naan' && fixed.items[1].dish === 'other' && fixed.items[1].other_name === 'pizza_margherita_xl' && fixed.items[1].alternative === 'none');
+const menu = await (await fetch(`${base}/food-menu`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ image: 'data:image/jpeg;base64,' + Buffer.from('menu').toString('base64'), item: 'Zinger burger' }) })).json();
+check('menu board photo → the item\'s calories', menu.kcal === 550 && menu.name === 'Zinger burger', JSON.stringify(menu));
+const badMenu = await fetch(`${base}/food-menu`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ image: 'not an image' }) });
+check('menu: a non-image is refused (400)', badMenu.status === 400, badMenu.status);
 server.close();
 console.log(fails ? `\n${fails} failed` : '\nall photo server checks pass');
 process.exit(fails ? 1 : 0);

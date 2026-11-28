@@ -13,6 +13,9 @@ import { DISH, DISHES, estimate } from './nutrition.js';
 import { near, typo } from './fuzzy.js';
 import { LOCAL_PLACES } from './places-local.js';
 import { UAE_PLACES } from './places-uae.js';
+import { ISB_PLACES } from './places-isb.js';
+import { LHE_PLACES } from './places-lhe.js';
+import { KHI_PLACES } from './places-khi.js';
 const UAE_CITIES = new Set(['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Al Ain', 'Ras Al Khaimah', 'Fujairah', 'UAE']);
 // In the UAE, the UAE branch of a chain and local UAE places come first; in Pakistan, the reverse.
 const nearBoost = (p, myCity) => !myCity ? 0 : p.city === myCity ? 0.8 : UAE_CITIES.has(myCity) === (p.country === 'UAE') ? (p.country === 'UAE' ? 0.6 : 0) : -0.6;
@@ -112,7 +115,7 @@ export const PLACES = [
 const norm = s => String(s).toLowerCase().replace(/['’]/g, '').normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
 /** All places: the seed list plus the client's own. */
-export const allPlaces = (custom = []) => [...PLACES, ...LOCAL_PLACES, ...UAE_PLACES, ...custom.map(p => ({ ...p, type: p.type || 'Added by you', custom: true }))];
+export const allPlaces = (custom = []) => [...PLACES, ...LOCAL_PLACES, ...ISB_PLACES, ...LHE_PLACES, ...KHI_PLACES, ...UAE_PLACES, ...custom.map(p => ({ ...p, type: p.type || 'Added by you', custom: true }))];
 
 /** Nutrition for a menu item: the chain's official numbers if present, else the dish model. */
 export function itemNutrition(item) {
