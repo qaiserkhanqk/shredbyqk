@@ -165,6 +165,7 @@
     <button type="button" class="tile" data-go="rehab"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.5-9-9.5C1.6 7.6 4.2 4 7.8 4c1.8 0 3.2 1 4.2 2.4C13 5 14.4 4 16.2 4 19.8 4 22.4 7.6 21 11.5 19 16.5 12 21 12 21z"/><path d="M9 12h6M12 9v6"/></svg></span><span><b>Fix a pain or injury</b><span>Back, shoulder, knee, ankle and more. A safe, step-by-step plan.</span></span></button>
     <button type="button" class="tile" data-go="gait"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round"><path d="M8 4c2 0 3 2 3 4s-1 5-3 5-3-3-3-5 1-4 3-4zM16 9c2 0 3 2 3 4s-1 4-3 4-3-2-3-4 1-4 3-4z"/></svg></span><span><b>Test how you move</b><span>Walking and running, jump height, knee control.</span></span></button>
     <button type="button" class="tile" data-go="scan"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="12" r="3"/></svg></span><span><b>Posture &amp; body fat</b><span>A photo check of how you stand, plus body fat.</span></span></button>
+    <button type="button" class="tile" data-go="lab"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M12 12l9-5M12 12v10M12 12L3 7"/></svg></span><span><b>3D Lab · athletes</b><span>Two cameras, one movement: a 3D skeleton, rotations, knee alignment and a report. For bowlers, footballers and anyone.</span></span></button>
     <button type="button" class="tile" data-go="fitage"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span><b>Fitness Age</b><span>How old your body really is, from the HUNT fitness research. Plus what would make you younger.</span></span></button>
     <button type="button" class="tile" data-go="vitals"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-5 4 10 2-5h6"/></svg></span><span><b>Body check</b><span>Heart rate and HRV with your fingertip on the camera, plus a 3-minute alertness test.</span></span></button>
     <button type="button" class="tile" data-go="reader"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-2-1.5-5-2-8-1.5v14c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5v-14c-3-.5-6 0-8 1.5z"/><path d="M12 6v14"/></svg></span><span><b>Read the Quran</b><span>All 114 surahs with translation and recitation. Continue where you left off.</span></span></button>
@@ -226,6 +227,45 @@
         <p class="muted" style="margin:0">Only your board name and points are shared. Your sleep, stress and health numbers never are.</p>
       </div>
     </details>
+  </section>
+
+  <!-- 3D LAB -->
+  <section class="screen" id="lab">
+    <button type="button" class="back" data-back>‹ Tools</button>
+    <div class="page-head"><div><span class="eyebrow">QK Athlete Biomechanics Lab</span><h1 class="display h1">Two cameras. One movement. 3D.</h1></div></div>
+    <details class="card" open><summary><b>How to film (2 minutes)</b></summary>
+      <ol class="small lab-steps">
+        <li>Two cameras: two phones, or a phone and a DJI. Both on tripods at hip height, 3–5 m from the athlete, at 60 fps or more if they can.</li>
+        <li>Camera A side-on. Camera B in front (or behind), so the two are about 90° apart.</li>
+        <li>Press record on both, then <b>clap once</b> where both can hear it. That lines the videos up.</li>
+        <li>The athlete does the movement: 3–5 squats, landings, deliveries or kicks, whole body in view the whole time.</li>
+        <li>Load both videos below. They are analysed on this device and never uploaded.</li>
+      </ol>
+      <p class="muted small" style="margin:0">Four separate videos from four angles at different times are four flat views, not 3D. 3D needs the same moment from two cameras.</p>
+    </details>
+    <div class="card stack">
+      <div class="grid2"><label class="field">Athlete<input id="labName" autocomplete="off"></label><label class="field">Height (cm)<input id="labHeight" type="number" inputmode="numeric" min="100" max="230"></label></div>
+      <div class="grid2"><label class="field">Movement<select id="labPreset"></select></label><label class="field" id="labArmWrap" hidden>Bowling arm<select id="labArm"><option value="R">Right</option><option value="L">Left</option></select></label></div>
+      <label class="field">Camera A: side-on video<input id="labSide" type="file" accept="video/*"></label>
+      <label class="field">Camera B: front or back video<input id="labFront" type="file" accept="video/*"></label>
+      <label class="check"><input type="checkbox" id="labBack"> Camera B was behind the athlete</label>
+      <label class="check"><input type="checkbox" id="labFast"> Faster analysis (a little less precise)</label>
+      <div class="btn-row"><button type="button" class="ghost" id="labDemo">Try the demo</button><button type="button" class="cta" id="labGo">Analyse in 3D</button></div>
+      <p class="muted small" id="labStatus" hidden></p>
+    </div>
+    <div class="stack lab-result" id="labResult" hidden>
+      <div class="card stack"><span class="eyebrow">3D skeleton · drag to turn</span><h2 class="display h2" id="labTitle"></h2>
+        <canvas id="labCanvas" class="lab-canvas" aria-label="3D skeleton"></canvas>
+        <div class="btn-row"><button type="button" class="ghost" id="labPlay">Play</button><input type="range" id="labScrub" min="0" max="0" value="0" aria-label="Frame"></div>
+        <p class="muted small" id="labNow" style="margin:0"></p>
+        <p class="muted small" id="labSync" style="margin:0"></p>
+      </div>
+      <div class="card stack"><span class="eyebrow">What QK found</span><div class="stack" id="labFlags"></div></div>
+      <div class="card stack"><span class="eyebrow">3D measurements</span><div id="labTable"></div></div>
+      <div class="btn-row"><button type="button" class="ghost" id="labCsv">Export data (CSV)</button><button type="button" class="ghost" id="labPrint">Print report</button></div>
+      <p class="muted small" style="margin:0">Coaching and screening grade from two cameras. Official decisions (such as an ICC bowling-action test) need an accredited lab.</p>
+    </div>
+    <div class="card stack" id="labHistory" hidden></div>
   </section>
 
   <!-- FITNESS AGE -->

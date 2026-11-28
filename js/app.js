@@ -50,6 +50,7 @@ import { initFitAge, renderFitAge } from './fitage-ui.js';
 import { initBoard, renderBoard, renderBoardCard } from './board-ui.js';
 import { initDone, showDone } from './done-ui.js';
 import { initReport, renderReport, weeklyTick } from './report-ui.js';
+import { initLab, renderLab } from './lab-ui.js';
 import * as volume from './volume.js';
 import * as mind from './mind.js';
 import { vitalNotes } from './hr.js';
@@ -82,6 +83,8 @@ initBoard({ S, persist: () => persist(), toast: m => toast(m), cloud: () => clou
 initDone({ S, persist: () => persist(), toast: m => toast(m), say: (t, o) => say(t, o), lib: LIB, unit: () => unit(), toUnit: prog.toUnit,
   rewardsLine: () => { const p = rewards.progress(rewards.lifetimeClean(S.sessions, isHoldId)); return p.next ? `${p.left} clean reps to ${p.next.name}` : null; } });
 initReport({ S, persist: () => persist(), lib: LIB, say: (t, o) => say(t, o) });
+initLab({ S, persist: () => persist(), toast: m => toast(m), say: (t, o) => say(t, o) });
+$('#labDemo').onclick = async () => { const { demoVideos } = await import('./lab-demo.js'); const d = demoVideos(); if (!$('#labName').value) $('#labName').value = 'Demo athlete'; window.__qkLab.analyse(d.side, d.front); };
 setTimeout(() => { try { if (weeklyTick()) renderToday(); } catch (e) { console.warn('weekly report:', e); } }, 1200);
 initFood({ S, persist: () => persist(), toast: m => toast(m), rehab: () => !!S.rehab?.active });
 const recorder2 = new SessionRecorder();
@@ -111,7 +114,7 @@ function mountOrbs() {
 /* ---------- Navigation ---------- */
 function tab(id) {
   $$('.screen').forEach(s => s.classList.toggle('on', s.id === id));
-  const tabFor = ['body', 'gait', 'scan', 'rehab', 'calm', 'vitals', 'fitage', 'brain', 'quran', 'reader'].includes(id) ? 'today' : ['board', 'report'].includes(id) ? 'progress' : id; // tools live under Today
+  const tabFor = ['body', 'gait', 'scan', 'rehab', 'calm', 'vitals', 'fitage', 'brain', 'quran', 'reader', 'lab'].includes(id) ? 'today' : ['board', 'report'].includes(id) ? 'progress' : id; // tools live under Today
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tabFor));
   if (id === 'today') renderToday();
   if (id === 'train') renderPrograms();
@@ -126,6 +129,7 @@ function tab(id) {
   if (id === 'fitage') renderFitAge();
   if (id === 'board') renderBoard();
   if (id === 'report') renderReport();
+  if (id === 'lab') renderLab();
   if (id === 'food') renderFood();
   if (id === 'scan') $('#hipWrap').hidden = S.profile.sex === 'male';
   if (id === 'body') { const first = { recover: 'rehab', calm: 'calm' }[S.profile.focus]; const t = first && $(`#body [data-go=${first}]`); if (t) $('#body .page-head').after(t); }
