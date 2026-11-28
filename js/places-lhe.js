@@ -59,9 +59,9 @@ export const LHE_PLACES = [
     I('Milky malt cake (slice)', 'cake_slice', { servings: 1.2 }), I('Three milk cake (slice)', 'cake_slice', { servings: 1.3 }), I('Brownie', 'brownie'), I('Cupcake', 'cake_slice')]),
   P('sweet-creme-lhe', 'Sweet Creme', 'Lahore', 'Gulberg; Cantt; Mumtaz Market; Raiwind Road', 'https://www.foodpanda.pk/restaurant/arns/sweet-creme-gulberg', [
     I('Super cup', 'ice_cream'), I('Molten lava with vanilla base', 'lava_cake', { servings: 1.3 }), I('Brownie with vanilla base', 'brownie', { servings: 1.4 }),
-    I('Super Sonic super fudge loaded sundae', 'ice_cream', { servings: 2 }), I('Oreo blizzard', 'ice_cream', { servings: 2 })]),
+    I('Super Sonic super fudge loaded sundae', 'sundae'), I('Oreo blizzard', 'ice_cream', { servings: 2 })]),
   P('frosti-lhe', 'Frosti', 'Lahore', '', 'https://thenews.com.pk/tns/detail/566710-frosti-bites', [
-    I('Soft-serve in waffle cone', 'ice_cream'), I('Cake ice cream sundae', 'ice_cream', { servings: 1.3 }), I('Lotus / salted caramel ice cream', 'ice_cream')], { check: true }),
+    I('Soft-serve in waffle cone', 'ice_cream'), I('Cake ice cream sundae', 'sundae', { servings: 0.65 }), I('Lotus / salted caramel ice cream', 'ice_cream')], { check: true }),
 
   // Continental, steak and burgers
   P('the-brasserie-lhe', 'The Brasserie', 'Lahore', 'Mall 1, Main Boulevard Gulberg III', 'https://dailytimes.com.pk/138504/french-food-arrives-brasserie/', [
@@ -104,16 +104,16 @@ export const LHE_PLACES = [
     I('Classic club sandwich', 'club_sandwich', R), I('Chicken biryani', 'chicken_biryani', R), I('Shezan supreme chicken steak', 'grilled_chicken_meal', R),
     I('Shezan Surprise ice cream', 'ice_cream', { servings: 1.3 })]),
   P('nisa-sultan-lhe', 'Nisa Sultan', 'Lahore', 'Lahore (also a mall branch)', 'https://www.thenews.pk/tns/detail/556414-new-wave-turks-town', [
-    I('Chicken doner roll', 'shawarma', R), I('Lamb doner roll', 'shawarma', { ...R, servings: 1.1 }), I('Chicken shish platter', 'shish_tawook', { ...R, servings: 2 }),
+    I('Chicken doner roll', 'doner_kebab', R), I('Lamb doner roll', 'doner_kebab', { ...R, servings: 1.1 }), I('Chicken shish platter', 'shish_tawook', { ...R, servings: 2 }),
     I('Lahmacun pide', 'manakish_meat', R), I('Hummus', 'hummus'), I('Turkish kunefe', 'kunafa'), I('Fries', 'fries', R)]),
 
   // Chinese, Thai and Japanese
   P('yum-chinese-lhe', 'Yum Chinese & Thai', 'Lahore', '24-K Gulberg; DHA', 'https://www.foodpanda.pk/restaurant/t5jc/yum-chinese-gulberg', [
     I('Chicken Manchurian', 'manchurian', R), I('Kung pao chicken', 'chilli_chicken', R), I('Mongolian beef', 'chilli_chicken', R), I('Chicken with cashew nuts', 'manchurian', R),
-    I('Thai basil chicken', 'manchurian', R), I('Tom yum gai soup', 'corn_soup'), I('Pad Thai chicken', 'pad_thai', R), I('Egg fried rice', 'egg_fried_rice', R), I('Chicken chow mein', 'chow_mein', R)]),
+    I('Thai basil chicken', 'manchurian', R), I('Tom yum gai soup', 'tom_yum'), I('Pad Thai chicken', 'pad_thai', R), I('Egg fried rice', 'egg_fried_rice', R), I('Chicken chow mein', 'chow_mein', R)]),
   P('fuchsia-lhe', 'Fuchsia Kitchen', 'Lahore', 'Hali Road, Gulberg', 'https://wanderlog.com/place/details/2670182/fuchsia-kitchen', [
     I('Crispy honey beef', 'manchurian', R), I('Cashew nut chicken', 'manchurian', R), I('Sweet & sour chicken', 'manchurian', R), I('Crispy lemon chicken', 'manchurian', R),
-    I('Tom yum soup', 'corn_soup'), I('Pad Thai', 'pad_thai', R), I('Crunchy maki sushi', 'sushi_roll'), I('Fried rice', 'egg_fried_rice', R)]),
+    I('Tom yum soup', 'tom_yum'), I('Pad Thai', 'pad_thai', R), I('Crunchy maki sushi', 'sushi_roll'), I('Fried rice', 'egg_fried_rice', R)]),
   P('mandarin-kitchen-lhe', 'Mandarin Kitchen', 'Lahore', 'Gulberg; DHA Phase 3', 'https://www.foodpanda.pk/restaurant/uzue/mandarin-kitchen-gulberg-uzue', [
     I('Crunchy honey beef', 'manchurian', R), I("Chef's special chicken", 'manchurian', R), I('Kung pao chicken', 'chilli_chicken', R), I('Mongolian beef', 'chilli_chicken', R),
     I('Mandarin Manchurian', 'manchurian', R), I('Steamed dumplings', 'dumplings'), I('Hot & sour soup', 'corn_soup'), I('Thai clear soup', 'corn_soup', { servings: 0.8 }),

@@ -47,5 +47,6 @@ check('unknown words are reported, not guessed', parseMeal('do roti aur xyzabc')
 check('splits on aur / and / , / + / te / ke saath', splitMeal('roti aur daal, chai + samosa te lassi ke saath kheer').length === 6);
 check('a meal sentence is recognised', looksLikeMeal('do roti aur daal') && looksLikeMeal('2 samosa') && !looksLikeMeal('karahi'));
 
+check('"ice cream" is ice cream, "cola with ice" is just cola', parseMeal('ice cream').items[0]?.ref.id === 'ice_cream' && parseMeal('cola with ice').items.map(i => i.ref.id).join() === 'cola');
 console.log(fails ? `\n${fails} FAILED` : '\nall meal-text checks passed');
 process.exit(fails ? 1 : 0);

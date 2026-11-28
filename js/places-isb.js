@@ -80,7 +80,7 @@ export const ISB_PLACES = [
     I('Soft-serve cup', 'ice_cream'), I('Brownie with soft swirl', 'brownie', { servings: 1.5 }),
     I('Molten lava cake with vanilla ice cream', 'lava_cake', { servings: 1.2 })]),
   P('isb-kaspas', "Kaspa's Desserts", 'Islamabad', 'Agha Khan Rd, F-6 Markaz', 'https://www.islamabadscene.com/?p=11955', [
-    I('American waffle with toppings', 'waffles', { servings: 1.2 }), I('Ice cream sundae', 'ice_cream', { servings: 2 }),
+    I('American waffle with toppings', 'waffles', { servings: 1.2 }), I('Ice cream sundae', 'sundae'),
     I('Milkshake', 'milkshake'), I('Cake (slice)', 'cake_slice')]),
   P('isb-sweetaholic', 'Sweetaholic', 'Islamabad', 'Roomy Signature Hotel, F-6 Markaz', W(8512374), [
     I('Ice cream (2 scoops)', 'ice_cream'), I('Pistachio milk cake (slice)', 'cake_slice', { servings: 1.3 }),
@@ -159,7 +159,7 @@ export const ISB_PLACES = [
     I('Chicken shawarma', 'shawarma', R), I('Beef shawarma', 'shawarma', R), I('Hummus', 'hummus'),
     I('Mixed grill platter', 'mixed_grill', R), I('Shish tawook', 'shish_tawook', R)]),
   P('isb-locanta', 'Locanta Turkish Restaurant & Café', 'Islamabad', 'Beverly Centre, F-6/1', W(10813471), [
-    I('Turkish döner', 'shawarma', R), I('Iskender kebab', 'shawarma', { ...R, servings: 1.5 }), I('Adana kebab (2 skewers)', 'seekh_kebab', { ...R, servings: 2 }),
+    I('Turkish döner', 'doner_kebab', R), I('Iskender kebab', 'doner_kebab', { ...R, servings: 1.5 }), I('Adana kebab (2 skewers)', 'seekh_kebab', { ...R, servings: 2 }),
     I('Lahmacun', 'manakish_meat', R), I('Pide', 'manakish_cheese', { ...R, servings: 1.5 })]),
   P('isb-mez-turkish', 'MêZ Turkish Restaurant', 'Islamabad', 'Roomy Signature Hotel, F-6 Markaz', 'https://blogpakistan.pk/turkish-restaurants-in-islamabad', [
     I('Lamb platter', 'mixed_grill', R), I('Turkish poultry platter', 'mixed_grill', R), I('Hummus', 'hummus'),

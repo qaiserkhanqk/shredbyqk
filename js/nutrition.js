@@ -294,7 +294,7 @@ export const DISHES = [
   D('kunafa', 'Kunafa', 'kunafa knafeh', 'sweet', 'piece', 150, null, [['vermicelli', 40], ['mozzarella', 30], ['sugar', 30]], F('ghee', 15, 18, 20)),
   D('biscuits', 'Biscuits (3)', 'biscuit biscuits cookies rusk papay', 'sweet', 'pack', 30, null, [['maida', 20], ['sugar', 6]], F('oil', 5, 5, 5)),
   D('donut', 'Glazed donut', 'donut doughnut', 'sweet', 'donut', 55, null, [['maida', 25], ['sugar', 12], ['milk', 5]], F('oil', 9, 10, 11)),
-  D('ice_cream', 'Ice cream (2 scoops)', 'ice cream scoop kulfi', 'sweet', 'cup', 140, null, [['iceCream', 140]], NOFAT),
+  D('ice_cream', 'Ice cream (2 scoops)', 'ice cream icecream scoop kulfi', 'sweet', 'cup', 140, null, [['iceCream', 140]], NOFAT),
   D('rabri', 'Rabri', 'rabri rabdi', 'sweet', 'katori', 120, null, [['milk', 300], ['sugar', 20], ['nuts', 3]], NOFAT),
   D('ras_malai', 'Ras malai', 'ras malai rasmalai', 'sweet', 'piece', 60, null, [['paneer', 20], ['milk', 60], ['sugar', 10], ['nuts', 2]], NOFAT),
   D('mithai', 'Mithai (barfi, chamcham)', 'mithai barfi chamcham milk cake sweets', 'sweet', 'piece', 45, null, [['khoya', 20], ['sugar', 12]], F('ghee', 1, 1, 1)), // LFAC barfi 40 g, FNDDS 45 g at 283 kcal/100 g

@@ -48,7 +48,7 @@ const SIZE_WORDS = new Set(['small', 'medium', 'regular', 'large', 'chota', 'chh
 const SAY = { chawal: 'plain rice', doodh: 'milk', milk: 'milk', bread: 'bread slice', toast: 'bread slice', egg: 'boiled egg', eggs: 'boiled egg', tea: 'chai', coke: 'cola', pepsi: 'cola', sprite: 'cola' };
 // What a bare word usually means at a Pakistani table (the most common version of the dish).
 const DEFAULT = { biryani: 'chicken_biryani', karahi: 'chicken_karahi', qorma: 'chicken_qorma', korma: 'chicken_qorma', pulao: 'chicken_pulao', samosa: 'samosa',
-  pheekichai: 'chai_no_sugar', qeema: 'qeema', keema: 'qeema', chapati: 'roti', roti: 'roti', rotiyan: 'roti', rotian: 'roti', rotiya: 'roti', paratha: 'paratha', naan: 'naan', kebab: 'seekh_kebab', kabab: 'seekh_kebab', tikka: 'chicken_tikka',
+  pheekichai: 'chai_no_sugar', icecream: 'ice_cream', qeema: 'qeema', keema: 'qeema', chapati: 'roti', roti: 'roti', rotiyan: 'roti', rotian: 'roti', rotiya: 'roti', paratha: 'paratha', naan: 'naan', kebab: 'seekh_kebab', kabab: 'seekh_kebab', tikka: 'chicken_tikka',
   salan: 'chicken_salan', daal: 'daal_masoor', dal: 'daal_masoor', chawal: 'plain_rice', rice: 'plain_rice', anday: 'boiled_egg', anda: 'anda_fry', egg: 'boiled_egg',
   burger: 'zinger_burger', pizza: 'pizza_slice', lassi: 'sweet_lassi', halwa: 'suji_halwa', chane: 'cholay', chanay: 'cholay', sabzi: 'mix_sabzi', chai: 'chai',
   shawarma: 'shawarma', roll: 'paratha_roll', pakoray: 'pakora', fries: 'fries', omelette: 'omelette', saag: 'sarson_saag', machli: 'fish_curry', fish: 'fish_curry',
@@ -169,6 +169,7 @@ const norm = s => String(s).toLowerCase()
   // "do anday ka omelette": the number counts eggs, and one omelette is 2 eggs.
   .replace(/\b([a-z]+|\d+(?:\.\d+)?)\s+(?:anday|ande|anda|eggs?)\s+(?:ka|ki|ke|wala|wali|walay)?\s*(omelette|omlet|amlet|amlate|omelet)\b/g, (m, n, o) => (isNum(n) ? ` ${Math.max(0.5, numOf(n) / 2)} ${o} ` : m))
   // "chai bina cheeni", "without sugar": the side is dropped (the no-sugar chai is its own dish).
+  .replace(/\bice[\s-]?creams?\b/g, ' icecream ') // "ice" alone is a side (ice in a drink), "ice cream" is a dessert
   .replace(/\b(chai|tea)\s+(?:bina|without|no)\s+(?:cheeni|chini|shakar|sugar)\b|\b(?:sugar\s*free|pheeki)\s+(chai|tea)\b/g, ' pheekichai ')
   .replace(/\b(?:bina|without|no)\s+(?:cheeni|chini|shakar|sugar)\b|\bsugar\s*free\b/g, ' nosugar ')
   .replace(/\s+/g, ' ').trim();
