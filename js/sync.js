@@ -81,6 +81,7 @@ export class Cloud {
   send(clientId, kind, body) { return this.req('/rest/v1/messages', { method: 'POST', body: { coach_id: this.uid, client_id: clientId, kind, body }, headers: { Prefer: 'return=minimal' } }); }
   /** One message per client (they see it in the app; the push job sends it as a notification within the hour). */
   broadcast(clientIds, title, bodyFor) { return clientIds.length ? this.req('/rest/v1/messages', { method: 'POST', body: clientIds.map(id => ({ coach_id: this.uid, client_id: id, kind: 'broadcast', title, body: bodyFor(id) })), headers: { Prefer: 'return=minimal' } }) : Promise.resolve(); }
+  labels(ids, fromIso) { return ids.length ? this.req(`/rest/v1/form_labels?client_id=in.(${ids.join(',')})&at=gte.${encodeURIComponent(fromIso)}&select=*&limit=10000`) : Promise.resolve([]); }
   scores(ids, fromWeek) { return ids.length ? this.req(`/rest/v1/scores?client_id=in.(${ids.join(',')})&week=gte.${fromWeek}&select=client_id,week,score,parts`) : Promise.resolve([]); }
   setPrizes(prizes) { return this.updateMe({ prizes }); }
   rewards(month) { return this.req(`/rest/v1/rewards?coach_id=eq.${this.uid}&month=eq.${month}&select=*`); }
@@ -115,6 +116,10 @@ export async function pushAll(cloud, S, mark = {}) {
   const checks = (S.checkins || []).filter(c => c.at > (mark.checkins || 0));
   await cloud.upsert('sessions', sets.map(s => sessionRow(uid, s)), 'client_id,at,ex');
   await cloud.upsert('checkins', checks.map(c => ({ client_id: uid, at: new Date(c.at).toISOString(), data: c })), 'client_id,at');
+  // "Was QK right?" labels (re-sent for a day so an answer changed after the set still arrives).
+  const labels = (S.labels || []).filter(l => l.at > (mark.labels || 0) - 864e5);
+  try { await cloud.upsert('form_labels', labels.map(l => ({ client_id: uid, at: new Date(l.at).toISOString(), ex: l.ex, counted: l.counted, reps: l.reps, cue: l.cue, verdict: l.verdict, view: l.view, vis: l.vis, unsure: l.unsure, model: l.model })), 'client_id,at'); }
+  catch (e) { console.warn('labels sync skipped:', e.message); }
   // Food: the last 8 days (re-sent, so edits catch up), places the client added, and the weekly summary.
   // If the server hasn't got the food tables yet (supabase/schema.sql not re-run), training still syncs.
   let food = null;
@@ -148,6 +153,7 @@ export async function pushAll(cloud, S, mark = {}) {
     sessions: Math.max(mark.sessions || 0, ...sets.filter(s => !String(s.ex).startsWith('class:')).map(s => s.at)),
     classes: Math.max(mark.classes || 0, ...classSets.map(s => s.at)),
     checkins: Math.max(mark.checkins || 0, ...checks.map(c => c.at)),
+    labels: Math.max(mark.labels || 0, ...(S.labels || []).map(l => l.at)),
   };
 }
 

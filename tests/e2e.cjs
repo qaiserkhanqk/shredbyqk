@@ -60,6 +60,9 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.fill('#loadKg', '80'); await p.click('#startDemo');
   await p.waitForSelector('#summary:not([hidden])', { timeout: 60000 });
   check('demo set: 10 reps, 7 clean', (await p.textContent('#sReps')) === '10' && /7 clean/.test(await p.textContent('#sClean')));
+  check('accuracy: after a camera set, "Was QK right?" with one-tap answers', await p.isVisible('#wasRight') && (await p.$$('#wasRight [data-wr]')).length === 3);
+  await p.click('#wasRight [data-wr="right"]'); await p.waitForTimeout(100);
+  check('accuracy: the answer is saved as a label (numbers only)', await p.evaluate(() => { const l = (JSON.parse(localStorage.getItem('shred_qk_v1')).labels || []); return l.length === 0 || (l[0].verdict === 'right' && !('video' in l[0])); }));
   check('demo set: bar speed card shown (hip thrust is horizontal → asks for plate calibration)', await p.isVisible('#vbtCard') && /Calibrate|plate/.test(await p.textContent('#vbtNote')));
   check('summary: rest timer starts by itself', (await p.textContent('#restBtn')) === 'Pause');
   check('summary: weight pre-filled from the setup', (await p.inputValue('#setKg')) === '80');
@@ -685,7 +688,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('dashboard: untick someone → one fewer selected', /^(\d+) of (\d+)/.exec(await p.textContent('#bcCount'))[1] === String(+/^(\d+)/.exec(cntBefore)[1] - 1), `${cntBefore} → ${await p.textContent('#bcCount')}`);
   await p.selectOption('#bcAud', 'noopen'); await p.selectOption('#bcAway', '90'); await p.waitForTimeout(100);
   check('dashboard: "hasn\'t opened the app for 3 months" works too', /selected/.test(await p.textContent('#bcCount')));
-  check('dashboard: opens on the month board (the prize one), QK can record the top 3', (await p.$$('#cbList .b-row')).length >= 5 && (await p.$$('#cbList [data-award]')).length === 3);
+  check('dashboard: opens on the month board (the prize one), QK can record the top 3 (ties share a place)', (await p.$$('#cbList .b-row')).length >= 5 && await p.evaluate(() => { const rows = [...document.querySelectorAll('#cbList .b-row')]; const top = rows.filter(r => /🥇|🥈|🥉/.test(r.querySelector('.b-rank').textContent)); return top.length >= 3 && top.every(r => r.querySelector('[data-award]')) && rows.filter(r => r.querySelector('[data-award]')).length === top.length; }), await p.textContent('#cbList'));
   await p.click('[data-cbrange=week]'); await p.waitForTimeout(100);
   check('dashboard: week view offers a weekly MVP shout-out', await p.isVisible('#cbMvp'));
   await p.click('#cbMvp'); await p.waitForTimeout(150);

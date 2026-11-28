@@ -6,7 +6,8 @@ import { parse as parseVoice } from './voicecmd.js';
 import { EXERCISES, RepEngine, allRules, estimateRIR, TIPS, BREATHING } from './exercises.js';
 import { FeedbackCoach, restSeconds } from './feedback.js';
 import { getVideoLandmarker, drawPose, liveModelName } from './pose.js';
-import { toPx, viewOf, Smoother, bestSide, angle } from './angles.js';
+import { toPx, viewOf, Smoother, OneEuro, jointVisibility, VIS_MIN, bestSide, angle } from './angles.js';
+import * as acc from './accuracy.js';
 import { MotionTracker, romSummary, torsoLen } from './motion.js';
 import { analyseGait } from './gait.js';
 import { analyseJumps, jumpReadiness } from './jump.js';
@@ -465,7 +466,7 @@ $('#videoFile').onchange = e => { const f = e.target.files[0]; e.target.value = 
 
 /* ---------- Live session (form check + gait capture) ---------- */
 let live = null, fb = null, engine = null, stream = null, recorder = null, chunks = [], facing = 'user', raf = 0;
-const smooth = new Smoother(0.55);
+const smooth = new OneEuro(); // adaptive: steady when still, no lag when moving (see angles.js)
 const fx = new FormFX();
 // Visible tracking: lock-on scan, body brackets, rep read-out and the LIVE chip (see hud.js).
 const hud = new TrackHUD();
@@ -498,7 +499,7 @@ async function startLive({ mode, source, file, auto = false }) {
   if (auto) exKey = null;
   const ex = mode === 'form' && !auto ? curEx() : null;
   const rx = mode === 'form' && !auto ? curRx : null;
-  live = { rx, mode, source, frames: [], t0: null, lost: 0, wrong: 0, demo: null, done: false, steps: 0, mPerPx: null, standFrames: [], times: [],
+  live = { rx, mode, source, frames: [], t0: null, lost: 0, wrong: 0, setupFrames: 0, demo: null, done: false, steps: 0, mPerPx: null, standFrames: [], times: [],
     auto, det: auto ? new ExerciseDetector() : null, buf: [], sets: [], lastRepT: 0 };
   bar.reset(); recorder2.start({ kind: mode, exercise: mode === 'form' && !auto ? exKey : undefined, gaitMode: mode === 'gait' ? gaitMode : undefined, source, loadKg: mode === 'form' ? parseFloat($('#loadKg').value) || null : undefined });
   engine = null; fb = null; smooth.reset(); motion.reset(); fx.reset(); hud.reset(); comp = null; recorder = null; $('#trackChip').innerHTML = '<i></i>Finding you…'; $('#trackChip').classList.remove('on'); $('#faultBanner').hidden = true;
@@ -645,7 +646,17 @@ function formFrame(px, ctx, t) {
     live.cleanBase = rewards.lifetimeClean(S.sessions, isHoldId); // reward milestones count from here
   }
   const raw = ex.metrics(px, engine.view), m = { ...raw };
-  for (const k of ['knee', 'hip', 'elbow', 'torsoLean', 'heelLift', 'shY', 'hipY']) if (raw[k] != null) m[k] = smooth.push(k, raw[k]);
+  for (const k of ['knee', 'hip', 'elbow', 'torsoLean', 'heelLift', 'shY', 'hipY']) if (raw[k] != null) m[k] = smooth.push(k, raw[k], t);
+  // Per-joint gate: if a joint this exercise is judged on is hidden or blurry, count the rep but don't judge it.
+  const vis = jointVisibility(px, ex.primary, engine.view);
+  m.unsure = vis < VIS_MIN; live.visSum = (live.visSum || 0) + vis; live.visN = (live.visN || 0) + 1;
+  // Setup check once, a second into the set: view, whole body in frame, distance, frame rate.
+  if (!quiet && !live.setupDone && ++live.setupFrames >= 30) {
+    live.setupDone = true;
+    const sc = acc.setupCheck({ px, w: ctx.canvas?.width || $('#video').videoWidth, h: ctx.canvas?.height || $('#video').videoHeight, view, wantView: ex.view, fps: hud.fps() });
+    live.setupIssues = sc.issues.map(i => i.id);
+    if (!sc.ok) speak(sc.issues[0].say, { id: 'setup_' + sc.issues[0].id, priority: 'high' });
+  }
 
   // Confidence gate: low-confidence landmarks give wrong angles, so stay quiet instead.
   if (raw.s.conf < 0.55) {
@@ -680,7 +691,14 @@ function formFrame(px, ctx, t) {
       ev.drift = motion.endRep();
       $('#repNum').textContent = engine.reps;
       flash(ev.faults.length ? 'bad' : 'good');
-      const dot = document.createElement('i'); if (ev.faults.length) dot.className = 'f'; $('#dots').appendChild(dot);
+      const dot = document.createElement('i'); dot.className = ev.unsure ? 'u' : ev.faults.length ? 'f' : ''; dot.dataset.rom = ev.rom || 0; $('#dots').appendChild(dot);
+      // Visual feedback after every rep (Weakley 2023: visual beat verbal): bar height = depth vs your best rep.
+      const all = [...$('#dots').children], best = Math.max(1, ...all.map(d => +d.dataset.rom));
+      all.forEach(d => { d.style.height = `${Math.max(20, Math.round(+d.dataset.rom / best * 100))}%`; });
+      const depthPct = Math.round((ev.rom || 0) / best * 100), slow = ev.vl >= 0.25;
+      $('#repLine').textContent = ev.unsure ? `Rep ${engine.reps} counted · couldn't see clearly, not judged` : `Rep ${engine.reps} · ${depthPct >= 95 ? 'full range' : depthPct + '% range'} · ${slow ? 'slowing down' : 'speed holding'}`;
+      $('#repLine').className = `rep-line ${ev.unsure ? 'u' : ev.faults.length ? 'f' : 'ok'}`;
+      if (ev.unsure && !live.saidUnsure && !quiet) { live.saidUnsure = true; say("Rep counted. I couldn't see your joints clearly, so I didn't judge that one.", { id: 'unsure_' + Date.now(), priority: 'low' }); }
       $('#cleanCt').textContent = `${engine.goodReps} clean`;
       $('#vlKnob').style.left = Math.min(100, ev.vl / .5 * 100) + '%';
       $('#vlTxt').textContent = ev.vl < .1 ? 'fresh' : ev.vl < .25 ? `−${Math.round(ev.vl * 100)}%` : `−${Math.round(ev.vl * 100)}% · near failure`;
@@ -691,6 +709,8 @@ function formFrame(px, ctx, t) {
     const awaiting = fb.awaitingFix;
     const line = ev.type === 'live' ? fb.onLive(ev.faults[0]) : ev.type === 'rep' ? fb.onRep(ev) : fb.onContinuousFault(ev.faults[0]);
     if (line) say(line.text, line);
+    // Front-view screening flags (knee cave): a gentle check once per set, never counted as a fault.
+    else if (ev.type === 'rep' && ev.checks?.length && !live.checkSaid) { live.checkSaid = true; say(`Worth a look on the replay: ${ev.checks[0].cue}`, { id: 'check_' + Date.now(), priority: 'low' }); }
     if (ev.type === 'rep') {
       // Rep read-out on the body and a shout at clean-streak milestones. No vibration: the phone is
       // propped up or on the floor, and a buzz can shift it out of position.
@@ -837,7 +857,8 @@ function endSet() {
   const avg = k => tempo.length ? (tempo.reduce((a, t) => a + t[k], 0) / tempo.length).toFixed(1) : '–';
   const prev = [...S.sessions].reverse().find(x => x.ex === exKey);
   const score = reps ? Math.round(good / reps * 100) : 0, prevScore = prev?.reps ? Math.round(prev.good / prev.reps * 100) : null;
-  const rs = romSummary(roms), drift = motion.drifts.length ? Math.max(...motion.drifts) : 0;
+  const typical = (S.romTyp || {})[exKey] || 0;
+  const rs = romSummary(roms, typical), drift = motion.drifts.length ? Math.max(...motion.drifts) : 0;
 
   $('#sumEyebrow').textContent = `${ex.name} · set ${setsToday(exKey) + 1}`;
   $('#scoreRing').hidden = false;
@@ -875,8 +896,12 @@ function endSet() {
     const kg = weighted && parseFloat($('#setKg').value) > 0 ? prog.fromUnit(parseFloat($('#setKg').value), unit()) : undefined;
     const rx = live?.rx;
     S.sessions.push(lastSet = { at: Date.now(), ex: exKey, name: ex.name, reps, good, faults: tally, vl, tempo, roms: roms.map(r => Math.round(r.rom)), kg, demo: live?.source === 'demo' || undefined,
+      unsure: engine?.unsureReps || undefined, checks: Object.keys(engine?.checkTally || {}).length ? engine.checkTally : undefined, view: engine?.view, vis: live?.visN ? Math.round(live.visSum / live.visN * 100) / 100 : undefined,
       ...(rx ? { target: rx.reps, mode: rx.mode === 'wave' ? 'wave' : undefined, wave: rx.day, rxKg: rx.kg } : {}) });
     logProgramDay(exKey);
+    // This lifter's usual full range (median of recent clean reps), for catching sets of half reps next time.
+    if (live?.source !== 'demo') { const clean = roms.filter(r => r.clean).map(r => r.rom); if (clean.length >= 3) { const sorted = clean.sort((a, b) => a - b), med = sorted[sorted.length >> 1]; S.romTyp ||= {}; S.romTyp[exKey] = Math.round(S.romTyp[exKey] ? S.romTyp[exKey] * 0.7 + med * 0.3 : med); } }
+    showWasRight({ at: lastSet.at, ex: exKey, counted: reps, cue: top?.id || null, view: engine?.view, vis: lastSet.vis, unsure: engine?.unsureReps || 0, demo: live?.source === 'demo' });
     showNext(); setTimeout(() => syncNow?.(), 2000);
     persist();
     const better = prevScore != null && score > prevScore ? ` Your form score is up from ${prevScore} to ${score} percent.` : '';
@@ -921,6 +946,7 @@ $('#nextSet').onclick = () => { if (flow) return nextInFlow(); stopRest(); $('#s
 function fixReps(d) {
   if (!lastSet) return;
   lastSet.reps = Math.max(1, lastSet.reps + d); lastSet.good = Math.min(lastSet.good, lastSet.reps); lastSet.edited = true;
+  if (wasRight && wasRight.at === lastSet.at) { wasRight.verdict = 'count'; wasRight.reps = lastSet.reps; if (!wasRight.demo) acc.saveLabel(S, acc.makeLabel(wasRight)); }
   $('#sReps').textContent = lastSet.reps; $('#sCompare').textContent = 'Count corrected. This set is left out of your form score.';
   persist();
 }
@@ -3077,3 +3103,21 @@ function oneNotice() {
   let shown = false;
   for (const id of ids) { const el = $(id); if (!el) continue; if (el.hidden) continue; if (shown) el.hidden = true; else shown = true; }
 }
+
+// "Was QK right?" after each camera set: one tap. Each answer is a label QK's accuracy is measured and tuned on.
+let wasRight = null;
+function showWasRight(info) {
+  wasRight = { ...info, verdict: null, model: (() => { try { return localStorage.getItem('qk_precision') || null; } catch { return null; } })() };
+  const box = $('#wasRight'); if (!box) return;
+  box.hidden = false; box.querySelectorAll('button').forEach(b => b.classList.remove('on'));
+  $('#wrCue').hidden = !info.cue; $('#wrThanks').hidden = true;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-wr]'); if (!b || !wasRight) return;
+  const v = b.dataset.wr;
+  b.parentElement.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  wasRight.verdict = v;
+  if (v === 'count') { $('#repFix').scrollIntoView({ block: 'center', behavior: 'smooth' }); toast('Use − and + to set the real count.'); }
+  if (!wasRight.demo) acc.saveLabel(S, acc.makeLabel(wasRight));
+  $('#wrThanks').hidden = false; persist();
+});
