@@ -217,7 +217,9 @@ function placeContext(text) {
   for (const t of tries) {
     const pw = words(t.place).filter(w => !CLAUSE_FILLER.has(w) && !HOME.test(w) && !OILY.test(w)), q = pw.join(' ');
     if (!q) { if (style) return { style, rest: t.rest }; continue; }
-    const hit = searchPlaces(q, [], 1)[0];
+    // An exact name beats a longer one that contains it ("bait al mandi" is Bait Al Mandi, not Bait Al Arab Mandi).
+    const hits = searchPlaces(q, [], 6), bare = x => words(x).filter(w => !CLAUSE_FILLER.has(w)).join(' ');
+    const hit = hits.find(h => bare(h.place.name) === q) || hits[0];
     if (hit && placeNamed(hit.place.name, q)) return { place: hit.place, style: style || (['Street', 'Dhaba'].includes(hit.place.type) ? 'shaadi' : 'restaurant'), rest: t.rest };
     // Not in the database: keep its name; it's restaurant food unless they said dhaba or home. "aloo ka paratha" is not a place.
     if ((!t.urdu || t.se) && !match(pw) && pw.length <= 4 && words(t.rest).length) return { unknownPlace: pw.map(w => w[0].toUpperCase() + w.slice(1)).join(' '), style: style || 'restaurant', rest: t.rest };
