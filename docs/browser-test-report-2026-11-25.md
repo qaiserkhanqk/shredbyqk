@@ -137,3 +137,29 @@ Chromium (the four test commands) passed in full: `npm test` 2,044, `npm run res
 | "Sukoon: recitation failure offers the passage on Quran.com" | Firefox | **A real gap.** When the recitation audio can't be decoded, Firefox reports a media-sink error (`NS_ERROR_DOM_MEDIA_MEDIASINK_ERR`) but never fires the audio element's `error` event. A probe showed the screen still on "Bismillah" after 6 s, in silence, with no Quran.com link. Sukoon's fallback relies on that event. Suggested fix: a timeout (if no audio plays within a few seconds, show the link). Not fixed yet. |
 
 Still not tested: real iPhone, Android or Mac Safari.
+
+## Re-run on 064ecab (2026-11-28): main's camera-accuracy update merged, all browser failures resolved
+**Chromium** (the four test commands): `npm test` 2,211, `npm run research:test` 510, `npm run test:e2e` 615 and
+`npm run research:e2e` 65, all with **0 failures**.
+
+**WebKit 26.6:** the main app test (`tests/e2e.cjs`) **254 ok, 0 failures**. **Firefox 155:** the same file **253 ok, 0
+failures, in two runs in a row**. `tests/sukoon-fallback.cjs` (5) and `tests/camera-live.cjs` (3) pass in all three
+browsers (logs in `docs/test-logs/`).
+
+What happened to each failure from the 69f1862 run, and the ones found since:
+
+| Failure | Browser | Cause | Resolution |
+|---|---|---|---|
+| Sukoon: no Quran.com link when the recitation can't play | Firefox | **Real gap**: Firefox never reports the failed audio | App fixed: 8 s safety net (`STALL_MS`, js/calm.js). Test first: `tests/sukoon-fallback.cjs`. The main test now waits up to 10 s for it. |
+| Tap-along pulse gave 76, not 80 | WebKit, Firefox | Test timing (the real gap between taps was ~790 ms) | Test now compares with the pulse the taps really gave, ±1 bpm |
+| "Set start: QK tells you what to do" | Firefox | No WebGL in this Firefox | Marked as needing WebGL, like the other camera checks |
+| Coach dashboard: "QK can record the top 3" | all | **main's own test**: it assumed no ties | Fixed on main (ties share a place); came in with the merge |
+| Plate calibration: second tap lost | Firefox | **Real**: the tap hit Firefox's own Picture-in-Picture button over the camera video, so the video popped out | App fixed: `disablepictureinpicture` on the camera video. Test first: `tests/camera-live.cjs` |
+| Rep line ("Rep 8 · full range …") carried over to a new set | all | **Real** bug in main's new camera update | App fixed: cleared when a set starts. Test first: `tests/camera-live.cjs` |
+| Brain tracker: "3 followed balls" not perfect, now and then | Firefox | Test: balls finish in random places and can overlap, so a tap at a ball's centre could hit another ball | Test taps the exact ball; the scoring check is unchanged |
+| "InvalidStateError: Navigated away from page" console errors | Firefox | Not pinned down | Seen in 2 earlier Firefox runs (both before the Picture-in-Picture fix); **not seen in the last 3 full Firefox runs**, including 2 traced runs set up to record where it came from. Left open: if it returns, the trace will show where. |
+
+`main`'s `sw.js` still did not parse (a line of file names sat before `const SHELL = [`); the merge rebuilt it (cache v46,
+136 files, every one exists) and `tests/sw.test.mjs` checks that it parses.
+
+Still not tested: real iPhone, Android or Mac Safari.
