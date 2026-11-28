@@ -114,14 +114,21 @@ export function followUps(S, { now = Date.now(), lib = {}, program = null } = {}
     add({ id: `mind:${new Date(now).toDateString()}`, kind: 'mind', title: `How are you doing, honestly${name}?`, text: `Sleep or stress has been rough on ${n} of the last 4 days. Not just your body: how are you feeling in yourself?`,
       say: 'Quick one. How are you doing, honestly?', actions: [{ label: "I'm good", act: 'mind:good' }, { label: 'A bit low', act: 'mind:low' }, { label: 'Struggling', act: 'mind:struggling' }] });
   }
-  // 14. Monthly winner.
+  // 14. The weekly report is ready (saved on Monday by report.js).
+  const wsNow = new Date(now); wsNow.setHours(0, 0, 0, 0); wsNow.setDate(wsNow.getDate() - ((wsNow.getDay() + 6) % 7));
+  const lw = new Date(wsNow.getTime() - 7 * DAY), lwKey = `${lw.getFullYear()}-${String(lw.getMonth() + 1).padStart(2, '0')}-${String(lw.getDate()).padStart(2, '0')}`;
+  const rep = S.reports?.[lwKey];
+  if (rep && now - wsNow.getTime() < 4 * DAY) add({ id: `report:${lwKey}`, kind: 'report', title: `Your week in review is ready${name}`,
+    text: `${rep.days} of ${rep.planned} training days${rep.kg ? ` · ${rep.kg >= 10000 ? (rep.kg / 1000).toFixed(1) + ' tonnes' : rep.kg.toLocaleString() + ' kg'} lifted` : ''}${rep.prs ? ` · ${rep.prs} new best${rep.prs > 1 ? 's' : ''}` : ''}. Plus your health, sleep and mind.`,
+    say: 'Your weekly report is ready.', actions: [{ label: 'See my week', act: 'report' }, { label: 'Later', act: 'ok' }] });
+  // 15. Monthly winner.
   for (const w of S.won || []) {
     const m = new Date(w.month).toLocaleDateString(undefined, { month: 'long' });
     add({ id: `won:${w.month}`, kind: 'won', title: `${['', '🥇 You came 1st', '🥈 You came 2nd', '🥉 You came 3rd'][w.place]} in ${m}!`, text: w.prize ? `Your prize: ${w.prize}. QK will be in touch.` : 'Top 3 on the monthly leaderboard. Proud of you.',
       say: `Congratulations! You finished number ${w.place} on the leaderboard in ${m}.`, actions: [{ label: 'Yes!', act: 'ok' }] });
     break;
   }
-  const order = ['mindReply', 'won', 'pain', 'mind', 'rough', 'missed', 'fitup', 'ramadan', 'travel', 'finished', 'pr', 'goal', 'skip', 'time', 'fitage', 'milestone'];
+  const order = ['mindReply', 'won', 'pain', 'mind', 'report', 'rough', 'missed', 'fitup', 'ramadan', 'travel', 'finished', 'pr', 'goal', 'skip', 'time', 'fitage', 'milestone'];
   return out.sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
 }
 

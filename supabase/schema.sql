@@ -317,6 +317,10 @@ create policy "coach manages rewards" on public.rewards for all using (coach_id 
 drop policy if exists "client reads own rewards" on public.rewards;
 create policy "client reads own rewards" on public.rewards for select using (client_id = auth.uid());
 
+-- Weekly report: the client's latest week-in-review snapshot and lifetime weight lifted (for the coach).
+alter table public.profiles add column if not exists week_report jsonb;
+alter table public.profiles add column if not exists lifetime_kg bigint;
+
 -- ============ Chat: clients message QK; Muhammad (QK's AI assistant) answers straight away ============
 -- One row per message. sender: 'client' (the client wrote it), 'assistant' (Muhammad, written only by the server
 -- with the service key, never by an app), 'coach' (QK typed it on the dashboard). A client message Muhammad hands

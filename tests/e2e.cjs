@@ -256,7 +256,8 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('reaction wall: counts hits', /5 hits/.test(await p.textContent('#bkEnd')));
   await p.click('#bkFin');
   await tap('[data-brain=track]'); await p.click('#tkGo'); await p.waitForSelector('#tkBox.pick', { timeout: 10000 });
-  for (const i of [0, 1, 2]) await p.click(`.tk-b[data-b="${i}"]`, { force: true });
+  // The balls may overlap: click the exact element, not a screen point (a point can land on another ball).
+  for (const i of [0, 1, 2]) await p.$eval(`.tk-b[data-b="${i}"]`, el => el.click());
   await p.waitForSelector('#tkFin', { timeout: 8000 });
   check('tracker: picking the 3 followed balls gives a tracking level', /Tracking level \d+/.test(await p.textContent('#tkEnd')) && /1 of 1 rounds perfect/.test(await p.textContent('#tkEnd')));
   await p.click('#tkFin');
@@ -645,12 +646,29 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('lapse: "Your Fitness Age has gone up" after 18 days off', /Your Fitness Age has gone up to \d+/.test(await p.textContent('#memCard')), await p.textContent('#memCard').catch(() => ''));
   // Leaderboard: the score card on Progress opens the board with points, parts and how to earn more.
   await go('progress'); await p.waitForTimeout(200);
-  check('leaderboard: card on Progress shows this week\'s points', /points/.test(await p.textContent('.b-card')));
-  await tap('.b-card'); await p.waitForTimeout(300);
+  check('leaderboard: card on Progress shows this week\'s points', /points/.test(await p.textContent('.b-card[data-go=board]')));
+  await tap('.b-card[data-go=board]'); await p.waitForTimeout(300);
   const bt = await p.textContent('#board');
   check('leaderboard: own score, the five parts and tips to earn more', /points this week/.test(bt) && /Training/.test(bt) && /Sleep/.test(bt) && /Earn more this week/.test(bt), bt.slice(0, 200));
   await tap('#board details summary'); await p.fill('#bNick', 'Beast Mode'); await p.press('#bNick', 'Tab');
   check('leaderboard: nickname saved', await p.evaluate(() => JSON.parse(localStorage.getItem('shred_qk_v1')).profile.nickname) === 'Beast Mode');
+  // Workout complete: the celebration screen with kg lifted, personal bests and a fun comparison.
+  await setS(`S.memory = { done: {} }; const t = Date.now(); S.sessions.push({ at: t - 8 * 864e5, ex: 'squat', name: 'Back Squat', kg: 60, reps: 8 }, { at: t - 30 * 60e3, ex: 'squat', name: 'Back Squat', kg: 80, reps: 8, good: 8 }, { at: t - 20 * 60e3, ex: 'squat', name: 'Back Squat', kg: 80, reps: 8, good: 8 }); S.totals = null;`);
+  await p.reload(); await p.waitForTimeout(600);
+  await p.evaluate(async () => { const m = await import('/js/done-ui.js'); m.showDone({ then: () => { window.__afterDone = true; } }); });
+  await p.waitForTimeout(1300);
+  const dt = await p.textContent('#done');
+  check('workout complete: full-screen celebration with kg lifted (counted up)', await p.isVisible('#done') && +(await p.textContent('#doneKg')).replace(/,/g, '') >= 1280, dt.slice(0, 160));
+  check('workout complete: personal best with a medal, and a fun comparison', /Personal bests/.test(dt) && /Heaviest ever: 80 kg/.test(dt) && /That's about/.test(dt), dt.slice(0, 300));
+  check('workout complete: confetti only because there was a real PR', await p.evaluate(() => document.querySelector('#done').classList.contains('big')));
+  await p.click('#doneClose'); await p.waitForTimeout(150);
+  check('workout complete: Continue closes it and moves on (cool-down offer)', !(await p.isVisible('#done')) && await p.evaluate(() => window.__afterDone === true));
+  check('workout complete: saved to workout history', await p.evaluate(() => (JSON.parse(localStorage.getItem('shred_qk_v1')).workouts || []).length >= 1));
+  // Weekly report: training, kg lifted, health scores, sleep and mind, one focus.
+  await go('progress'); await p.waitForTimeout(150); await tap('[data-go=report]'); await p.waitForTimeout(300);
+  await p.click('[data-rweek=this]'); await p.waitForTimeout(200);
+  const rt = await p.textContent('#report');
+  check('weekly report: wins, training with kg lifted, health, sleep & mind, one focus', /Wins/.test(rt) && /kg lifted|tonnes lifted/.test(rt) && /Your health/.test(rt) && /Sleep & mind/.test(rt) && /Next week, one thing/.test(rt), rt.slice(0, 300));
   // Coach dashboard demo: this phone's training is the first client.
   await p.goto('https://shred.local/coach.html'); await p.waitForTimeout(700);
   check('dashboard demo: your own training is the first client, with sample clients', /\(this phone\)/.test(await p.textContent('.cd-row')) && (await p.$$('.cd-row')).length >= 7, (await p.textContent('.cd-row')).replace(/\s+/g, ' '));
@@ -668,7 +686,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('dashboard: untick someone → one fewer selected', /^(\d+) of (\d+)/.exec(await p.textContent('#bcCount'))[1] === String(+/^(\d+)/.exec(cntBefore)[1] - 1), `${cntBefore} → ${await p.textContent('#bcCount')}`);
   await p.selectOption('#bcAud', 'noopen'); await p.selectOption('#bcAway', '90'); await p.waitForTimeout(100);
   check('dashboard: "hasn\'t opened the app for 3 months" works too', /selected/.test(await p.textContent('#bcCount')));
-  check('dashboard: opens on the month board (the prize one), QK can record the top 3', (await p.$$('#cbList .b-row')).length >= 5 && (await p.$$('#cbList [data-award]')).length === 3);
+  check('dashboard: opens on the month board (the prize one), QK can record the top 3 (ties share a place)', (await p.$$('#cbList .b-row')).length >= 5 && (await p.$$('#cbList [data-award]')).length >= 3, (await p.textContent('#cbList')).slice(0, 400)); // ties share a place, so 3+ buttons
   await p.click('[data-cbrange=week]'); await p.waitForTimeout(100);
   check('dashboard: week view offers a weekly MVP shout-out', await p.isVisible('#cbMvp'));
   await p.click('#cbMvp'); await p.waitForTimeout(150);
