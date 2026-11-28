@@ -113,7 +113,7 @@ export const EXERCISES = {
       return m;
     },
     bottom: [
-      { id: 'sq_valgus', view: 'front', priority: 1, test: (m, c) => m.kneeGap < m.ankleGap * (c?.P?.sqValgus ?? 0.8),
+      { id: 'sq_valgus', view: 'front', priority: 1, screen: true, test: (m, c) => m.kneeGap < m.ankleGap * (c?.P?.sqValgus ?? 0.8) * (c?.base?.kneeGap && c.base.ankleGap ? Math.min(1, c.base.kneeGap / c.base.ankleGap) : 1),
         cue: 'Spread the floor apart with your feet.', yes: 'Yes, knees tracking out. That\'s it.', tag: 'Knees out', src: 'S1',
         why: 'Knees caving in (valgus) shifts load onto the inner knee ligaments.' },
       { id: 'sq_heels', view: 'side', only: FREE_SQUATS, priority: 2,
@@ -223,10 +223,10 @@ export const EXERCISES = {
         cue: 'Keep the bar close. Slide it down your legs.', yes: 'Bar close. Good.', tag: 'Bar close', src: 'S2',
         why: 'A bar drifting away from the legs loads the lower back far more for the same weight.' },
       { id: 'rdl_arms', only: ex => !ex.barOnBack, priority: 2, test: m => m.elbow < 155,
-        cue: 'Long arms. Keep your elbows straight; your arms are just hooks.', yes: 'Straight arms. Good.', tag: 'Straight arms', src: 'S1',
+        cue: 'Arms are ropes: let the bar hang and slide it down your legs.', yes: 'Straight arms. Good.', tag: 'Straight arms', src: 'S1',
         why: 'Bending the arms in a pull wastes the leg drive and lets the bar drift.' },
       { id: 'rdl_locked', only: ex => !!ex.softKnee, priority: 2, test: m => m.knee > 174,
-        cue: 'Keep a soft bend in your knees.', yes: 'Soft knees. Good.', tag: 'Soft knees', src: 'S1',
+        cue: 'Push your hips back toward the wall behind you, knees soft.', yes: 'Soft knees. Good.', tag: 'Soft knees', src: 'S1',
         why: 'Locked knees put the hamstring stretch onto the back of the knee and lower back instead.' },
       { id: 'rdl_squat', only: ex => !ex.dl, priority: 2, test: m => m.knee < 135,
         cue: 'Push your hips back to touch the wall behind you.', yes: 'Beautiful hinge.',
@@ -284,10 +284,10 @@ export const EXERCISES = {
     },
     always: [
       { id: 'cu_body', priority: 2, test: (m, c) => bodySway(m, c),
-        cue: 'Keep your body still. Only your forearms move.', yes: 'Body still. That\'s it.', tag: 'Body still',
+        cue: 'Keep the bar path close and smooth: no swinging the weight.', yes: 'Body still. That\'s it.', tag: 'Body still',
         why: 'Rocking the body uses momentum, so the biceps do less of the work.' },
       { id: 'cu_swing', priority: 2, test: m => m.upperArmSwing > 30,
-        cue: 'Keep your elbows glued to your ribs.', yes: 'Elbows still. Perfect.',
+        cue: 'Pin the weight close to your sides, like holding a newspaper under each arm.', yes: 'Elbows still. Perfect.',
         why: 'Swinging uses momentum and the shoulders instead of the biceps.' },
     ],
     bottom: [
@@ -343,9 +343,9 @@ export const EXERCISES = {
         cue: 'Hinge further. Bring your chest closer to parallel with the floor.', yes: 'Good hinge.', tag: 'Hinge more', src: 'S1',
         why: 'With your torso near parallel to the floor, your back muscles pull straight up against gravity.' },
       { id: 'row_body', priority: 2, test: (m, c) => movedBy(m, c, 'torsoLean', 15),
-        cue: 'Keep your chest still. Pull with your arms, not by lifting your body.', yes: 'Torso still. Strict reps.', tag: 'Chest still', src: 'S1',
+        cue: 'Keep your chest on the same spot and pull the weight to you.', yes: 'Torso still. Strict reps.', tag: 'Chest still', src: 'S1',
         why: 'Heaving the torso up turns the row into a swing and takes work off the back muscles.' },
-      { id: 'row_short', priority: 3, test: m => m.elbow > 85, cue: 'Pull your elbows back past your ribs.', yes: 'Full squeeze. Good.',
+      { id: 'row_short', priority: 3, test: m => m.elbow > 85, cue: 'Pull the weight all the way to your belly button.', yes: 'Full squeeze. Good.',
         why: 'The mid-back muscles (rhomboids, mid-traps) work hardest at the end of the pull.' },
     ],
     top: [
@@ -364,7 +364,7 @@ export const EXERCISES = {
       return m;
     },
     bottom: [
-      { id: 'vp_short', priority: 3, test: m => m.elbow > 80, cue: 'Drive your elbows down into your back pockets.', yes: 'That\'s a full pull.',
+      { id: 'vp_short', priority: 3, test: m => m.elbow > 80, cue: 'Pull the bar down to your collarbone.', yes: 'That\'s a full pull.',
         why: 'Pulling the elbows all the way down fully contracts the lats.' },
       { id: 'vp_even', priority: 2, test: m => m.wristDiff > 0.25, cue: 'Pull both hands down evenly.', yes: 'Even pull, good.',
         why: 'An uneven pull means one side is doing more of the work.' },
@@ -407,7 +407,7 @@ export const EXERCISES = {
       // the shoulder blades have rolled forward (protracted) instead of staying pinned back.
       { id: 'bp_scap', only: BENCH_PRESS, priority: 2,
         test: (m, c) => c?.bottom && (c.bottom.shY - m.shY) / (c.bottom.upperArm || 1) > 0.2,
-        cue: 'Pinch your shoulder blades together and keep them pinned to the bench.', yes: 'Shoulders stayed pinned. Perfect.', tag: 'Pin shoulders',
+        cue: 'Bend the bar into a smile and pin your back into the bench.', yes: 'Shoulders stayed pinned. Perfect.', tag: 'Pin shoulders',
         why: 'Retracted shoulder blades protect the shoulder joint and give the chest a stable base to press from.' },
       { id: 'bp_lockout', priority: 3, test: (m, c) => m.elbow < lim(c, 'lockElbow', 155), cue: 'Press all the way up until your arms are straight.', yes: 'Locked out.', tag: 'Lock out',
         why: 'Finishing each rep trains the triceps through range.' },
@@ -437,7 +437,7 @@ export const EXERCISES = {
       return m;
     },
     always: [
-      { id: 'fly_bend', priority: 2, test: m => m.elbowBend < 110, cue: 'Keep a soft, fixed bend in your elbows, like hugging a tree.', yes: 'Good arm shape.',
+      { id: 'fly_bend', priority: 2, test: m => m.elbowBend < 110, cue: 'Hug a big tree: keep the same wide arc every rep.', yes: 'Good arm shape.',
         why: 'Bending the elbows more turns the fly into a press and takes load off the chest.' },
     ],
   },
@@ -448,11 +448,11 @@ export const EXERCISES = {
     metrics(p) { const m = common(p); m.upperArmSwing = fromVertical(m.s.sh, m.s.el); return m; },
     always: [
       { id: 'tri_body', priority: 2, test: (m, c) => bodySway(m, c),
-        cue: 'Keep your upper body still. Only your forearms move.', yes: 'Steady. Good.', tag: 'Body still',
+        cue: 'Smooth curl: the weight travels, your body stays put.', yes: 'Steady. Good.', tag: 'Body still',
         why: 'Leaning into the rep lets the shoulders and body weight do the triceps\' job.' },
     ],
     top: [
-      { id: 'tri_lockout', priority: 3, test: (m, c) => m.elbow < lim(c, 'lockElbow', 160), cue: 'Straighten your arm all the way and squeeze.', yes: 'Full lockout.',
+      { id: 'tri_lockout', priority: 3, test: (m, c) => m.elbow < lim(c, 'lockElbow', 160), cue: 'Push the weight all the way out until it stops.', yes: 'Full lockout.',
         why: 'The triceps are fully shortened at lockout, so finishing the rep matters.' },
     ],
   },
@@ -474,9 +474,9 @@ export const EXERCISES = {
     ],
     always: [
       { id: 'raise_body', priority: 2, test: (m, c) => bodySway(m, c, 10),
-        cue: 'Keep your body still. Lift with your shoulders only.', yes: 'Steady body. Good.', tag: 'Body still',
+        cue: 'Keep the weights floating out wide, body still like a statue.', yes: 'Steady body. Good.', tag: 'Body still',
         why: 'Rocking the body flings the weight up with momentum instead of the shoulder muscles.' },
-      { id: 'raise_swing', priority: 2, test: m => m.torsoLean > 15, cue: 'Stand tall. Lift with your shoulders, not momentum.', yes: 'Strict reps. Nice.',
+      { id: 'raise_swing', priority: 2, test: m => m.torsoLean > 15, cue: 'Stay tall and float the weights up slowly, no swing.', yes: 'Strict reps. Nice.',
         why: 'Swinging the torso uses momentum instead of the target muscle.' },
     ],
   },
@@ -502,7 +502,7 @@ export const EXERCISES = {
     setup: 'Lying side-on to the camera, camera on the floor about two metres away.',
     metrics(p) { const m = common(p); m.torsoAngle = fromVertical(m.s.hip, m.s.sh); return m; },
     bottom: [
-      { id: 'cr_short', priority: 3, test: m => m.torsoAngle > 68, cue: 'Curl your ribs towards your hips.', yes: 'Good crunch.',
+      { id: 'cr_short', priority: 3, test: m => m.torsoAngle > 68, cue: 'Bring your chest down toward your belt.', yes: 'Good crunch.',
         why: 'The abs flex the spine. Curling, not just lifting the head, is what trains them.' },
     ],
   },
@@ -521,7 +521,7 @@ export const EXERCISES = {
     track: 'an', name: 'Leg Extension', view: 'side', primary: 'knee', downT: 110, upT: 160, concentric: 'up',
     setup: 'Side-on to the camera, hip, knee and ankle in frame.',
     metrics: p => common(p),
-    top: [{ id: 'ke_lockout', priority: 3, test: (m, c) => m.knee < lim(c, 'lockKnee', 165), cue: 'Straighten your legs fully and squeeze your quads.', yes: 'Full squeeze.', why: 'The quads are fully contracted only at full knee extension.' }],
+    top: [{ id: 'ke_lockout', priority: 3, test: (m, c) => m.knee < lim(c, 'lockKnee', 165), cue: 'Kick the pad all the way up until it stops.', yes: 'Full squeeze.', why: 'The quads are fully contracted only at full knee extension.' }],
   },
 
   kneeFlex: {
@@ -554,7 +554,7 @@ export const EXERCISES = {
 // (depth, lockout, range). These are cued the moment they show.
 const LIVE = new Set(['fsq_elbows', 'rdl_bar', 'rdl_arms', 'rdl_locked', 'lu_stride', 'row_angle', 'sq_feet', 'sq_shift', 'row_body', 'sq_valgus', 'sq_heels', 'sq_chest', 'bp_legs', 'pu_sag', 'pu_pike', 'rdl_squat', 'lu_torso', 'cu_swing', 'raise_swing', 'fly_bend', 'dip_deep']);
 // What the lifter is doing wrong, in plain words, shown on screen next to the fix.
-const WRONG = {
+export const WRONG = {
   fsq_elbows: 'Elbows dropping', rdl_bar: 'Bar drifting away from your legs', rdl_arms: 'Bending your arms', rdl_locked: 'Knees locked straight',
   dl_hips_first: 'Hips rising before your chest', lu_stride: 'Step too short', bp_head: 'Head lifting off the bench', pr_stack: 'Wrists not over your elbows',
   row_angle: 'Torso too upright', pu_hands: 'Hands too far forward',
@@ -600,6 +600,7 @@ export class RepEngine {
     this.tLeaveTop = null; this.tBottom = null; this.roms = [];
     this.base = null; this.ascentSnap = null; // base = start position (standing / set up on the bench)
     this.liveSeen = new Set(); this.liveCount = {};
+    this.unsureReps = 0; this.checkTally = {}; // reps counted but not judged (joint hidden); screening flags
   }
 
   // `only` limits a rule to some library exercises (e.g. heel rise is meaningless on a leg press).
@@ -636,17 +637,17 @@ export class RepEngine {
       // clearly rising, the drive-up (ascent) rules take over, so one mistake isn't cued twice.
       const lc = this.ctx(), rising = v > b + 0.15 * (this.upT - b);
       for (const r of this.rules(ex.bottom)) {
-        if (!r.live || rising || this.liveSeen.has(r.id)) continue;
-        this.liveCount[r.id] = r.test(m, lc) ? (this.liveCount[r.id] || 0) + 1 : 0;
+        if (!r.live || r.screen || rising || this.liveSeen.has(r.id)) continue;
+        this.liveCount[r.id] = !m.unsure && r.test(m, lc) ? (this.liveCount[r.id] || 0) + 1 : 0;
         if (this.liveCount[r.id] >= 6) { this.liveSeen.add(r.id); events.push({ type: 'live', faults: [r] }); }
       }
       if (!this.ascentSnap && v >= b + 0.4 * (this.upT - b)) {
         this.ascentSnap = { ...m };
-        for (const r of this.rules(ex.ascent)) if (!r.continuous && !this.liveSeen.has(r.id) && r.test(this.ascentSnap, this.ctx())) { this.liveSeen.add(r.id); events.push({ type: 'live', faults: [r] }); }
+        for (const r of this.rules(ex.ascent)) if (!r.continuous && !r.screen && !m.unsure && !this.liveSeen.has(r.id) && r.test(this.ascentSnap, this.ctx())) { this.liveSeen.add(r.id); events.push({ type: 'live', faults: [r] }); }
       }
       // Continuous drive-up rules are checked on every frame of the way up, not at one moment.
       if (rising) for (const r of this.rules(ex.ascent)) {
-        if (r.continuous && !this.liveSeen.has(r.id) && r.test(m, lc)) { this.liveSeen.add(r.id); events.push({ type: 'live', faults: [r] }); }
+        if (r.continuous && !r.screen && !m.unsure && !this.liveSeen.has(r.id) && r.test(m, lc)) { this.liveSeen.add(r.id); events.push({ type: 'live', faults: [r] }); }
       }
       if (v > this.upT) {
         this.phase = 'top';
@@ -656,8 +657,9 @@ export class RepEngine {
         this.tempo.push(ex.concentric === 'down' ? { ecc: up, con: down } : { ecc: down, con: up });
         const c = this.ctx();
         const all = [...this.rules(ex.bottom), ...this.rules(ex.ascent)];
-        this.repFaults = [...this.rules(ex.bottom).filter(r => r.test(this.bottomSnap, c)),
-          ...(this.ascentSnap ? this.rules(ex.ascent).filter(r => r.test(this.ascentSnap, c)) : [])];
+        this.repUnsure = !!this.bottomSnap.unsure;
+        this.repFaults = [...(this.repUnsure ? [] : this.rules(ex.bottom).filter(r => r.test(this.bottomSnap, c))),
+          ...(this.ascentSnap && !this.ascentSnap.unsure ? this.rules(ex.ascent).filter(r => r.test(this.ascentSnap, c)) : [])];
         // Faults caught live during the rep count for the rep even if the bottom snapshot missed them.
         for (const r of all) if (this.liveSeen.has(r.id) && !this.repFaults.includes(r)) this.repFaults.push(r);
         this.repLive = [...this.liveSeen];
@@ -672,19 +674,22 @@ export class RepEngine {
       if (++this.topFrames >= 12 || this.phase === 'bottom') {
         this.pendingTop = false;
         const c = { ...this.ctx(), bottom: this.repBottom };
-        const faults = [...this.repFaults, ...this.rules(ex.top).filter(r => r.test(this.topSnap, c))]
+        const found = [...this.repFaults, ...(this.topSnap.unsure ? [] : this.rules(ex.top).filter(r => r.test(this.topSnap, c)))]
           .sort((a, b) => a.priority - b.priority);
+        const faults = found.filter(f => !f.screen), checks = found.filter(f => f.screen), unsure = this.repUnsure;
         faults.forEach(f => { this.faultTally[f.id] = (this.faultTally[f.id] || 0) + 1; });
-        if (!faults.length) this.goodReps++;
+        checks.forEach(f => { this.checkTally[f.id] = (this.checkTally[f.id] || 0) + 1; });
+        if (unsure) this.unsureReps++;
+        else if (!faults.length) this.goodReps++;
         const rom = Math.abs(this.topSnap[ex.primary] - this.bottomSnap[ex.primary]);
-        this.roms.push({ rom, clean: !faults.length });
-        events.push({ type: 'rep', reps: this.reps, faults, live: this.repLive || [], tempo: this.tempo[this.tempo.length - 1], vl: this.velocityLoss(), rom });
+        this.roms.push({ rom, clean: !faults.length && !unsure });
+        events.push({ type: 'rep', reps: this.reps, faults, checks, unsure, live: this.repLive || [], tempo: this.tempo[this.tempo.length - 1], vl: this.velocityLoss(), rom });
       }
     }
 
     // Continuous faults must persist ~10 frames (~0.33 s) — a "bandwidth" so brief wobbles are ignored.
     for (const r of this.rules(ex.always)) {
-      this.alwaysCount[r.id] = r.test(m, this.ctx()) ? (this.alwaysCount[r.id] || 0) + 1 : 0;
+      this.alwaysCount[r.id] = !m.unsure && !r.screen && r.test(m, this.ctx()) ? (this.alwaysCount[r.id] || 0) + 1 : 0;
       if (this.alwaysCount[r.id] === 10) {
         this.faultTally[r.id] = (this.faultTally[r.id] || 0) + 1;
         events.push({ type: 'fault', faults: [r] });

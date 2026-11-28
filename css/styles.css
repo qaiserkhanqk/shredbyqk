@@ -1218,3 +1218,12 @@ body.no-scroll { overflow: hidden; }
 .rd-player { position: sticky; bottom: 96px; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-radius: 999px; background: var(--night); color: #ECF1EC; box-shadow: 0 10px 30px -10px rgba(0,0,0,.4); font-size: .88rem; }
 .rd-player .linkbtn { color: #9FD0B6; }
 .wm-mark { width: 26px; height: 26px; margin-right: 7px; flex: none; }
+
+/* Camera accuracy */
+.was-right { display: grid; gap: 6px; padding: 10px 12px; border-radius: 14px; background: var(--surface-2); }
+.was-right .seg button.on { background: var(--z2); color: #fff; }
+.rep-line { display: block; font-size: .8rem; font-weight: 700; margin-top: 2px; min-height: 1.1em; }
+.rep-line.ok { color: var(--good); } .rep-line.f { color: var(--warn); } .rep-line.u { color: var(--muted); }
+#dots { display: flex; align-items: flex-end; gap: 3px; height: 28px; }
+#dots i { width: 7px; min-height: 6px; border-radius: 3px; background: var(--good); transition: height .25s; }
+#dots i.f { background: var(--warn); } #dots i.u { background: var(--muted); opacity: .6; }
