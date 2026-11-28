@@ -23,12 +23,12 @@ import path from 'node:path';
 
 const APP = (process.argv[2] || '').replace(/\/?$/, '/');
 const WD = process.env.WD_URL || 'http://127.0.0.1:4444';
-const LOG = process.argv[3] || `docs/test-logs/ios-iphone12pro-${new Date().toISOString().slice(0, 10)}.log`;
+const LOG = process.argv[3] || `docs/test-logs/ios-combined-${new Date().toISOString().slice(0, 10)}.log`;
 if (!/^https:\/\//.test(APP)) { console.error('usage: node tests/ios/run-iphone.mjs https://<Mac-IP>:8443/ [log-file]'); process.exit(1); }
 fs.mkdirSync(path.dirname(LOG), { recursive: true });
 const out = fs.createWriteStream(LOG, { flags: 'w' });
 const say = s => out.write(s + '\n');
-let fails = 0, count = 0, fallbacks = [];
+let fails = 0, count = 0, fallbacks = [], tapEvents = [];
 const results = [];
 const check = (name, ok, detail = '') => { count++; if (!ok) fails++; results.push({ name, ok }); say(`${ok ? 'ok  ' : 'FAIL'} ${name}${!ok && detail ? '  — ' + String(detail).slice(0, 600) : ''}`); };
 const section = s => say(`\n## ${s}`);
@@ -138,7 +138,41 @@ async function openCycle({ flags, consent = true } = {}) {
 }
 async function goCycle(welcome = false) {
   if (welcome || await visible('#welcomeBtn')) await tap('#welcomeBtn', 300);
-  await tap('.tabs [data-tab=body]', 300); await tap('[data-go=cycle]', 600);
+  await goTool('cycle', 600);
+}
+// Opens a tool screen the way a finger would: a visible [data-go=id] tile is tapped; if the tile is not on screen
+// (main's 4-tab layout puts tools under Today and Body), the same click is delivered to the tile by script.
+async function goBody() { await goTool('body', 400); }
+async function goTool(id, waitMs = 500) {
+  if (await visible('.tabs [data-tab=today]')) await tap('.tabs [data-tab=today]', 250);
+  const sel = `[data-go=${id}]`;
+  if (await visible(sel)) return tap(sel, waitMs);
+  if (await visible('[data-go=body]') && id !== 'body') { await tap('[data-go=body]', 300); if (await visible(sel)) return tap(sel, waitMs); }
+  fallbacks.push(`${sel} (tile not on screen)`); await run(q => document.querySelector(q).click(), sel); await sleep(waitMs);
+}
+// Every part of the combined app opens on the real iPhone: the screen shows, has content, fits the width,
+// and throws no JavaScript error.
+async function allScreens() {
+  await resetSite(); await navigate(APP, 'all screens'); await waitFor(() => exists('#welcomeBtn'), 15000);
+  if (await visible('#welcomeBtn')) await tap('#welcomeBtn', 400);
+  const openOk = async (id, label) => {
+    await sleep(300);
+    const st = await run(q => { const el = document.getElementById(q); if (!el) return { missing: true };
+      const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+      return { shown: r.height > 0 && cs.display !== 'none' && !el.hidden, chars: (el.innerText || '').trim().length,
+        overflow: Math.max(0, document.scrollingElement.scrollWidth - innerWidth), errs: (window.__qk?.errs || []).slice() }; }, id);
+    check(`${label} opens on the iPhone and shows content`, st.shown && st.chars > 20, JSON.stringify(st));
+    check(`${label}: no sideways scrolling`, st.overflow <= 1, `${st.overflow}px`);
+    check(`${label}: no JavaScript error`, !(st.errs || []).length, (st.errs || []).join(' | '));
+  };
+  for (const [t, label] of [['today', 'Today tab'], ['train', 'Train tab'], ['food', 'Food tab'], ['progress', 'Me tab']]) {
+    await tap(`.tabs [data-tab=${t}]`, 600); await openOk(t, label);
+  }
+  for (const [id, label] of [['body', 'Body hub'], ['rehab', 'Rehab'], ['combine', 'Athlete Combine'], ['lab', 'Biomechanics Lab'],
+    ['scan', 'Posture scan'], ['gait', 'Gait'], ['calm', 'Calm'], ['vitals', 'Vitals'], ['fitage', 'Fitness age'], ['brain', 'Brain'],
+    ['reader', 'Quran reader'], ['board', 'Leaderboard'], ['report', 'Weekly report']]) {
+    try { await goTool(id, 800); await openOk(id, label); } catch (e) { check(`${label} opens on the iPhone and shows content`, false, e.message); }
+  }
 }
 async function reopenCycle(label) { await navigate(APP, label); await waitFor(() => exists('#welcomeBtn'), 15000); await goCycle(); await sleep(300); }
 
@@ -182,10 +216,10 @@ async function cycleE2E() {
   await resetSite(); await navigate(APP, 'e2e');
   await waitFor(() => exists('#welcomeName'), 15000);
   await fill('#welcomeName', 'Sara'); await tap('#welcomeBtn', 400);
-  await tap('.tabs [data-tab=body]');
+  await goBody();
   check('cycle: hidden by default (flag off)', !(await visible('#cycleTile')));
   await tap('.tabs [data-tab=progress]'); await tap('#diagCard summary'); await tap('#flagCycle'); await tap('#diagCard summary');
-  await tap('.tabs [data-tab=body]'); check('cycle: tile shown once the prototype flag is on', await visible('#cycleTile'));
+  await goBody(); check('cycle: tile shown once the prototype flag is on', await visible('#cycleTile'));
   await tap('[data-go=cycle]', 600); await waitFor(() => exists('#cyConsent'));
   const ct = await text('#cyConsent');
   check('cycle: consent screen first, says no sharing and not contraception', /not contraception/.test(ct) && /Nothing is shared/.test(ct));
@@ -400,8 +434,9 @@ async function mobileLayout() {
   const first = await layout('welcome');
   check('iPhone: pinch-zoom is not disabled', first.zoomDisabled === false);
   await tap('#welcomeBtn');
-  for (const tab of ['today', 'train', 'progress', 'body']) { await tap(`.tabs [data-tab=${tab}]`); await layout(`${tab} tab`); }
-  await tap('.tabs [data-tab=body]'); await tap('[data-go=cycle]', 600); await layout('cycle consent');
+  for (const tab of ['today', 'train', 'food', 'progress']) { await tap(`.tabs [data-tab=${tab}]`); await layout(`${tab} tab`); }
+  for (const id of ['body', 'rehab', 'combine', 'lab', 'brain', 'reader']) { await goTool(id, 700); await layout(`${id} screen`); }
+  await goTool('cycle', 600); await layout('cycle consent');
   await checkBox('#cyAgree'); await tap('[data-act=consent]', 500);
   await runAsync(async today => {
     const S = await import('/js/cycle/store.js'), M = await import('/js/cycle/model.js'), D = await import('/js/cycle/dates.js');
@@ -415,7 +450,7 @@ async function mobileLayout() {
       M.setSituation(s, 'perimenopause', true); for (const k of ['hotFlushes', 'focus']) M.setCategory(s, k, true);
     });
   }, dayStr(0));
-  await tap('.tabs [data-tab=today]'); await tap('.tabs [data-tab=body]'); await tap('[data-go=cycle]', 700);
+  await goTool('cycle', 700);
   await layout('cycle screen with synthetic history');
   const sumSel = await run(() => { const b = [...document.querySelectorAll('[data-act=summary]')].find(e => e.getBoundingClientRect().width > 0); if (!b) return null; b.setAttribute('data-qk-sum', '1'); return '[data-qk-sum="1"]'; });
   if (sumSel) { await tap(sumSel, 600); await layout('cycle summary'); } else say('note the summary button was not shown in this state (same as the Playwright test, which skips it)');
@@ -438,18 +473,28 @@ async function mobileLayout() {
     await waitFor(() => run(() => document.readyState === 'complete'), 30000); await run(HOOKS);
     const env = await run(() => ({ ua: navigator.userAgent, secure: window.isSecureContext, crypto: !!(window.crypto && crypto.subtle), w: innerWidth, h: innerHeight, dpr: devicePixelRatio, standalone: !!navigator.standalone, title: document.title, sw: !!navigator.serviceWorker, idb: !!window.indexedDB, notif: typeof Notification }));
     say(`device: ${JSON.stringify(env)}`);
+    // Tap self-test: does a WebDriver element click on this iOS version deliver a real "click" to the page?
+    // (On iOS 27.2.1 it does not: touchstart arrives, but touchend only arrives when the next tap starts, so no click
+    // fires and the next tap is reported "intercepted". When that happens every tap falls back to a script click.)
+    await run(() => { const b = document.createElement('button'); b.id = '__qkTap'; b.textContent = 'tap test'; b.style.cssText = 'position:fixed;top:120px;left:40px;width:200px;height:60px;z-index:2147483647'; window.__qkTapped = []; for (const t of ['touchstart', 'touchend', 'click']) b.addEventListener(t, () => window.__qkTapped.push(t)); document.body.appendChild(b); });
+    const { [EL]: tid } = await wd('POST', s('/element'), { using: 'css selector', value: '#__qkTap' });
+    try { await wd('POST', s(`/element/${tid}/click`), {}); } catch (e) { say(`note tap self-test click error: ${e.message}`); }
+    await sleep(800);
+    tapEvents = await run(() => { const v = window.__qkTapped; document.getElementById('__qkTap')?.remove(); return v; });
+    say(tapEvents.includes('click') ? `note tap self-test: WebDriver taps deliver real clicks on this phone (${tapEvents.join(', ')})`
+      : `note tap self-test: a WebDriver tap did NOT deliver a click on this phone (events seen: ${tapEvents.join(', ') || 'none'}). This is a safaridriver limitation, so taps below fall back to script clicks; finger taps are covered by the manual checklist instead.`);
     section('Secure context');
     check('the app loaded over HTTPS with the local certificate trusted (secure context)', env.secure === true && /Shred/i.test(env.title + (await text('body')).slice(0, 2000)), JSON.stringify(env));
     check('Web Crypto (crypto.subtle) is available', env.crypto === true);
     if (!env.secure) throw new Error('not a secure context: the certificate is not trusted on the iPhone');
-    for (const [name, fn] of [['cycle e2e', cycleE2E], ['pregnancy', pregnancy], ['companion', companion], ['adjust', adjust], ['privacy', privacy], ['mobile layout', mobileLayout]]) {
+    for (const [name, fn] of [['all screens', allScreens], ['cycle e2e', cycleE2E], ['pregnancy', pregnancy], ['companion', companion], ['adjust', adjust], ['privacy', privacy], ['mobile layout', mobileLayout]].filter(([n]) => !process.env.ONLY || process.env.ONLY.split(',').includes(n))) {
       try { await fn(); } catch (e) { check(`${name}: run completed`, false, e.message); try { await wd('POST', s('/alert/accept'), {}); } catch { /* no dialog */ } }
     }
   } catch (e) { check('run completed', false, e.message); }
   await harvest(pageLabel);
   section('Whole run');
   check('no JavaScript errors (collected after each page load)', harvested.errs.length === 0, [...new Set(harvested.errs)].slice(0, 8).join(' | '));
-  if (fallbacks.length) say(`note ${fallbacks.length} tap(s) used a script click because Safari reported the target covered: ${[...new Set(fallbacks)].join(', ')}`);
+  if (fallbacks.length) say(`note ${fallbacks.length} tap(s) used a script click after the WebDriver tap was refused (${tapEvents.includes('click') ? 'Safari reported the target covered' : 'most likely the unfinished-tap limitation from the self-test above, not a covered button'}): ${[...new Set(fallbacks)].join(', ')}`);
   else say('note every tap was a real WebDriver tap (no script-click fallbacks)');
   try { await resetSite(); } catch { /* leave nothing behind if possible */ }
   try { await wd('DELETE', s('')); } catch { /* ignore */ }

@@ -1,0 +1,62 @@
+# Shred by QK — real iPhone Safari run, Sat Nov 28 2026 12:59:24 GMT+0400 (Gulf Standard Time)
+app: https://10.20.3.86:8443/  (served from this Mac over HTTPS on the local network; synthetic data only)
+safaridriver session capabilities: {"safari:deviceName":"QK","safari:platformVersion":"27.2.1","safari:automaticInspection":false,"webkit:WebRTC":{"DisableICECandidateFiltering":false,"DisableInsecureMediaCapture":false},"webkit:alwaysAllowAutoplay":false,"browserVersion":"27.2","safari:deviceType":"iPhone","strictFileInteractability":false,"browserName":"Safari","safari:useSimulator":false,"safari:platformBuildVersion":"24B156","setWindowRect":false,"safari:deviceUDID":"00008101-00156DD40105001E","safari:automaticProfiling":false,"acceptInsecureCerts":false,"safari:experimentalWebSocketUrl":false,"platformName":"iOS","safari:diagnose":false}
+device: {"secure":true,"crypto":true,"standalone":false,"ua":"Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Mobile/15E148 Safari/604.1","h":781,"dpr":3,"title":"Shred by QK","sw":true,"idb":true,"w":428,"notif":"undefined"}
+note tap self-test: a WebDriver tap did NOT deliver a click on this phone (events seen: touchstart). This is a safaridriver limitation, so taps below fall back to script clicks; finger taps are covered by the manual checklist instead.
+
+## Secure context
+ok   the app loaded over HTTPS with the local certificate trusted (secure context)
+ok   Web Crypto (crypto.subtle) is available
+
+## Cycle section of tests/e2e.cjs
+ok   cycle: hidden by default (flag off)
+ok   cycle: tile shown once the prototype flag is on
+ok   cycle: consent screen first, says no sharing and not contraception
+ok   cycle: consent needs the box ticked
+ok   cycle: no history → "not enough data", no range
+ok   cycle: 5 cycles → dates from past cycles, explained, never called a prediction interval
+ok   cycle: "may come earlier or later" is visible without opening any section
+ok   cycle: spotting logged without changing the estimate
+ok   cycle: correcting the latest start updates the estimate
+ok   cycle: optional symptom (energy) logged after switching it on
+ok   cycle: symptom-pattern findings hidden by default (research flag off)
+ok   cycle: research flag on → pattern card shown, labelled unvalidated
+ok   cycle: reminder added with its next time and reason
+ok   cycle: reminder paused
+ok   cycle: reminder deleted
+ok   cycle: demo wearable labelled synthetic, skin temp not core temp, DS07 unavailable
+ok   cycle: phase education (opt-in) has a "not enough data" state, no day-14 assumption
+ok   cycle: stored encrypted in IndexedDB (no dates or words in the stored value)
+ok   cycle: no cycle record left in localStorage
+ok   cycle: nothing cycle-related in the main store or error log
+ok   reload: every logged period start is still there after a full page reload
+ok   reload: the logged energy symptom is still there
+ok   reload: the estimate is unchanged
+ok   reload: still there after opening the address again (new page load)
+ok   cycle: export contains the user's data (file content handed to Safari)
+ok   cycle: delete all → data gone and consent asked again
+ok   cycle: after delete + reload, nothing comes back
+ok   unreadable data: a reset button is offered and returns to the consent screen
+note not ported from e2e.cjs: two-tab tests (one Safari tab per WebDriver session on iPhone) and the mood-purge export test.
+
+## tests/mobile-layout.cjs on the real iPhone screen
+ok   iPhone · welcome: nothing wider than the screen
+ok   iPhone · welcome: every control at least 24×24 px
+ok   iPhone · welcome: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone: pinch-zoom is not disabled
+ok   iPhone · today tab: nothing wider than the screen
+ok   iPhone · today tab: every control at least 24×24 px
+ok   iPhone · today tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone · train tab: nothing wider than the screen
+ok   iPhone · train tab: every control at least 24×24 px
+ok   iPhone · train tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone · progress tab: nothing wider than the screen
+ok   iPhone · progress tab: every control at least 24×24 px
+ok   iPhone · progress tab: input text at least 16 px (no iOS zoom on focus)
+FAIL mobile layout: run completed  — no element .tabs [data-tab=body]
+
+## Whole run
+ok   no JavaScript errors (collected after each page load)
+note 52 tap(s) used a script click after the WebDriver tap was refused (most likely the unfinished-tap limitation from the self-test above, not a covered button): .tabs [data-tab=today] (click intercepted), [data-go=body] (click intercepted), .tabs [data-tab=progress] (click intercepted), #diagCard summary (click intercepted), #flagCycle (click intercepted), [data-go=cycle] (click intercepted), [data-act=consent] (click intercepted), #cyAgree (click intercepted), [data-act=logStart] (click intercepted), [data-act=logSpotting] (click intercepted), #cyHistory summary (click intercepted), #cySettings summary (click intercepted), #cySettings [data-cat=energy] (click intercepted), [data-act=saveDay] (click intercepted), #cySettings [data-flag=patternInsights] (click intercepted), [data-act=remindersOn] (click intercepted), [data-act=addRem] (click intercepted), #cyReminders [data-act=pauseRem] (click intercepted), #cyReminders [data-act=delRem] (click intercepted), [data-act=wearableOn] (click intercepted), #cySettings [data-flag=phaseEducation] (click intercepted), [data-act=export] (click intercepted), [data-act=deleteAll] (click intercepted), [data-act=resetStorage] (click intercepted), .tabs [data-tab=train] (click intercepted)
+
+1 FAILED of 45 in 1.0 min
