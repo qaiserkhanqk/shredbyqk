@@ -128,10 +128,11 @@
     <button type="button" class="cam-start" id="foodPhotoBtn"><span class="cam-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span><span><b data-t>Snap your meal</b><span data-t>One photo and it’s logged. QK names each dish and counts the portions; tap to fix anything.</span></span></button>
     <input type="file" accept="image/*" capture="environment" id="foodPhoto" hidden>
     <div id="foodPhotoBox" hidden></div>
+    <div class="card stack quick-card" id="foodQuick" hidden></div>
     <div class="log-tools"><button type="button" class="ghost" id="foodVoice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span data-t>Say what you ate</span></button><button type="button" class="ghost" id="foodScan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7V4h3M18 4h3v3M21 17v3h-3M6 20H3v-3M7 8v8M10 8v8M13 8v8M17 8v8"/></svg><span data-t>Scan barcode</span></button></div>
     <label class="field"><span class="eyebrow" data-t>Search, or type the whole meal</span><input id="foodSearch" type="search" placeholder="do roti aur karahi · KFC zinger · gol gappay" autocomplete="off"></label>
     <div class="card" id="foodResults" hidden></div>
-    <div class="card"><div class="card-head"><b data-t>Today’s food</b></div><div class="list" id="foodLog"></div></div>
+    <div class="card"><div class="card-head day-head"><b id="foodDayTitle">Today’s food</b><div class="day-nav" id="foodDayNav"></div></div><div class="list" id="foodLog"></div></div>
     <div class="card stack" id="foodWeight"></div>
     <div class="card stack" id="foodPlan"></div>
     <div class="card stack" id="foodWeek"></div>

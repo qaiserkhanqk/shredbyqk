@@ -56,6 +56,11 @@ export function evaluate(o) {
   if (Math.abs(pct) > 2) return { kind: 'check', change: { kg: r1(kg), days: 14 }, title: 'One weigh-in looks off',
     message: 'Your weigh-ins jump more than a body really changes in two weeks, so one of them is probably a typo (or pounds typed as kg). If it was the last one, delete it here; then weigh in again tomorrow morning.', choices: [{ id: 'undo', label: 'Delete my last weigh-in' }, { id: 'keep', label: 'It\'s right, keep it' }] };
   const change = { kg: r1(kg), days: 14 };
+  // Ramadan: weight usually dips 1–1.5 kg (mostly water and less food in the gut) and comes back within weeks of Eid
+  // (Sadeghirad 2014; Fernando 2019). Don't read it as progress, and never offer a cut while fasting.
+  if (o.ramadan) return { kind: 'ramadan', change, title: 'Ramadan check-in',
+    message: `${kg <= -0.05 ? `You're down ${r1(-kg)} kg` : kg >= 0.05 ? `You're up ${r1(kg)} kg` : 'Your weight is steady'}. In Ramadan the scale moves with water and meal timing, and most of a Ramadan drop comes back after Eid, so QK won't change your calories now. Protein at sehri and iftar, water between iftar and sehri, and keep training light. QK checks in properly after Eid.`,
+    choices: [keep] };
   const said = kg <= -0.05 ? `You're down ${r1(-kg)} kg over the last two weeks` : kg >= 0.05 ? `You're up ${r1(kg)} kg over the last two weeks` : 'Your weight has held steady over the last two weeks';
   const lower = d => {
     if (o.rehab && d < 0) return null;

@@ -269,6 +269,35 @@ Typed and spoken units follow the same numbers: "ek katori" is 240 g of curry, "
 (handful) is 30 g. Protein targets for clients with a BMI over 30 use a reference weight (the weight at BMI 25 plus
 40% of the rest), and protein never goes over 35% of the day's calories.
 
+## Fewer taps (November 2026)
+
+Logging often matters more than logging in detail (Harvey 2019), so the same meal never has to be typed twice:
+
+- **One tap** on Food: your usual meals for this time of day (eaten on 2+ days in the last 30, with your own portions),
+  "Same as yesterday", your saved meals, and in Ramadan iftar staples.
+- **Saved meals**: "Save meal" on any meal ("Ammi's daal chawal"); search finds it by name or by any dish in it.
+- **Earlier days**: ‹ › on Today's food goes back up to 6 days. Log there, copy a meal or a whole day to today, or tick
+  "I didn't log everything" so that day doesn't drag your weekly averages down.
+- **Which meal?** on every food sheet: lunch logged at 7 pm stays lunch. Gallery photos are logged when they were taken.
+- **Shared plates**: "hum 4 the, karahi aur 2 roti" divides the pot dishes (karahi, biryani, daal, salan) by 4 and keeps the
+  rotis you counted. Every meal with a pot dish has a "Shared?" picker too.
+- **Anything else?** after a meal: one tap for chai, a cold drink, raita, an extra roti, mithai, fries or salad (the
+  things photos and memory miss most; AI photo apps under-read meals by about 250–345 kcal).
+- **Protein left** from 2 pm, with 2–3 desi ways to close it; a **fibre** bar (14 g per 1,000 kcal).
+- **Weekend line** in the weekly report when Fri–Sun runs 300+ kcal above weekdays.
+- **Ramadan**: meals become Sehri, Iftar and Late; the check-in never cuts calories during Ramadan and doesn't read the
+  usual 1–1.5 kg dip (which mostly returns after Eid) as progress.
+- **Snap the menu**: on a place's item, 📷 reads the printed calories off a menu board (UAE menus must show them).
+- **Share to Shred** (Android): share a meal photo from the gallery or WhatsApp; the "Log a meal" app shortcut opens Food.
+
+## Western and café food
+
+64 Western dishes (breakfasts, steaks, pastas, salads, sandwiches, Asian café plates, desserts and coffee), each modelled
+on a Pakistani café portion and checked against USDA FoodData Central, UK CoFID or the chain's published values (the
+reference is beside each dish in js/nutrition.js). 167 more cafés and restaurants in Islamabad, Lahore and Karachi
+(js/places-isb.js, places-lhe.js, places-khi.js), 879 menu items, each with its source link. Places marked `check` were
+weakly sourced or may have closed.
+
 ## Making it more accurate over time
 
 - **Weigh real plates.** Order or cook each top dish a few times, weigh the katori, and skim and weigh the oil. Then adjust the fat grams in `DISHES`. This is the single biggest accuracy gain, and the tests show how far each change moves away from INDB.

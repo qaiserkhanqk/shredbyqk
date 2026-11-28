@@ -78,5 +78,16 @@ check('lots of steps → a win', sh.wins.some(w => /steps a day/.test(w)) || sh.
 check('water goal: 80 kg → 11 glasses, +2 on training days', waterGoal(80) === 11 && waterGoal(80, true) === 13);
 check('text for QK lists wins and next week', /Went well:/.test(reportText(r, 'Sara')) && /Next week:/.test(reportText(r)));
 
+{ // Weekdays vs Fri–Sun, and days the client says weren't fully logged.
+  const now = new Date('2026-11-29T21:00:00').getTime(), DAYMS = 864e5, prof = { sex: 'male', age: 30, heightCm: 178, weightKg: 82, job: 'desk', trainDays: 3, dietGoal: 'lose' };
+  const it = (at, id, servings) => { const e = estimate({ t: 'dish', id }, { servings }); return { at, ref: { t: 'dish', id }, opts: { servings }, meal: 'Lunch', name: id, kcal: e.kcal, protein: e.protein, carbs: e.carbs, fat: e.fat }; };
+  const log = [];
+  for (let d = 0; d < 7; d++) { const t = now - d * DAYMS, wd = new Date(t).getDay(), big = [0, 5, 6].includes(wd); log.push(it(t, 'chicken_karahi', big ? 2.5 : 1.2), it(t, 'roti', big ? 4 : 2), { ...it(t - 5 * 3600e3, 'paratha', 1), meal: 'Breakfast' }); }
+  const r = weekReport({ log, profile: prof, now });
+  check('weekend line: weekdays vs Fri–Sun', r.weekend && r.weekend.weekend - r.weekend.weekday >= 300 && r.notes.some(n => /Fri–Sun about/.test(n)), JSON.stringify(r.weekend));
+  const k = dayKey(now - DAYMS), r2 = weekReport({ log, profile: prof, now, incomplete: { [k]: true } });
+  check('"I didn\'t log everything" days are left out', r2.logged === r.logged - 1, `${r.logged} → ${r2.logged}`);
+}
+
 console.log(fails ? `\n${fails} FAILED` : '\nall weekly report checks passed');
 process.exit(fails ? 1 : 0);

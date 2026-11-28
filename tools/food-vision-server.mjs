@@ -382,6 +382,19 @@ export const server = http.createServer(async (req, res) => {
     try { const r = await chatAnswer(who); return res.end(JSON.stringify({ ok: true, posted: !!r.posted })); }
     catch (e) { console.error('chat:', e.message); res.statusCode = 502; return res.end('{"error":"failed"}'); }
   }
+  // Menu board: { image, item } → { kcal } read off a photo of the menu (UAE menus must show calories).
+  if (req.method === 'POST' && req.url.startsWith('/food-menu')) {
+    res.setHeader('content-type', 'application/json');
+    let body = ''; for await (const c of req) { body += c; if (body.length > 1.5e6) { res.statusCode = 413; return res.end('{"error":"too big"}'); } }
+    const who = await caller(req);
+    if (who === false) { res.statusCode = 401; return res.end('{"error":"sign in"}'); }
+    if (!allow('menu:' + (who || req.socket.remoteAddress), Date.now(), 1)) { res.statusCode = 429; return res.end('{"error":"busy"}'); }
+    try {
+      const q = JSON.parse(body || '{}');
+      if (typeof q.image !== 'string' || !/^data:image\/(jpeg|png|webp);base64,/.test(q.image)) throw new Error('bad request');
+      return res.end(JSON.stringify(await readMenu(q.image, typeof q.item === 'string' ? q.item.slice(0, 80) : '')));
+    } catch (e) { console.error('menu:', e.message); res.statusCode = e.message === 'bad request' ? 400 : 502; return res.end(JSON.stringify({ error: e.message === 'bad request' ? 'bad request' : 'failed' })); }
+  }
   if (req.method !== 'POST' || !/^\/food-(vision|text)/.test(req.url)) { res.statusCode = 404; return res.end(); }
   // Too many photos waiting: say so straight away (the app waits and tries once more) rather than time out.
   if (pending >= MAX_QUEUE) { busy++; res.statusCode = 503; res.setHeader('Retry-After', '5'); return res.end('{"error":"busy"}'); }
@@ -441,4 +454,37 @@ export function allow(who, now = Date.now(), perMin = RATE) {
   list.push(now); hits.set(who, list);
   if (hits.size > 50000) hits.delete(hits.keys().next().value);
   return true;
+}
+
+/* ---------- Menu board: read one item's calories ---------- */
+/** { kcal: number|null, name } for the item on a photographed menu (null when the menu doesn't show calories). */
+export async function readMenu(image, item = '') {
+  const ask = `This is a photo of a restaurant menu or menu board. Find the item "${item.replace(/"/g, '')}" (or the closest match) and the calories printed for it. Answer with JSON only: {"name": "the item as printed", "kcal": number or null}. Use null if no calories are printed for it. Never estimate.`;
+  const clean = a => { const k = Math.round(+a?.kcal); return { name: String(a?.name || item).slice(0, 80), kcal: k > 20 && k < 5000 ? k : null }; };
+  if (PROVIDER === 'mock') return clean({ name: item, kcal: 550 });
+  if (PROVIDER === 'gemini') {
+    const { mime, data } = imageOf(image);
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(FAST || MODEL)}:generateContent`, {
+      method: 'POST', signal: AbortSignal.timeout(20e3), headers: { 'content-type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
+      body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: ask }, { inline_data: { mime_type: mime, data } }] }], generationConfig: { responseMimeType: 'application/json' } }),
+    });
+    if (!r.ok) throw await httpError('gemini', r);
+    return clean(JSON.parse((await r.json()).candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '{}'));
+  }
+  if (PROVIDER === 'openai') {
+    const r = await fetch(`${process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'}/chat/completions`, {
+      method: 'POST', signal: AbortSignal.timeout(20e3), headers: { 'content-type': 'application/json', authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: JSON.stringify({ model: MODEL, response_format: { type: 'json_object' }, messages: [{ role: 'user', content: [{ type: 'text', text: ask }, { type: 'image_url', image_url: { url: image } }] }] }),
+    });
+    if (!r.ok) throw await httpError('openai', r);
+    return clean(JSON.parse((await r.json()).choices[0].message.content));
+  }
+  const { mime, data } = imageOf(image);
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST', signal: AbortSignal.timeout(20e3), headers: { 'content-type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: MODEL, max_tokens: 200, messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: mime, data } }, { type: 'text', text: ask }] }] }),
+  });
+  if (!r.ok) throw await httpError('anthropic', r);
+  const t = (await r.json()).content?.map(c => c.text || '').join('') || '{}';
+  return clean(JSON.parse(t.match(/\{[\s\S]*\}/)?.[0] || '{}'));
 }
