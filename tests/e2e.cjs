@@ -204,9 +204,9 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   // Phone on the limb: fake the motion sensor. Thigh flat (90° from vertical), shin 30° behind vertical → 120° knee bend.
   await p.click('#rehabActive [data-romtest=kneeFlexion]');
   check('sensor: phone-on-limb is offered first for the knee bend, with no accuracy claim', await p.isVisible('#romSensor') && /phone on your leg/.test(await p.textContent('#romSensor')) && !/accurate/i.test(await p.textContent('#rsheetBody')));
-  // Allow motion sensors the way a person taps "Allow" (Chromium asks before sending devicemotion readings).
-  // Chromium's grant replaces the origin's permissions, so camera and microphone are listed too or later camera checks fail.
-  if (b.browserType().name() === 'chromium') await ctx.grantPermissions(['accelerometer', 'gyroscope', 'magnetometer', 'camera', 'microphone'], { origin: 'https://shred.local' });
+  // Answer the motion-sensor prompt "Allow" inside the page. (context.grantPermissions would replace the page's other
+  // permissions and break the camera checks that follow.)
+  await p.evaluate(() => { if (window.DeviceMotionEvent) DeviceMotionEvent.requestPermission = async () => 'granted'; });
   await p.click('#romSensor'); await p.click('#snGo');
   await p.evaluate(async () => {
     const g = 9.81, r = d => d * Math.PI / 180, wait = ms => new Promise(res => setTimeout(res, ms));
