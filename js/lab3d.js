@@ -210,16 +210,16 @@ export function report(rec, { preset = 'squat', bowlArm = 'R' } = {}) {
   for (const s of asym) if (s.diff >= 10 && s.pct >= 10) flags.push(`${s.name}: ${Math.round(s.diff)}° difference between left and right. Worth checking strength and mobility on the ${s.left < s.right ? 'left' : 'right'}.`);
   if (pr.key === 'deepest') {
     const v = Math.max(M[ki].valgusL, M[ki].valgusR);
-    if (v >= 10) flags.push(`Knees moving in about ${Math.round(v)}° at the bottom. Screening flag: knee valgus on landing is a known ACL risk pattern (Hewett 2005). Re-test and coach knees over toes.`);
+    if (v >= 10) flags.push(`Knees moving in about ${Math.round(v)}° at the bottom. In lab studies, more knee-inward angle went with higher knee load (Sigward 2015). Re-test and coach knees over toes.`);
   }
   if (preset === 'bowling') {
     const e = bowlArm === 'L' ? 'elbowL' : 'elbowR', hz = rec.info.hz, from = Math.max(0, ki - Math.round(0.15 * hz));
     const before = Math.max(...M.slice(from, ki + 1).map(m => m[e])), ext = before - M[ki][e];
     flags.push(`Bowling elbow: straightened about ${Math.round(ext)}° in the last 0.15 s before release (bent ${Math.round(before)}° → ${Math.round(M[ki][e])}°). ${ext > 15 ? 'Above the 15° the ICC allows: get an accredited lab test before any decision.' : 'Within the 15° the ICC allows.'} Screening only: official tests use accredited labs.`);
     const sideBendAtRelease = Math.abs(M[ki].sideBend);
-    if (sideBendAtRelease > 45) flags.push(`Trunk side-bend at release about ${Math.round(sideBendAtRelease)}°. Injured young fast bowlers averaged about 50° vs 40° in uninjured ones (Bayne 2016): monitor back load.`);
+    if (sideBendAtRelease > 45) flags.push(`Trunk side-bend at release about ${Math.round(sideBendAtRelease)}°. Side-bend helps pace; large amounts are something bowling coaches watch closely in young fast bowlers (Bayne 2016). Have a bowling coach review the action.`);
     const sepRange = Math.max(...M.map(m => m.shoulderRot)) - Math.min(...M.map(m => m.shoulderRot));
-    flags.push(`Shoulder line turned through about ${Math.round(sepRange)}° during the delivery. Large counter-rotation (a mixed action) is linked to lumbar stress injury (Elliott 2000).`);
+    flags.push(`Shoulder line turned through about ${Math.round(sepRange)}° during the delivery. Large counter-rotation is what defines a mixed action, which bowling coaches review closely (Elliott 2000). Two-camera rotation estimates are rough, so treat this as a reason for a coach review.`);
   }
   return { preset: pr.name, key: ki == null ? null : { i: ki, t: F[ki].t, label }, rows, asym, flags, series: M };
 }

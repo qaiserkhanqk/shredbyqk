@@ -65,7 +65,7 @@ export function analyseSingleLegSquat(frames, { valgusFlagDeg = 10, asymFlagDeg 
   if (!legs.L && !legs.R) issues.push('No single-leg squats found. Face the camera and lift one foot clearly off the floor.');
   const findings = [], name = { L: 'left', R: 'right' };
   for (const [side, r] of Object.entries(legs)) {
-    if (r.meanFppa > valgusFlagDeg) findings.push({ title: `${cap(name[side])} knee collapses inward (${r.meanFppa}°)`, why: 'Dynamic knee valgus on a single leg is linked to patellofemoral pain and ACL injury risk. It usually comes from weak hip abductors and external rotators, or poor foot control.', fix: [`Side-lying abduction, ${name[side]} leg first`, 'Banded single-leg squats, knee pushed out', 'Short-foot drill'] });
+    if (r.meanFppa > valgusFlagDeg) findings.push({ title: `${cap(name[side])} knee collapses inward (${r.meanFppa}°)`, why: 'Knees caving inward on one leg is a pattern coaches and physios watch for. It usually comes from weak hip abductors and external rotators, or poor foot control.', fix: [`Side-lying abduction, ${name[side]} leg first`, 'Banded single-leg squats, knee pushed out', 'Short-foot drill'] });
     if (r.pelvicDrop > 5) findings.push({ title: `Hip drops when standing on the ${name[side]} leg (${r.pelvicDrop}°)`, why: 'The opposite hip sinks, which points to glute medius weakness on the standing side.', fix: ['Single-leg stance with level hips', 'Lateral step-downs', 'Copenhagen plank'] });
   }
   let asymmetry = null;
