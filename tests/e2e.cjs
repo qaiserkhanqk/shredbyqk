@@ -673,10 +673,10 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('weekly report: wins, training with kg lifted, health, sleep & mind, one focus', /Wins/.test(rt) && /kg lifted|tonnes lifted/.test(rt) && /Your health/.test(rt) && /Sleep & mind/.test(rt) && /Next week, one thing/.test(rt), rt.slice(0, 300));
   // 3D Lab: the demo athlete filmed by two cameras → synced, 3D skeleton, measurements and flags.
   await go('body'); await tap('[data-go=lab]'); await p.waitForTimeout(200);
-  check('3D lab: filming guide, two video inputs, and "four separate videos are not 3D"', (await p.$$('#labSide, #labFront')).length === 2 && /not 3D/.test(await p.textContent('#lab')));
+  check('3D lab: filming guide, four camera slots, and "four separate videos are not 3D"', (await p.$$('.lab-cams input[type=file]')).length === 4 && /not 3D/.test(await p.textContent('#lab')));
   await tap('#labDemo'); await p.waitForTimeout(800);
   const lt = await p.textContent('#labResult');
-  check('3D lab: demo → synced, 3D measurements and flags', await p.isVisible('#labResult') && /Synced by the movement \(\+0\.50 s/.test(lt) && /Knee bend, left/.test(lt) && /Knees moving in/.test(lt), lt.slice(0, 300));
+  check('3D lab: demo → synced, 3D measurements and flags', await p.isVisible('#labResult') && /4 cameras\. Synced by the movement \(Front \+0\.50 s/.test(lt) && /Knee bend, left/.test(lt) && /Knees moving in/.test(lt), lt.slice(0, 300));
   check('3D lab: skeleton drawn and turnable', await p.evaluate(() => { const c = document.querySelector('#labCanvas'); return c.width > 0 && c.getContext('2d').getImageData(0, 0, c.width, c.height).data.some(x => x); }));
   check('3D lab: saved to the athlete history (no video)', await p.evaluate(() => { const l = JSON.parse(localStorage.getItem('shred_qk_v1')).lab || []; return l.length >= 1 && !('frames' in l[l.length - 1]); }));
   // Coach dashboard demo: this phone's training is the first client.
@@ -701,6 +701,15 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('dashboard: week view offers a weekly MVP shout-out', await p.isVisible('#cbMvp'));
   await p.click('#cbMvp'); await p.waitForTimeout(150);
   check('dashboard: MVP shout-out fills the notification', /MVP is .+ with \d+ points/.test(await p.inputValue('#bcBody')), await p.inputValue('#bcBody'));
+  // Squad dashboard: sample squad + this phone's 3D Lab tests; trends, squad comparison, add an athlete.
+  await p.waitForTimeout(300);
+  check('squad: roster with tests and flags (flagged athletes first)', (await p.$$('#sqList [data-ath]')).length >= 6 && /flag/.test(await p.textContent('#sqList')), await p.textContent('#sqCount'));
+  check('squad: this phone\'s 3D Lab test appears as an athlete', /\(this phone\)/.test(await p.textContent('#sqList')));
+  await p.click('#sqList [data-ath="a1"]'); await p.waitForTimeout(150);
+  const sd = await p.textContent('#sqDetail');
+  check('squad: athlete trend and squad comparison for their movement', /over time/.test(sd) && /Squad comparison/.test(sd) && /Squad average/.test(sd) && (await p.$$('#sqDetail .sq-chart')).length === 1, sd.slice(0, 200));
+  await p.click('#cdSquad details summary'); await p.fill('#sqName', 'New Bowler'); await p.fill('#sqTeamIn', 'U19'); await p.click('#sqAdd'); await p.waitForTimeout(150);
+  check('squad: add an athlete', /New Bowler/.test(await p.textContent('#sqList')));
   check('no JavaScript errors', errs.length === 0, errs.join(' | '));
   await b.close();
   console.log(fails ? `${fails} FAILED` : 'ALL PASS'); process.exit(fails ? 1 : 0);

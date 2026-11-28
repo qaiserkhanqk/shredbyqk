@@ -25,16 +25,33 @@ export function pose(t, { valgus = 0, twist = 0 } = {}) {
   return { P, k };
 }
 
-/** Project to a camera: 'side' sees (Z, Y), 'front' sees (X, Y). t0: this camera started t0 seconds late. */
-export function film(kind, { t0 = 0, dur = 6, fps = 30, W, H, ppm, cx = 0.5, cy = 0.55, jitter = 1.5, opts, seed = 7 } = {}) {
+/**
+ * Project to a camera. kind: 'side' / 'sideR' (on the athlete's right, sees Z, Y), 'sideL' (on the left, mirrored),
+ * 'front' (sees X, Y), 'back' (mirrored). t0: this camera started t0 seconds late.
+ * occlude: a side camera can't see the far-side limbs well, so they get extra noise and low visibility.
+ */
+export function film(kind, { t0 = 0, dur = 6, fps = 30, W, H, ppm, cx = 0.5, cy = 0.55, jitter = 1.5, opts, seed = 7, occlude = false } = {}) {
   let sd = seed; const rnd = () => ((sd = (sd * 16807) % 2147483647) / 2147483647 - 0.5);
+  const far = i => (kind === 'sideL' ? i >= 12 && i % 2 === 0 : (kind === 'side' || kind === 'sideR') ? i >= 11 && i % 2 === 1 : false);
   const frames = [];
   for (let t = 0; t < dur; t += 1 / fps) {
     const { P } = pose(t, opts);
-    frames.push({ t: t - t0, lm: P.map(p => { const u = kind === 'side' ? p.z : p.x; return { x: cx + (u * ppm + rnd() * jitter) / W, y: cy - (p.y * ppm + rnd() * jitter) / H + 0.3, v: 0.99 }; }) });
+    frames.push({ t: t - t0, lm: P.map((p, i) => {
+      const u = kind === 'sideL' ? -p.z : kind === 'back' ? -p.x : /^side/.test(kind) ? p.z : p.x;
+      const hidden = occlude && far(i), j = hidden ? 45 : jitter;
+      return { x: cx + (u * ppm + rnd() * j) / W, y: cy - (p.y * ppm + rnd() * j) / H + 0.3, v: hidden ? 0.35 : 0.99 };
+    }) });
   }
   return frames;
 }
+
+/** Four cameras round the demo athlete, each started at a different moment, far-side limbs partly hidden. */
+export const demoVideos4 = (opts = { valgus: 1, twist: 15 }) => [
+  { pos: 'sideR', frames: film('sideR', { W: 1920, H: 1080, ppm: 420, opts, occlude: true, seed: 3 }), w: 1920, h: 1080 },
+  { pos: 'front', frames: film('front', { W: 1080, H: 1920, ppm: 600, t0: 0.5, opts, seed: 5 }), w: 1080, h: 1920 },
+  { pos: 'sideL', frames: film('sideL', { W: 1920, H: 1080, ppm: 380, t0: 1.2, opts, occlude: true, seed: 11 }), w: 1920, h: 1080 },
+  { pos: 'back', frames: film('back', { W: 1080, H: 1920, ppm: 560, t0: 0.8, opts, seed: 13 }), w: 1080, h: 1920 },
+];
 
 /** Two "videos" of the demo athlete (front camera started 0.5 s late), ready for the Lab. */
 export const demoVideos = (opts = { valgus: 1, twist: 15 }) => ({

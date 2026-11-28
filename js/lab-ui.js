@@ -6,7 +6,8 @@ import * as lab from './lab3d.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-let ctx; // { S, persist, toast, say }
+let ctx; // { S, persist, toast, say, cloud: () => Cloud|null }
+let squad = []; // coach's athletes, when signed in as a coach
 let cur = null; // { rec, rep, meta }
 let view = { yaw: -35, i: 0, playing: false, raf: 0 };
 
@@ -23,12 +24,21 @@ export function initLab(c) {
   cv.onpointerdown = e => { drag = e.clientX; cv.setPointerCapture(e.pointerId); };
   cv.onpointermove = e => { if (drag == null) return; view.yaw += (e.clientX - drag) * 0.5; drag = e.clientX; draw(); };
   cv.onpointerup = () => { drag = null; };
-  window.__qkLab = { analyse: (side, front, opts) => show(side, front, opts) }; // test hook: landmark frames straight in
+  window.__qkLab = { analyse: (views, opts) => show(views, opts) }; // test hook: landmark frames straight in
+  $('#labSquad').onchange = () => { const a = squad.find(x => x.id === $('#labSquad').value); if (a) { $('#labName').value = a.name; if (a.height_cm) $('#labHeight').value = a.height_cm; } };
 }
 
-export function renderLab() {
+export async function renderLab() {
   if (!ctx) return;
   const p = ctx.S.profile || {};
+  // Signed in as a coach: pick the squad athlete; results are saved to them for the squad dashboard.
+  const cloud = ctx.cloud?.();
+  if (cloud?.signedIn) {
+    try {
+      const me = await cloud.me();
+      if (me?.role === 'coach') { squad = await cloud.athletes(); $('#labSquad').innerHTML = '<option value="">Not in the squad (just this phone)</option>' + squad.map(a => `<option value="${esc(a.id)}">${esc(a.name)}${a.team ? ' · ' + esc(a.team) : ''}</option>`).join(''); $('#labSquadWrap').hidden = false; }
+    } catch {}
+  }
   if (!$('#labName').value) $('#labName').value = p.name || '';
   if (!$('#labHeight').value && p.heightCm) $('#labHeight').value = p.heightCm;
   drawHistory();
@@ -61,30 +71,38 @@ async function clapOf(file) {
   } catch { return null; }
 }
 
+const NAMES = { sideR: 'Right-side video', sideL: 'Left-side video', front: 'Front video', back: 'Back video' };
 async function run() {
-  const fa = $('#labSide').files[0], fb = $('#labFront').files[0];
-  if (!fa || !fb) return ctx.toast('Add both videos: one side-on, one from the front or back.');
+  const slots = [...document.querySelectorAll('.lab-cams input[type=file]')].filter(i => i.files[0]).map(i => ({ pos: i.dataset.pos, file: i.files[0] }));
+  if (!slots.some(s => /^side/.test(s.pos)) || !slots.some(s => s.pos === 'front' || s.pos === 'back')) return ctx.toast('Add at least one side-on video and one front or back video.');
+  // Side camera first: it sets the scale and the clock the others are lined up to.
+  slots.sort((a, b) => (/^side/.test(b.pos) ? 1 : 0) - (/^side/.test(a.pos) ? 1 : 0));
   $('#labGo').disabled = true; status('Loading the precise pose model…');
   const lm = await getVideoLandmarker($('#labFast').checked ? 'full' : 'heavy');
-  const A = await framesOf(fa, lm, 'Side video'), B = await framesOf(fb, lm, $('#labBack').checked ? 'Back video' : 'Front video');
-  status('Lining the two videos up…');
-  const [ca, cb] = await Promise.all([clapOf(fa), clapOf(fb)]);
-  show(A, B, { clap: ca != null && cb != null ? ca - cb : null });
+  const views = [];
+  for (const s of slots) views.push({ pos: s.pos, ...(await framesOf(s.file, lm, NAMES[s.pos])) });
+  status(`Lining the ${views.length} videos up…`);
+  const claps = await Promise.all(slots.map(s => clapOf(s.file)));
+  await show(views, { claps });
   $('#labGo').disabled = false;
 }
 
-/** Sync, reconstruct, report and draw. side/front: { frames, w, h }. */
-function show(A, B, { clap = null } = {}) {
+/** Sync, reconstruct, report and draw. views: [{ pos, frames, w, h }] (first = side camera). */
+async function show(views, { claps = null } = {}) {
   const S = ctx.S, preset = $('#labPreset').value, heightM = (parseFloat($('#labHeight').value) || S.profile?.heightCm || 175) / 100;
-  let lag, how;
-  if (clap != null) { lag = clap; how = `Synced by the clap (${lag >= 0 ? '+' : ''}${lag.toFixed(2)} s)`; }
-  else { const m = lab.motionLag(lab.resample(A.frames, 60), lab.resample(B.frames, 60)); lag = m.lag; how = `Synced by the movement (${lag >= 0 ? '+' : ''}${lag.toFixed(2)} s, match ${Math.round(m.r * 100)}%)${m.r < 0.8 ? '. Weak match: clap at the start next time.' : ''}`; }
-  const rec = lab.reconstruct(A.frames, B.frames, { heightM, sideW: A.w, sideH: A.h, frontW: B.w, frontH: B.h, back: $('#labBack').checked, lag });
+  const sy = lab.syncAll(views, { claps: claps && claps.every(c => c != null) ? claps : null });
+  const lagTxt = sy.lags.slice(1).map((l, i) => `${NAMES[views[i + 1].pos].replace(' video', '')} ${l >= 0 ? '+' : ''}${l.toFixed(2)} s`).join(', ');
+  const how = sy.how === 'clap' ? `Synced by the clap (${lagTxt})` : `Synced by the movement (${lagTxt}; match ${Math.round(sy.r * 100)}%)${sy.r < 0.8 ? '. Weak match: clap at the start next time.' : ''}`;
+  const rec = lab.reconstructMulti(views.map((v, i) => ({ ...v, lag: sy.lags[i] })), { heightM });
   const rep = lab.report(rec, { preset, bowlArm: $('#labArm').value });
-  const meta = { athlete: $('#labName').value.trim() || 'Athlete', preset, heightCm: Math.round(heightM * 100) };
+  const athleteId = $('#labSquad').value || null;
+  const meta = { athlete: $('#labName').value.trim() || 'Athlete', preset, heightCm: Math.round(heightM * 100), cameras: views.length, athleteId };
   cur = { rec, rep, meta };
-  (S.lab ||= []).push(lab.summary(rep, meta)); if (S.lab.length > 60) S.lab.splice(0, S.lab.length - 60); ctx.persist();
-  status(''); $('#labResult').hidden = false; $('#labSync').textContent = `${how} · ${rec.info.duration.toFixed(1)} s analysed in 3D at ${rec.info.hz} frames a second.`;
+  const sum = lab.summary(rep, meta);
+  (S.lab ||= []).push(sum); if (S.lab.length > 60) S.lab.splice(0, S.lab.length - 60); ctx.persist();
+  let saved = '';
+  if (athleteId) { try { await ctx.cloud().saveLabTest(athleteId, sum); saved = ' Saved to the squad dashboard.'; } catch (e) { saved = ` Not saved to the squad (${e.message}); kept on this phone.`; } }
+  status(''); $('#labResult').hidden = false; $('#labSync').textContent = `${views.length} cameras. ${how} · ${rec.info.duration.toFixed(1)} s analysed in 3D at ${rec.info.hz} frames a second.${saved}`;
   const f = v => (v == null || !Number.isFinite(v) ? '–' : `${Math.round(v)}°`);
   $('#labTable').innerHTML = `<div class="lab-row head"><span>Measurement</span><span>Min</span><span>Max</span><span>${esc(rep.key?.label || 'Range')}</span></div>` +
     rep.rows.map(r => `<div class="lab-row"><span>${esc(r.name)}</span><span>${f(r.min)}</span><span>${f(r.max)}</span><span><b>${rep.key ? f(r.at) : f(r.range)}</b></span></div>`).join('');
