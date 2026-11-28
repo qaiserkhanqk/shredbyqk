@@ -51,8 +51,22 @@ Crashes are logged on the device. **Export error log** in the same panel gives t
    - ICC(2,1) (absolute agreement), rated poor, moderate, good or excellent
 5. Retune any thresholds that show bias, then publish the numbers. Those figures are what back an accuracy claim.
 
+## Clinic accuracy study (rehab angles, goniometer)
+
+The rehab angles can also be checked in a clinic, but **only once ethics approval and patient consent exist**. Collecting patients' readings for a study is research on health data: in Dubai that goes to the Dubai Scientific Research Ethics Committee (DSREC) unless the facility has its own approved committee, and Federal Law 2/2019 applies (compliance review 2026-11-28). Until then the app only lets a physio compare their goniometer with the app **for the patient in front of them** (clinician mode → **Compare with your goniometer**); it shows a summary from 5 pairs and never exports them.
+
+Once approved:
+
+1. The patient does the measurement in the app: phone on the limb, or camera.
+2. Straight away, the physio measures the same movement with their goniometer (or digital inclinometer) and enters it in clinician mode.
+3. Export the pairs with `agreementCsv()` in `js/assess.js` (format above, `subject,metric,app,reference,…`; the metric is the test plus the method, e.g. `kneeFlexion_sensor`). It is deliberately not wired to a button yet: add the consent screen and the export together.
+4. Run `npm run validate study.csv` on the combined exports.
+5. Aim for at least 30 pairs per metric and method, from at least 15 people, measured by more than one physio.
+6. Replace the working error numbers in `js/assess.js` (`MEASURE_ERROR`) with the measured ones: the smallest detectable change is about 1.96 × √2 × the standard error. Until this is done, don't claim the app is accurate, or more accurate than the camera.
+
 ## What each automated test checks
 
+- **`tests/rehab-measure.test.mjs`:** phone-on-limb geometry (the same answer whichever way the platform reports gravity), steady-reading and movement detection, the middle of 3 tries, camera rep peaks and the side-on check, measurement-error bands, strength side-to-side, SANE and GROC, Bland–Altman agreement and the study CSV, and the clinician dynamometer and goniometer actions.
 - **`tests/simulate.mjs`:** coach feedback timing on a scripted hip-thrust set: faded cues, praise after a fix, fatigue detection.
 - **`tests/gait.mjs`:** simulated walker: cadence, and finding a right-hip restriction built into it.
 - **`tests/library.mjs`:** all 84 exercises map to a working movement pattern, and every muscle group has exercises.

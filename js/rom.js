@@ -20,11 +20,51 @@ function countCycles(sig, lowT, highT) {
   return n;
 }
 
+/**
+ * Peak of each repetition in an angle signal: runs of frames above 60% of the way from low to high.
+ * Used to see whether the 3 tries agree. Runs shorter than 3 frames are jitter, not a rep.
+ */
+export function repPeaks(sig) {
+  const f = sig.filter(Number.isFinite);
+  if (f.length < 6) return [];
+  const lo = p05(f), hi = p95(f);
+  if (hi - lo < 5) return [hi];
+  const thr = lo + 0.6 * (hi - lo), peaks = [];
+  let run = [];
+  for (const v of [...sig, NaN]) {
+    if (Number.isFinite(v) && v > thr) run.push(v);
+    else { if (run.length >= 3) peaks.push(p95(run)); run = []; }
+  }
+  return peaks;
+}
+
+// The limb segment that must lie across the camera's view for each side-on test (MediaPipe ids, left side;
+// the right side is +1). If it points towards or away from the camera, the 2D angle is foreshortened.
+const PLANE_SEG = { kneeFlexion: [23, 25], kneeExtension: [23, 25], ankleDorsiflexion: [25, 27], shoulderFlexion: [11, 13], trunkFlexion: [23, 11], trunkExtension: [23, 11] };
+const OUT_OF_PLANE_MAX = 30;
+
+/**
+ * Median angle (degrees) by which the tested segment points out of the camera's view, from MediaPipe's 3D
+ * world landmarks (frames[i].px.world). null when the recording has no 3D landmarks.
+ */
+export function outOfPlane(id, frames) {
+  const seg = PLANE_SEG[id];
+  if (!seg) return null;
+  const vals = [];
+  for (const f of frames) {
+    const w = f.px.world; if (!w) continue;
+    const off = bestSide(f.px).side === 'left' ? 0 : 1, a = w[seg[0] + off], b = w[seg[1] + off];
+    if (!a || !b) continue;
+    vals.push(Math.atan2(Math.abs(b.z - a.z), Math.hypot(b.x - a.x, b.y - a.y)) * 180 / Math.PI);
+  }
+  return vals.length >= 10 ? Math.round(med(vals)) : null;
+}
+
 export const ROM_TESTS = {
   shoulderFlexion: {
     name: 'Shoulder forward raise', view: 'side', unit: '°', secs: 12, norm: '160–180°', higher: true,
     how: 'Stand side-on, the arm to test nearest the camera. Raise your straight arm forward and up as high as you can, 3 times, slowly.',
-    measure: frames => { const s = bestSide(frames[0].px).side; const v = frames.map(f => { const b = bestSide(f.px); return [b.hip, b.sh, b.el].every(q => q.v >= 0.6) ? angle(b.hip, b.sh, b.el) : NaN; }); return { value: p95(v), side: sideName(s) }; }, // side-on: only the near arm is visible
+    measure: frames => { const s = bestSide(frames[0].px).side; const v = frames.map(f => { const b = bestSide(f.px); return [b.hip, b.sh, b.el].every(q => q.v >= 0.6) ? angle(b.hip, b.sh, b.el) : NaN; }); return { value: p95(v), side: sideName(s), trials: repPeaks(v) }; }, // side-on: only the near arm is visible
   },
   shoulderAbduction: {
     name: 'Shoulder side raise', view: 'front', unit: '°', secs: 12, norm: '160–180°', higher: true, bothSides: true,
@@ -47,7 +87,7 @@ export const ROM_TESTS = {
   kneeFlexion: {
     name: 'Knee bend', view: 'side', unit: '°', secs: 12, norm: '135°+ (full bend)', higher: true,
     how: 'Lie or sit side-on, the knee to test nearest the camera. Slide your heel towards your bottom as far as you can, 3 times.',
-    measure: frames => { const s = bestSide(frames[0].px).side; return { value: p95(frames.map(f => { const b = bestSide(f.px); return 180 - angle(b.hip, b.kn, b.an); })), side: sideName(s) }; },
+    measure: frames => { const s = bestSide(frames[0].px).side; const v = frames.map(f => { const b = bestSide(f.px); return 180 - angle(b.hip, b.kn, b.an); }); return { value: p95(v), side: sideName(s), trials: repPeaks(v) }; },
   },
   kneeExtension: {
     name: 'Knee straightening', view: 'side', unit: '° short of straight', secs: 10, norm: '0° (fully straight)', higher: false,
@@ -60,7 +100,8 @@ export const ROM_TESTS = {
     measure: frames => {
       // The front leg's shin angle from vertical at its most forward point (weight-bearing lunge test).
       const s = bestSide(frames[0].px).side;
-      return { value: p95(frames.map(f => { const b = bestSide(f.px); return fromVertical(b.an, b.kn); })), side: sideName(s) };
+      const v = frames.map(f => { const b = bestSide(f.px); return fromVertical(b.an, b.kn); });
+      return { value: p95(v), side: sideName(s), trials: repPeaks(v) };
     },
   },
   chairStand30: {
@@ -122,12 +163,19 @@ export async function runRomTest(id, frames, { mPerPx = null } = {}) {
   const issues = [];
   if (frames.length < 20) return { ok: false, issues: ['The recording was too short. Follow the instructions for the full time.'] };
   const fps = measuredFps(frames.map(f => f.t));
+  // Side-on tests: if the limb pointed towards the camera, the angle is foreshortened and can't be trusted.
+  const oop = t.view === 'side' ? outOfPlane(id, frames) : null;
+  if (oop != null && oop > OUT_OF_PLANE_MAX) return { ok: false, outOfPlane: oop, issues: [`The limb was turned about ${oop}° towards the camera, so the angle can't be measured. Turn fully side-on and try again.`] };
   const r = await t.measure(frames, { mPerPx });
   if (r.issue) issues.push(r.issue);
+  // The 3 tries should agree. A big spread means the movement wasn't repeated the same way, or the camera lost the limb.
+  const tr = (r.trials || []).filter(Number.isFinite);
+  const spread = tr.length >= 2 && t.unit.startsWith('°') ? Math.round(Math.max(...tr) - Math.min(...tr)) : null;
+  if (spread != null && spread > 10) issues.push(`Your tries differed by about ${spread}°, so this result is less certain.`);
   const vals = t.bothSides ? [r.L, r.R] : [r.value];
   if (!vals.some(Number.isFinite)) return { ok: false, issues: issues.length ? issues : ['No clear movement was measured. Check the camera view in the instructions and try again.'] };
   const round = v => (Number.isFinite(v) ? Math.round(v * 10) / 10 : null);
-  return { ok: true, test: id, unit: t.unit, fps: Math.round(fps), value: round(r.value), side: r.side, L: round(r.L), R: round(r.R), trials: r.trials, issues };
+  return { ok: true, test: id, unit: t.unit, fps: Math.round(fps), value: round(r.value), side: r.side, L: round(r.L), R: round(r.R), trials: r.trials, spread, outOfPlane: oop, method: 'camera', issues };
 }
 
 /** Limb symmetry index (%). For "lower is better" measures (e.g. knee drift) the ratio is inverted. */

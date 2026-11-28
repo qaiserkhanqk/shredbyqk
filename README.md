@@ -80,18 +80,25 @@ The app is built so a new client is never faced with a wall of features:
 - **Training flow:** Next set restarts the camera in one tap, the rest timer starts by itself, the screen stays on, a miscounted set can be corrected, and weights are logged with last time's figure shown.
 - **Send my week to QK:** a one-tap text summary (days trained, form score, top fault, new best weights). No video.
 - **Back up and restore** your history as a file. The app also asks the browser not to clear its saved data.
-- **Rehab clinic:** 18 injuries and pain conditions:
+- **Rehab programmes:** 18 named injuries and pain conditions, plus camera movement-check programmes for the knee, shoulder, ankle and hip:
   - lower back, neck
   - frozen shoulder, rotator cuff, tennis and golfer's elbow
   - hip, knee osteoarthritis, kneecap pain, jumper's knee, ACL, PCL, meniscus
   - hamstring, Achilles, ankle sprain, heel pain, shin splints
 
-  Each one has:
-  - a red-flag safety screen with emergency guidance
-  - phased programmes passed on measured criteria
-  - pain traffic lights
-  - camera measurements (range of motion, hop test with left/right symmetry, calf-raise and sit-to-stand counts)
-  - weekly function scores
+  Flow: safety check → questions about the pain → (for people without a diagnosis) a movement check with the phone or camera that measures and compares sides, never naming a condition → a written plan → exercises with check-ins. Each programme has:
+  - a red-flag safety screen with emergency guidance for the person's region (UAE 998, UK 999, US 911)
+  - an assessment that grades how easily the pain flares (irritability) and sets the starting dose, pain limit and sessions a week
+  - phased programmes passed on measured criteria: the injured side's own results, 3 separate days with next-morning checks, and for ACL at least 9 months since surgery or injury
+  - pain traffic lights, with a physio review advised and progression paused after 2 flare-ups in a row
+  - measurements: phone on the limb (the phone's motion sensor used as an inclinometer; offered first for knee, ankle and shoulder angles), or the camera (range of motion, hop test with left/right symmetry, calf-raise and sit-to-stand counts). Every angle test is done 3 times; the camera rejects recordings where the limb isn't side-on (3D body points) and flags tries that disagree. A change only counts as progress when it's bigger than the measurement error (`js/assess.js` MEASURE_ERROR)
+  - strength checks without equipment (single-leg sit-to-stand, single-leg bridge, side plank, calf raises, arm hold), compared side to side; clinicians can add handheld dynamometer readings
+  - an overall rating each week: SANE (% of normal) and, after the first week, a global rating of change. Licensed questionnaires (KOOS, ODI, QuickDASH) are not built in until a licence is confirmed
+  - weekly check-ins (warning signs rechecked, function re-rated) and a programme log
+  - clinician mode: a physio unlocks it on the patient's phone with their own PIN to confirm a diagnosis, set the phase, dose and pain limit, require approval for phase changes, enter dynamometer readings, and compare their goniometer with the app's reading for that patient (no study collection or export until consent and ethics approval exist); every change is logged under their name
+  - a shareable progress report (text or PDF) for the physio
+
+  Wording rule: never call it a clinic, care plan, treatment or patient file (UAE health-facility advertising and medical-device risk; compliance review 2026-11-27).
 
   It supports rehab and doesn't diagnose; content must be signed off by a physio before launch.
 - **Cycle tracking (prototype, off by default).** Log periods, spotting and optional symptoms; a transparent next-period range from your own history; explainable personal patterns; optional reminders; encrypted on the device. Not clinically validated, not contraception. See **[CYCLE.md](CYCLE.md)**.

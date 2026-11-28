@@ -1,0 +1,135 @@
+# Shred by QK — real iPhone Safari run, Sat Nov 28 2026 12:56:27 GMT+0400 (Gulf Standard Time)
+app: https://10.20.3.86:8443/  (served from this Mac over HTTPS on the local network; synthetic data only)
+safaridriver session capabilities: {"safari:deviceName":"QK","safari:platformVersion":"27.2.1","safari:automaticInspection":false,"webkit:WebRTC":{"DisableICECandidateFiltering":false,"DisableInsecureMediaCapture":false},"webkit:alwaysAllowAutoplay":false,"browserVersion":"27.2","safari:deviceType":"iPhone","strictFileInteractability":false,"browserName":"Safari","safari:useSimulator":false,"safari:platformBuildVersion":"24B156","setWindowRect":false,"safari:deviceUDID":"00008101-00156DD40105001E","safari:automaticProfiling":false,"acceptInsecureCerts":false,"safari:experimentalWebSocketUrl":false,"platformName":"iOS","safari:diagnose":false}
+device: {"secure":true,"crypto":true,"standalone":false,"ua":"Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Mobile/15E148 Safari/604.1","h":781,"dpr":3,"title":"Shred by QK","sw":true,"idb":true,"w":428,"notif":"undefined"}
+note tap self-test: a WebDriver tap did NOT deliver a click on this phone (events seen: touchstart). This is a safaridriver limitation, so taps below fall back to script clicks; finger taps are covered by the manual checklist instead.
+
+## Secure context
+ok   the app loaded over HTTPS with the local certificate trusted (secure context)
+ok   Web Crypto (crypto.subtle) is available
+ok   Today tab opens on the iPhone and shows content
+ok   Today tab: no sideways scrolling
+ok   Today tab: no JavaScript error
+ok   Train tab opens on the iPhone and shows content
+ok   Train tab: no sideways scrolling
+ok   Train tab: no JavaScript error
+ok   Food tab opens on the iPhone and shows content
+ok   Food tab: no sideways scrolling
+ok   Food tab: no JavaScript error
+ok   Me tab opens on the iPhone and shows content
+ok   Me tab: no sideways scrolling
+ok   Me tab: no JavaScript error
+ok   Body hub opens on the iPhone and shows content
+ok   Body hub: no sideways scrolling
+ok   Body hub: no JavaScript error
+ok   Rehab opens on the iPhone and shows content
+ok   Rehab: no sideways scrolling
+ok   Rehab: no JavaScript error
+ok   Athlete Combine opens on the iPhone and shows content
+ok   Athlete Combine: no sideways scrolling
+ok   Athlete Combine: no JavaScript error
+ok   Biomechanics Lab opens on the iPhone and shows content
+ok   Biomechanics Lab: no sideways scrolling
+ok   Biomechanics Lab: no JavaScript error
+ok   Posture scan opens on the iPhone and shows content
+ok   Posture scan: no sideways scrolling
+ok   Posture scan: no JavaScript error
+ok   Gait opens on the iPhone and shows content
+ok   Gait: no sideways scrolling
+ok   Gait: no JavaScript error
+ok   Calm opens on the iPhone and shows content
+ok   Calm: no sideways scrolling
+ok   Calm: no JavaScript error
+ok   Vitals opens on the iPhone and shows content
+ok   Vitals: no sideways scrolling
+ok   Vitals: no JavaScript error
+ok   Fitness age opens on the iPhone and shows content
+ok   Fitness age: no sideways scrolling
+ok   Fitness age: no JavaScript error
+ok   Brain opens on the iPhone and shows content
+ok   Brain: no sideways scrolling
+ok   Brain: no JavaScript error
+ok   Quran reader opens on the iPhone and shows content
+ok   Quran reader: no sideways scrolling
+ok   Quran reader: no JavaScript error
+ok   Leaderboard opens on the iPhone and shows content
+ok   Leaderboard: no sideways scrolling
+ok   Leaderboard: no JavaScript error
+ok   Weekly report opens on the iPhone and shows content
+ok   Weekly report: no sideways scrolling
+ok   Weekly report: no JavaScript error
+
+## Cycle section of tests/e2e.cjs
+FAIL cycle e2e: run completed  — no element .tabs [data-tab=body]
+
+## tests/cycle-ui-pregnancy.cjs
+ok   flag off: no pregnancy mode form
+ok   pregnancy card: weeks today from her due date
+ok   …trimester and due date shown, described as an estimate
+ok   …urgent warning signs are one tap away
+ok   …sources shown
+ok   the dates-only estimate is paused
+ok   Zara checks in on the day a new week starts
+ok   pregnancy symptoms can be switched on in settings
+ok   reload: pregnancy card and due date still there after a full reload
+ok   "My baby was born": the pregnancy card is replaced by the postpartum card
+ok   postpartum card: bleeding after birth is not a period; mood; check-ups; warning signs
+ok   iPhone: postpartum card fits the screen
+ok   "My pregnancy ended": mode ends without asking why, and no postpartum card
+ok   a gentle message is shown
+ok   an impossible due date is refused and nothing starts
+ok   iPhone: pregnancy card (warning signs open) fits the screen
+
+## tests/cycle-ui-companion.cjs
+ok   flag off: no companion card
+ok   day 1 of a period: Zara asks how she is feeling (renamed from QK)
+ok   the card says her answers stay on her phone
+ok   the companion card is the first card on the screen (above the estimate)
+ok   it says why it is asking
+ok   "Cramps" asks how strong, in one tap
+ok   after answering, the check-in closes for today
+ok   her answer is saved in today's log
+ok   and what helped her before is offered (comfort card)
+ok   reload: the saved answer (pain moderate) is still there after reopening
+ok   she can rename her companion in settings
+ok   "Not now" hides it
+ok   …and it stays hidden for the rest of today
+
+## tests/cycle-ui-adjust.cjs
+ok   flag off: no band-adjusted card
+ok   flag on: the card is labelled research
+ok   with no band data it says why it cannot adjust (band not connected)
+ok   it states the evidence: synthetic only, not validated
+ok   the dates-only estimate is still shown
+ok   it never mentions ovulation or fertility
+ok   when neither model can estimate, the card says "Not enough data yet."
+
+## tests/privacy-check.cjs (every feature on)
+ok   flows ran: pregnancy card shown
+ok   the data was saved (read back after a full reload: pain, companion name, due date)
+ok   3. nothing she logged is readable in browser storage (encrypted at rest)
+ok   1. no requests to any other server (performance resource entries)
+note Google Fonts requested (fonts.googleapis.com): no health data, but it reveals the visit to Google. Self-hosting the fonts is an open decision.
+ok   2. nothing she logged appears in the console (output after page load)
+
+## tests/mobile-layout.cjs on the real iPhone screen
+ok   iPhone · welcome: nothing wider than the screen
+ok   iPhone · welcome: every control at least 24×24 px
+ok   iPhone · welcome: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone: pinch-zoom is not disabled
+ok   iPhone · today tab: nothing wider than the screen
+ok   iPhone · today tab: every control at least 24×24 px
+ok   iPhone · today tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone · train tab: nothing wider than the screen
+ok   iPhone · train tab: every control at least 24×24 px
+ok   iPhone · train tab: input text at least 16 px (no iOS zoom on focus)
+ok   iPhone · progress tab: nothing wider than the screen
+ok   iPhone · progress tab: every control at least 24×24 px
+ok   iPhone · progress tab: input text at least 16 px (no iOS zoom on focus)
+FAIL mobile layout: run completed  — no element .tabs [data-tab=body]
+
+## Whole run
+ok   no JavaScript errors (collected after each page load)
+note 150 tap(s) used a script click after the WebDriver tap was refused (most likely the unfinished-tap limitation from the self-test above, not a covered button): .tabs [data-tab=today] (click intercepted), .tabs [data-tab=train] (click intercepted), .tabs [data-tab=food] (click intercepted), .tabs [data-tab=progress] (click intercepted), [data-go=body] (click intercepted), [data-go=rehab] (click intercepted), [data-go=combine] (tile not on screen), [data-go=lab] (click intercepted), [data-go=scan] (click intercepted), [data-go=gait] (click intercepted), [data-go=calm] (click intercepted), [data-go=vitals] (click intercepted), [data-go=fitage] (click intercepted), [data-go=brain] (click intercepted), [data-go=reader] (click intercepted), [data-go=board] (tile not on screen), [data-go=report] (tile not on screen), [data-go=cycle] (click intercepted), #cyAgree (click intercepted), [data-act=consent] (click intercepted), #cySituation summary (click intercepted), [data-act=pregStart] (element not interactable), #cySettings summary (click intercepted), [data-act=pregBirth] (click intercepted), #cyPpWarn summary (click intercepted), [data-act=pregEnded] (click intercepted), #cyPregWarn summary (click intercepted), [data-cat=pain] (click intercepted), [data-act=logStart] (click intercepted), #cyCompanion [data-act=companionAnswer][data-ans=cramps] (click intercepted), #cyCompanion [data-act=companionSeverity][data-sev=moderate] (click intercepted), [data-act=companionName] (click intercepted), #cyCompanion [data-act=companionDismiss] (click intercepted), [data-act=saveDay] (click intercepted)
+
+2 FAILED of 110 in 2.7 min

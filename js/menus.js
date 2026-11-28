@@ -16,6 +16,12 @@ import { UAE_PLACES } from './places-uae.js';
 import { ISB_PLACES } from './places-isb.js';
 import { LHE_PLACES } from './places-lhe.js';
 import { KHI_PLACES } from './places-khi.js';
+import { KHI2_PLACES } from './places-khi2.js';
+import { LHE2_PLACES } from './places-lhe2.js';
+import { ISB2_PLACES } from './places-isb2.js';
+import { PSH_PLACES } from './places-psh.js';
+import { ASIAN_PLACES } from './places-asian.js';
+import { CHAINS2, CHAIN_ITEMS_MORE } from './places-chains2.js';
 const UAE_CITIES = new Set(['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Al Ain', 'Ras Al Khaimah', 'Fujairah', 'UAE']);
 // In the UAE, the UAE branch of a chain and local UAE places come first; in Pakistan, the reverse.
 const nearBoost = (p, myCity) => !myCity ? 0 : p.city === myCity ? 0.8 : UAE_CITIES.has(myCity) === (p.country === 'UAE') ? (p.country === 'UAE' ? 0.6 : 0) : -0.6;
@@ -27,16 +33,16 @@ const R = { style: 'restaurant', styleKnown: true }, S = { style: 'shaadi', styl
 // values yet; the Punjab Food Authority asked them to in 2023). Each says where it's from. Gathered from
 // the chains' nutrition pages and PDFs in Nov 2026; re-check the URL before relying on one.
 const O = (kcal, protein, carbs, fat, source, url) => ({ kcal, protein, carbs, fat, source, url });
-const MCD_SG = 'McDonald\'s Singapore', KFC_UK = 'KFC UK (Mar 2025)';
+const MCD_SG = 'McDonald\'s Singapore', KFC_UK = 'KFC UK (Nov 2026)';
 export const PLACES = [
   // International chains
   { id: 'kfc', name: 'KFC', type: 'Chain', items: [
-    I('Zinger Burger', 'zinger_burger', R, O(420, 25.8, 40.9, 17.6, KFC_UK, 'https://www.kfc.co.uk/nutrition-allergens')),
+    I('Zinger Burger', 'zinger_burger', R, O(468, 23, 43, 22, KFC_UK, 'https://www.kfc.co.uk/nutrition-allergens')),
     I('Mighty Zinger', 'mighty_zinger', R), I('Krunch Burger', 'zinger_burger', { ...R, servings: 0.8 }),
     I('Hot & Crispy chicken (1 piece)', 'fried_chicken', R),
-    I('Hot Wings (6)', 'wings', R, O(540, 29.4, 22.2, 37.2, KFC_UK + ', 6 × 90 kcal', 'https://www.kfc.co.uk/nutrition-allergens')),
-    I('Popcorn chicken (regular)', 'nuggets', R, O(285, 17.6, 17.6, 16.2, KFC_UK, 'https://www.kfc.co.uk/nutrition-allergens')),
-    I('Nuggets (6)', 'nuggets', R), I('Fries (regular)', 'fries', R, O(245, 3.7, 38.1, 9.2, KFC_UK, 'https://www.kfc.co.uk/nutrition-allergens')),
+    I('Hot Wings (6)', 'wings', R, O(546, 29.4, 22.8, 37.2, KFC_UK + ', 6 × 91 kcal', 'https://www.kfc.co.uk/nutrition-allergens')),
+    I('Popcorn chicken (regular)', 'nuggets', R, O(307, 18, 18, 18, KFC_UK, 'https://www.kfc.co.uk/nutrition-allergens')),
+    I('Nuggets (6)', 'nuggets', R), I('Fries (regular)', 'fries', R, O(261, 3.1, 38, 9.8, KFC_UK, 'https://www.kfc.co.uk/nutrition-allergens')),
     I('Fries (large)', 'fries', { ...R, servings: 1.5 }), I('Twister / wrap', 'shawarma', R), I('Soft drink (regular)', 'cola', { servings: 1.1 }) ] },
   { id: 'mcdonalds', name: "McDonald's", type: 'Chain', items: [
     I('Big Mac', 'beef_burger', R, O(558, 28, 48, 28, MCD_SG, 'https://www.mcdonalds.com.sg/food-menu/big-mac')),
@@ -115,7 +121,27 @@ export const PLACES = [
 const norm = s => String(s).toLowerCase().replace(/['’]/g, '').normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
 /** All places: the seed list plus the client's own. */
-export const allPlaces = (custom = []) => [...PLACES, ...LOCAL_PLACES, ...ISB_PLACES, ...LHE_PLACES, ...KHI_PLACES, ...UAE_PLACES, ...custom.map(p => ({ ...p, type: p.type || 'Added by you', custom: true }))];
+// One entry per brand: when a chain (CHAINS2) also appears as a city place, the city entry's items are folded into the
+// chain (items with official values win, names de-duplicated) and the city entry goes. The same restaurant found by two
+// city researchers (same name and city) is merged the same way. Extra items for the original chains are appended.
+const key = n => String(n).toLowerCase().replace(/\(.*?\)/g, '').replace(/[^a-z0-9]+/g, ' ').replace(/\b(the|cafe|café|restaurant|co)\b/g, '').trim();
+const mergeItems = (a, b) => { const seen = new Set(a.map(i => key(i.name))); return [...a, ...b.filter(i => !seen.has(key(i.name)) && seen.add(key(i.name)))]; };
+function buildPlaces() {
+  for (const [id, extra] of Object.entries(CHAIN_ITEMS_MORE)) { const c = PLACES.find(p => p.id === id); if (c) c.items = mergeItems(c.items, extra); }
+  const chains = [...PLACES, ...CHAINS2.filter(c => !PLACES.some(p => key(p.name) === key(c.name)))];
+  const byChain = new Map(chains.map(c => [key(c.name), c]));
+  const out = new Map();
+  for (const p of [...LOCAL_PLACES, ...ISB_PLACES, ...ISB2_PLACES, ...LHE_PLACES, ...LHE2_PLACES, ...KHI_PLACES, ...KHI2_PLACES, ...PSH_PLACES, ...ASIAN_PLACES]) {
+    const ch = byChain.get(key(p.name));
+    if (ch && CHAINS2.includes(ch)) { ch.items = mergeItems(ch.items, p.items); ch.cities = [...new Set([...(ch.cities || []), p.city])]; continue; }
+    const k = key(p.name) + '|' + p.city;
+    if (out.has(k)) { const q = out.get(k); if (p.items.length > q.items.length) out.set(k, { ...p, items: mergeItems(p.items, q.items) }); else q.items = mergeItems(q.items, p.items); }
+    else out.set(k, p);
+  }
+  return [...chains, ...out.values()];
+}
+const ALL = buildPlaces();
+export const allPlaces = (custom = []) => [...ALL, ...UAE_PLACES, ...custom.map(p => ({ ...p, type: p.type || 'Added by you', custom: true }))];
 
 /** Nutrition for a menu item: the chain's official numbers if present, else the dish model. */
 export function itemNutrition(item) {
