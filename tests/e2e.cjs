@@ -100,7 +100,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   else check('camera: no WebGL → says the browser needs graphics acceleration (WebGL)', /WebGL/.test(await p.textContent('#status')), await p.textContent('#status'));
   check('camera: Calibrate button shown for barbell lift', await p.isVisible('#calBtn'));
   await p.click('#calBtn'); await p.click('#viewport', { position: { x: 200, y: 200 } }); await p.click('#viewport', { position: { x: 200, y: 330 } });
-  check('calibration: two taps accepted', /Calibrated/.test(await p.textContent('#status')));
+  { const st = await p.textContent('#status'); check('calibration: two taps accepted', /Calibrated/.test(st), st); }
   check('camera: angle numbers hidden by default', !(await p.isVisible('#readout')));
   await p.click('#endLive'); await p.click('#nextSet'); await p.waitForTimeout(1500);
   check('camera: Next set restarts the camera with no setup sheet', await p.isVisible('#live') && !(await p.isVisible('#setup')));
@@ -355,7 +355,10 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('sukoon: tension 10 → support with emergency numbers first', /Get support now/.test(await p.textContent('#calmSheetBody')) && /116 123/.test(await p.textContent('#calmSheetBody')));
   await p.click('#cCont'); await p.waitForTimeout(1500);
   check('sukoon: breathing pacer runs', await p.isVisible('#calmPacer') && /Breathe (in|out)/.test(await p.textContent('#calmWord')));
-  await p.click('#calmSkip'); await p.waitForTimeout(1500);
+  await p.click('#calmSkip');
+  // 2026-11-28: waits up to 10 s, not a fixed 1.5 s. Chromium and WebKit report the failed audio at once; Firefox
+  // reports nothing, so the link comes from the 8 s safety net (STALL_MS in js/calm.js; see tests/sukoon-fallback.cjs).
+  await p.waitForSelector('#calmLinks a[href="https://quran.com/94/1-8"]', { timeout: 10000 }).catch(() => {});
   check('sukoon: recitation failure offers the passage on Quran.com', await p.isVisible('#calmLinks a[href="https://quran.com/94/1-8"]'));
   await p.click('#calmSkip');
   check('sukoon: dua shown with its source', await p.isVisible('#calmDua') && /Bukhari 6369/.test(await p.textContent('#calmDua')));
@@ -429,7 +432,10 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('reaction wall: counts hits', /5 hits/.test(await p.textContent('#bkEnd')));
   await p.click('#bkFin');
   await tap('[data-brain=track]'); await p.click('#tkGo'); await p.waitForSelector('#tkBox.pick', { timeout: 10000 });
-  for (const i of [0, 1, 2]) await p.click(`.tk-b[data-b="${i}"]`, { force: true });
+  // 2026-11-28: each followed ball is tapped as that element. The balls finish in random places and can overlap, so a tap
+  // at a ball's centre could land on another ball drawn on top (failed now and then, seen in Firefox); the scoring being
+  // checked is unchanged.
+  for (const i of [0, 1, 2]) await p.dispatchEvent(`.tk-b[data-b="${i}"]`, 'click');
   await p.waitForSelector('#tkFin', { timeout: 8000 });
   check('tracker: picking the 3 followed balls gives a tracking level', /Tracking level \d+/.test(await p.textContent('#tkEnd')) && /1 of 1 rounds perfect/.test(await p.textContent('#tkEnd')));
   await p.click('#tkFin');
