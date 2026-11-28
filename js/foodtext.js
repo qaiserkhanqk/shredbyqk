@@ -42,7 +42,8 @@ const ADJ = new Set(['green', 'sweet', 'hot', 'plain', 'white', 'black', 'specia
 // "seekh kebab paratha roll": the words before a wrapper are its filling, not another dish.
 const WRAPPER = ['roll', 'burger', 'sandwich', 'wrap', 'shawarma', 'pizza', 'paratha roll'];
 // Dishes sold as a pack of pieces: "4 nuggets" is ⅔ of a 6-piece box.
-const PACK = { nuggets: 6, wings: 6, gol_gappay: 6, biscuits: 3, pancakes: 2, tacos: 2, dumplings: 6, sushi_roll: 8, mozzarella_sticks: 6 };
+const PACK = { nuggets: 6, wings: 6, gol_gappay: 6, biscuits: 3, pancakes: 2, tacos: 2, dumplings: 6, sushi_roll: 8, mozzarella_sticks: 6,
+  batair: 2, reshmi_kebab: 2, gola_kebab: 2, aloo_tikki: 2, prawn_tempura: 6, bao: 2, scones: 2, macarons: 3 };
 const SIZE_WORDS = new Set(['small', 'medium', 'regular', 'large', 'chota', 'chhota', 'choti', 'bara', 'bada', 'bari', 'full', 'single', 'double']);
 // Everyday words dish names don't contain.
 const SAY = { chawal: 'plain rice', doodh: 'milk', milk: 'milk', bread: 'bread slice', toast: 'bread slice', egg: 'boiled egg', eggs: 'boiled egg', tea: 'chai', coke: 'cola', pepsi: 'cola', sprite: 'cola' };
@@ -98,7 +99,8 @@ const FOOD_WORDS = new Set(INDEX.flatMap(e => [...e.name, ...e.alias]));
 const placeNamed = (name, query) => {
   const w = name.toLowerCase().replace(/['’]/g, '').split(/[^a-z0-9]+/).find(x => x.length >= 3 && !GENERIC.has(x) && !FOOD_WORDS.has(x) && !ADJ.has(x) && !SIDE.has(x));
   // In a spoken meal a place must really be named: exact, or one typo in a longer word (no prefixes: "bun" ≠ "Bundu").
-  return !!w && query.split(' ').some(q => q === w || (q.length >= 6 && w.length >= 6 && q[0] === w[0] && rawLev(q, w) <= 1));
+  // A word that already names a food is never a typo of a place ("pastry" ≠ The Pantry).
+  return !!w && query.split(' ').some(q => q === w || (q.length >= 6 && w.length >= 6 && q[0] === w[0] && !FOOD_WORDS.has(q) && rawLev(q, w) <= 1));
 };
 
 /** One phrase's words → a dish (or a place's menu item), or null. Tries splitting and dropping words. */
@@ -162,6 +164,8 @@ const norm = s => String(s).toLowerCase()
   // Dishes whose name has "and" / "with" in it, so the split doesn't make two dishes of them.
   .replace(/\bfish\s+(?:and|n|&|aur)\s+chips\b/g, 'fish chips').replace(/\bmac(?:aroni)?\s+(?:and|n|&)\s+cheese\b/g, 'mac cheese')
   .replace(/\bbagels?\s+(?:with|and|&)\s+cream\s+cheese\b/g, 'bagel cream cheese')
+  .replace(/\bhot\s+(?:and|n|&)\s+sour\b/g, 'hot sour').replace(/\bscones?\s+(?:with|and|&)\s+(?:cream|jam)(?:\s+(?:and|&)\s+(?:cream|jam))?\b/g, 'scones')
+  .replace(/\bcold\s*brew(?:ed)?\s+coffee\b/g, 'cold brew') // "cold coffee" is a blended shake, so coffee stays off the cold brew
   .replace(/\b(cereal|cornflakes|corn\s+flakes|oats|oatmeal|porridge|granola)\s+(?:with|and|&|aur)\s+(milk|doodh|yogh?urt|dahi)\b/g, (m, a, b) => a === 'granola' || !/milk|doodh/.test(b) ? ' granola yogurt ' : /cereal|flakes/.test(a) ? ' cereal milk ' : ' oatmeal ')
   .replace(/\bek dedh\b/g, 'dedh').replace(/['’]/g, '').replace(/[^\p{L}\p{N}.,+&]+/gu, ' ')
   // "do se teen roti", "2-3 roti", "2 ya 3": a range is its middle, not a place called "Do".
