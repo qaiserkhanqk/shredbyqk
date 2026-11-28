@@ -8,7 +8,7 @@
 //    coach review. Fast movements need slow-motion video (120–240 fps) for accurate events.
 // 2. Landing test. Front-on drop landing: peak frontal-plane knee angle (knee caving in) in the first
 //    ~0.3 s after landing on each leg, and the left–right difference. The same 2D measure as the
-//    single-leg squat test (kneetest.js); used as a screen for ACL-injury risk, not a diagnosis.
+//    single-leg squat test (kneetest.js); a movement screen, not an injury prediction or a diagnosis.
 // Limits: 2D only, so angles are accurate in the plane the camera faces; no forces.
 import { angle } from './angles.js';
 import { fppa } from './kneetest.js';
@@ -57,7 +57,7 @@ export function analyseBowling(frames, { arm = 'R', view = 'side' } = {}) {
     const bend = Math.abs(deg(Math.atan2(sh.x - hp.x, hp.y - sh.y)));
     out.sideBend = Math.round(bend);
     out.findings.push(bend > 45
-      ? { title: `High trunk side-bend at release (${Math.round(bend)}°)`, detail: 'Injured young fast bowlers averaged about 50° here, uninjured about 40°. Add the trunk work in your programme (Pallof press, suitcase carries, back-extension holds) and have a coach look at the action.', ok: false }
+      ? { title: `High trunk side-bend at release (${Math.round(bend)}°)`, detail: 'Side-bend helps pace; large amounts are something bowling coaches watch closely in young fast bowlers (Bayne 2016). Add the trunk work in your programme (Pallof press, suitcase carries, back-extension holds) and have a coach look at the action.', ok: false }
       : { title: `Trunk side-bend at release ${Math.round(bend)}°`, detail: 'Within the range seen in uninjured bowlers. Keep the trunk work in your programme.', ok: true });
   }
   return out;
@@ -87,7 +87,7 @@ export function analyseLanding(frames, { flagDeg = 10, asymDeg = 5 } = {}) {
   const L = Math.round(peak('L')), R = Math.round(peak('R')), asym = Math.abs(L - R);
   const findings = [];
   for (const [side, v] of [['Left', L], ['Right', R]]) findings.push(v > flagDeg
-    ? { title: `${side} knee caves in on landing (${v}°)`, detail: 'Knees moving inward on landing is a known ACL-injury risk factor. Practise single-leg drop-and-stick landings: knee over the second toe, hips back, soft and quiet.', ok: false }
+    ? { title: `${side} knee caves in on landing (${v}°)`, detail: 'In lab studies, more knee-inward angle on landing went with higher knee load (Sigward 2015). Phone angles are rough, so compare with your own earlier videos. Practise single-leg drop-and-stick landings: knee over the second toe, hips back, soft and quiet.', ok: false }
     : { title: `${side} knee stays in line (${v}°)`, detail: 'Good landing control.', ok: true });
   if (asym > asymDeg) findings.push({ title: `Left and right differ by ${asym}°`, detail: 'One side controls the landing less well. Add extra single-leg landing work on the weaker side.', ok: false });
   return { ok: true, landings: landings.length, L, R, asym, findings, issues: [] };

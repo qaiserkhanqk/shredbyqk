@@ -178,8 +178,11 @@ const uniq = xs => [...new Set(xs.filter(Boolean))];
 /**
  * A programme for sport + role + phase, in the same shape as programs.js.
  * Off-season: 3 days. Pre-season: 2 days. In-season: 2 short days.
+ * focus (optional, from the Athlete Combine, js/combine/): { limiter: { name, cat, ex: [ids] }, fixes: [{ title, ex: [ids] }] }.
+ * The limiter's work opens every day (done fresh); up to two movement fixes follow it. Their ids win over
+ * the role's own picks when both appear, so nothing is doubled.
  */
-export function buildProgram(sportId, roleId, phase, lib) {
+export function buildProgram(sportId, roleId, phase, lib, focus = null) {
   const sp = sportById(sportId), r = roleOf(sportId, roleId); if (!sp || !r) return null;
   const k = r.volume || 1, I = (id, cat) => it(lib, id, cat, phase, k);
   const protect = uniq([...(sp.protect || []), ...(r.protect || [])]);
@@ -196,15 +199,22 @@ export function buildProgram(sportId, roleId, phase, lib) {
     days.push({ name: 'Maintain A', focus: 'Short and heavy, early in the week', items: [I(S[0], 'strength'), I(P[0], 'power'), I(T[0], 'trunk'), I(protect[0], 'protect')] });
     days.push({ name: 'Maintain B', focus: 'Prevention dose and a primer', items: [I(S[1] || S[0], 'strength'), ...protect.slice(1, 3).map(x => I(x, 'protect')), I(P[1] || P[0], 'power')] });
   }
+  if (focus) {
+    const lim = focus.limiter ? focus.limiter.ex.map(x => I(x, focus.limiter.cat)) : [];
+    const fix = uniq((focus.fixes || []).flatMap(f => f.ex)).slice(0, 2).map(x => I(x, 'protect'));
+    for (const d of days) d.items = [...lim, ...fix, ...d.items];
+  }
   for (const d of days) { const seen = new Set(); d.items = d.items.filter(x => x && !seen.has(x[0]) && seen.add(x[0])); }
   const ph = PHASES.find(p => p.id === phase);
   return {
     id: `ath-${sportId}-${roleId}-${phase}`, name: `${sp.name}: ${r.name}`, goal: `${sp.name} · ${ph.name}`, level: 'Athlete',
     days: days.length, weeks: phase === 'in' ? 12 : 6, athlete: { sport: sportId, role: roleId, phase },
-    tagline: r.desc, method: `${sp.season[phase]} ${r.why || ''}`.trim(), flag: r.flag, gaps: [r.gaps, sp.gaps].filter(Boolean).join(' '),
+    tagline: r.desc, method: `${sp.season[phase]} ${r.why || ''}${focusNote(focus)}`.trim(), flag: r.flag, focus: focus || undefined, gaps: [r.gaps, sp.gaps].filter(Boolean).join(' '),
     plan: days,
   };
 }
+
+const focusNote = f => !f ? '' : ` From your Athlete Combine: ${[f.limiter && `your #1 limiter is ${f.limiter.name.toLowerCase()}, so its work opens every session`, f.fixes?.length && `movement work for ${f.fixes.map(x => x.title.toLowerCase()).join(' and ')}`].filter(Boolean).join('; ')}.`;
 
 /** Parse an athlete programme id back into its parts (for saved state). */
 export function parseId(id) {

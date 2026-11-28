@@ -26,4 +26,7 @@ export const ATHLETE = [
   ['mbShotPut', 'Med-Ball Rotational Shot Put', ['Core', 'Shoulders', 'Chest'], 'Medicine ball', null, { kind: 'plyo', coach: 'explosive', reps: 5, guide: 'Side-on to a wall, load the back hip, rotate and push the ball into the wall.' }],
   ['bikeIntervals', 'Bike Intervals', ['Quads', 'Glutes'], 'Machine', null, { kind: 'cardio', coach: 'intervals', work: 30, rest: 60, rounds: 8, guide: 'Hard but even efforts. Match the work and rest to your sport.' }],
   ['turn505', '5-0-5 Turns', ['Quads', 'Glutes', 'Calves'], 'No equipment', null, { kind: 'run', coach: 'intervals', work: 6, rest: 45, rounds: 8, guide: 'Sprint 15 m through a gate, turn on the line, sprint back 5 m. Alternate turning foot.' }],
+  ['ghosting', 'Squash Ghosting', ['Full body', 'Quads'], 'Court', null, { coach: 'intervals', work: 40, rest: 40, rounds: 6, guide: 'From the T, move to a corner, lunge and play a shadow shot, then push back to the T. Keep the same lunge depth on the last rep as the first.' }],
+  ['sprawl', 'Sprawl', ['Full body', 'Core'], 'Bodyweight', null, { guide: 'From a fighting stance, shoot your legs back and drop your hips to the floor, then snap back up to stance. Fast.' }],
+  ['deadHang', 'Dead Hang', ['Forearms', 'Back'], 'Pull-up bar', null, { hold: 30, guide: 'Hang from a bar with straight arms, shoulders gently active. Hold as long as you can with a good grip.' }],
 ];

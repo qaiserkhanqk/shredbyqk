@@ -33,6 +33,7 @@ import { CLOUD, cloudOn } from './cloud-config.js';
 import * as classes from './classes.js';
 import * as routines from './routines.js';
 import * as athletes from './athletes.js';
+import { initCombine, renderCombine, finishCombine, currentFocus, isCombineMode, combineModeName, combineMinFps, combineMoving, gatesFor, COMBINE_MODES } from './combine/ui.js';
 import { analyseBowling, analyseLanding } from './sportsbio.js';
 import { Cloud, pushAll } from './sync.js';
 import { PROGRAMS, scheme as progScheme, weeklySets, currentDay, byId as builtinById, GOALS, pickProgram, defaultDays, COLLECTIONS, collectionOf } from './programs.js';
@@ -114,7 +115,7 @@ function mountOrbs() {
 /* ---------- Navigation ---------- */
 function tab(id) {
   $$('.screen').forEach(s => s.classList.toggle('on', s.id === id));
-  const tabFor = ['body', 'gait', 'scan', 'rehab', 'calm', 'vitals', 'fitage', 'brain', 'quran', 'reader', 'lab'].includes(id) ? 'today' : ['board', 'report'].includes(id) ? 'progress' : id; // tools live under Today
+  const tabFor = ['body', 'gait', 'scan', 'rehab', 'calm', 'vitals', 'fitage', 'brain', 'quran', 'reader', 'lab', 'combine'].includes(id) ? 'today' : ['board', 'report'].includes(id) ? 'progress' : id; // tools live under Today
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tabFor));
   if (id === 'today') renderToday();
   if (id === 'train') renderPrograms();
@@ -127,6 +128,7 @@ function tab(id) {
   if (id !== 'reader') leaveReader();
   if (id === 'reader') renderReader();
   if (id === 'fitage') renderFitAge();
+  if (id === 'combine') renderCombine();
   if (id === 'board') renderBoard();
   if (id === 'report') renderReport();
   if (id === 'lab') renderLab();
@@ -496,14 +498,14 @@ async function keepAwake(on) {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && (!$('#live').hidden || !$('#summary').hidden)) keepAwake(true); });
 let lastSource = null, lastSet = null;
 
-async function startLive({ mode, source, file, auto = false }) {
+async function startLive({ mode, source, file, auto = false, opts = {} }) {
   keepAwake(true);
   $('#setup').hidden = true; $('#summary').hidden = true; $('#live').hidden = false;
   $('#tempoRing').hidden = true;
   if (auto) exKey = null;
   const ex = mode === 'form' && !auto ? curEx() : null;
   const rx = mode === 'form' && !auto ? curRx : null;
-  live = { rx, mode, source, frames: [], t0: null, lost: 0, wrong: 0, setupFrames: 0, demo: null, done: false, steps: 0, mPerPx: null, standFrames: [], times: [],
+  live = { rx, mode, source, opts, gates: [], timeScale: 1, frames: [], t0: null, lost: 0, wrong: 0, setupFrames: 0, demo: null, done: false, steps: 0, mPerPx: null, standFrames: [], times: [],
     auto, det: auto ? new ExerciseDetector() : null, buf: [], sets: [], lastRepT: 0 };
   bar.reset(); recorder2.start({ kind: mode, exercise: mode === 'form' && !auto ? exKey : undefined, gaitMode: mode === 'gait' ? gaitMode : undefined, source, loadKg: mode === 'form' ? parseFloat($('#loadKg').value) || null : undefined });
   engine = null; fb = null; smooth.reset(); motion.reset(); fx.reset(); hud.reset(); comp = null; recorder = null; $('#trackChip').innerHTML = '<i></i>Finding you…'; $('#trackChip').classList.remove('on'); $('#faultBanner').hidden = true;
@@ -512,10 +514,11 @@ async function startLive({ mode, source, file, auto = false }) {
   $('#repNum').textContent = '0'; $('#repLbl').textContent = ex?.hold ? 'seconds' : 'reps'; $('#dots').innerHTML = ''; $('#cleanCt').textContent = '0 clean'; $('#vlKnob').style.left = '0%'; $('#vlTxt').textContent = 'fresh';
   $('#gSteps').textContent = '0'; $('#gProg').style.width = '0'; $('#gStepsLbl').textContent = mode === 'gait' ? 'Steps seen' : 'Time';
   const testName = { rom: TEST.rom?.label || 'Measurement', gait: `Gait · ${gaitMode === 'run' ? 'running' : 'walking'}`, jump: 'Jump test', sls: 'Single-leg squat knee test', land: 'Landing test', bowl: 'Bowling action check', bodymap: 'Map my body' };
+  if (isCombineMode(mode)) testName[mode] = combineModeName(mode, opts);
   $('#detectChip').hidden = !auto; $('#detectChip').classList.remove('found'); $('#detectAlt').hidden = true; $('#detectChange').hidden = true;
   $('#detectTxt').textContent = 'Start your exercise. I\'ll recognise it.';
   $('#liveEyebrow').textContent = auto ? 'Camera coach' : mode === 'form' ? ex.name : testName[mode];
-  $('#liveTitle').textContent = auto ? 'Start moving' : mode === 'form' ? `Set ${setsToday(exKey) + 1}${source === 'demo' ? ' · demo' : ''}` : (mode === 'bodymap' ? 'Stand still, side-on' : source === 'demo' ? 'Demo walker' : source === 'file' ? 'Analysing your video (precise mode)' : mode === 'gait' ? 'Walk naturally for 10 seconds' : mode === 'jump' ? 'Up to 3 jumps' : mode === 'rom' ? `${TEST.rom.secs} seconds` : mode === 'land' ? 'Step off and land, 3 times' : mode === 'bowl' ? 'Bowl one delivery' : 'Left leg first, then right');
+  $('#liveTitle').textContent = auto ? 'Start moving' : mode === 'form' ? `Set ${setsToday(exKey) + 1}${source === 'demo' ? ' · demo' : ''}` : (mode === 'bodymap' ? 'Stand still, side-on' : source === 'demo' ? 'Demo walker' : source === 'file' ? 'Analysing your video (precise mode)' : mode === 'gait' ? 'Walk naturally for 10 seconds' : mode === 'jump' ? 'Up to 3 jumps' : mode === 'rom' ? `${TEST.rom.secs} seconds` : mode === 'land' ? 'Step off and land, 3 times' : mode === 'bowl' ? 'Bowl one delivery' : isCombineMode(mode) ? 'Athlete Combine' : 'Left leg first, then right');
   $('#endLive').textContent = mode === 'form' ? 'End set' : 'Stop';
   $('#flipCam').hidden = source !== 'camera';
   $('#calBtn').hidden = !(mode === 'form' && vbtOn() && source !== 'demo');
@@ -531,7 +534,14 @@ async function startLive({ mode, source, file, auto = false }) {
       canvas.width = DEMO_W; canvas.height = DEMO_H;
     } else {
       video.hidden = false;
-      if (source === 'file') { video.srcObject = null; video.src = URL.createObjectURL(file); video.loop = false; video.playbackRate = 1; }
+      if (source === 'file') {
+        video.srcObject = null; video.src = URL.createObjectURL(file); video.loop = false;
+        // A slow-motion file plays slowed down, so its media time runs 4× or 8× real time: divide it back.
+        // Real-time uploads of tests play at half speed so the pose model sees more of the frames.
+        const slow = $(isCombineMode(mode) ? '#combSlow' : '#gaitSlow');
+        live.timeScale = mode === 'form' ? 1 : +(slow?.value || 1) || 1;
+        video.playbackRate = mode !== 'form' && live.timeScale === 1 ? 0.5 : 1;
+      }
       else {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error('nocam');
         // Tests ask for 60 fps: event timing (jump flight, foot contacts) gets twice as precise.
@@ -545,6 +555,13 @@ async function startLive({ mode, source, file, auto = false }) {
       live.model = source === 'file' ? 'heavy' : mode === 'form' ? liveModelName() : 'full';
       live.lm = await getVideoLandmarker(live.model);
       $('#status').textContent = '';
+      const prompts = gatesFor(mode);
+      if (prompts.length) { // the athlete taps the cones on the video before timing starts
+        if (source === 'file') { video.pause(); video.currentTime = 0; }
+        await tapGates(prompts);
+        if (!live) return;
+        if (source === 'file') await video.play();
+      }
     }
     if (mode === 'form' && source !== 'file' && $('#recordChk').checked) startComposite(source === 'demo' ? canvas : video);
   } catch (err) {
@@ -617,7 +634,7 @@ function loop(now) {
     px = live.demo.frame(now); live.demo.drawScene(ctx);
   } else if (video.readyState >= 2 && video.videoWidth) {
     if (canvas.width !== video.videoWidth) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
-    const ts = live.source === 'file' ? video.currentTime * 1000 : now;
+    const ts = live.source === 'file' ? video.currentTime * 1000 / live.timeScale : now;
     if (ts > lastTs || live.source === 'camera') {
       lastTs = ts; t = live.source === 'file' ? ts : now;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -941,7 +958,7 @@ const showAngles = () => { try { return localStorage.getItem('qk_angles') === '1
 $('#readout').hidden = !showAngles();
 $('#anglesBtn').onclick = () => { const on = !showAngles(); try { localStorage.setItem('qk_angles', on ? '1' : '0'); } catch {} $('#readout').hidden = !on; $('#anglesBtn').textContent = on ? 'Hide angles' : 'Angles'; };
 $('#anglesBtn').textContent = showAngles() ? 'Hide angles' : 'Angles';
-$('#endLive').onclick = () => { if (!live) return; ['gait', 'jump', 'sls', 'rom', 'land', 'bowl'].includes(live.mode) ? finishTest() : endSet(); };
+$('#endLive').onclick = () => { if (!live) return; ['gait', 'jump', 'sls', 'rom', 'land', 'bowl', ...COMBINE_MODES].includes(live.mode) ? finishTest() : endSet(); };
 $('#flipCam').onclick = () => { const m = live?.mode || 'form'; live && (live.done = true); facing = facing === 'user' ? 'environment' : 'user'; stopLive(); live = null; startLive({ mode: m, source: 'camera' }); };
 $('#doneBtn').onclick = () => { flow = null; stopRest(); keepAwake(false); $('#summary').hidden = true; tab('today'); };
 // After a camera set the phone is already placed, so the next set starts straight away.
@@ -1115,6 +1132,10 @@ const TEST = {
   sls: { secs: 30, label: 'Record knee test (30 s)', minFps: 25, view: 'front', intro: () => 'Stand on your left leg and do five slow squats.' },
   land: { secs: 12, label: 'Record 3 landings (12 s)', minFps: 25, view: 'front', intro: () => 'Step onto the box. Step off and land on both feet. Three times.' },
   bowl: { secs: 8, label: 'Record a delivery (8 s)', minFps: 25, view: null, intro: () => 'Bowl when you\'re ready. Keep your whole body in frame.' },
+  // Athlete Combine (js/combine/): tests and one-phone movement checks.
+  ...Object.fromEntries(COMBINE_MODES.map(m => [m, { secs: m === 'c_cmj' || m === 'c_slHop' || m === 'c_nordic' ? 15 : 12, minFps: combineMinFps(m), view: 'side',
+    intro: () => ({ c_cmj: 'Hands on hips. Stand still for a second, then jump as high as you can. Three jumps.', c_slHop: `On your ${live?.opts?.side === 'R' ? 'right' : 'left'} leg. Hands on hips, stand still, then jump straight up. Three jumps.`,
+      c_hops: 'Hands on hips. Stand still for a second, then ten fast, high hops. As little time on the ground as you can.', c_nordic: 'Kneel upright, side-on to me. Lower forward as slowly as you can.' }[m] || 'Go when you\'re ready. Keep your whole body in frame.') }])),
 };
 $$('[data-gmode]').forEach(b => b.onclick = () => { gaitMode = b.dataset.gmode; $$('[data-gmode]').forEach(x => x.classList.toggle('on', x === b)); });
 $$('[data-test]').forEach(b => b.onclick = () => {
@@ -1184,6 +1205,7 @@ function testFrame(px, ctx, t) {
   live.frames.push({ t, px }); recorder2.push(t, px);
   if (live.mode === 'gait') { footTrails.L.push(px[31], 1); footTrails.R.push(px[32], 1); footTrails.L.draw(ctx); footTrails.R.draw(ctx); }
   drawPose(ctx, px, { color: '#9FD0B6' });
+  if (live.gates.length) { ctx.save(); ctx.strokeStyle = '#d8e66c'; ctx.lineWidth = 3; ctx.setLineDash([10, 8]); for (const x of live.gates) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, ctx.canvas.height); ctx.stroke(); } ctx.restore(); }
   const cfg = TEST[live.mode], el = (t - (live.source === 'file' ? 0 : live.t0)) / 1000;
   if (live.mode === 'bodymap' && live.source !== 'file') {
     const steps = cfg.steps(live.source === 'demo'), i = steps.filter(x => el >= x[0]).length - 1, [line, label] = BM_STEP[steps[i][1]];
@@ -1207,15 +1229,26 @@ function testFrame(px, ctx, t) {
 
 function finishTest() {
   if (!live) return;
-  const { frames, mode, source } = live, demo = source === 'demo';
+  const { frames, mode, source } = live, demo = source === 'demo', live0 = live;
   const w = $('#overlay').width, h = $('#overlay').height;
   stopLive(); $('#live').hidden = true; live = null;
   footTrails.L.reset(); footTrails.R.reset();
   const cfg = TEST[mode];
   // Quality gate first: a bad recording gives a bad answer, so say what to fix instead.
-  const q = demo ? { ok: true, score: 100, issues: [], fps: 30 } : assessQuality(frames, { w, h, minFps: cfg.minFps, view: cfg.view, viewOf, joints: mode === 'jump' ? [23, 24, 25, 26, 27, 28, 29, 30, 31, 32] : undefined });
+  const q = demo ? { ok: true, score: 100, issues: [], fps: 30 } : assessQuality(frames, { w, h, minFps: cfg.minFps, view: cfg.view, viewOf, joints: ['jump', 'c_cmj', 'c_slHop', 'c_hops'].includes(mode) ? [23, 24, 25, 26, 27, 28, 29, 30, 31, 32] : undefined });
   if (mode === 'rom') { recorder2.finish({ mode, quality: q }); return finishRom(frames, q); }
   if (mode === 'bodymap') { recorder2.finish({ mode, quality: q }); return finishBodyMap(frames, demo); }
+  if (isCombineMode(mode)) {
+    recorder2.finish({ mode, quality: q });
+    // Sprints, deliveries and punches cross the frame, so only the frame-rate warning applies there.
+    const moving = combineMoving(mode);
+    const out = !moving && q.score < 40 ? { ok: false, say: 'The recording quality was too low. ' + (q.issues[0] || ''), html: `${qualityHTML(q)}<div class="card"><b>No result yet</b></div>` }
+      : finishCombine(mode, frames, moving ? { issues: q.issues.filter(i => /fps|frame rate/i.test(i)) } : q, { side: live0.opts?.side, gates: live0.gates });
+    tab('combine');
+    const box = $('#combineResult'); box.hidden = false; box.innerHTML = out.html; box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    say(out.say, { id: 'comb_done_' + Date.now(), priority: 'high' });
+    return;
+  }
   const mPerPx = scaleFromHeight(frames.slice(0, 20), (S.profile.heightCm || 0) / 100);
   const r = mode === 'gait' ? analyseGait(frames, { mode: gaitMode }) : mode === 'jump' ? analyseJumps(frames, { mPerPx })
     : mode === 'land' ? analyseLanding(frames) : mode === 'bowl' ? analyseBowling(frames, { arm: $('#bowlArm').value, view: $('#bowlView').value }) : analyseSingleLegSquat(frames);
@@ -1941,7 +1974,8 @@ $('#cpRound').onclick = () => { if (!cls) return; cls.score++; $('#cpScore').tex
 /* ---------- Workout builder ---------- */
 // Built programs live in S.customPrograms and behave exactly like the built-in ones.
 const programById = id => builtinById(id) || (S.customPrograms || []).find(p => p.id === id) || athleteProgram(id) || null;
-const athleteProgram = id => { const a = athletes.parseId(id); return a ? athletes.buildProgram(a.sport, a.role, a.phase, LIB) : null; };
+// The Athlete Combine's limiter and movement fixes shape the programme when it's for the same sport and position.
+const athleteProgram = id => { const a = athletes.parseId(id); if (!a) return null; const c = S.combine, f = c?.sport === a.sport && c?.role === a.role ? currentFocus() : null; return athletes.buildProgram(a.sport, a.role, a.phase, LIB, f); };
 let bd = null, bdDay = 0;
 function openBuilder(p) {
   bd = p ? JSON.parse(JSON.stringify(p)) : builder.blank();
@@ -2255,6 +2289,15 @@ $('#calBtn').onclick = () => {
   $('#status').textContent = 'Tap the TOP edge of a 45 cm plate';
 };
 $('#viewport').addEventListener('click', e => {
+  if (live?.gateWait) { // Athlete Combine: cone positions for the sprint and 5-0-5
+    const c = $('#overlay'), r = c.getBoundingClientRect(), k = Math.min(r.width / c.width, r.height / c.height), ox = (r.width - c.width * k) / 2;
+    let x = e.clientX - r.left; if ($('#viewport').classList.contains('mirror')) x = r.width - x;
+    live.gates.push((x - ox) / k);
+    const w = live.gateWait;
+    if (live.gates.length < w.prompts.length) { $('#status').textContent = w.prompts[live.gates.length]; return; }
+    live.gateWait = null; $('#viewport').classList.remove('calibrating'); $('#status').textContent = '';
+    return w.res();
+  }
   if (!live?.calPts) return;
   const c = $('#overlay'), r = c.getBoundingClientRect();
   const k = Math.min(r.width / c.width, r.height / c.height), ox = (r.width - c.width * k) / 2, oy = (r.height - c.height * k) / 2;
@@ -2657,6 +2700,14 @@ $('#studioList').onclick = async e => {
   renderStudio();
 };
 $('#studioExport').onclick = async () => { const data = await exportClips(); if (!Object.keys(data.clips).length) return toast('Record some lines first.'); downloadJSON(`shred-voice-${Date.now()}.json`, data); };
+
+/* ---------- Athlete Combine (js/combine/) ---------- */
+function tapGates(prompts) {
+  return new Promise(res => { live.gateWait = { prompts, res }; $('#viewport').classList.add('calibrating'); $('#status').textContent = prompts[0]; });
+}
+initCombine({ $, esc, S, persist, say, toast, lib: LIB,
+  startTest: (mode, source, file, opts) => { if (source === 'file' && !file) return; startLive({ mode, source, file, opts }); },
+  openProgram: id => showProgram(id) });
 
 /* ---------- Boot ---------- */
 mountOrbs(); bindPlan(); bindProfile(); bindPersonal(); renderTrain(); renderToday(); applyMute(); renderTestHistory();

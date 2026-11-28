@@ -105,6 +105,7 @@
 
     <div class="prog-head more-head"><span class="eyebrow">More ways to train</span></div>
     <button type="button" class="cam-start athlete-start" id="athleteBtn"><span class="cam-ic">🏆</span><span><b>Train for your sport</b><span id="athleteSub">Cricket, football, MMA, boxing, padel, tennis, hockey, squash. Built for your position.</span></span></button>
+    <button type="button" class="ghost full" data-go="combine">Test yourself first: Athlete Combine</button>
     <div class="prog-head"><span class="eyebrow">Classes · QK runs them, any time</span></div>
     <div class="prog-strip" id="classStrip" role="list"></div>
     <div class="prog-head"><span class="eyebrow">At home · no gym needed</span></div>
@@ -166,6 +167,7 @@
     <button type="button" class="tile" data-go="rehab"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.5-9-9.5C1.6 7.6 4.2 4 7.8 4c1.8 0 3.2 1 4.2 2.4C13 5 14.4 4 16.2 4 19.8 4 22.4 7.6 21 11.5 19 16.5 12 21 12 21z"/><path d="M9 12h6M12 9v6"/></svg></span><span><b>Fix a pain or injury</b><span>Back, shoulder, knee, ankle and more. A safe, step-by-step plan.</span></span></button>
     <button type="button" class="tile" data-go="gait"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round"><path d="M8 4c2 0 3 2 3 4s-1 5-3 5-3-3-3-5 1-4 3-4zM16 9c2 0 3 2 3 4s-1 4-3 4-3-2-3-4 1-4 3-4z"/></svg></span><span><b>Test how you move</b><span>Walking and running, jump height, knee control.</span></span></button>
     <button type="button" class="tile" data-go="scan"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="12" r="3"/></svg></span><span><b>Posture &amp; body fat</b><span>A photo check of how you stand, plus body fat.</span></span></button>
+    <button type="button" class="tile" data-go="combine"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 4a2 2 0 1 0 0 .01M8 21l3-6 3 2v4M11 15l-1-5 4-1 3 3 3 1M10 10l-4 2"/></svg></span><span><b>Athlete Combine</b><span>Test power, speed and agility on camera, find your #1 limiter, and get your sport programme built around it.</span></span></button>
     <button type="button" class="tile" data-go="lab"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M12 12l9-5M12 12v10M12 12L3 7"/></svg></span><span><b>3D Lab · athletes</b><span>Two cameras, one movement: a 3D skeleton, rotations, knee alignment and a report. For bowlers, footballers and anyone.</span></span></button>
     <button type="button" class="tile" data-go="fitage"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span><b>Fitness Age</b><span>How old your body really is, from the HUNT fitness research. Plus what would make you younger.</span></span></button>
     <button type="button" class="tile" data-go="vitals"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-5 4 10 2-5h6"/></svg></span><span><b>Body check</b><span>Heart rate and HRV with your fingertip on the camera, plus a 3-minute alertness test.</span></span></button>
@@ -443,11 +445,20 @@
         <button class="ghost" type="button" id="gaitDemo">Watch a demo</button>
       </div>
     </div>
+    <label class="field">Uploading a slow-motion video? <select id="gaitSlow" aria-label="Upload speed">
+      <option value="1">It plays at normal speed</option><option value="4">It plays slowed down (120 fps slow-mo)</option><option value="8">It plays slowed down (240 fps slow-mo)</option></select></label>
     <div id="gaitResult" class="stack" hidden></div>
     <div class="card" id="testHistory" hidden><span class="eyebrow">Your history</span><div class="list" id="testHistoryList" style="margin-top:6px"></div></div>
   </section>
 
   <!-- SCAN -->
+  <section class="screen" id="combine">
+    <button type="button" class="back" data-back>‹ Tools</button>
+    <div class="page-head"><div><span class="eyebrow">Athlete Combine</span><h1 class="display h1">Test yourself like an athlete</h1></div></div>
+    <div id="combineResult" class="stack" hidden></div>
+    <div id="combineRoot" class="stack"></div>
+  </section>
+
   <section class="screen" id="scan">
     <button type="button" class="back" data-back>‹ Tools</button>
     <div class="page-head"><div><span class="eyebrow">Body scan</span><h1 class="display h1">How you stand</h1></div></div>

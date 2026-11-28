@@ -1216,3 +1216,4 @@ body.no-scroll { overflow: hidden; }
   #lab .lab-result { position: absolute; top: 60px; left: 0; right: 0; }
   #lab .btn-row { display: none; }
 }
+.role-list button.on { outline: 2px solid var(--z1); outline-offset: -2px; }
