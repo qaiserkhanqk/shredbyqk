@@ -1139,3 +1139,16 @@ details.adj[hidden] { display: none; }
 .rd-nav > * { flex: 0 1 48%; }
 .rd-player { position: sticky; bottom: 96px; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-radius: 999px; background: var(--night); color: #ECF1EC; box-shadow: 0 10px 30px -10px rgba(0,0,0,.4); font-size: .88rem; }
 .rd-player .linkbtn { color: #9FD0B6; }
+/* ---------- Fewer taps on Food ---------- */
+.quick-card { gap: 8px; }
+.quick-chips { display: flex; gap: 8px; flex-wrap: nowrap; }
+.mchip.saved { border-style: dashed; }
+.day-head { display: flex; justify-content: space-between; align-items: center; }
+.day-nav { display: flex; gap: 6px; }
+.day-nav .iconbtn[disabled] { opacity: .35; }
+.meal-tools { display: flex; gap: 12px; align-items: center; justify-content: flex-end; flex-wrap: wrap; margin: -4px 0 4px; font-size: .8rem; }
+.meal-tools select { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: inherit; font: inherit; padding: 2px 4px; }
+.extras, .pnudge { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 10px; }
+.day-tools { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.pulse-once { animation: chatpulse .8s 3; }
+.menu-kcal { display: flex; gap: 8px; align-items: flex-end; } .menu-kcal .field { flex: 1; }

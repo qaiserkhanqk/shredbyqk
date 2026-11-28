@@ -2626,6 +2626,8 @@ if (S.profile.name) {
 if (new URLSearchParams(location.search).has('calm') || location.hash === '#calm') { $('#welcome').hidden = true; tab('calm'); startCalmNow(); }
 // A notification tap: ?tab=food opens Food (check-in day, or a plan QK updated).
 else if (['food', 'train', 'today', 'progress'].includes(new URLSearchParams(location.search).get('tab')) && S.profile?.name) { $('#welcome').hidden = true; tab(new URLSearchParams(location.search).get('tab')); }
+// "Log a meal" shortcut and photos shared from the gallery/WhatsApp open Food (js/food.js reads the shared photo).
+if (['snap', 'shared'].includes(new URLSearchParams(location.search).get('food')) && S.profile?.name) { $('#welcome').hidden = true; tab('food'); }
 // From a calendar reminder or the app-icon shortcut: ?start=today opens straight into today's workout.
 if (new URLSearchParams(location.search).get('start') === 'today' && S.profile.name) { $('#welcome').hidden = true; tab('today'); if (activeProgram()) setTimeout(startFlow, 500); }
 // First run: three short questions, then straight to Today.

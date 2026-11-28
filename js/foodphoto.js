@@ -151,6 +151,13 @@ export function imageQuality(pixels, w, h) {
 }
 
 /** Words the app's own parser didn't catch ("kadhi chawal ki plate") → dishes from the catalogue, via the server. */
+/** Read one item's calories off a photo of a menu board: { kcal, name } (kcal null when none is printed). */
+export async function readMenuKcal(file, item) {
+  if (!PHOTO_CONFIG.endpoint) throw new Error('no-endpoint');
+  const { dataUrl } = await prepareImage(file);
+  const r = await postBusyAware(PHOTO_CONFIG.endpoint.replace(/food-vision$/, 'food-menu'), { image: dataUrl, item });
+  return r.json();
+}
 export async function askText(text) {
   if (!PHOTO_CONFIG.endpoint || !text.trim()) return [];
   const r = await postBusyAware(PHOTO_CONFIG.endpoint.replace(/food-vision$/, 'food-text'), { text });
