@@ -156,12 +156,13 @@ export class SukoonTones {
   unlock() {
     const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
     if (!AC) return false;
-    this.ctx ||= new AC(); this.ctx.resume?.(); return true;
+    // A refused start (e.g. the page is being left) only means no tones: handled quietly, never an error.
+    this.ctx ||= new AC(); this.ctx.resume?.()?.catch?.(() => {}); return true;
   }
   start({ beat, carrier, mode = 'binaural', volume = 0.6 }) {
     this.stop(0);
     if (!this.unlock()) return false;
-    const c = this.ctx; c.resume?.();
+    const c = this.ctx; c.resume?.()?.catch?.(() => {});
     const now = c.currentTime;
     this.master = c.createGain();
     this.master.gain.setValueAtTime(0, now);

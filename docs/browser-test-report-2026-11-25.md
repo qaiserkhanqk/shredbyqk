@@ -157,9 +157,27 @@ What happened to each failure from the 69f1862 run, and the ones found since:
 | Plate calibration: second tap lost | Firefox | **Real**: the tap hit Firefox's own Picture-in-Picture button over the camera video, so the video popped out | App fixed: `disablepictureinpicture` on the camera video. Test first: `tests/camera-live.cjs` |
 | Rep line ("Rep 8 · full range …") carried over to a new set | all | **Real** bug in main's new camera update | App fixed: cleared when a set starts. Test first: `tests/camera-live.cjs` |
 | Brain tracker: "3 followed balls" not perfect, now and then | Firefox | Test: balls finish in random places and can overlap, so a tap at a ball's centre could hit another ball | Test taps the exact ball; the scoring check is unchanged |
-| "InvalidStateError: Navigated away from page" console errors | Firefox | Not pinned down | Seen in 2 earlier Firefox runs (both before the Picture-in-Picture fix); **not seen in the last 3 full Firefox runs**, including 2 traced runs set up to record where it came from. Left open: if it returns, the trace will show where. |
+| "InvalidStateError: Navigated away from page" console errors, now and then | Firefox | **Real, harmless to the user**: the Sukoon tones player never handled a refused sound start (`AudioContext.resume()`); when the page is left mid-request Firefox refuses it. Found by locating the text in Firefox's own Web Audio code | App fixed: refusals handled quietly in js/sukoon.js (and `close()` in js/lab-ui.js). Test first: `tests/sukoon-audio.test.mjs` forces the refusal every time |
 
 `main`'s `sw.js` still did not parse (a line of file names sat before `const SHELL = [`); the merge rebuilt it (cache v46,
 136 files, every one exists) and `tests/sw.test.mjs` checks that it parses.
+
+Still not tested: real iPhone, Android or Mac Safari.
+
+## Re-run on 208f949 (2026-11-28): main's 3D Lab and cafés merged, Sukoon sound-start fix
+Chromium: `npm test` 2,324 and `npm run test:e2e` 636, 0 failures; `npm run research:test` 510 and
+`npm run research:e2e` 65, 0 failures (run on ae3a2ae; nothing in the research platform changed after it).
+Main app test (`tests/e2e.cjs`): **WebKit 263 ok, 0 failures; Firefox 262 ok, 0 failures, two runs in a row.**
+
+Still not tested: real iPhone, Android or Mac Safari.
+
+## Re-run on the merge with main 09b5655 (2026-11-28): main already holds the cycle branch
+`main` combined this branch on 2026-11-28 (40dbef2). After merging `main` back in: Chromium `npm test` 2,559,
+`npm run test:e2e` 670, `npm run research:test` 510 and `npm run research:e2e` 65, all 0 failures. Main app test
+(`tests/e2e.cjs`): Chromium 296, **Firefox 295 and WebKit 295, all 0 failures**.
+
+On `main`, the WebKit run stopped part-way at the new rehab sensor check: desktop WebKit refuses to construct a
+`DeviceMotionEvent` in the test ("Illegal constructor"). The test now puts the same readings on a plain `devicemotion`
+event there; phones send the real event, and the app code is unchanged.
 
 Still not tested: real iPhone, Android or Mac Safari.

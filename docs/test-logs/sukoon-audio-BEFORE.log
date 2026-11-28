@@ -1,0 +1,5 @@
+# 2026-11-28, BEFORE the fix
+ok   a refused sound start does not throw
+FAIL a refused sound start is handled quietly (no unhandled error)  — Navigated away from page | Navigated away from page | Navigated away from page
+1 FAILED
+exit=1

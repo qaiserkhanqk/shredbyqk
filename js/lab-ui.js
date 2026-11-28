@@ -66,7 +66,7 @@ async function framesOf(file, lm, label, { hz = 30, maxSec = 20 } = {}) {
 async function clapOf(file) {
   try {
     const ac = new (window.AudioContext || window.webkitAudioContext)();
-    const buf = await ac.decodeAudioData(await file.arrayBuffer()); ac.close?.();
+    const buf = await ac.decodeAudioData(await file.arrayBuffer()); ac.close?.()?.catch?.(() => {});
     return lab.clapTime(buf.getChannelData(0), buf.sampleRate);
   } catch { return null; }
 }

@@ -1,0 +1,5 @@
+# 2026-11-28, AFTER the fix (refused AudioContext.resume()/close() handled quietly)
+ok   a refused sound start does not throw
+ok   a refused sound start is handled quietly (no unhandled error)
+ALL PASS
+exit=0
