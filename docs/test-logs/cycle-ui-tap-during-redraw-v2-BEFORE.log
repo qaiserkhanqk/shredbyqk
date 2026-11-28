@@ -1,0 +1,21 @@
+# chromium
+browser: chromium 153.0.8010.12
+ok   a tap in progress while another tab saves is not lost (both periods are saved)
+ok   …and after the tap, this tab shows the other tab's save too
+FAIL a tap that starts while this tab is still re-reading the other tab's save is not lost  — ["2026-08-19","2026-10-18","2026-11-17"]
+ok   no JavaScript errors
+1 FAILED of 4
+# firefox
+browser: firefox 155.0
+ok   a tap in progress while another tab saves is not lost (both periods are saved)
+ok   …and after the tap, this tab shows the other tab's save too
+FAIL a tap that starts while this tab is still re-reading the other tab's save is not lost  — ["2026-08-19","2026-10-18","2026-11-17"]
+ok   no JavaScript errors
+1 FAILED of 4
+# webkit
+browser: webkit 26.6
+ok   a tap in progress while another tab saves is not lost (both periods are saved)
+ok   …and after the tap, this tab shows the other tab's save too
+FAIL a tap that starts while this tab is still re-reading the other tab's save is not lost  — ["2026-08-19","2026-10-18","2026-11-17"]
+ok   no JavaScript errors
+1 FAILED of 4

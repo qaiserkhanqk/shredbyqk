@@ -1,0 +1,9 @@
+ok   flag off: no band-adjusted card
+ok   flag on: the card is labelled research
+ok   with no band data it says why it cannot adjust (band not connected)
+ok   it states the evidence: synthetic only, not validated
+ok   the dates-only estimate is still shown
+ok   it never mentions ovulation or fertility
+FAIL when neither model can estimate, the card says "Not enough data yet."  — Band-adjusted estimate · research Your band is not connected.Research feature. It uses your band's skin temperature together with your own past cycles. It has not been validated on real people or a real band; it has only been tested on synthetic (made-up) data. Your period may come earlier or later. It is not for contraception.
+ok   no JavaScript errors
+1 FAILED of 8

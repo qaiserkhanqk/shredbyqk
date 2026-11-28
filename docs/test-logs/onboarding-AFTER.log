@@ -1,0 +1,24 @@
+ok   man: no age or period question
+ok   woman: asked her age
+ok   other or prefer not to say: asked her age too (nobody who has periods is locked out)
+ok   woman under 18: no period question, with a kind note (18 and over; a parent or guardian, school nurse or doctor can help)
+ok   the note offers no "parent agreed" tick box or way round it
+ok   woman 18+: asked whether she would like to track her periods
+ok   the old age choices are gone (under 13, 13 to 17)
+ok   "Not right now": asked which applies (pregnant, recently gave birth, menopause, just not now)
+ok   man: period tracking and Zara stay off, and he lands on Today
+ok   woman, yes: period tracking and Zara on, and she goes straight to her cycle screen
+ok   under 18: never turned on, even if a period answer is sent
+ok   under 18: no pregnancy or other mode is turned on either
+ok   woman, no: off, lands on Today, and is told she can turn it on in settings
+ok   not right now, pregnant: pregnancy mode on and she goes to her cycle screen
+ok   not right now, recently gave birth: postpartum (pregnancy mode) on
+ok   not right now, menopause: menopause mode on
+ok   not right now, just not now: off, lands on Today
+ok   other or prefer not to say, yes: on (no sex assumed for the body-fat formula)
+ok   no answers (skipped): nothing is changed
+ok   Zara is introduced as a companion, never as clinical or medical
+ok   the welcome says she can rename Zara
+ok   the minimum age is 18
+ok   invalid answers are refused
+ALL PASS (23)

@@ -29,7 +29,7 @@ let avatarEls = [];
 let muted = false;
 
 export function registerAvatar(el) { avatarEls.push(el); }
-export function setMuted(v) { muted = v; if (v) speechSynthesis?.cancel(); }
+export function setMuted(v) { muted = v; if (v) globalThis.speechSynthesis?.cancel(); } // `speechSynthesis?.` alone throws where the API does not exist
 // Coaching language: 'ur' speaks the short workout cues in Urdu when the phone has an Urdu voice.
 let lang = 'en';
 export const setLang = l => { lang = l === 'ur' ? 'ur' : 'en'; };

@@ -66,6 +66,9 @@ import { initChat, checkReplies, renderCard as renderChatCard } from './chatui.j
 import { sanitizePlan } from './dietplan.js';
 import { PHOTO_CONFIG } from './foodphoto.js';
 import { landmarksFrom, analyse, render, navyBodyFat, bfCategory, stanceProblem } from './bodyscan.js';
+import { personalise, GENDERS, AGES, PERIODS, NOT_NOW, NOTES as ABOUT_NOTES } from './onboarding.js';
+import { initCycle, renderCycle } from './cycle/ui.js';
+import { readFlags, setFlag } from './cycle/flags.js';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -100,6 +103,8 @@ const vbtOn = () => { const it = LIB[exKey]; return !!it?.pattern && VBT_EQUIP.i
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 let toastTimer;
+const NO_WEBGL = 'This browser can\'t run the pose analysis: it needs graphics acceleration (WebGL). Turn on hardware acceleration in your browser settings, or try another browser.';
+const noWebGL = e => e?.message === 'webgl_unavailable';
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 2600); }
 
 /* ---------- Coach avatar ---------- */
@@ -118,12 +123,14 @@ function mountOrbs() {
 /* ---------- Navigation ---------- */
 function tab(id) {
   $$('.screen').forEach(s => s.classList.toggle('on', s.id === id));
-  const tabFor = ['body', 'gait', 'scan', 'rehab', 'calm', 'vitals', 'fitage', 'brain', 'quran', 'reader', 'lab', 'combine'].includes(id) ? 'today' : ['board', 'report'].includes(id) ? 'progress' : id; // tools live under Today
+  const tabFor = id === 'cycle' && !$('#cycleTabBtn').hidden ? 'cycle'
+    : ['body', 'gait', 'scan', 'rehab', 'calm', 'vitals', 'fitage', 'brain', 'quran', 'reader', 'lab', 'combine', 'cycle'].includes(id) ? 'today' : ['board', 'report'].includes(id) ? 'progress' : id; // tools live under Today
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tabFor));
   if (id === 'today') renderToday();
   if (id === 'train') renderPrograms();
   if (id === 'progress') { renderProgress(); renderLoad(); renderToday(); $('#youName').textContent = S.profile.name || 'You'; renderBoardCard(); }
   if (id === 'rehab') renderRehab();
+  if (id === 'cycle') renderCycle();
   if (id === 'calm') renderCalm();
   if (id === 'vitals') renderVitals();
   if (id === 'brain') renderBrain();
@@ -514,7 +521,7 @@ async function startLive({ mode, source, file, auto = false, opts = {} }) {
   engine = null; fb = null; smooth.reset(); motion.reset(); fx.reset(); hud.reset(); comp = null; recorder = null; $('#trackChip').innerHTML = '<i></i>Finding you…'; $('#trackChip').classList.remove('on'); $('#faultBanner').hidden = true;
   $('#formMeters').hidden = mode !== 'form'; $('#gaitMeters').hidden = mode === 'form';
   $('#repBig').hidden = mode !== 'form'; $('#trackChip').hidden = mode !== 'form'; $('#cueHint').hidden = mode !== 'form';
-  $('#repNum').textContent = '0'; $('#repLbl').textContent = ex?.hold ? 'seconds' : 'reps'; $('#dots').innerHTML = ''; $('#cleanCt').textContent = '0 clean'; $('#vlKnob').style.left = '0%'; $('#vlTxt').textContent = 'fresh';
+  $('#repNum').textContent = '0'; $('#repLbl').textContent = ex?.hold ? 'seconds' : 'reps'; $('#dots').innerHTML = ''; $('#repLine').textContent = ''; $('#repLine').className = 'rep-line'; $('#cleanCt').textContent = '0 clean'; $('#vlKnob').style.left = '0%'; $('#vlTxt').textContent = 'fresh';
   $('#gSteps').textContent = '0'; $('#gProg').style.width = '0'; $('#gStepsLbl').textContent = mode === 'gait' ? 'Steps seen' : 'Time';
   const testName = { rom: TEST.rom?.label || 'Measurement', gait: `Gait · ${gaitMode === 'run' ? 'running' : 'walking'}`, jump: 'Jump test', sls: 'Single-leg squat knee test', land: 'Landing test', bowl: 'Bowling action check', bodymap: 'Map my body' };
   if (isCombineMode(mode)) testName[mode] = combineModeName(mode, opts);
@@ -569,7 +576,7 @@ async function startLive({ mode, source, file, auto = false, opts = {} }) {
     if (mode === 'form' && source !== 'file' && $('#recordChk').checked) startComposite(source === 'demo' ? canvas : video);
   } catch (err) {
     console.warn(err);
-    $('#status').textContent = source === 'file' ? 'That video couldn\'t be played. Try an MP4 or MOV.' : 'Camera blocked. Allow camera access for this site in your browser settings, then try again.';
+    $('#status').textContent = noWebGL(err) ? NO_WEBGL : source === 'file' ? 'That video couldn\'t be played. Try an MP4 or MOV.' : 'Camera blocked. Allow camera access for this site in your browser settings, then try again.';
     return;
   }
 
@@ -826,7 +833,7 @@ function adoptExercise(res, t, replay) {
   live.held = 0; live.goodHeld = 0; live.lastT = null; live.lastSec = null; live.wrong = 0;
   const ex = curEx();
   $('#liveEyebrow').textContent = ex.name; $('#liveTitle').textContent = `Set ${setsToday(exKey) + 1}`;
-  $('#repLbl').textContent = ex.hold ? 'seconds' : 'reps'; $('#repNum').textContent = '0'; $('#dots').innerHTML = ''; $('#cleanCt').textContent = '0 clean';
+  $('#repLbl').textContent = ex.hold ? 'seconds' : 'reps'; $('#repNum').textContent = '0'; $('#dots').innerHTML = ''; $('#repLine').textContent = ''; $('#repLine').className = 'rep-line'; $('#cleanCt').textContent = '0 clean';
   $('#detectChip').classList.add('found'); $('#detectTxt').textContent = `${res.label} ✓`; $('#faultBanner').hidden = true; live.badUntil = 0;
   $('#detectAlt').hidden = !res.alt; if (res.alt) $('#detectAlt').textContent = `Or ${res.alt.label.toLowerCase()}?`;
   $('#detectChange').hidden = false;
@@ -1382,7 +1389,7 @@ async function runScan(file) {
     S.scans.push({ at: Date.now(), view: r.view, findings: r.findings.map(f => f.title) }); persist();
     const issues = r.findings.filter(f => !f.good);
     say(issues.length ? `Scan done. I spotted ${issues.length} thing${issues.length > 1 ? 's' : ''} to work on. The main one: ${issues[0].title}.` : 'Scan done. Your alignment looks good.', { id: 'scan_' + Date.now(), priority: 'high' });
-  } catch (e) { console.error(e); $('#scanStatus').textContent = 'That file couldn\'t be read. Try a JPG photo instead.'; }
+  } catch (e) { if (noWebGL(e)) { $('#scanStatus').textContent = NO_WEBGL; return; } console.error(e); $('#scanStatus').textContent = 'That file couldn\'t be read. Try a JPG photo instead.'; }
 }
 $('#scanFile').onchange = e => { runScan(e.target.files[0]); e.target.value = ''; };
 $('#scanFile2').onchange = e => { runScan(e.target.files[0]); e.target.value = ''; };
@@ -2328,7 +2335,7 @@ async function guidedScan(file, want) {
     fullScan[want] = analyse(px);
     slot.firstChild.textContent = (want === 'front' ? '1 · Front ✓' : '2 · Side ✓');
     renderFullScan();
-  } catch (e) { console.error(e); toast('That file couldn\'t be read. Try a JPG photo.'); }
+  } catch (e) { if (noWebGL(e)) return toast(NO_WEBGL); console.error(e); toast('That file couldn\'t be read. Try a JPG photo.'); }
 }
 function renderFullScan() {
   const box = $('#fullScreen'), f = fullScan.front, sd = fullScan.side;
@@ -3147,7 +3154,7 @@ $('#studioList').onclick = async e => {
       else { if (studioRec) await studioRec.r.stop(); studioRec = { id, r: await startRecording() }; }
     } else if (act === 'play') { const blob = await getClip(id); if (blob) new Audio(URL.createObjectURL(blob)).play(); }
     else if (act === 'del') { await deleteClip(id); }
-  } catch (err) { toast('Microphone not available. Allow microphone access for this site.'); studioRec = null; }
+  } catch (err) { toast(err?.message === 'recording_unsupported' ? 'This browser can\'t record audio. Try a recent Safari, Chrome or Firefox.' : 'Microphone not available. Allow microphone access for this site.'); studioRec = null; }
   renderStudio();
 };
 $('#studioExport').onclick = async () => { const data = await exportClips(); if (!Object.keys(data.clips).length) return toast('Record some lines first.'); downloadJSON(`shred-voice-${Date.now()}.json`, data); };
@@ -3160,8 +3167,55 @@ initCombine({ $, esc, S, persist, say, toast, lib: LIB,
   startTest: (mode, source, file, opts) => { if (source === 'file' && !file) return; startLive({ mode, source, file, opts }); },
   openProgram: id => showProgram(id) });
 
+/* ---------- Cycle tracking (prototype, off by default) ----------
+   Lives in its own encrypted store (js/cycle/store.js). Nothing from it goes into S, the coach voice,
+   session exports or the error log. */
+function applyCycleFlag() {
+  // Under 18 (her own answer at sign-up): the Profile switch can't turn period tracking on; the note says why.
+  const minor = S.profile.ageBand === 'under18';
+  if (minor && readFlags().cycleTracking) setFlag('cycleTracking', false);
+  $('#profileCycle').disabled = minor; $('#profileCycleNote').hidden = !minor; $('#profileCycleNote').textContent = minor ? ABOUT_NOTES.under18 : '';
+  const on = readFlags().cycleTracking; $('#cycleTile').hidden = !on; $('#cycleTabBtn').hidden = !on; $('#cycle .back').hidden = on; /* it has its own tab when on */ $('#flagCycle').checked = on; $('#profileCycle').checked = on; }
+$('#flagCycle').onchange = e => { setFlag('cycleTracking', e.target.checked); applyCycleFlag(); };
+$('#profileCycle').onchange = e => { setFlag('cycleTracking', e.target.checked); applyCycleFlag(); };
+
+/* ---------- Personalised sign-up (js/onboarding.js; product owner's flow, 2026-11-27) ----------
+   Asked once, on the welcome screen. A man never sees period tracking; a woman (or "Other or prefer not to say") aged
+   13 or over is asked whether she would like to track her periods. Skipping changes nothing and asks again next time.
+   The period answer only sets the switches; it is not kept in the profile. */
+const about = {};
+const chips = (q, set) => `<div class="chips-wrap" role="group">${Object.entries(set).map(([v, l]) => `<button type="button" class="mchip ${about[q] === v ? 'on' : ''}" data-about="${q}" data-val="${v}" aria-pressed="${about[q] === v}">${l}</button>`).join('')}</div>`;
+function renderAbout() {
+  const r = personalise(about);
+  $('#aboutYou').innerHTML = `<div class="about-q"><b>Which best describes you?</b><span class="muted small">Optional. It lets the app show you only what's relevant.</span>${chips('gender', GENDERS)}</div>
+    <div class="about-q" id="aboutAge" ${r.ask.age ? '' : 'hidden'}><b>How old are you?</b>${chips('age', AGES)}</div>
+    <div class="about-q" id="aboutPeriods" ${r.ask.periods ? '' : 'hidden'}><b>Would you like to track your periods?</b>${chips('periods', PERIODS)}</div>
+    <div class="about-q" id="aboutNotNow" ${r.ask.notNow ? '' : 'hidden'}><b>Which applies to you?</b>${chips('notNow', NOT_NOW)}</div>
+    <p class="note" id="aboutNote" ${r.note ? '' : 'hidden'}>${esc(r.note || '')}</p>
+    <p class="note">Your answers stay on this phone. You can change this any time in You &gt; Profile.</p>`;
+}
+$('#aboutYou').onclick = e => {
+  const b = e.target.closest('[data-about]'); if (!b) return;
+  const q = b.dataset.about; about[q] = b.dataset.val;
+  for (const k of ({ gender: ['age', 'periods', 'notNow'], age: ['periods', 'notNow'], periods: ['notNow'] })[q] || []) delete about[k]; // later answers depend on this one
+  renderAbout();
+};
+/** Applies her answers when she taps Start. Returns where to go, or null if she skipped or left a question open. */
+function applyAbout() {
+  if (S.profile.aboutDone || !about.gender) return null;
+  const r = personalise(about);
+  if ((r.ask.age && !about.age) || (r.ask.periods && !about.periods) || (r.ask.notNow && !about.notNow)) return null; // not finished: ask again next time
+  for (const [k, v] of Object.entries(r.flags)) setFlag(k, v);
+  S.profile.gender = about.gender; S.profile.ageBand = about.age || null; S.profile.aboutDone = true;
+  if (r.sex) { S.profile.sex = r.sex; $('#pSex').value = r.sex; }
+  persist(); applyCycleFlag();
+  try { if (r.intent) localStorage.setItem('shred_onboard_intent', r.intent); } catch {}
+  return r.route;
+}
+initCycle({ root: $('#cycleRoot'), toast });
+
 /* ---------- Boot ---------- */
-mountOrbs(); bindPlan(); bindProfile(); bindPersonal(); renderTrain(); renderToday(); applyMute(); renderTestHistory();
+applyCycleFlag(); mountOrbs(); bindPlan(); bindProfile(); bindPersonal(); renderTrain(); renderToday(); applyMute(); renderTestHistory();
 if (S.profile.name) {
   // Returning client: straight to Today. The first tap anywhere wakes the voice (phones need a tap before sound).
   $('#welcome').hidden = true;
@@ -3176,14 +3230,17 @@ if (['snap', 'shared'].includes(new URLSearchParams(location.search).get('food')
 // From a calendar reminder or the app-icon shortcut: ?start=today opens straight into today's workout.
 if (new URLSearchParams(location.search).get('start') === 'today' && S.profile.name) { $('#welcome').hidden = true; tab('today'); if (activeProgram()) setTimeout(startFlow, 500); }
 // First run: three short questions, then straight to Today.
-const OB_STEPS = ['ob1', 'ob2', 'ob3', 'obGoal', 'obExp'];
+const OB_STEPS = ['ob1', 'obAbout', 'ob2', 'ob3', 'obGoal', 'obExp'];
+let obRoute = null; // 'cycle' when she chose to track her periods (js/onboarding.js)
 const obStep = n => { const id = typeof n === 'number' ? ['ob1', 'ob2', 'ob3'][n - 1] : n; OB_STEPS.forEach(x => $('#' + x).hidden = x !== id); $('#obIntro').hidden = id !== 'ob1'; };
 $('#welcomeBtn').onclick = () => {
   const nm = $('#welcomeName').value.trim();
   if (nm && !S.profile.name) { S.profile.name = nm; $('#pName').value = nm; persist(); }
-  obStep(2);
+  // Our optional "about you" step (gender, age 18+, periods) comes right after the name, once.
+  if (!S.profile.aboutDone) { renderAbout(); obStep('obAbout'); } else obStep(2);
   try { getVideoLandmarker().catch(() => {}); } catch {} // warm the model up in the background; never block the next step
 };
+$('#aboutNext').onclick = () => { obRoute = applyAbout(); obStep(2); };
 $('#ob2').onclick = e => {
   const b = e.target.closest('[data-focus]'); if (!b) return;
   S.profile.focus = b.dataset.focus; persist();
@@ -3237,7 +3294,7 @@ $('#obDone').onclick = $('#obSkip').onclick = () => finishWelcome();
 function finishWelcome() {
   saveObKnow();
   if (S.program && S.plan?.days.length) setDays(freq.clampDays(S.plan.days.length), 'plan');
-  $('#welcome').hidden = true; bindPlan(); renderPrograms(); renderToday(); tab('today');
+  $('#welcome').hidden = true; bindPlan(); renderPrograms(); renderToday(); tab(obRoute === 'cycle' ? 'cycle' : 'today');
   if (S.profile.goal === 'athlete' && !S.athlete) setTimeout(() => { tab('train'); openAthlete('sport'); }, 600);
   say(`${greeting(S.profile.name)} ${nudgeLine()}`, { id: 'greet', priority: 'high' });
 }

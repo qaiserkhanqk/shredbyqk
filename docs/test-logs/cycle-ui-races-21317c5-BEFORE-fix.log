@@ -1,0 +1,9 @@
+FAIL delayed save stores the values shown when Save was pressed (date, symptom, checkbox)  — {"2026-11-09":{"hist":{"energy":[{"v":"high","at":"2026-11-18T11:08:21.735Z"}]},"energy":"high","src":{"energy":"typed"},"rec":{"energy":"2026-11-18T11:08:21.735Z"}}}
+FAIL delayed save does not store the values typed afterwards  — {"hist":{"energy":[{"v":"high","at":"2026-11-18T11:08:21.735Z"}]},"energy":"high","src":{"energy":"typed"},"rec":{"energy":"2026-11-18T11:08:21.735Z"}}
+FAIL delayed "Period started" uses the date shown when it was pressed  — ["2026-10-11"]
+FAIL two rapid saves each store their own date and values  — {"2026-11-12":{"hist":{"energy":[{"v":"high","at":"2026-11-18T11:08:28.617Z"}]},"energy":"high","src":{"energy":"typed"},"rec":{"energy":"2026-11-18T11:08:28.624Z"}}}
+FAIL cross-tab contention: this tab stores the values shown when Save was pressed  — {"2026-11-14":{"hist":{"unwell":[{"v":true,"at":"2026-11-18T11:08:34.900Z"}],"energy":[{"v":"high","at":"2026-11-18T11:08:34.900Z"}]},"unwell":true,"rec":{"unwell":"2026-11-18T11:08:34.900Z","energy":"2026-11-18T11:08:34.900Z"},"energy":"high","src":{"energy":"typed"}}}
+ok   cross-tab contention: the other tab's save is kept too (no lost update)
+ok   no JavaScript errors
+5 FAILED of 7
+exit 1

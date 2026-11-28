@@ -1,0 +1,29 @@
+ok   1 six contiguous 30-min readings all marked poor: not an "ok" night, all 6 rejected  — {"status":"no_usable_data","rejected":6}
+ok   1 rejection reasons are recorded per reason  — {"vendor_poor":6}
+ok   1 mixed night: only the good readings are used, poor ones counted as rejected  — {"samples":6,"rejected":6,"rejectedBy":{"vendor_poor":6}}
+ok   1 nights made only of poor readings cannot trigger a temperature shift
+ok   2 a temporary August rise that returned to baseline is not shown in November as "possibly after ovulation"  — {"status":"not_enough_data","label":"Not enough data","temperature":{"eligible":false,"reason":"contradictory","text":"A rise was seen from 2026-08-15, but it did not last (back to the earlier level on 2026-08-18)."},"text":"A rise was seen from 2026-08-15, but it did not last (back to the earlier level on 2026-08-18). So we don't estimate which phase you're in."}
+ok   2 contradictory evidence (rise, then back to baseline): abstains
+ok   2 missing recent evidence (no readings for the last nights): abstains
+ok   2 control: a rise still present last night, within usual cycle length, can still be shown as an estimate
+ok   3 no logs outside the window: the outside rate is unknown (null), not 0  — null
+ok   3 …and no pattern is surfaced without comparative evidence
+ok   3 the explanation never says "0% of your logs at other times"
+ok   3 the status says the comparison is missing  — {"category":"energy","status":"insufficient","why":"You logged energy at other times in only 0 of these cycles, so we can't compare these days with the rest of your cycle."}
+ok   4 six identical 28-day cycles: a single date is not called an "estimated range"  — {"headline":"From your past cycles","from":"2026-07-22","to":"2026-07-22"}
+ok   4 the text always says the period can fall outside what past cycles show  — Your last 6 cycles were all 28 days long, which would put your next period on 22 Jul. Your next period may come earlier or later than this. It is what your past cycles would show, not a prediction interval, and it has not been validated.
+ok   4 the result declares it is not a calibrated interval
+ok   4 no invented padding: one 40-day cycle shows day 40 only, not a ±2-day "range"  — 2026-12-09–2026-12-09
+ok   5 identical resync keeps the January sync time  — 2026-01-11T08:00:00.000Z
+ok   5 the January historical view still has the night
+ok   5 a later material change: January view shows the January value, current view the new one  — [33.9]
+ok   6 current view shows the corrected value
+ok   6 the January historical view keeps what was known in January  — {"mood":"low"}
+ok   6 a deleted entry is gone from current AND historical views (deletion honoured)
+ok   6 purge (consent withdrawal for mood) removes the value and its history everywhere
+ok   7 (audit 3.3) missing time-zone offset: flagged tz_unknown, night not "ok", reason recorded
+ok   7 (audit 2.4) overdue: flagged and headline says later than recent cycles
+ok   7 (audit 2.2) overdue: period check-ins keep going, with the true reason (not "Paused.")  — {"next":{"id":"rmwhjeve90","date":"2026-10-03","time":"09:00","mins":540,"shiftedForQuietHours":false},"why":"Your period hasn't been logged and it is later than your recent cycles. You asked for check-ins until you log one."}
+ok   7 (audit 6.2) evaluation excludes and counts cycles whose true outcome was never logged  — 1
+ok   7 (audit 5.3/5.4) text states cycles without logs and uses "cycle day 24"  — You logged lower energy around cycle day 24 in 3 of the 3 cycles with energy logs then (3 of your 6 complete cycles had no logs then).
+ALL PASS

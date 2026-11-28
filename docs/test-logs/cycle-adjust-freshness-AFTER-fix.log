@@ -1,0 +1,27 @@
+ok   control: on 13 April (fresh data) the band-adjusted estimate is 23 April
+ok   on 19 May: no band-adjusted date any more
+ok   …the reason is stale band data, in the agreed words
+ok   …it shows the date of the last usable overnight reading (12 April)
+ok   …it falls back to the logged-period estimate, unchanged (23 April, not rolled forward)
+ok   …which is shown as overdue, asking her to log her period
+ok   the evaluator applies the same rule
+ok   the limit is a documented, configurable setting (provisional, not clinical)
+ok   3 missing nights since the last usable one: still fresh
+ok   4 missing nights: stale
+ok   a different setting moves the cutoff (configurable)
+ok   old readings synced late, a duplicate, and a successful sync today do not make it fresh
+ok   too little wear, missing values, a time-zone change, other metrics and a night she marked unwell: still stale
+ok   still adjusted (fresh, the rise lasts), with its date unchanged: 23 April
+ok   marked overdue
+ok   the card says the date has passed and asks her to log or confirm her period
+ok   the card shows the last usable overnight reading (27 April)
+ok   enough logged periods: the logged-period estimate is shown
+ok   one logged period: no date from either model
+ok   …says there are not enough logged periods instead of showing a date
+ok   new usable overnight readings that meet the existing rules: band adjustment resumes
+ok   …its date is not rolled forward (still 23 April), and it shows as overdue
+ok   new usable nights back at the earlier level: fresh, but the existing rule still says no
+ok   the logged-period estimate is identical with or without band data
+ok   the band-adjusted flag is still off by default
+ok   no forbidden wording, no ovulation or fertility claims, and the limit is never called clinical
+ALL PASS (26)

@@ -1,0 +1,9 @@
+ok   day 0, just synced: the card shows the date of the last usable overnight reading
+ok   …and does not say the band data is stale
+ok   10 days later with no new band data: "No recent usable band data"
+ok   …the last usable reading date is unchanged
+ok   …one logged period only: "Not enough data yet." and no date
+ok   after a sync with new usable nights, the band data is fresh again
+ok   …and the last usable reading date moved forward
+ok   no JavaScript errors
+ALL PASS (8)

@@ -1,0 +1,5 @@
+FAIL sw.js is valid JavaScript (it parses) SyntaxError
+FAIL every js module is in the offline shell compat-check.js onboarding.js
+ok   app code is network-first
+ok   models stay cache-first
+2 FAILED

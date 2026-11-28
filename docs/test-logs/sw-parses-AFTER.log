@@ -1,0 +1,5 @@
+ok   sw.js is valid JavaScript (it parses)
+ok   every js module is in the offline shell
+ok   app code is network-first
+ok   models stay cache-first
+sw: all pass

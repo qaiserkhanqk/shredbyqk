@@ -1,0 +1,7 @@
+browser: chromium 153.0.8010.12
+FAIL recitation never starts and never reports an error: within 12 s she is offered the passage on Quran.com  — Bismillah
+FAIL …with a plain message saying it could not load  — Bismillah
+ok   control: when the recitation is playing, no fallback appears (no false alarm)
+ok   control: when the phone needs a tap to start sound, the "Play recitation" button stays (no fallback over it)
+ok   no JavaScript errors
+2 FAILED of 5

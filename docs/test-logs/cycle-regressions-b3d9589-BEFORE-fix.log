@@ -1,0 +1,14 @@
+FAIL 3 a corrected session replaces the current record (one record per source session, not two)  — 2 records: 2026-10-31=34.05, 2026-11-01=33.9
+FAIL 3 the current record is the corrected version
+FAIL 3 the earlier version is kept in the version history
+ok   3 history: the view as known before the correction shows only the original version
+FAIL 3 history: the view after the correction shows only the corrected version  — [34.05,33.9]
+ok   3 an identical resync of the corrected session changes nothing
+FAIL 3 a different session on another night is still a separate record
+FAIL 4 three sessions on ONE night do not count as three confirmation nights  — detected=true nightsUsed=9
+FAIL 4 nightsUsed counts distinct biological nights  — nightsUsed=9
+FAIL 4 a baseline of 2 nights split into 6 sessions does not satisfy the 6-night baseline  — detected=true nightsUsed=9
+ok   4 control: 6 distinct baseline nights + 3 distinct high nights is detected
+FAIL 4 a second, shorter session on a baseline night is not an extra night (same result, same count)  — nightsUsed=10
+9 FAILED
+exit 1

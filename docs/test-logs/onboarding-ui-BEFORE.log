@@ -1,0 +1,9 @@
+FAIL first launch: "Which best describes you?" is on the welcome screen
+FAIL run completed  — page.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('#aboutYou [data-about=gender][data-val="man"]')[22m
+
+    at pick (/home/user/shredbyqk/tests/onboarding-ui.cjs:21:31)
+    at /home/user/shredbyqk/tests/onboarding-ui.cjs:29:13
+ok   no JavaScript errors
+2 FAILED of 3

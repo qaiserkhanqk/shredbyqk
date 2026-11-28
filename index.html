@@ -174,6 +174,7 @@
     <button type="button" class="tile" data-go="reader"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-2-1.5-5-2-8-1.5v14c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5v-14c-3-.5-6 0-8 1.5z"/><path d="M12 6v14"/></svg></span><span><b>Read the Quran</b><span>All 114 surahs with translation and recitation. Continue where you left off.</span></span></button>
     <button type="button" class="tile" data-go="brain"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 1V5a2 2 0 0 0-3-1z"/><path d="M15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-6 1"/></svg></span><span><b>Train your brain</b><span>Speed drill, brain games, Quran memory and 2-minute lessons, with your Brain score.</span></span></button>
     <button type="button" class="tile" data-go="calm"><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></span><span><b>Calm your mind</b><span>Sukoon: slow breathing, Quran and dua for anxiety, anger, sleep and more.</span></span></button>
+    <button type="button" class="tile" data-go="cycle" id="cycleTile" hidden><span class="tile-ic"><svg viewBox="0 0 24 24" fill="none" stroke="url(#zoneStroke)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16"/><circle cx="12" cy="4" r="1.6" fill="currentColor"/></svg></span><span><b>Cycle tracking</b><span>Prototype. Log periods and symptoms, see a transparent estimate.</span></span></button>
   </section>
 
   <!-- BRAIN -->
@@ -376,6 +377,13 @@
       </div>
     </details>
     <p class="muted small" style="margin:0">Sukoon is a wellbeing exercise, not treatment for a mental-health condition. <button type="button" class="linkbtn" id="calmSupportLink">Need support now?</button></p>
+  </section>
+
+  <!-- CYCLE (prototype, behind the cycleTracking flag) -->
+  <section class="screen" id="cycle">
+    <button type="button" class="back" data-back>‹ Tools</button>
+    <div class="page-head"><div><span class="eyebrow">Cycle tracking</span><h1 class="display h1">Your cycle</h1></div></div>
+    <div id="cycleRoot" class="stack"></div>
   </section>
 
   <!-- TESTS -->
@@ -632,6 +640,8 @@
           <label class="field">Sex (body-fat formula)<select id="pSex"><option value="male">Male</option><option value="female">Female</option></select></label>
           <label class="field">Height (cm)<input id="pHeight" type="number" inputmode="decimal"></label>
         </div>
+        <label class="check"><input type="checkbox" id="profileCycle"> Period and cycle tracking (prototype)</label>
+        <p class="muted small" id="profileCycleNote" hidden></p>
         <label class="field">Weights in<select id="pUnit"><option value="kg">Kilograms (kg)</option><option value="lb">Pounds (lb)</option></select></label>
         <label class="field">Coach photo (QK's face)<input id="coachPhoto" type="file" accept="image/*"></label>
         <label class="field">Coach voice<select id="voiceSel"></select></label>
@@ -717,6 +727,7 @@
     <details class="card" id="diagCard">
       <summary>App health &amp; diagnostics</summary>
       <div class="stack" style="margin-top:14px">
+        <label class="check"><input type="checkbox" id="flagCycle"> Cycle tracking prototype (synthetic data only, off by default)</label>
         <label class="field">Tracking precision<select id="precisionSel">
           <option value="">Automatic</option><option value="lite">Fast (older phones)</option><option value="full">Balanced</option><option value="heavy">Precise (slower, newest phones)</option>
         </select></label>
@@ -736,6 +747,7 @@
     <button type="button" class="on" data-tab="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg>Today</button>
     <button type="button" data-tab="train"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11"/></svg>Train</button>
     <button type="button" data-tab="food"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11h16a8 8 0 0 1-16 0z"/><path d="M9 7c0-1.5 1-2 1-3.5M14 7c0-1.5 1-2 1-3.5"/></svg>Food</button>
+    <button type="button" data-tab="cycle" id="cycleTabBtn" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16"/></svg>Cycle</button>
     <button type="button" data-tab="progress"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>Me</button>
   </nav>
 </div>
@@ -796,7 +808,7 @@
       <span class="rec" id="recBadge" hidden>Rec</span>
     </div>
     <div class="viewport" id="viewport">
-      <div class="media"><video id="video" playsinline muted></video><canvas id="overlay"></canvas></div>
+      <div class="media"><video id="video" playsinline muted disablepictureinpicture></video><canvas id="overlay"></canvas></div>
       <div class="rep-big" id="repBig"><span class="num" id="repNum">0</span><small id="repLbl">reps</small></div>
       <div class="readout" id="readout"></div>
       <div class="privacy-chip" aria-label="Private: video stays on this phone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>On this phone only</div>
@@ -957,6 +969,10 @@
     <label class="field" id="welcomeNameWrap" style="width:100%;text-align:left">What should QK call you?<input id="welcomeName" placeholder="Your first name" autocomplete="given-name"></label>
     <button class="cta" type="button" id="welcomeBtn">Next</button>
   </div>
+  <div class="ob" id="obAbout" hidden>
+    <div class="about" id="aboutYou"></div>
+    <button class="cta" type="button" id="aboutNext">Next</button>
+  </div>
   <div class="ob" id="ob2" hidden>
     <h2 class="display h2">What do you want help with first?</h2>
     <div class="ob-pick" role="group" aria-label="What do you want help with first?">
@@ -1028,6 +1044,7 @@
 </div>
 
 <div class="toast" id="toast" hidden></div>
+<script src="js/compat-check.js"></script>
 <script type="module" src="js/app.js"></script>
 <div id="reportPrint" aria-hidden="true"></div>
 </body>

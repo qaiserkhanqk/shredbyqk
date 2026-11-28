@@ -1,0 +1,5 @@
+ok   3 the version string differs from the version before night aggregation
+ok   3 the version string names the night-aggregation change
+ok   3 every result reports the new version
+ALL PASS
+exit 0

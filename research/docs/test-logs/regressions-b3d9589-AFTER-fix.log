@@ -1,0 +1,35 @@
+ok   1 control: the researcher sees experimental estimates and stored runs
+ok   1 /runs: a participant cannot read stored experimental runs (historical outputs)
+ok   1 /export: a participant export contains no experimental estimates or forecasts
+ok   1 /export: a participant export contains no quarantine records (researcher-only, as on /quarantine)
+ok   1 /analysis (historical as-of): still no experimental layers for a participant
+ok   1 control: the researcher export still has derived runs and quarantine
+ok   2 withdrawing consent invalidates pending previews for that participant
+ok   2 a commit after core consent was withdrawn is refused and stores nothing
+ok   2 a saved preview holds no unconsented LH or hormonal content
+ok   2 quarantine keeps the reason but not the unconsented LH/hormonal cells
+ok   2 exports contain no unconsented LH or hormonal data
+ok   2 control: with LH consent the LH result is stored
+ok   2 an LH import previewed before LH consent was withdrawn cannot be committed
+ok   2 withdrawing LH consent removes stored LH results from the database
+ok   2 ... and from exports
+ok   2 the commit transaction itself rechecks optional consent (no LH stored when it was withdrawn)
+ok   2 the commit transaction itself rechecks core consent
+ok   5 a daytime sleep session crossing noon gets ONE night label (not split at noon)
+ok   5 a session whose UTC offset changes part-way keeps one label (taken from the session start, documented)
+ok   6 quality: a model change (same serial and firmware) is flagged as a device transition
+ok   6 inference: a model change with a level offset is not reported as a shift (separate segments)
+ok   6 provenance lists the canonical stream identities, including model
+ok   7 a correction made AFTER the cutoff does not change the as-of analysis (reproducible)
+ok   7 ... the excluded sample is still counted as valid at the earlier cutoff
+ok   7 a cutoff after the correction applies it
+ok   7 the provenance input hash includes effective corrections (differs once a correction applies)
+ok   7 an entry ingested after the cutoff is not used, even if its recorded_at is earlier
+ok   7 control: after ingestion it is used
+ok   8 a self-referencing correction is rejected
+ok   8 a circular correction within one file is rejected
+ok   8 a circular correction across imports (existing x corrects y, new y corrects x) is rejected
+ok   8 malformed circular data in storage cannot hang analysis (finishes within 5 s)
+ok   8 ... and the circular/self-referencing entries are dropped, valid ones kept
+ALL PASS (33)
+exit 0

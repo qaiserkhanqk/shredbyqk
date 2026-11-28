@@ -1,0 +1,27 @@
+ok   control: before the pregnancy, the gap is asked about
+FAIL while pregnant (pregnancy mode): no "missed period" question  — {"version":"checkins-0.1.0","kind":"missedLog","periodId":"mwyck7tz4j17q","length":56,"typical":28,"text":"Your last cycle was 56 days, about twice your usual 28. Did you have a period in between that you didn't log? (It started on 30 Mar and the next on 25 May.)"}
+ok   …manual history editing still works while pregnant
+FAIL while "Pregnant" is ticked: no "missed period" question
+FAIL a gap that crosses a pregnancy is not asked about as a missed log  — {"version":"checkins-0.1.0","kind":"missedLog","periodId":"mwyck7u8edstw","length":56,"typical":28,"text":"Your last cycle was 56 days, about twice your usual 28. Did you have a period in between that you didn't log? (It started on 30 Mar and the next on 25 May.)"}
+FAIL after the restart: pre-pregnancy cycles are not used to call a gap "about twice your usual"  — {"version":"checkins-0.1.0","kind":"missedLog","periodId":"mwyck7u9kxci5","length":56,"typical":28,"text":"Your last cycle was 56 days, about twice your usual 28. Did you have a period in between that you didn't log? (It started on 1 Jun and the next on 27 Jul.)"}
+ok   …but with enough cycles since the restart, a gap of about two of them is asked about
+FAIL a gap during which she had ticked "Pregnant" is not asked about
+ok   control: the forecast has a range
+FAIL the check-in appears on her typical date  — {"typical":"2026-04-10","rangeStart":"2026-04-01"}
+FAIL …and on every day from her typical date to the end of her range  — 2026-04-10,2026-04-11,2026-04-12,2026-04-13,2026-04-14,2026-04-15,2026-04-16,2026-04-17,2026-04-18,2026-04-19
+ok   no duplicate question on the day of, or just after, her newly logged start
+FAIL once her period end is logged (day 4), the check-in appears from the first day of her range (day 7)  — "2026-04-01"
+ok   after she logs the new start, it does not ask again that day or the next
+FAIL a 15-day cycle after 15, 15, 35 is not asked about as "about twice your usual"  — {"version":"checkins-0.1.0","kind":"missedLog","periodId":"mwyck7ud1dpppy","length":15,"typical":15,"text":"Your last cycle was 15 days, about twice your usual 15. Did you have a period in between that you didn't log? (It started on 11 Mar and the next on 26 Mar.)"}
+ok   control: the 96-day gap is asked about
+ok   "No": her dates are not changed
+ok   "No": the unusual-gap safeguard stays (the 96-day gap is still not used)
+ok   …and the missed-period question is gone
+FAIL …she is told the dates are saved but the gap is not used
+FAIL …with no forbidden wording or medical claims
+ok   …and asking or showing this never changes her data
+FAIL "Keep it out": the notice goes away and the gap stays out
+FAIL "Use this gap": only her explicit tap makes the 96-day gap count
+FAIL …and the notice goes away
+FAIL a gap that is used anyway (56 days) gets no notice
+15 FAILED of 26

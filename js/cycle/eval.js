@@ -1,0 +1,301 @@
+// Reproducible evaluation harness: dates-only baseline vs a sensor-assisted CANDIDATE.
+//
+// ▸ Everything in this file runs on SYNTHETIC participants. Its numbers show that the harness works; they are
+//   NOT real-world performance and must never be reported as such.
+// ▸ The same code is meant to run on a real, consented study dataset later (see docs/cycle-validation-plan.md),
+//   by replacing makeCohort() with a loader that yields the same participant shape.
+//
+// Design:
+//  • Frozen configuration: algorithm versions, parameters, device model and firmware, cohort seed. Wearable
+//    nights from any other model or firmware are excluded from the sensor model, and the count is reported.
+//  • Participant-separated: participants are split by a hash of their ID into 'development' and 'test'.
+//    No parameter is fitted at all (all are fixed in advance), and the headline report uses 'test' only.
+//  • Time-ordered with no future-data leakage: each prediction made "on day D" sees only data dated before D
+//    (model.stateAsOf). A self-check re-runs predictions with all future data scrambled and requires
+//    identical output.
+//  • Outcomes are LOGGED period starts, as in a real study. Cycles whose end was not logged are not scored.
+import { addDays, diffDays } from './dates.js';
+import { blankState, giveConsent, stateAsOf as stateAsOfModel, cycles, setCategory } from './model.js';
+/** Every prediction "on day D" is made at midday on D, using only what had been entered or synced by then. */
+const stateAsOf = (s, asOf) => stateAsOfModel(s, asOf, { knownAt: `${asOf}T12:00:00.000Z` });
+import { estimateNext, PARAMS, ALGORITHM_VERSION } from './predict.js';
+import { retrospectiveShift, SHIFT_PARAMS, SHIFT_VERSION } from './tempshift.js';
+import { MockWearable, normalise, summariseNights, rng, gauss } from './wearables.js';
+import { findPatterns, PATTERN_PARAMS } from './patterns.js';
+import { CATEGORIES } from './model.js';
+import { periodPrompt, NUDGE_PARAMS, NUDGE_VERSION } from './nudges.js';
+import { adjustedEstimate, ADJUST_VERSION } from './adjust.js';
+
+export const SYNTHETIC_BANNER = 'SYNTHETIC DATA. These results test the software only. They are not real-world or clinical performance and must not be quoted as accuracy.';
+
+export const FROZEN = Object.freeze({
+  cohortVersion: 'synthetic-cohort-1', seed: 20261114, participants: 40, cyclesEach: 12,
+  device: { model: 'Mock Band (synthetic)', firmware: 'mock-1.0' },
+  algorithms: { baseline: ALGORITHM_VERSION, sensor: `sensor-candidate-0.2.0=${ADJUST_VERSION}` },
+  params: { predict: PARAMS, shift: SHIFT_PARAMS, patterns: PATTERN_PARAMS, nudges: NUDGE_PARAMS },
+  nudgeVersion: NUDGE_VERSION,
+});
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const hash = s => { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
+export const splitOf = id => (hash(id) % 10 < 3 ? 'development' : 'test');
+
+/* ---------- Synthetic cohort ---------- */
+export function makeParticipant(i, seed = FROZEN.seed, cyclesEach = FROZEN.cyclesEach) {
+  const r = rng(seed + i * 7919), id = `P${String(i).padStart(3, '0')}`;
+  const group = ['regular', 'regular', 'variable', 'long'][i % 4];
+  const mean = group === 'regular' ? 26 + r() * 6 : group === 'variable' ? 29 + r() * 4 : 36 + r() * 6;
+  const sd = group === 'regular' ? 1.2 : group === 'variable' ? 5 : 3;
+  const pMissedLog = i % 5 === 0 ? 0.08 : 0;
+  let start = addDays('2025-01-06', Math.floor(r() * 20));
+  const truth = [], high = new Set();
+  for (let k = 0; k < cyclesEach; k++) {
+    const length = Math.round(clamp(mean + gauss(r) * sd, 20, 60)), luteal = Math.round(clamp(13 + gauss(r) * 1.5, 9, 17));
+    const ovulation = addDays(start, length - luteal - 1);
+    truth.push({ start, length, ovulation, logged: k === 0 || r() >= pMissedLog });
+    for (let d = 1; d <= luteal; d++) high.add(addDays(ovulation, d));
+    start = addDays(start, length);
+  }
+  truth.push({ start, length: null, ovulation: null, logged: true }); // the start that closes the last cycle
+  const changeAt = i % 6 === 0 ? truth[Math.floor(cyclesEach / 2)].start : null; // some participants switch firmware mid-way
+  const device = new MockWearable({ seed: seed + i, highFrom: n => high.has(n), base: 33.6 + r() * 0.6,
+    deviceChanges: changeAt ? [{ from: changeAt, firmware: 'mock-2.0', base: 34.3 }] : [] });
+  const sym = i % 3 === 0 ? { cat: 'energy', from: 1, to: 2 } : i % 3 === 1 ? { cat: 'energy', preMenstrual: 3 } : null;
+  return { id, group, truth, device, sym, adherence: 0.4 + r() * 0.5, r };
+}
+
+/** Build the participant's full logged state (everything they would ever log). */
+export function participantState(p) {
+  const s = blankState(p.id); giveConsent(s, '2025-01-01T00:00:00Z'); setCategory(s, 'energy', true, { at: '2025-01-01T00:00:00Z' }); s.consent.wearable = '2025-01-01T00:00:00Z';
+  const logged = p.truth.filter(t => t.logged);
+  // Entry times (issue 10): a start is entered on its own evening, its end on the end date's evening.
+  s.periods = logged.map((t, k) => { const end = addDays(t.start, 4);
+    return { id: `${p.id}-${k}`, start: t.start, end, missedBefore: false, versions: [
+      { at: `${t.start}T20:00:00.000Z`, start: t.start, end: null, missedBefore: false, lengthConfirmed: false },
+      { at: `${end}T20:00:00.000Z`, start: t.start, end, missedBefore: false, lengthConfirmed: false }] }; });
+  const last = p.truth.at(-1).start, r = rng(hash(p.id));
+  // Symptom logs on a fraction of days; missing days stay missing.
+  for (let k = 0; k + 1 < p.truth.length; k++) {
+    const c = p.truth[k];
+    for (let d = 1; d <= c.length; d++) {
+      if (r() > p.adherence) continue;
+      const date = addDays(c.start, d - 1);
+      let notable = r() < 0.12;
+      if (p.sym?.from && d >= p.sym.from && d <= p.sym.to) notable = r() < 0.85;
+      if (p.sym?.preMenstrual && d > c.length - p.sym.preMenstrual) notable = r() < 0.85;
+      s.days[date] = { energy: notable ? 'low' : 'usual', src: { energy: 'typed' }, rec: { energy: `${date}T21:00:00.000Z` } };
+    }
+  }
+  const { readings } = normalise(p.device.packets(p.truth[0].start, addDays(last, -1)), { now: Date.parse(last + 'T12:00:00Z') });
+  s.wearable.nights = summariseNights(readings).filter(n => n.metric === 'skin_temp').map(n => ({ ...n, syncedAt: `${addDays(n.night, 1)}T08:00:00.000Z` })); // synced the next morning
+  return s;
+}
+
+export const makeCohort = (n = FROZEN.participants, seed = FROZEN.seed) => Array.from({ length: n }, (_, i) => makeParticipant(i, seed));
+
+/* ---------- Models ---------- */
+const median = xs => { const a = [...xs].sort((x, y) => x - y), m = a.length >> 1; return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
+
+export function baselineModel(view, asOf) {
+  const e = estimateNext(view, asOf);
+  if (!e.rangeStart) return { predicted: false, status: e.status };
+  return { predicted: true, date: addDays(e.lastStart, Math.round(e.median)), rangeStart: e.rangeStart, rangeEnd: e.rangeEnd, status: e.status };
+}
+
+/** Candidate: after a retrospective rise in THIS cycle, use the person's own past rise→next-start intervals.
+ *  Since band-adjusted 0.2.0 this calls the app's own adjustedEstimate(), so the evaluator applies exactly the app's
+ *  eligibility rules (pregnancy restart, a rise that went back to baseline, one band identity). `frozen` additionally
+ *  restricts nights to the pre-registered evaluation device; pass null to apply only the app's rules. */
+export function sensorModel(view, asOf, frozen = FROZEN) {
+  const v = frozen ? { ...view, wearable: { ...view.wearable, nights: view.wearable.nights.filter(n => n.model === frozen.device.model && n.firmware === frozen.device.firmware) } } : view;
+  const a = adjustedEstimate(v, asOf);
+  if (a.status !== 'adjusted') return { ...baselineModel(view, asOf), usedSensor: false, abstainReason: a.reason };
+  return { predicted: true, usedSensor: true, date: a.date, rangeStart: a.rangeStart, rangeEnd: a.rangeEnd, status: 'sensor' };
+}
+export const MODELS = { baseline: baselineModel, sensor: sensorModel };
+
+/* ---------- Period-start evaluation (walk-forward) ---------- */
+export function evaluatePeriods(cohort, { models = MODELS } = {}) {
+  const rows = []; rows.meta = { cyclesScored: { development: 0, test: 0 }, excludedMissedLog: { development: 0, test: 0 } };
+  for (const p of cohort) {
+    const s = participantState(p), logged = s.periods.map(x => x.start), split = splitOf(p.id);
+    for (let k = 1; k + 1 <= logged.length - 1; k++) {
+      const prev = logged[k], actual = logged[k + 1];
+      // Audit 6.2: if a true start between these two logged starts was never logged, the "next logged start" is not
+      // the real outcome. Such cycles are excluded and counted, not scored against the wrong date.
+      if (p.truth.some(t => t.start > prev && t.start < actual && !t.logged)) { rows.meta.excludedMissedLog[split]++; continue; }
+      rows.meta.cyclesScored[split]++;
+      for (let d = 1; addDays(prev, d) < actual; d++) {
+        const asOf = addDays(prev, d), view = stateAsOf(s, asOf), lead = diffDays(asOf, actual);
+        for (const [name, fn] of Object.entries(models)) {
+          const out = fn(view, asOf);
+          rows.push({ participant: p.id, split: splitOf(p.id), group: p.group, model: name, cycleDay: d + 1, lead, predicted: out.predicted, usedSensor: !!out.usedSensor,
+            error: out.predicted ? diffDays(actual, out.date) : null, covered: out.predicted ? actual >= out.rangeStart && actual <= out.rangeEnd : null,
+            width: out.predicted ? diffDays(out.rangeStart, out.rangeEnd) + 1 : null });
+        }
+      }
+    }
+  }
+  return rows;
+}
+
+const BUCKETS = [['1–3 days ahead', 1, 3], ['4–7 days ahead', 4, 7], ['8–14 days ahead', 8, 14], ['15+ days ahead', 15, 1e9]];
+export function periodMetrics(rows) {
+  const n = rows.length, pr = rows.filter(r => r.predicted), abs = pr.map(r => Math.abs(r.error));
+  const pct = f => (pr.length ? Math.round((1000 * pr.filter(f).length) / pr.length) / 10 : null);
+  return { opportunities: n, predictions: pr.length, noPredictionPct: n ? Math.round((1000 * (n - pr.length)) / n) / 10 : null,
+    mae: abs.length ? +(abs.reduce((a, v) => a + v, 0) / abs.length).toFixed(2) : null, medianAbsError: abs.length ? median(abs) : null,
+    within1: pct(r => Math.abs(r.error) <= 1), within2: pct(r => Math.abs(r.error) <= 2), within3: pct(r => Math.abs(r.error) <= 3),
+    rangeCoverage: pct(r => r.covered), meanRangeWidth: pr.length ? +(pr.reduce((a, r) => a + r.width, 0) / pr.length).toFixed(1) : null,
+    meanLeadTime: pr.length ? +(pr.reduce((a, r) => a + r.lead, 0) / pr.length).toFixed(1) : null,
+    sensorUsedPct: pr.length ? Math.round((1000 * pr.filter(r => r.usedSensor).length) / pr.length) / 10 : null };
+}
+export function periodReport(rows, split = 'test') {
+  const sel = rows.filter(r => r.split === split), models = [...new Set(sel.map(r => r.model))], out = {};
+  for (const m of models) {
+    const mr = sel.filter(r => r.model === m);
+    out[m] = { all: periodMetrics(mr), byLead: Object.fromEntries(BUCKETS.map(([l, a, b]) => [l, periodMetrics(mr.filter(r => r.lead >= a && r.lead <= b))])),
+      byGroup: Object.fromEntries(['regular', 'variable', 'long'].map(g => [g, periodMetrics(mr.filter(r => r.group === g))])),
+      cycleDay2: periodMetrics(mr.filter(r => r.cycleDay === 2)) };
+  }
+  return out;
+}
+
+/* ---------- Separate endpoint: retrospective rise vs SYNTHETIC ovulation ----------
+   The synthetic "ovulation" is the generator's own label. A real evaluation needs a clinician-designed
+   reference (e.g. urinary LH surge plus ultrasound) and is a separate study endpoint. */
+export function evaluateShift(cohort, split = 'test') {
+  const errs = []; let cyclesScored = 0, detected = 0, excludedFirmware = 0;
+  for (const p of cohort.filter(x => splitOf(x.id) === split)) {
+    const s = participantState(p);
+    const v = { ...s, wearable: { nights: s.wearable.nights.filter(n => { const ok = n.firmware === FROZEN.device.firmware; if (!ok) excludedFirmware++; return ok; }) } };
+    for (const t of p.truth.slice(0, -1)) {
+      if (!t.ovulation || !t.logged) continue; cyclesScored++;
+      const sh = retrospectiveShift(v, t.start, addDays(t.start, t.length));
+      if (sh.detected) { detected++; errs.push(diffDays(t.ovulation, sh.firstHighNight)); }
+    }
+  }
+  return { cyclesScored, detectedPct: cyclesScored ? Math.round((1000 * detected) / cyclesScored) / 10 : null, excludedNightsOtherFirmware: excludedFirmware,
+    riseMinusSyntheticOvulation: errs.length ? { median: median(errs), min: Math.min(...errs), max: Math.max(...errs) } : null };
+}
+
+/* ---------- Symptom check-in forecast vs each person's own simple baselines ---------- */
+export function evaluateSymptoms(cohort, split = 'test') {
+  const tally = { pattern: z(), lastCycle: z(), baseRate: z() };
+  function z() { return { alerts: 0, trueAlerts: 0, falseAlerts: 0, notableDays: 0, caught: 0, cycles: 0 }; }
+  for (const p of cohort.filter(x => splitOf(x.id) === split)) {
+    const s = participantState(p), starts = s.periods.map(x => x.start), def = CATEGORIES.energy;
+    for (let k = 1; k + 1 < starts.length; k++) {
+      const cs = starts[k], ce = starts[k + 1], view = stateAsOf(s, cs), pats = findPatterns(view).filter(x => x.category === 'energy');
+      const prevStart = starts[k - 1], hist = Object.entries(view.days).filter(([, d]) => d.energy);
+      const baseRate = hist.length ? hist.filter(([, d]) => def.notable.includes(d.energy)).length / hist.length : 0;
+      for (const t of Object.values(tally)) t.cycles++;
+      for (let d = 1; addDays(cs, d - 1) < ce; d++) {
+        const date = addDays(cs, d - 1), logged = s.days[date]?.energy; if (!logged) continue; // only days with an outcome
+        const truth = def.notable.includes(logged);
+        const near = [-1, 0, 1].some(o => def.notable.includes(view.days[addDays(prevStart, d - 1 + o)]?.energy));
+        const alerts = { pattern: pats.some(x => d >= x.from && d <= x.to), lastCycle: near, baseRate: baseRate >= 0.5 };
+        for (const [m, a] of Object.entries(alerts)) { const t = tally[m]; if (truth) t.notableDays++; if (a) { t.alerts++; truth ? t.trueAlerts++ : t.falseAlerts++; } if (a && truth) t.caught++; }
+      }
+    }
+  }
+  return Object.fromEntries(Object.entries(tally).map(([m, t]) => [m, { ...t, precisionPct: t.alerts ? Math.round((1000 * t.trueAlerts) / t.alerts) / 10 : null,
+    recallPct: t.notableDays ? Math.round((1000 * t.caught) / t.notableDays) / 10 : null, falseAlertsPerCycle: t.cycles ? +(t.falseAlerts / t.cycles).toFixed(2) : null }]));
+}
+
+/* ---------- Low-effort mode: "Has your period started?" prompt timing ----------
+   Compares the wearable-timed prompt with a dates-only prompt that asks every day from the start of the
+   estimated range until a period is logged. A prompt counts as a HIT if it is shown between the day before and
+   two days after the logged start; earlier prompts are FALSE prompts (nagging). Nothing is auto-recorded in
+   either case, so a false prompt costs one "Not yet" tap. Synthetic data: the generator puts a temperature
+   step before each period, so the sensor prompt is expected to look good here BY CONSTRUCTION. */
+export function evaluateSensorPrompt(cohort, split = 'test') {
+  const z = () => ({ cycles: 0, hits: 0, lags: [], falsePrompts: 0 }), t = { sensor: z(), rangeOnly: z() };
+  for (const p of cohort.filter(x => splitOf(x.id) === split)) {
+    const s = participantState(p), starts = s.periods.map(x => x.start);
+    for (let k = 1; k + 1 < starts.length; k++) {
+      const prev = starts[k], actual = starts[k + 1];
+      const hit = { sensor: null, rangeOnly: null }, asked = new Set();
+      for (let d = addDays(prev, NUDGE_PARAMS.MIN_CYCLE_DAY - 1); d <= addDays(actual, 2); d = addDays(d, 1)) {
+        // The person has not logged this period yet: answering the prompt is how it gets logged.
+        const view = stateAsOf(s, d); view.periods = view.periods.filter(x => x.start < actual);
+        const pr = periodPrompt(view, d);
+        if (pr.ask && !asked.has(pr.key)) { asked.add(pr.key); if (d < addDays(actual, -1)) t.sensor.falsePrompts++; else if (!hit.sensor) hit.sensor = d; }
+        const e = estimateNext(view, d), rangeAsk = e.rangeStart && d >= e.rangeStart;
+        if (rangeAsk) { if (d < addDays(actual, -1)) t.rangeOnly.falsePrompts++; else if (!hit.rangeOnly) hit.rangeOnly = d; }
+      }
+      for (const m of ['sensor', 'rangeOnly']) { t[m].cycles++; if (hit[m]) { t[m].hits++; t[m].lags.push(diffDays(actual, hit[m])); } }
+    }
+  }
+  return Object.fromEntries(Object.entries(t).map(([m, x]) => [m, { cycles: x.cycles, hitPct: x.cycles ? Math.round((1000 * x.hits) / x.cycles) / 10 : null,
+    medianLagDays: x.lags.length ? median(x.lags) : null, falsePromptsPerCycle: x.cycles ? +(x.falsePrompts / x.cycles).toFixed(2) : null }]));
+}
+
+/* ---------- Leakage self-check (audit 6.3: every participant, several dates, more fields scrambled) ---------- */
+export function leakageCheck(p, model = baselineModel, at = [2, 4, 7]) {
+  const s = participantState(p);
+  for (const i of at) {
+    if (!s.periods[i]) continue;
+    const asOf = addDays(s.periods[i].start, 5), a = model(stateAsOf(s, asOf), asOf);
+    const t = structuredClone(s); // scramble everything dated on or after asOf, or entered after it
+    for (const x of t.periods) { if (x.start >= asOf) x.start = addDays(x.start, 3); if (x.end && x.end >= asOf) x.end = addDays(x.end, 2); x.missedBefore = x.start >= asOf ? !x.missedBefore : x.missedBefore; }
+    for (const x of t.periods) for (const v of x.versions || []) if (v.at >= `${asOf}T00:00`) { v.start = addDays(v.start, 3); v.end = v.end && addDays(v.end, 2); }
+    for (const [d, day] of Object.entries(t.days)) if (d >= asOf) day.energy = day.energy === 'low' ? 'usual' : 'low';
+    for (const n of t.wearable.nights) if (n.night >= asOf && n.value) n.value += 5;
+    if (JSON.stringify(a) !== JSON.stringify(model(stateAsOf(t, asOf), asOf))) return false;
+  }
+  return true;
+}
+/** Audit 6.4: what was excluded from the data, by reason (test participants). */
+export function dataExclusions(cohort, split = 'test') {
+  const out = { nights: 0, byStatus: {}, rejectedReadingsByReason: {} };
+  for (const p of cohort.filter(x => splitOf(x.id) === split)) for (const n of participantState(p).wearable.nights) {
+    out.nights++; out.byStatus[n.status] = (out.byStatus[n.status] || 0) + 1;
+    for (const [r, c] of Object.entries(n.rejectedBy || {})) out.rejectedReadingsByReason[r] = (out.rejectedReadingsByReason[r] || 0) + c;
+  }
+  return out;
+}
+
+export function runEvaluation({ participants = FROZEN.participants, seed = FROZEN.seed } = {}) {
+  const cohort = makeCohort(participants, seed);
+  const rows = evaluatePeriods(cohort);
+  return { banner: SYNTHETIC_BANNER, frozen: { ...FROZEN, participants, seed },
+    splits: { development: cohort.filter(p => splitOf(p.id) === 'development').length, test: cohort.filter(p => splitOf(p.id) === 'test').length },
+    leakageFree: cohort.filter(p => splitOf(p.id) === 'test').every(p => leakageCheck(p, baselineModel) && leakageCheck(p, sensorModel)),
+    cyclesScored: rows.meta.cyclesScored.test, excludedMissedLog: rows.meta.excludedMissedLog.test, dataExclusions: dataExclusions(cohort, 'test'),
+    periodStart: periodReport(rows, 'test'), ovulationEndpoint: evaluateShift(cohort, 'test'), symptomForecast: evaluateSymptoms(cohort, 'test'), periodPrompt: evaluateSensorPrompt(cohort, 'test') };
+}
+
+/** Markdown rendering of a report. */
+export function toMarkdown(rep) {
+  const L = [`# Cycle estimate evaluation (synthetic)`, '', `> **${rep.banner}**`, '',
+    `Frozen config: cohort \`${rep.frozen.cohortVersion}\`, seed ${rep.frozen.seed}, device \`${rep.frozen.device.model}\` firmware \`${rep.frozen.device.firmware}\`, baseline \`${rep.frozen.algorithms.baseline}\`, sensor candidate \`${rep.frozen.algorithms.sensor}\`.`,
+    `Participants: ${rep.splits.development} development (not scored), ${rep.splits.test} held-out test. Leakage self-check (every test participant, 3 dates each, both models): **${rep.leakageFree ? 'passed' : 'FAILED'}**.`, '',
+    `Cycles scored: ${rep.cyclesScored}. Excluded because a period in between was never logged (the true outcome is unknown to the app): ${rep.excludedMissedLog}.`,
+    `Wearable nights: ${rep.dataExclusions.nights}; by status ${JSON.stringify(rep.dataExclusions.byStatus)}; rejected readings by reason ${JSON.stringify(rep.dataExclusions.rejectedReadingsByReason)}.`, '',
+    '"Window coverage" below is how often the true start fell inside the past-cycle window. The app does NOT present that window as a prediction interval: an interval would be derived from held-out data like this, but from a real study, not synthetic data.', '',
+    '## Period-start estimate (held-out test participants, every day of every scored cycle)', ''];
+  const head = '| Model | Slice | Opportunities | No prediction | MAE (days) | ±1 d | ±2 d | ±3 d | Window coverage | Mean window width | Mean lead time | Sensor used |', sep = '|' + '---|'.repeat(12);
+  L.push(head, sep);
+  const row = (m, label, x) => L.push(`| ${m} | ${label} | ${x.opportunities} | ${x.noPredictionPct ?? '–'}% | ${x.mae ?? '–'} | ${x.within1 ?? '–'}% | ${x.within2 ?? '–'}% | ${x.within3 ?? '–'}% | ${x.rangeCoverage ?? '–'}% | ${x.meanRangeWidth ?? '–'} d | ${x.meanLeadTime ?? '–'} d | ${x.sensorUsedPct ?? '–'}% |`);
+  for (const [m, r] of Object.entries(rep.periodStart)) {
+    row(m, 'all', r.all); row(m, 'cycle day 2', r.cycleDay2);
+    for (const [k, v] of Object.entries(r.byLead)) row(m, k, v);
+    for (const [k, v] of Object.entries(r.byGroup)) row(m, `${k} cycles`, v);
+  }
+  const o = rep.ovulationEndpoint;
+  L.push('', '## Separate endpoint: retrospective temperature rise vs the generator\'s synthetic ovulation label', '',
+    `Cycles scored: ${o.cyclesScored}. Rise detected: ${o.detectedPct}%. Nights excluded for non-frozen firmware: ${o.excludedNightsOtherFirmware}.`,
+    o.riseMinusSyntheticOvulation ? `Rise night minus synthetic ovulation (days): median ${o.riseMinusSyntheticOvulation.median}, range ${o.riseMinusSyntheticOvulation.min} to ${o.riseMinusSyntheticOvulation.max}.` : 'No rises detected.',
+    'This only checks that the detector behaves as designed on data built to contain a step. A real ovulation endpoint needs a clinician-designed reference protocol.', '',
+    '## Symptom check-in forecast vs personal simple baselines (energy, held-out test)', '',
+    '| Method | Alerts | True | False | False per cycle | Precision | Recall |', '|---|---|---|---|---|---|---|');
+  for (const [m, t] of Object.entries(rep.symptomForecast)) L.push(`| ${m} | ${t.alerts} | ${t.trueAlerts} | ${t.falseAlerts} | ${t.falseAlertsPerCycle} | ${t.precisionPct ?? '–'}% | ${t.recallPct ?? '–'}% |`);
+  if (rep.periodPrompt) {
+    L.push('', '## Low-effort mode: "Has your period started?" prompt (held-out test)', '', '| Prompt | Cycles | Hit (−1…+2 days) | Median lag (days) | False prompts per cycle |', '|---|---|---|---|---|');
+    for (const [m, x] of Object.entries(rep.periodPrompt)) L.push(`| ${m === 'sensor' ? 'wearable-timed' : 'dates-only range'} | ${x.cycles} | ${x.hitPct}% | ${x.medianLagDays ?? '–'} | ${x.falsePromptsPerCycle} |`);
+    L.push('', 'Neither prompt records anything: a hit saves the person a tap, a false prompt costs one "Not yet". The wearable-timed prompt looks good here by construction (the synthetic generator puts a temperature step before each period).');
+  }
+  L.push('', '`pattern` = the app\'s personal-pattern rule; `lastCycle` = alert if the same cycle day (±1) was notable last cycle; `baseRate` = alert every day if the person logs "notable" on half or more of their days.');
+  return L.join('\n');
+}

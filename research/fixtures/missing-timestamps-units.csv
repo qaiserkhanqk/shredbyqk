@@ -1,0 +1,6 @@
+participant_ref,timestamp_utc,end_timestamp_utc,utc_offset_minutes,tz_name,device_manufacturer,device_model,device_serial_pseudonym,firmware,sampling_interval_s,sampling_config,sensor_site,measurement_kind,derivation,aggregation,night_label,value,unit,precision,source_quality_flags,sleep_session_id
+P-SYN-0001,2026-01-05T23:00:00Z,2026-01-05T23:10:00Z,0,,SyntheticCo,SYN-1,P-SYN-0001-dev1,1.4.2,600,synthetic,wrist,skin_temperature,raw,sample,,33.89,C,0.01,,P-SYN-0001-2026-01-05
+P-SYN-0001,,,0,,SyntheticCo,SYN-1,P-SYN-0001-dev1,1.4.2,600,synthetic,wrist,skin_temperature,raw,sample,,33.89,C,0.01,,P-SYN-0001-2026-01-05
+P-SYN-0001,2026-01-05T23:10:00Z,2026-01-05T23:20:00Z,0,,SyntheticCo,SYN-1,P-SYN-0001-dev1,1.4.2,600,synthetic,wrist,skin_temperature,raw,sample,,33.82,,0.01,,P-SYN-0001-2026-01-05
+P-SYN-0001,2026-01-05T23:20:00Z,2026-01-05T23:30:00Z,0,,SyntheticCo,SYN-1,P-SYN-0001-dev1,1.4.2,600,synthetic,wrist,skin_temperature,raw,sample,,33.75,kelvinish,0.01,,P-SYN-0001-2026-01-05
+P-SYN-0001,2026-01-05T23:30:00Z,2026-01-05T23:40:00Z,7,,SyntheticCo,SYN-1,P-SYN-0001-dev1,1.4.2,600,synthetic,wrist,skin_temperature,raw,sample,,33.82,C,0.01,,P-SYN-0001-2026-01-05

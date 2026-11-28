@@ -1,0 +1,10 @@
+ok   4a detected rise reports a possible-onset interval separate from the first high night
+ok   4a ... the interval spans the unobserved nights before the first high night
+ok   4a control: with no missing nights the onset interval is the first high night itself
+ok   4a a rise that began while the 6-night baseline was forming is not reported as plain "no sustained rise"
+ok   4b guard: six low nights, 55 missing days, three high nights → abstains, no rise reported
+ok   4c one reading a week away from its session does not move the session's night
+ok   4c ... the outlying reading is excluded and reported, not used
+ok   4c the session-span limit is a documented, configurable parameter
+ALL PASS
+exit 0

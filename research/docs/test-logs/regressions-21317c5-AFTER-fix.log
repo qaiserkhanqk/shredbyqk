@@ -1,0 +1,113 @@
+ok   1b consent granted=missing (participant) is rejected with 400 and changes nothing
+ok   1b consent granted=missing (researcher) is rejected with 400 and changes nothing
+ok   1b consent granted=null (participant) is rejected with 400 and changes nothing
+ok   1b consent granted=null (researcher) is rejected with 400 and changes nothing
+ok   1b consent granted="false" (participant) is rejected with 400 and changes nothing
+ok   1b consent granted="false" (researcher) is rejected with 400 and changes nothing
+ok   1b consent granted="true" (participant) is rejected with 400 and changes nothing
+ok   1b consent granted="true" (researcher) is rejected with 400 and changes nothing
+ok   1b consent granted=0 (participant) is rejected with 400 and changes nothing
+ok   1b consent granted=0 (researcher) is rejected with 400 and changes nothing
+ok   1b consent granted=1 (participant) is rejected with 400 and changes nothing
+ok   1b consent granted=1 (researcher) is rejected with 400 and changes nothing
+ok   1b consent granted=[] (participant) is rejected with 400 and changes nothing
+ok   1b consent granted=[] (researcher) is rejected with 400 and changes nothing
+ok   1b consent granted={} (participant) is rejected with 400 and changes nothing
+ok   1b consent granted={} (researcher) is rejected with 400 and changes nothing
+ok   1b control: real Booleans still work (participant grants then withdraws)
+ok   1b feature enabled=missing is rejected with 400 and changes nothing
+ok   1b feature enabled=null is rejected with 400 and changes nothing
+ok   1b feature enabled="false" is rejected with 400 and changes nothing
+ok   1b feature enabled="true" is rejected with 400 and changes nothing
+ok   1b feature enabled=0 is rejected with 400 and changes nothing
+ok   1b feature enabled=1 is rejected with 400 and changes nothing
+ok   1b feature enabled=[] is rejected with 400 and changes nothing
+ok   1b feature enabled={} is rejected with 400 and changes nothing
+ok   1b a non-Boolean reimport flag is rejected
+ok   1d guard: participants still cannot read runs or quarantine, or import
+ok   2a the preview response identifies the previewed file and type (sourceHash, recordType)
+ok   2a a commit naming a different type or file than the preview is refused (409) and stores nothing
+ok   2a control: a commit naming the previewed type and file succeeds
+ok   4c the API accepts a timing exclusion as its own correction action
+ok   3f annotation types "constructor", "__proto__", … are rejected as invalid types (no server error)
+ok   3f measurement kind or unit named "constructor"/"__proto__" is rejected or quarantined (no server error)
+ok   3f parseUnit never returns an inherited object property
+ok   1c setup: the old version left the " lh_test " / " hormonal_medication " quarantine rows after withdrawal
+ok   1c after upgrade: retained raw LH/hormonal rows of the participant who withdrew are removed
+ok   1c after upgrade: no LH/hormonal annotation remains for that participant
+ok   1c after upgrade: the affected preview is invalidated
+ok   1c the other participant (consent still given) keeps everything, including an unaffected preview
+ok   1c the purge is audited with counts only (no content, no reference)
+ok   1c control: the bleeding entry of the withdrawn participant is kept
+ok   1c granting consent again after the upgrade restores nothing
+ok   3a control: an identical row is an exact duplicate
+ok   3a a changed sleep_session_id is not discarded as an exact duplicate (quarantined as a conflict, original kept)
+ok   3a a changed device_model is not discarded as an exact duplicate (quarantined as a conflict, original kept)
+ok   3a a changed sampling_interval_s is not discarded as an exact duplicate (quarantined as a conflict, original kept)
+ok   3a a changed precision is not discarded as an exact duplicate (quarantined as a conflict, original kept)
+ok   3a a changed tz_name is not discarded as an exact duplicate (quarantined as a conflict, original kept)
+ok   3a a changed device_manufacturer is not discarded as an exact duplicate (quarantined as a conflict, original kept)
+ok   3a a changed sampling_config is not discarded as an exact duplicate (quarantined as a conflict, original kept)
+ok   3b a correction recorded at the same instant supersedes its ancestor (id order irrelevant)
+ok   3b a same-instant retraction removes its ancestor
+ok   3b a correction recorded EARLIER than its ancestor (clock skew) still supersedes it
+ok   3b a multi-level chain with tied times resolves to its last link
+ok   3b a multi-level chain ending in a retraction removes the entry
+ok   3b cycles are still rejected safely (valid entries kept)
+ok   3c impossible timestamp 2026-02-30T10:00:00Z is quarantined, not normalised
+ok   3c impossible timestamp 2026-02-29T10:00:00Z is quarantined, not normalised
+ok   3c impossible timestamp 2026-04-31T10:00:00Z is quarantined, not normalised
+ok   3c impossible timestamp 2026-13-01T10:00:00Z is quarantined, not normalised
+ok   3c impossible timestamp 2026-01-01T24:00:00Z is quarantined, not normalised
+ok   3c impossible timestamp 2026-01-01T23:60:00Z is quarantined, not normalised
+ok   3c impossible timestamp 2026-01-01T23:59:60Z is quarantined, not normalised
+ok   3c impossible timestamp 2026-01-01T10:00:00+14:30 is quarantined, not normalised
+ok   3c impossible timestamp 2026-01-01T10:00:00-12:30 is quarantined, not normalised
+ok   3c impossible timestamp 2026-01-01T10:00:00+05:61 is quarantined, not normalised
+ok   3c valid timestamp 2024-02-29T10:00:00Z is accepted
+ok   3c valid timestamp 2026-12-31T23:59:59Z is accepted
+ok   3c valid timestamp 2026-01-01T10:00:00+14:00 is accepted
+ok   3c valid timestamp 2026-01-01T10:00:00-12:00 is accepted
+ok   3c valid timestamp 2026-01-01T10:00:00+05:45 is accepted
+ok   3c valid timestamp 2026-01-01T10:00:00.123456Z is accepted
+ok   3c an impossible end timestamp is quarantined
+ok   3c an impossible recorded_at is rejected
+ok   3c annotation dates: 29 Feb only in leap years; 31 Apr never
+ok   3d at import, a vendor night that has not ended yet is quarantined, not accepted
+ok   3d a historical vendor night imports normally
+ok   3d a future-dated vendor night does not appear in an earlier analysis
+ok   3d it appears once its night has ended under the documented convention
+ok   3d the convention is documented in the configuration
+ok   3e sampling interval 1e308 s is rejected or quarantined (out of range / not finite)
+ok   3e sampling interval 1e20 s is rejected or quarantined (out of range / not finite)
+ok   3e sampling interval 86400000 s is rejected or quarantined (out of range / not finite)
+ok   3e sampling interval 3601 s is rejected or quarantined (out of range / not finite)
+ok   3e sampling interval Infinity s is rejected or quarantined (out of range / not finite)
+ok   3e an interval at the documented maximum (3600 s) is accepted
+ok   3e a single measurement interval longer than the maximum is quarantined
+ok   3e malformed observations do not crash the whole analysis
+ok   3e calculated coverage is limited to the night window (≤ 12 h fallback window)
+ok   3e the full pipeline completes with malformed stored observations
+ok   3f CSV "33".5 is rejected, not read as 33.5
+ok   3f CSV x"y (quote inside an unquoted cell) is rejected
+ok   3f control: valid quoted CSV still parses
+ok   3f JSON records are limited to the same column count as CSV (41 fields rejected)
+ok   3f JSON cells are limited to the same length as CSV (513 characters rejected)
+ok   3f JSON values must be plain values (objects and arrays rejected)
+ok   4a [33,33,33,33,34,34,34,34]: separate detection, confirmation and possible-onset fields
+ok   4a ... the possible onset includes night 5 (the first observed high night), not only night 6
+ok   4a ... confirmation is the last night of the qualifying window
+ok   4a gradual rise: onset is an interval reaching back before the threshold crossing, or abstains
+ok   4a rise during baseline formation: not reported as "no clear shift"; onset left-censored or abstained
+ok   4a missing nights before the rise: the onset interval spans the unobserved nights
+ok   4a already-elevated readings from the first observed night (nothing near cycle start): not "no clear shift"
+ok   4b five low nights, 55 missing days, three high nights: no shift reported; labelled abstention
+ok   4b the gap policy is configurable and documented as an engineering assumption
+ok   4b control: a one-night gap still allows detection
+ok   4c a sample with a corrupted timestamp far from its session does not decide the session's night
+ok   4c setup: an uncorrected near-session wrong time still labels the session from the earliest sample
+ok   4c excluding the VALUE keeps the sample's timing (label unchanged, value not used)
+ok   4c excluding the TIMING removes the sample from session labelling and placement; the session is re-labelled
+ok   4c replay: before the timing correction the old label stands; after it, the corrected label (and provenance lists it)
+ALL PASS (111)
+exit 0

@@ -1,0 +1,22 @@
+# 2026-11-28, on the merge of main 35bdb17 into the cycle branch, BEFORE the fix
+== chromium
+browser: chromium 153.0.8010.12
+FAIL the camera video can never be popped out into Picture-in-Picture
+FAIL a new set starts with an empty rep line (not the last set's "Rep 10 · …")  — before: "Rep 8 · full range · speed holding", new set: "Rep 8 · full range · speed holding"
+ok   no JavaScript errors
+2 FAILED of 3
+exit=1
+== firefox
+browser: firefox 155.0
+FAIL the camera video can never be popped out into Picture-in-Picture
+FAIL a new set starts with an empty rep line (not the last set's "Rep 10 · …")  — before: "Rep 8 · full range · speed holding", new set: "Rep 8 · full range · speed holding"
+ok   no JavaScript errors
+2 FAILED of 3
+exit=1
+== webkit
+browser: webkit 26.6
+FAIL the camera video can never be popped out into Picture-in-Picture
+FAIL a new set starts with an empty rep line (not the last set's "Rep 10 · …")  — before: "Rep 8 · full range · speed holding", new set: "Rep 8 · full range · speed holding"
+ok   no JavaScript errors
+2 FAILED of 3
+exit=1

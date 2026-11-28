@@ -1,0 +1,14 @@
+ok   3 a corrected session replaces the current record (one record per source session, not two)
+ok   3 the current record is the corrected version
+ok   3 the earlier version is kept in the version history
+ok   3 history: the view as known before the correction shows only the original version
+ok   3 history: the view after the correction shows only the corrected version
+ok   3 an identical resync of the corrected session changes nothing
+ok   3 a different session on another night is still a separate record
+ok   4 three sessions on ONE night do not count as three confirmation nights
+ok   4 nightsUsed counts distinct biological nights
+ok   4 a baseline of 2 nights split into 6 sessions does not satisfy the 6-night baseline
+ok   4 control: 6 distinct baseline nights + 3 distinct high nights is detected
+ok   4 a second, shorter session on a baseline night is not an extra night (same result, same count)
+ALL PASS
+exit 0

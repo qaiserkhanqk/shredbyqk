@@ -1,0 +1,9 @@
+FAIL module server/totp.js exists  — Cannot find module '/home/user/shredbyqk/research/server/totp.js' imported from /home/user/shredbyqk/research/tests/e2e-account.cjs
+(node:607) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+FAIL mfa ui: a researcher without two-factor is told it must be set up first
+FAIL e2e-account run completed  — TypeError: store.mfaBegin is not a function
+    at /home/user/shredbyqk/research/tests/e2e-account.cjs:36:21
+ok   no external requests
+ok   no script, CSP or console errors
+3 FAILED of 5

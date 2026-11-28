@@ -1,0 +1,22 @@
+# 2026-11-28, AFTER the fix (disablepictureinpicture on the camera video; the rep line is cleared when a set starts)
+== chromium
+browser: chromium 153.0.8010.12
+ok   the camera video can never be popped out into Picture-in-Picture
+ok   a new set starts with an empty rep line (not the last set's "Rep 10 · …")
+ok   no JavaScript errors
+ALL PASS (3)
+exit=0
+== firefox
+browser: firefox 155.0
+ok   the camera video can never be popped out into Picture-in-Picture
+ok   a new set starts with an empty rep line (not the last set's "Rep 10 · …")
+ok   no JavaScript errors
+ALL PASS (3)
+exit=0
+== webkit
+browser: webkit 26.6
+ok   the camera video can never be popped out into Picture-in-Picture
+ok   a new set starts with an empty rep line (not the last set's "Rep 10 · …")
+ok   no JavaScript errors
+ALL PASS (3)
+exit=0

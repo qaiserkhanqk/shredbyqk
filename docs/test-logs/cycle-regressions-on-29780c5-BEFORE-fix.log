@@ -1,0 +1,33 @@
+### node tests/cycle-regressions-29780c5.test.mjs  (commit 29780c5, unchanged code)
+FAIL 1 three raw + three vendor-derived samples are not combined into one valid night  — [{"kind":"raw","status":"ok","value":35}]
+FAIL 1 no summary reports a value that mixes the two kinds (35 °C)
+FAIL 1 unknown or missing measurement kind does not default to raw, and is not usable  — ["raw","raw"]
+FAIL 1 two source identities (same device ID, different model) are not pooled into one night
+ok   1 control: six compatible raw samples still form a night
+FAIL 2 daytime-only samples (14:00–17:00) without sleep information: no "overnight" summary  — ["ok"]
+FAIL 2 night-time samples without verified sleep information also abstain (no assumed sleep window)
+FAIL 2 mixed batch: only the verified sleep session is summarised; daytime readings are not used  — [{"night":"2026-11-01","status":"ok","value":33.9},{"night":"2026-11-02","status":"ok","value":36}]
+ok   2 shift worker: a verified main sleep in the daytime is used (no universal night window)  — ["ok"]
+FAIL 2 a sleep session the source does not mark as main sleep (a nap) is not used as a night
+FAIL 3 offset NaN: no crash, valid data still summarised, bad packet quarantined  — Invalid time value
+FAIL 3 offset Infinity: no crash, valid data still summarised, bad packet quarantined  — Invalid time value
+FAIL 3 offset -Infinity: no crash, valid data still summarised, bad packet quarantined  — Invalid time value
+FAIL 3 offset 100000 minutes: no crash, valid data still summarised, bad packet quarantined  — [{"night":"2026-11-01","status":"ok"},{"night":"2027-01-10","status":"insufficient_wear"}]
+ok   3 offset not a whole quarter hour (7 min): no crash, valid data still summarised, bad packet quarantined  — [{"night":"2026-11-01","status":"ok"}]
+ok   3 offset a string: no crash, valid data still summarised, bad packet quarantined  — [{"night":"2026-11-01","status":"ok"}]
+FAIL 3 the quarantined packet carries a clear reason  — []
+FAIL 4 a 2 March historical forecast stays "early" after pregnancy is marked in April  — early → paused
+ok   4 current safety behaviour kept: estimates are paused now
+ok   4 a historical view after the change sees it
+FAIL 4 a later change ("no longer") does not rewrite history: 2 March view still paused
+FAIL 4 deleting the entry as a mistake removes it from current AND historical views  — no deletion API
+ok   4 consent withdrawal (delete all): no situation or history left in current or historical views
+16 FAILED
+exit 1
+
+### node tests/cycle-ui-regressions.cjs  (commit 29780c5, unchanged code, headless Chromium)
+FAIL 5 cycle tracking on, research flag off: no symptom-pattern finding is displayed
+ok   5 research flag on: the pattern card is shown, marked as unvalidated research
+ok   no JavaScript errors
+1 FAILED
+exit 1

@@ -1,0 +1,358 @@
+// Cycle data model: pure functions over one user's state object. No storage, no DOM. The encrypted
+// repository (store.js) persists the result.
+//
+// Principles enforced here:
+//  • A period exists only because the user logged or confirmed it. Nothing is inferred from a watch.
+//  • Spotting is logged as a day, separate from periods. It never starts a cycle.
+//  • A day with no entry is UNKNOWN. It is never read as "no bleeding".
+//  • Nothing can be written before core consent. Symptom categories are opt-in one by one.
+//  • Errors carry a code only, never the data that caused them, so error logs stay free of health data.
+import { isDate, addDays, diffDays } from './dates.js';
+
+export const CONSENT_VERSION = 'cycle-prototype-2026-11';
+export const SCHEMA = 1;
+
+/** Symptom categories. All off by default; each has a plain explanation shown before it is turned on. */
+export const CATEGORIES = {
+  pain: { label: 'Pain', why: 'Cramps or other pain, so you can look back at when it happened.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe pain' },
+  energy: { label: 'Energy', why: 'How your energy felt compared with your usual.', options: [['low', 'Lower than usual'], ['usual', 'Usual'], ['high', 'Higher than usual']], notable: ['low'], notableLabel: 'lower energy' },
+  mood: { label: 'Mood', why: 'A word for your mood, only if you want to track it. Nothing is inferred from sensors.', options: [['good', 'Good'], ['okay', 'Okay'], ['low', 'Low'], ['anxious', 'Anxious'], ['irritable', 'Irritable']], notable: ['low', 'anxious', 'irritable'], notableLabel: 'low, anxious or irritable mood' },
+  cravings: { label: 'Cravings', why: 'Food cravings, if you notice them.', options: [['none', 'None'], ['some', 'Some'], ['strong', 'Strong']], notable: ['strong'], notableLabel: 'strong cravings' },
+  sleep: { label: 'Sleep', why: 'How you felt you slept. This is your rating, not a sensor reading.', options: [['poor', 'Poor'], ['ok', 'OK'], ['good', 'Good']], notable: ['poor'], notableLabel: 'poor sleep' },
+  // Common premenstrual symptoms (ACOG premenstrual disorders guidance; docs/premenstrual-patterns.md), 2026-11-27.
+  appetite: { label: 'Appetite', why: 'Whether you felt hungrier or less hungry than usual. No calories, diets or weight.', options: [['less', 'Less than usual'], ['usual', 'Usual'], ['more', 'More than usual']], notable: ['more'], notableLabel: 'a bigger appetite' },
+  bloating: { label: 'Bloating', why: 'A swollen or full feeling in your tummy.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe bloating' },
+  breasts: { label: 'Breast tenderness', why: 'Sore, tender or swollen breasts.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe breast tenderness' },
+  headache: { label: 'Headache', why: 'Headaches, including migraines.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe headaches' },
+  // Training feel (competitor-gap work, docs/competitor-gaps.md): lets her own pattern show. No training advice is
+  // given by cycle phase, because the evidence for general phase-based rules is weak and individual (docs).
+  // Perimenopause and menopause symptoms (group 'midlife': offered in settings only in midlife mode). Symptom areas
+  // follow published research (docs/midlife-evidence.md: MRS, SWAN, GSM terminology); the wording is our own and is
+  // awaiting clinician review. No score is calculated.
+  hotFlushes: { group: 'midlife', label: 'Hot flushes or night sweats', why: 'Sudden waves of heat, flushing or sweating, by day or at night.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe hot flushes or night sweats' },
+  focus: { group: 'midlife', label: 'Concentration and memory', why: 'Brain fog, forgetting words, or finding it harder to concentrate than usual.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe trouble concentrating' },
+  aches: { group: 'midlife', label: 'Joint and muscle aches', why: 'Aching or stiff joints or muscles that are not from a workout or injury.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe aches' },
+  heartRacing: { group: 'midlife', label: 'Heart racing or pounding', why: 'Feeling your heart racing, pounding or skipping a beat. If you have chest pain, feel breathless or faint, get urgent medical help.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe heart racing' },
+  dryness: { group: 'midlife', label: 'Vaginal dryness or discomfort', why: 'Dryness, irritation or discomfort, including during sex.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe dryness or discomfort' },
+  bladder: { group: 'midlife', label: 'Bladder changes', why: 'Needing to pass urine more urgently or more often, or discomfort when you do.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe bladder changes' },
+  // Pregnancy symptoms (group 'pregnancy': offered in settings only in pregnancy mode) and recovery after birth (group
+  // 'postpartum'). Areas from docs/pregnancy-postpartum-evidence.md; wording our own, awaiting clinician review.
+  nausea: { group: 'pregnancy', label: 'Nausea or being sick', why: 'Feeling sick or being sick. If you can\'t keep food or drink down, call your midwife or doctor.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe nausea' },
+  heartburn: { group: 'pregnancy', label: 'Heartburn', why: 'A burning feeling in your chest or throat, often after eating.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe heartburn' },
+  swelling: { group: 'pregnancy', label: 'Swelling', why: 'Swollen feet, ankles or fingers. Sudden or severe swelling of your face or hands needs a call to your maternity unit now.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe swelling' },
+  backPain: { group: 'pregnancy', label: 'Back or pelvic pain', why: 'Aches in your back or around your pelvis.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe back or pelvic pain' },
+  afterBirthBleeding: { group: 'postpartum', label: 'Bleeding after birth', why: 'Bleeding after birth (lochia) is not a period. Soaking a pad in an hour or less, or passing large clots, needs urgent help.', options: [['none', 'None'], ['light', 'Light'], ['moderate', 'Moderate'], ['heavy', 'Heavy']], notable: ['heavy'], notableLabel: 'heavy bleeding after birth' },
+  healingPain: { group: 'postpartum', label: 'Pain where you are healing', why: 'Pain from stitches, a tear or a caesarean wound.', options: [['none', 'None'], ['mild', 'Mild'], ['moderate', 'Moderate'], ['severe', 'Severe']], notable: ['moderate', 'severe'], notableLabel: 'moderate or severe healing pain' },
+  training: { label: 'Training', why: 'How your workouts felt compared with usual, so you can see your own pattern. No training advice is given by cycle phase.', options: [['easier', 'Easier than usual'], ['usual', 'Usual'], ['harder', 'Harder than usual']], notable: ['harder'], notableLabel: 'training feeling harder' },
+};
+/** Things that can disturb a night's skin temperature. Optional, per night (the evening's date), true or false.
+ *  The temperature research rule and the wearable-timed questions leave these nights out. Not health judgements. */
+export const NIGHT_DISRUPTORS = ['unwell', 'travel', 'alcohol', 'lateNight', 'hotOrColdRoom'];
+export const nightDisrupted = (s, date) => NIGHT_DISRUPTORS.some(k => s.days[date]?.[k] === true);
+export const BLEEDING = ['period', 'spotting', 'none'];
+/** Home ovulation-test (urinary LH) results, recorded exactly as the person read them. Research only, opt-in
+ *  (consent scope 'lhTests'). Deliberately NOT a symptom category, so pattern, suggestion and forecast code never
+ *  scan it, and nothing in the app interprets it: no fertile window, ovulation day or contraception advice. */
+export const LH_RESULTS = { positive: 'Positive', negative: 'Negative', invalid: 'Invalid or unclear' };
+
+/** Situations in which dates-based phase information is not shown, and estimates carry a caveat. */
+export const SITUATIONS = {
+  hormonalContraception: { label: 'Using hormonal contraception', note: 'Bleeds on hormonal contraception are usually withdrawal bleeds, not a natural cycle. Estimates describe your logged bleeding pattern only.' },
+  pregnant: { label: 'Pregnant', note: 'Estimates and period reminders are paused.' },
+  postpartum: { label: 'Recently gave birth or breastfeeding', note: 'Cycles often change after birth and while breastfeeding, so estimates may be less reliable.' },
+  perimenopause: { label: 'Perimenopause or menopause', note: 'Cycles often become more variable, so estimates may be less reliable.' },
+  other: { label: 'Another condition or medicine that affects my cycle', note: 'Estimates may be less reliable.' },
+};
+
+export class CycleError extends Error {
+  constructor(code) { super(`cycle:${code}`); this.code = code; }
+}
+
+export const blankState = owner => ({
+  schema: SCHEMA, owner,
+  consent: { version: null, core: null, categories: {}, wearable: null, reminders: null, lhTests: null, log: [] },
+  periods: [],           // [{id, start, end|null, missedBefore, createdAt, updatedAt}]
+  days: {},              // {'YYYY-MM-DD': {bleeding?, pain?, energy?, mood?, cravings?, sleep?, unwell?, travel?}}
+  situation: {},         // keys of SITUATIONS → true (current)
+  situationLog: [],      // [{key, on, at}] every change, for historical views (issue 4 reproduced in 29780c5)
+  settings: { lockScreenDetail: false, quietHours: { start: '22:00', end: '07:00' }, remindersPausedUntil: null },
+  reminders: [],
+  delivered: {},         // reminderId → last date it was shown
+  dismissed: {},         // insight key → date dismissed
+  promptsDismissed: {},  // confirmation prompt key → date
+  wearable: { devices: [], nights: [] }, // nightly summaries only; raw samples are not kept
+  pregnancy: null,       // current pregnancy she told the app about (js/cycle/pregnancy.js)
+  pregnancies: [],       // ended pregnancies [{dueDate, endDate, outcome: 'birth'|'ended'}]
+  postpartum: null,      // {birthDate} while postpartum mode is on
+  comfort: { tries: [] }, // comfort options she tried and whether they helped (js/cycle/comfort.js)
+});
+
+let seq = 0;
+const newId = () => `${Date.now().toString(36)}${(seq++).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+/* ---------- Consent ---------- */
+const stamp = (s, change, at) => { s.consent.log.push({ at, change }); };
+export function giveConsent(s, at = new Date().toISOString()) {
+  s.consent.version = CONSENT_VERSION; s.consent.core = at; stamp(s, 'core:given', at); return s;
+}
+export const hasConsent = s => !!s.consent.core && s.consent.version === CONSENT_VERSION;
+function requireConsent(s) { if (!hasConsent(s)) throw new CycleError('NO_CONSENT'); }
+
+/** Turn a symptom category on or off. Turning it off stops collection; pass purge to delete past entries. */
+export function setCategory(s, cat, on, { purge = false, at = new Date().toISOString() } = {}) {
+  requireConsent(s);
+  if (!(cat in CATEGORIES)) throw new CycleError('INVALID_INPUT');
+  if (on) s.consent.categories[cat] = at; else delete s.consent.categories[cat];
+  stamp(s, `category:${cat}:${on ? 'on' : 'off'}${purge ? ':purged' : ''}`, at);
+  if (!on && purge) for (const d of Object.values(s.days)) delete d[cat];
+  if (!on) invalidateDerived(s, cat, purge);
+  pruneDays(s);
+  return s;
+}
+
+/* Things derived from a category's logs: pattern reminders (whose `origin` copies pattern text), their delivery
+   records, dismissed insights and suggestion answers. Turning a category off disables its reminders (with a
+   reason shown to the user); purging deletes all of it, so nothing derived from purged logs remains or is exported. */
+function invalidateDerived(s, cat, purge) {
+  const derived = (s.reminders || []).filter(r => r.kind === 'pattern' && r.category === cat);
+  if (purge) {
+    const ids = new Set(derived.map(r => r.id));
+    s.reminders = s.reminders.filter(r => !ids.has(r.id));
+    for (const id of ids) delete s.delivered[id];
+    for (const k of Object.keys(s.dismissed)) if (k.startsWith(`${cat}:`)) delete s.dismissed[k];
+    for (const k of Object.keys(s.promptsDismissed)) if (k.startsWith(`sugg:${cat}:`)) delete s.promptsDismissed[k];
+    if (cat === 'pain') s.comfort = { tries: [] }; // comfort records reveal pain, so they go with it
+  } else for (const r of derived) { r.enabled = false; r.disabledReason = 'category_off'; }
+}
+export const categoryOn = (s, cat) => !!s.consent.categories[cat];
+
+export function setScopeConsent(s, scope, on, at = new Date().toISOString()) {
+  requireConsent(s);
+  if (!['wearable', 'reminders', 'lhTests'].includes(scope)) throw new CycleError('INVALID_INPUT');
+  s.consent[scope] = on ? at : null; stamp(s, `${scope}:${on ? 'on' : 'off'}`, at);
+  if (!on && scope === 'wearable') s.wearable = { devices: [], nights: [] }; // withdrawing deletes the data
+  if (!on && scope === 'reminders') { s.reminders = []; s.delivered = {}; }
+  if (!on && scope === 'lhTests') { for (const d of Object.values(s.days)) delete d.lh; pruneDays(s); } // and their history
+  return s;
+}
+
+/* ---------- Situations (pregnancy, contraception, …) ----------
+   Versioned (issue 4 reproduced in 29780c5): every change is logged with its time, so a historical view shows the
+   situation as it was known then, while the CURRENT view applies it immediately (e.g. pregnancy pauses estimates
+   now). Unticking is a later change; history keeps the earlier state. eraseSituation() is for an entry made by
+   mistake: it removes the situation and its whole history, so deletion is honoured in every view. */
+export function setSituation(s, key, on, { at = new Date().toISOString() } = {}) {
+  requireConsent(s);
+  if (!(key in SITUATIONS)) throw new CycleError('INVALID_INPUT');
+  if (on) s.situation[key] = true; else delete s.situation[key];
+  (s.situationLog ||= []).push({ key, on: !!on, at });
+  return s;
+}
+export function eraseSituation(s, key) {
+  requireConsent(s);
+  delete s.situation[key];
+  s.situationLog = (s.situationLog || []).filter(e => e.key !== key);
+  return s;
+}
+
+/* ---------- Periods ---------- */
+const sorted = s => [...s.periods].sort((a, b) => a.start.localeCompare(b.start));
+function checkPeriod(s, start, end, ignoreId, todayStr) {
+  if (!isDate(start) || (end != null && !isDate(end))) throw new CycleError('INVALID_DATE');
+  if (todayStr && start > todayStr) throw new CycleError('FUTURE_DATE');
+  if (end != null && end < start) throw new CycleError('END_BEFORE_START');
+  if (todayStr && end != null && end > todayStr) throw new CycleError('FUTURE_DATE');
+  const e = end ?? start;
+  for (const p of s.periods) {
+    if (p.id === ignoreId) continue;
+    const pe = p.end ?? p.start;
+    if (start <= pe && e >= p.start) throw new CycleError('OVERLAP');
+  }
+}
+
+/** Log the first day of a period (a confirmed start). */
+/** Where an entry came from. Every stored value is something the user typed or confirmed; predictions are never stored. */
+export const SOURCES = ['typed', 'suggestion', 'range_prompt', 'sensor_prompt', 'companion', 'checkin'];
+const src = v => (SOURCES.includes(v) ? v : 'typed');
+
+export function logPeriodStart(s, start, { today: t, at = new Date().toISOString(), source } = {}) {
+  requireConsent(s); checkPeriod(s, start, null, null, t);
+  // An earlier period with no end stays without an end: we never invent an end date. The user can add it.
+  const p = { id: newId(), start, end: null, missedBefore: false, source: src(source), createdAt: at, updatedAt: at, versions: [] };
+  addVersion(p, at);
+  s.periods.push(p); s.periods = sorted(s);
+  if (s.days[start]?.bleeding) { delete s.days[start].bleeding; pruneDays(s); } // the period record now covers that day
+  return p;
+}
+/* Version history (issue 10 reproduced in 0f26696): each period keeps what it looked like after every entry or
+   correction, with the time that happened, so "what was known on date D" can be replayed exactly. Deleting a period
+   removes it and its history (privacy wins); a historical replay then treats it as never entered. */
+function addVersion(p, at) { (p.versions ||= []).push({ at, start: p.start, end: p.end, missedBefore: !!p.missedBefore, lengthConfirmed: !!p.lengthConfirmed }); }
+
+export function logPeriodEnd(s, id, end, { today: t, at = new Date().toISOString() } = {}) {
+  requireConsent(s);
+  const p = s.periods.find(x => x.id === id); if (!p) throw new CycleError('NOT_FOUND');
+  checkPeriod(s, p.start, end, id, t); p.end = end; p.updatedAt = at; addVersion(p, at); return p;
+}
+/** Edit (correct) a period. Corrections replace the old values; nothing is kept from the wrong entry. */
+export function editPeriod(s, id, { start, end, missedBefore, lengthConfirmed }, { today: t, at = new Date().toISOString() } = {}) {
+  requireConsent(s);
+  const p = s.periods.find(x => x.id === id); if (!p) throw new CycleError('NOT_FOUND');
+  const ns = start ?? p.start, ne = end === undefined ? p.end : end;
+  checkPeriod(s, ns, ne, id, t);
+  Object.assign(p, { start: ns, end: ne, updatedAt: at });
+  if (missedBefore != null) p.missedBefore = !!missedBefore;
+  if (lengthConfirmed != null) p.lengthConfirmed = !!lengthConfirmed; // "yes, the gap before this start is right"
+  addVersion(p, at);
+  s.periods = sorted(s); return p;
+}
+export function deletePeriod(s, id) {
+  requireConsent(s);
+  const n = s.periods.length; s.periods = s.periods.filter(p => p.id !== id);
+  if (s.periods.length === n) throw new CycleError('NOT_FOUND');
+}
+
+/** The period EPISODE a date may belong to, used only to decide whether to ask "did a new period start?".
+ *  It is NOT evidence of bleeding on that day: use observedBleeding() for that.
+ *  Without a logged end, an older period covers only its start day; the latest one covers up to `today` for at
+ *  most 7 days, after which the app asks whether it has ended. */
+export function periodOn(s, date, t = date) {
+  const latest = sorted(s).at(-1);
+  return s.periods.find(p => p.start <= date && date <= (p.end ?? (p === latest ? minDate(t, addDays(p.start, 6)) : p.start)));
+}
+const minDate = (a, b) => (a < b ? a : b);
+
+/** What the log actually says about bleeding on a date (issue 4 reproduced in 0f26696):
+ *   'period'   — the logged first day of a period, a day inside a period whose end the user confirmed, or a day
+ *                the user logged as period bleeding;
+ *   'spotting' / 'none' — the user logged that for the day (an explicit day entry always wins);
+ *   'unknown'  — anything else, including later days of a period that has no end logged yet. */
+export function observedBleeding(s, date) {
+  const d = s.days[date]?.bleeding;
+  if (d) return d;
+  if (s.periods.some(p => p.start === date || (p.end && p.start <= date && date <= p.end))) return 'period';
+  return 'unknown';
+}
+
+/* ---------- Day logs ---------- */
+export function logDay(s, date, fields, { today: t, source, at = new Date().toISOString() } = {}) {
+  requireConsent(s);
+  if (!isDate(date)) throw new CycleError('INVALID_DATE');
+  if (t && date > t) throw new CycleError('FUTURE_DATE');
+  const d = s.days[date] || {};
+  for (const [k, v] of Object.entries(fields)) {
+    if (k === 'bleeding') { if (v != null && !BLEEDING.includes(v)) throw new CycleError('INVALID_INPUT'); }
+    else if (k === 'lh') { if (!s.consent.lhTests) throw new CycleError('LH_OFF'); if (v != null && !(v in LH_RESULTS)) throw new CycleError('INVALID_INPUT'); }
+    else if (NIGHT_DISRUPTORS.includes(k)) { if (v != null && typeof v !== 'boolean') throw new CycleError('INVALID_INPUT'); }
+    else if (k in CATEGORIES) {
+      if (!categoryOn(s, k)) throw new CycleError('CATEGORY_OFF');
+      if (v != null && !CATEGORIES[k].options.some(([o]) => o === v)) throw new CycleError('INVALID_INPUT');
+    } else throw new CycleError('INVALID_INPUT');
+    if (v == null || v === false) { delete d[k]; if (d.src) delete d.src[k]; if (d.rec) delete d.rec[k]; if (d.hist) delete d.hist[k]; } // deletion removes history too
+    else {
+      // Version history (issue 6 reproduced in 80ea40f): a correction appends; earlier values stay available to
+      // historical views. A value written before history existed is seeded from its entry time.
+      const h = ((d.hist ||= {})[k] ||= (d[k] != null && d.rec?.[k] ? [{ v: d[k], at: d.rec[k] }] : []));
+      if (!h.length || h.at(-1).v !== v) h.push({ v, at });
+      d[k] = v; if (k in CATEGORIES || k === 'bleeding' || k === 'lh') (d.src ||= {})[k] = src(source); (d.rec ||= {})[k] = at;
+    }
+  }
+  s.days[date] = d; pruneDays(s); return d;
+}
+function pruneDays(s) {
+  for (const [k, v] of Object.entries(s.days)) {
+    for (const meta of ['src', 'rec', 'hist']) if (v[meta]) { for (const f of Object.keys(v[meta])) if (!(f in v)) delete v[meta][f]; if (!Object.keys(v[meta]).length) delete v[meta]; }
+    if (!Object.keys(v).length) delete s.days[k];
+  }
+}
+
+/* ---------- Confirmation prompts ----------
+   The app asks; it never decides. Two prompts:
+   1. "Did a period start?" when the user logged period-type bleeding on a day not inside a logged period.
+   2. "Has your period ended?" when a period has been open for 8+ days. */
+export function pendingPrompts(s, t) {
+  const out = [];
+  for (const [date, d] of Object.entries(s.days)) {
+    if (d.bleeding === 'period' && !periodOn(s, date, t) && !s.promptsDismissed[`start:${date}`]) {
+      out.push({ key: `start:${date}`, kind: 'confirmStart', date, text: `You logged bleeding on ${date}. Was that the first day of a period?` });
+    }
+  }
+  const latest = sorted(s).at(-1);
+  for (const p of latest ? [latest] : []) {
+    const since = diffDays(p.start, t);
+    if (p.end == null && since >= 7 && since <= 20 && !s.promptsDismissed[`end:${p.id}`]) out.push({ key: `end:${p.id}`, kind: 'confirmEnd', id: p.id, date: p.start, text: 'Your period has been open for over a week. Has it ended?' });
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+export function dismissPrompt(s, key, t) { s.promptsDismissed[key] = t; }
+
+/* ---------- Cycles ----------
+   A cycle runs from one confirmed start to the day before the next. Its length is known only when the next
+   start exists. Lengths outside 15–90 days are kept but marked "check" (often a typo or a missed log) and
+   left out of estimates until the user confirms the entries. Both bounds are display safeguards, not
+   clinical limits. */
+export const PLAUSIBLE = { min: 15, max: 90 };
+
+/** The end of her most recent pregnancy, or null. Estimates and the learning stage use only cycles from then on:
+ *  cycles often change after a pregnancy, and the gap that contains one is not a cycle. A design rule, not physiology. */
+export function restartDate(s, upTo = '9999-12-31') {
+  return (s.pregnancies || []).map(p => p.endDate).filter(d => d && d <= upTo).sort().at(-1) || null;
+}
+
+export function cycles(s) {
+  const ps = sorted(s), out = [];
+  for (let i = 0; i + 1 < ps.length; i++) {
+    const a = ps[i], b = ps[i + 1], length = diffDays(a.start, b.start);
+    let usable = true, reason = null;
+    if (b.missedBefore) { usable = false; reason = 'You said you may have missed logging a period in this gap.'; }
+    else if (length < PLAUSIBLE.min || length > PLAUSIBLE.max) { usable = !!b.lengthConfirmed; reason = usable ? null : `${length} days is unusual for one cycle. Check the dates, or mark a missed log.`; }
+    out.push({ start: a.start, nextStart: b.start, length, periodLength: a.end ? diffDays(a.start, a.end) + 1 : null, usable, reason });
+  }
+  return out;
+}
+
+/** State as it was known at `knownAt` (an ISO instant; default: the start of `asOf`, UTC), restricted to events
+ *  before `asOf`. Used to prevent future-data leakage (issue 10 reproduced in 0f26696):
+ *   • periods: the latest version entered before knownAt; periods entered later are invisible;
+ *   • day fields: a value entered after knownAt is UNKNOWN in this view (we don't know what, if anything, was there);
+ *   • wearable nights: only those synced before knownAt.
+ *  Entries from older versions without entry times are kept by event date and counted in `recordTimeUnknown`, so an
+ *  evaluation can report or exclude them. */
+export function stateAsOf(s, asOf, { knownAt = `${asOf}T00:00:00.000Z` } = {}) {
+  const c = JSON.parse(JSON.stringify(s));
+  let unknownTime = 0;
+  c.periods = c.periods.map(p => {
+    if (p.versions?.length) { const v = p.versions.filter(x => x.at < knownAt).at(-1); return v ? { ...p, start: v.start, end: v.end, missedBefore: v.missedBefore, lengthConfirmed: v.lengthConfirmed, versions: undefined } : null; }
+    if (p.createdAt) return p.createdAt < knownAt ? p : null;
+    unknownTime++; return p;
+  }).filter(p => p && p.start < asOf).map(p => ({ ...p, end: p.end && p.end < asOf ? p.end : null }));
+  c.periods.sort((a, b) => a.start.localeCompare(b.start));
+  const days = {};
+  for (const [d, day] of Object.entries(c.days)) {
+    if (d >= asOf) continue;
+    const kept = {};
+    for (const [k, v] of Object.entries(day)) {
+      if (k === 'src' || k === 'rec' || k === 'hist') continue;
+      const hist = day.hist?.[k];
+      if (hist?.length) { const known = hist.filter(x => x.at < knownAt).at(-1); if (known) kept[k] = known.v; continue; } // value as known then
+      const at = day.rec?.[k];
+      if (at == null) { if (k in CATEGORIES || k === 'bleeding' || k === 'lh') unknownTime++; kept[k] = v; }
+      else if (at < knownAt) kept[k] = v;
+    }
+    if (Object.keys(kept).length) days[d] = kept;
+  }
+  c.days = days;
+  c.wearable.nights = c.wearable.nights.filter(n => n.night < asOf).map(n => { // the version known at knownAt (issue 5)
+    const { prior, ...cur } = n, known = [...(prior || []), cur].filter(x => !x.syncedAt || x.syncedAt < knownAt).at(-1);
+    return known || null;
+  }).filter(Boolean);
+  // Situations as known at knownAt. Keys set by older versions without a log entry have an unknown time: kept, counted.
+  const log = c.situationLog || [], logged = new Set(log.map(e => e.key)), sit = {};
+  for (const e of [...log].sort((a, b) => a.at.localeCompare(b.at))) if (e.at < knownAt) { if (e.on) sit[e.key] = true; else delete sit[e.key]; }
+  for (const k of Object.keys(c.situation || {})) if (!logged.has(k) && c.situation[k]) { sit[k] = true; unknownTime++; }
+  c.situation = sit;
+  c.pregnancies = (c.pregnancies || []).filter(p => p.endDate < asOf && (!p.endedAt || p.endedAt < knownAt));
+  if (c.pregnancy?.startedAt && c.pregnancy.startedAt >= knownAt) c.pregnancy = null;
+  c.recordTimeUnknown = unknownTime;
+  return c;
+}

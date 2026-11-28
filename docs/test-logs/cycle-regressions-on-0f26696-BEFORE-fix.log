@@ -1,0 +1,36 @@
+FAIL 1 no lock: two simultaneous saves never silently lose one (both kept, or one rejected as retryable CONFLICT)  — ["2026-10-01"]
+ok   1 no lock: a save racing a delete leaves nothing behind
+FAIL 1 no lock: withdrawing reminder consent can't be undone by a racing save  — {"consent":"2026-11-14T04:44:53.456Z","n":1}
+ok   2 simultaneous first opens share one key: reopen after a save decrypts
+FAIL 2 the second first-opener can save, and the result still decrypts
+FAIL 3 purge: pattern reminders for the purged category are deleted
+FAIL 3 purge: their origin text, delivery state and dismissals are gone from the data (and so from exports)
+ok   3 purge: no reminder for the purged category is delivered
+FAIL 3 turning a category off (no purge) disables its pattern reminders
+FAIL 4 explicit "none" inside an open period is not "observed menstruation"
+FAIL 4 spotting inside an open period is not "observed menstruation"
+FAIL 4 an unlogged later day of an open period is unknown, not observed
+ok   4 the logged start day is observed
+ok   4 confirmed end: days inside a confirmed start–end are observed
+FAIL 4 confirmed end: a day logged as spotting inside it is not observed menstruation
+FAIL 5 different moods in different cycles are never reported as one exact mood "in 3 of N"  — ["Mood: around this time you logged \"low\" in 3 of 4 cycles. Same today?"]
+FAIL 5 repeated logs in one cycle count once; ties and majorities use exact per-cycle counts  — Mood: around this time you logged "anxious" in 4 of 4 cycles. Same today?
+FAIL 6 tEnd = Infinity: never an "ok" night, coverage stays finite  — {"status":"ok","coverageMin":null}
+ok   6 NaNend is flagged and never usable
+ok   6 NaNstart is flagged and never usable
+FAIL 6 futureEnd is flagged and never usable
+ok   6 reversed is flagged and never usable
+ok   6 infStart is flagged and never usable
+FAIL 7 same value, new off-wrist warning (clean then off-wrist): the reading is not usable
+ok   7 same value, new off-wrist warning (off-wrist then clean): the reading is not usable
+FAIL 7 same value but different firmware: not treated as an exact duplicate  — {"received":2,"duplicates":1,"conflicts":0,"invalid":0,"outOfRange":0,"badTimestamp":0,"offWrist":0,"unknownMetric":0}
+FAIL 7 same value but different unit: not treated as an exact duplicate  — {"received":2,"duplicates":1,"conflicts":0,"invalid":0,"outOfRange":0,"badTimestamp":0,"offWrist":0,"unknownMetric":0}
+FAIL 7 same value but different end time: not treated as an exact duplicate  — {"received":2,"duplicates":1,"conflicts":0,"invalid":0,"outOfRange":0,"badTimestamp":0,"offWrist":0,"unknownMetric":0}
+FAIL 8 six baseline nights, a 19-night gap, three high nights: abstains (detected:false) and says why  — {"detected":true,"why":"A sustained rise was seen. This may be consistent with a past ovulation. It is not proof."}
+FAIL 9 a two-year-old HRV baseline is not called "your usual"  — {"ask":true,"key":"hrv:2026-11-13","night":"2026-11-13","value":30,"usual":50,"text":"Your overnight heart-rate variability was lower than your usual. Training, short sleep, alcohol, illness and stress can all do this, so it doesn't tell us how you feel. Want to log how you feel today?"}
+ok   9 after a device change, old-device nights are not used as the baseline
+FAIL 10 a period dated 1 Jan but entered 1 Jun is not visible as of 15 Jan
+ok   10 …and is visible once it had been entered
+FAIL 10 a later correction does not change what the forecast was as of an earlier date
+FAIL 10 a day backfilled later is unknown in earlier views
+23 FAILED

@@ -1,0 +1,7 @@
+FAIL S1 a "summary for a doctor" button is offered
+ok   S1 no summary is shown until the person asks
+ok   L1 with the LH research flag off, there is no LH field or opt-in
+FAIL L2 with the flag on, LH logging needs its own opt-in first
+ok   no JavaScript errors
+2 FAILED
+exit 1

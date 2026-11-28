@@ -1,0 +1,53 @@
+ok   a separate flag, off by default
+ok   due date from the first day of her last period = +280 days (ACOG CO 700)
+ok   she tells the app: the pregnant situation is on
+ok   a due date from her midwife or doctor can be entered directly
+ok   a due date from her midwife or doctor replaces the calculated one
+ok   needs a due date or a last-period date
+ok   last period in the future is refused
+ok   a due date more than 44 weeks away or long past is refused
+ok   no consent: refused
+ok   dates-only estimates pause in pregnancy (unchanged behaviour)
+ok   17 weeks and 1 day on 2026-06-30
+ok   second trimester (14+0 to 27+6, ACOG)
+ok   first trimester at 13+6
+ok   third trimester from 28+0
+ok   days to her due date
+ok   the due date is described as an estimate, and her scan date comes first
+ok   from 37 weeks: babies are considered term from 37 weeks (ACOG CO 579)
+ok   from 42 weeks: talk to your midwife or doctor today
+ok   urgent warning signs are always included, with a "get help now" instruction
+ok   includes baby moving less (don't wait) and bleeding or fluid leaking
+ok   sources are shown
+ok   no forbidden wording
+ok   not pregnant: null
+ok   pregnancy symptom categories exist (group "pregnancy")
+ok   swelling says sudden swelling of face or hands needs a call now
+ok   postpartum categories exist (bleeding after birth, healing pain)
+ok   after birth: pregnant off, postpartum on, kept in her history
+ok   days and weeks since birth
+ok   bleeding after birth is not a period, and usually settles within about 6 weeks
+ok   baby blues: common in the first 2 weeks; if low mood lasts longer, talk to someone
+ok   postnatal care: contact within 3 weeks and a full check by 12 weeks (ACOG CO 736)
+ok   periods: can take months to return, and pregnancy is possible before the first period
+ok   postpartum warning signs include heavy bleeding, chest pain and thoughts of harming yourself
+ok   no forbidden wording
+ok   heavy bleeding after birth logged: an urgent alert
+ok   right after: no estimate from pre-pregnancy cycles, with a plain reason
+ok   the gap that includes the pregnancy is never used as a cycle
+ok   estimates use only cycles after the pregnancy
+ok   the learning stage restarts too
+ok   postpartum caveat still shown
+ok   she is not asked why; pregnancy mode ends; not switched to postpartum
+ok   a gentle message with where to get support, no blame and no medical claims
+ok   the companion stays quiet for a while unless she switches it back on
+ok   estimates restart from her next periods
+ok   she can delete all pregnancy records
+ok   pregnancy: a weekly check-in on the day a new week starts
+ok   …offering her pregnancy categories (nausea) and Fine
+ok   …and not on other days
+ok   answer saved as she chose it (how strong), marked as from the companion
+ok   after birth: check-ins on days 3, 7, 10 and 14 (the baby-blues window), then weekly to 12 weeks
+ok   the postpartum check-in asks about mood and includes the privacy line
+ok   no forbidden wording
+ALL PASS (52)

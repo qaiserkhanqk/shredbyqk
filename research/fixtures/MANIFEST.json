@@ -1,0 +1,40 @@
+{
+  "synthetic": true,
+  "generator": "synth-1.0.0",
+  "builder": "research/tools/make-fixtures.mjs",
+  "note": "Invented data for testing code behaviour only. Not real people, not real devices, not evidence of accuracy.",
+  "files": {
+    "overnight-samples.csv": {
+      "sha256": "b3a513460c93f038b2aa0a6f6ce6786cea1ca31fb21a388d302b0ee1c5c88c5a",
+      "purpose": "Individual timestamped overnight wrist-skin samples, 3 nights, 10-minute interval"
+    },
+    "vendor-nightly.json": {
+      "sha256": "7bbaec65a30bb4970603a40193b1e734cae6856ab75ce5ea0fd45d8e528bf491",
+      "purpose": "One vendor-derived nightly value (not raw samples)"
+    },
+    "missing-timestamps-units.csv": {
+      "sha256": "e2a3128e81b3afce67f6504ddf87debc3c65274259d2123a0b80aad92d40ada0",
+      "purpose": "Rows with a missing timestamp, a missing unit, an unrecognised unit and an invalid UTC offset, plus one valid row"
+    },
+    "mixed-units.csv": {
+      "sha256": "f5086d16e6ba3f120cd04b28bbf8f34019d238fb7d0b86888a85446941863b06",
+      "purpose": "The same night reported partly in °C and partly in °F"
+    },
+    "overlap-conflict.csv": {
+      "sha256": "6d1ed9595efd22e2a8c8964ae62261874a0c549fc86b2f9e0c0722fd95a55814",
+      "purpose": "Re-upload overlap: one exact duplicate of overnight-samples.csv and one row with the same timestamp but a different value"
+    },
+    "device-tz-change.csv": {
+      "sha256": "c076a22341fa3212368677a2f6b11346461bc278b7feff02a873af88fc174f6b",
+      "purpose": "Device replacement (new serial, model and firmware from 2026-01-09) and a time-zone change to UTC+09:00 from 2026-01-11"
+    },
+    "annotations-with-correction.csv": {
+      "sha256": "139428a6cc5b0a0fdc371f74ec5729957c8a78e380c7baa83c4f9118e64dc871",
+      "purpose": "Bleeding entries with a later correction and a retraction; an illness flag"
+    },
+    "corrupted.csv": {
+      "sha256": "e17b5c4113923b2e9b5350ebdc0ecaa5051e518627391c42d75f5a05d6d45b98",
+      "purpose": "A broken file: an unterminated quote"
+    }
+  }
+}

@@ -7,6 +7,10 @@ Shred is tested at four levels. Each one catches a different kind of problem.
 | **1. Unit tests** | Maths and logic errors: angles, rep counting, bar speed, jump height, knee angle, gait events, quality checks. Synthetic data with a **known true answer**, so the error is measured exactly. | `npm test` | Every push (GitHub Actions). A failure blocks deploy. |
 | **2. Regression tests** | A bug that was fixed coming back. Replays recorded sessions in `tests/fixtures/` and checks the stored correct answer. | `npm test` (included) | Every push |
 | **3. End-to-end tests** | Integration problems: buttons that do nothing, screens that don't open, camera start-up, crashes. Runs the real app in Chrome with a fake camera. | `npm run test:e2e` | Every push (separate job; doesn't block deploy) |
+| **3a. Phone layout** | Sideways scrolling, controls under 24×24 px, input text under 16 px (iOS zoom), disabled pinch-zoom, on emulated iPhone SE, iPhone 13 and Pixel 7. | `node tests/mobile-layout.cjs` (part of `npm run test:e2e`) | With the end-to-end tests |
+| **3b. Other browsers** | The same browser tests in Firefox or WebKit (Safari's engine) | `npm run test:e2e:firefox`, `npm run test:e2e:webkit` (install the browsers first) | By hand; not run in the development environment |
+| **3c. Browser compatibility** | The oldest browser versions that can run the app, from MDN browser-compat-data | `npm run compat:audit -- --bcd …/data.json` → `docs/browser-compat.md` | After adding a new web feature |
+| **3d. Real phones** | Safari's real behaviour: storage, date pickers, notifications, install | `docs/real-phone-testing.md` (by hand) | Before any release to users |
 | **4. Validation study** | How accurate the app is on real people, compared with lab equipment. | `npm run validate results.csv` | Before making accuracy claims, then once a year |
 
 ## The workflow when a client reports a problem
@@ -83,6 +87,7 @@ Once approved:
   - pain traffic lights
   - phase progression (ACL return-to-sport symmetry)
   - camera measurements on known movements: shoulder 150°, knee 125°, forward bend 80°, 11 sit-to-stands, 18 calf raises, a 120 cm hop
+- **`tests/cycle.test.mjs`**, **`tests/cycle-integration.test.mjs`** and **`tests/cycle-nudges.test.mjs`:** (plus deletion and two-tab regressions from the audit in `docs/cycle-audit-9f87b83.md`) cycle tracking (including low-effort mode prompts and suggestions): irregular/long cycles, corrected and missing logs, spotting, sparse history, time zones, consent changes, reminders, bad sensor readings, device changes, deletion, cross-user isolation. `npm run eval:cycle` runs the synthetic evaluation harness (results are synthetic, never accuracy). See [CYCLE.md](CYCLE.md).
 - **`tests/sukoon.test.mjs`:**
   - every Quran passage is a real verse range, and the basmala is added only where it belongs
   - each binaural pair differs by exactly the beat rate

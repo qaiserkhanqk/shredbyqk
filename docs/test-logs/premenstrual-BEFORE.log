@@ -1,0 +1,13 @@
+FAIL module js/cycle/premenstrual.js exists  — Cannot find module '/home/user/shredbyqk/js/cycle/premenstrual.js' imported from /home/user/shredbyqk/tests/premenstrual.test.mjs
+FAIL module js/cycle/asks.js exists  — Cannot find module '/home/user/shredbyqk/js/cycle/asks.js' imported from /home/user/shredbyqk/tests/premenstrual.test.mjs
+FAIL 5 days before the period, compared with cycle days 5 to 12, in 3 cycles
+FAIL sources: ACOG guideline No. 7 (2023) and the DRSP (Endicott 2006), with DOIs
+FAIL the flag is off by default
+FAIL new optional symptoms: bloating, breast tenderness, headache, appetite  — ["pain","energy","mood","cravings","sleep","hotFlushes","focus","aches","heartRacing","dryness","bladder","nausea","heartburn","swelling","backPain","afterBirthBleeding","healingPain","training"]
+ok   …and each new symptom is off until she turns it on
+FAIL finding her pattern ran to the end  — TypeError: P.premenstrualPatterns is not a function     at file:///home/user/shredbyqk/tests/premenstrual.test.mjs:55:15
+FAIL when it does not apply ran to the end  — TypeError: P.premenstrualPatterns is not a function     at file:///home/user/shredbyqk/tests/premenstrual.test.mjs:80:75
+FAIL in the moment ran to the end  — TypeError: P.premenstrualNow is not a function     at file:///home/user/shredbyqk/tests/premenstrual.test.mjs:90:17
+FAIL mood: PMDD note ran to the end  — TypeError: P.premenstrualPatterns is not a function     at file:///home/user/shredbyqk/tests/premenstrual.test.mjs:107:15
+FAIL not too many questions ran to the end  — TypeError: A.askAllowed is not a function     at file:///home/user/shredbyqk/tests/premenstrual.test.mjs:115:43
+11 FAILED of 12

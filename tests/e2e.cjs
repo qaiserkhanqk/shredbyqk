@@ -1,7 +1,7 @@
 // End-to-end test: runs the real app in Chromium (fake camera) and clicks through every flow.
 // Serves the files via request interception, so no web server is needed.
 // Run: node tests/e2e.cjs   (needs Playwright + Chromium; not run in CI)
-const { chromium } = require('playwright');
+const { launch, openCycle: openCycleScreen } = require('./browser.cjs'); // E2E_BROWSER=chromium|firefox|webkit
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.task': 'application/octet-stream', '.webmanifest': 'application/manifest+json' };
@@ -9,15 +9,19 @@ let fails = 0;
 const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? '  — ' + detail : ''}`); if (!ok) fails++; };
 
 (async () => {
-  const b = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
+  const b = await launch({ chromiumArgs: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'], firefoxUserPrefs: { 'media.navigator.streams.fake': true, 'media.navigator.permission.disabled': true } });
   // Service workers are blocked: their script fetch bypasses request interception, which only exists in this test.
-  const ctx = await b.newContext({ viewport: { width: 400, height: 860 }, acceptDownloads: true, serviceWorkers: 'block' });
-  await ctx.route('https://shred.local/**', r => {
+  // WebKit has no fake-camera switch: grant camera access the way a person taps "Allow" (Chromium and Firefox do this
+  // through their fake-media options above). Without it the app correctly shows "Camera blocked".
+  const camPerm = b.browserType().name() === 'webkit' ? { permissions: ['camera', 'microphone'] } : {};
+  const ctx = await b.newContext({ viewport: { width: 400, height: 860 }, acceptDownloads: true, serviceWorkers: 'block', ...camPerm });
+  const serve = r => {
     let p = new URL(r.request().url()).pathname; if (p === '/') p = '/index.html';
     const f = path.join(ROOT, p);
     if (!fs.existsSync(f)) return r.fulfill({ status: 404, body: '' });
     r.fulfill({ status: 200, body: fs.readFileSync(f), headers: { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' } });
-  });
+  };
+  await ctx.route('https://shred.local/**', serve);
   // Simulated demo lifters are hidden in the app; this switch turns them on for the test run only.
   await ctx.addInitScript(() => { try { localStorage.setItem('qk_demo', '1'); } catch {} });
   // Quick log (weight, reps, how it felt) is the app's default. Most checks below exercise the camera flow, so they
@@ -33,8 +37,15 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
     else await p.click(`.tabs [data-tab=${id}]`);
   };
   await p.goto('https://shred.local/');
+  // The pose features need WebGL. Headless Firefox here has none, so in that case the honest message is checked
+  // instead, and the log says the pose analysis itself was NOT tested in this browser.
+  const webgl = await p.evaluate(() => { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); });
+  if (!webgl) console.log('note: this browser has no WebGL here, so camera and photo pose analysis were NOT tested; the no-WebGL message was checked instead');
   check('welcome: asks for a first name', await p.isVisible('#welcomeName'));
   await p.fill('#welcomeName', 'Sara'); await p.click('#welcomeBtn');
+  // Merge 2026-11-27: our optional "about you" step (js/onboarding.js) comes right after the name; skipped here.
+  check('first run: an optional "which best describes you?" step', await p.isVisible('#obAbout') && /describes you/i.test(await p.textContent('#obAbout')));
+  await p.click('#aboutNext');
   check('first run: asks what they want help with', await p.isVisible('[data-focus=train]') && await p.isVisible('[data-focus=recover]') && await p.isVisible('[data-focus=calm]'));
   await p.click('[data-focus=train]');
   check('first run: asks their goal', await p.isVisible('#obGoals') && (await p.$$('#obGoals [data-goal]')).length >= 10);
@@ -45,7 +56,9 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('first run: training → asks which days', await p.isVisible('#obDays'));
   await p.click('#obDays [data-day="1"]'); await p.click('#obDays [data-day="3"]'); await p.click('#obDone');
   check('today: greets by name', /Sara/.test(await p.textContent('#hello')));
-  check('navigation: 4 tabs (Today, Train, Food, Me)', (await p.$$('.tabs button')).length === 4 && /Food/.test(await p.textContent('.tabs')));
+  // Merge 2026-11-27: the bar also holds a Cycle tab, hidden unless she chose to track her periods, so this counts the
+  // visible tabs and checks the Cycle tab stays hidden for this user.
+  check('navigation: 4 tabs (Today, Train, Food, Me); the Cycle tab stays hidden', (await p.$$('.tabs button:not([hidden])')).length === 4 && /Food/.test(await p.textContent('.tabs')) && await p.$eval('.tabs [data-tab=cycle]', b => b.hidden));
   check('today: one next step with one main button', await p.isVisible('#nextCard') && (await p.textContent('#nextCta')).length > 0, await p.textContent('#nextTitle'));
   check('today: quick buttons for calm, brain and all tools', await p.isVisible('#today [data-go=calm-now]') && await p.isVisible('#today [data-go=brain]') && await p.isVisible('#today [data-go=body]'));
   await p.click('[data-feel=great]');
@@ -83,10 +96,11 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
 
   // 3. Live camera form check (fake camera, no person) starts without errors
   await p.click('[data-muscle=All]'); await p.click('[data-train=squat]'); await p.click('#startCam'); await p.waitForTimeout(5000);
-  check('camera: live squat session starts', await p.isVisible('#live') && (await p.textContent('#status')) === '');
+  if (webgl) check('camera: live squat session starts', await p.isVisible('#live') && (await p.textContent('#status')) === '');
+  else check('camera: no WebGL → says the browser needs graphics acceleration (WebGL)', /WebGL/.test(await p.textContent('#status')), await p.textContent('#status'));
   check('camera: Calibrate button shown for barbell lift', await p.isVisible('#calBtn'));
   await p.click('#calBtn'); await p.click('#viewport', { position: { x: 200, y: 200 } }); await p.click('#viewport', { position: { x: 200, y: 330 } });
-  check('calibration: two taps accepted', /Calibrated/.test(await p.textContent('#status')));
+  { const st = await p.textContent('#status'); check('calibration: two taps accepted', /Calibrated/.test(st), st); }
   check('camera: angle numbers hidden by default', !(await p.isVisible('#readout')));
   await p.click('#endLive'); await p.click('#nextSet'); await p.waitForTimeout(1500);
   check('camera: Next set restarts the camera with no setup sheet', await p.isVisible('#live') && !(await p.isVisible('#setup')));
@@ -126,7 +140,8 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await go('scan');
   await p.setInputFiles('#scanFront', process.argv[2] || path.join(ROOT, 'tests/pose.jpg')).catch(() => {});
   await p.waitForSelector('#toast:not([hidden])', { timeout: 60000 }).catch(() => {});
-  check('two-view scan: lunge photo rejected with advice', /knees|arms|feet|Stand/.test(await p.textContent('#toast')));
+  if (webgl) check('two-view scan: lunge photo rejected with advice', /knees|arms|feet|Stand/.test(await p.textContent('#toast')), await p.textContent('#toast'));
+  else check('two-view scan: no WebGL → says the browser needs graphics acceleration (WebGL)', /WebGL/.test(await p.textContent('#toast')), await p.textContent('#toast'));
 
   // 6. Rehab clinic: normal path (knee pain at the front) and an emergency red-flag path (back pain)
   await go('rehab'); await p.click('[data-area=Knee]'); await p.click('[data-cond=pfp]');
@@ -251,9 +266,164 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('load: weekly load shown in Progress', /300 points/.test(await p.textContent('#loadNow')) && !!(await p.$('#loadChart svg')));
   await go('progress'); await tap('#studioCard summary'); await p.waitForTimeout(400);
   check('studio: lists coaching lines', /of \d+ lines recorded/.test(await p.textContent('#studioCount')));
+  if (!(await p.evaluate(() => !!window.MediaRecorder))) {
+    // Playwright's Linux WebKit build has no MediaRecorder (Safari has had it since 14.1). Recording itself can't be
+    // tested in that browser, so check the honest message instead and say so in the log.
+    console.log('note studio: this browser build has no MediaRecorder, so recording itself was NOT tested here');
+    await tap('#studioList [data-act=rec]'); await p.waitForTimeout(400);
+    check('studio: a browser that can\'t record says so (not "allow microphone")', /can't record audio/.test(await p.textContent('#toast')), await p.textContent('#toast'));
+  } else {
   await tap('#studioList [data-act=rec]'); await p.waitForTimeout(1200); await tap('#studioList [data-act=rec]'); await p.waitForTimeout(600);
   check('studio: record with the microphone and save a clip', /1 of \d+ lines recorded/.test(await p.textContent('#studioCount')) && /recorded/.test(await p.textContent('#studioList')));
+  }
 
+  // 8. Cycle tracking prototype (synthetic data): off by default, consent-gated, encrypted, deletable
+  p.on('dialog', d => d.accept());
+  const dayStr = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const cy = async (sel, ms = 350) => { await tap(sel); await p.waitForTimeout(ms); };
+  await go('body');
+  check('cycle: hidden by default (flag off)', !(await p.isVisible('#cycleTile')));
+  await go('progress'); await tap('#diagCard summary'); await tap('#flagCycle'); await tap('#diagCard summary');
+  await go('body'); check('cycle: tile shown once the prototype flag is on', await p.isVisible('#cycleTile'));
+  await p.click('[data-go=cycle]'); await p.waitForSelector('#cyConsent');
+  check('cycle: consent screen first, says no sharing and not contraception', /not contraception/.test(await p.textContent('#cyConsent')) && /Nothing is shared/.test(await p.textContent('#cyConsent')));
+  await cy('[data-act=consent]');
+  check('cycle: consent needs the box ticked', await p.isVisible('#cyConsent'));
+  await p.check('#cyAgree'); await cy('[data-act=consent]', 600); await p.waitForSelector('#cyEstimate');
+  check('cycle: no history → "not enough data", no range', /Not enough data/.test(await p.textContent('#cyHeadline')) && !(await p.$('.cy-range')));
+  for (const n of [-161, -132, -101, -71, -41, -10]) { await p.fill('#cyDate', dayStr(n)); await cy('[data-act=logStart]'); }
+  const detail = await p.textContent('#cyDetail');
+  check('cycle: 5 cycles → dates from past cycles, explained, never called a prediction interval', /From your past cycles/.test(await p.textContent('#cyHeadline')) && /between 29 and 31 days/.test(detail) && await p.isVisible('.cy-range') && !/Estimated range/.test(await p.textContent('#cyEstimate')), detail);
+  check('cycle: "may come earlier or later" is visible without opening any section', await p.isVisible('#cyOutside') && /earlier or later/.test(await p.textContent('#cyOutside')));
+  await p.fill('#cyDate', dayStr(-3)); await cy('[data-act=logSpotting]');
+  check('cycle: spotting logged without changing the estimate', (await p.textContent('#cyDetail')) === detail);
+  await tap('#cyHistory summary');
+  await p.$eval('#cyHistory [data-pid] [data-edit=start]', (el, v) => { el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); }, dayStr(-16)); await p.waitForTimeout(500);
+  check('cycle: correcting the latest start updates the estimate', /between 25 and 31 days/.test(await p.textContent('#cyDetail')), await p.textContent('#cyDetail'));
+  await tap('#cySettings summary'); await cy('#cySettings [data-cat=energy]', 500);
+  await p.selectOption('#cyLog [data-sym=energy]', 'low'); await cy('[data-act=saveDay]');
+  check('cycle: optional symptom (energy) logged after switching it on', /\(current\)[\s\S]*energy low/.test(await p.textContent('#cyHistory')));
+  check('cycle: symptom-pattern findings hidden by default (research flag off)', !(await p.$('#cyPatterns')) && !(await p.$('#cyInsight')));
+  await cy('#cySettings [data-flag=patternInsights]', 500);
+  check('cycle: research flag on → pattern card shown, labelled unvalidated', /Energy: not enough data/.test(await p.textContent('#cyPatterns')) && /unvalidated/.test(await p.textContent('#cyPatterns')));
+  await cy('[data-act=remindersOn]', 500); await cy('[data-act=addRem]', 500);
+  check('cycle: reminder added with its next time and reason', (await p.$$('#cyReminders [data-rid]')).length === 1 && /You asked for a daily reminder/.test(await p.textContent('#cyReminders')));
+  await cy('#cyReminders [data-act=pauseRem]', 500);
+  check('cycle: reminder paused', /Resume/.test(await p.textContent('#cyReminders [data-rid]')));
+  await cy('#cyReminders [data-act=delRem]', 500);
+  check('cycle: reminder deleted', (await p.$$('#cyReminders [data-rid]')).length === 0);
+  await cy('[data-act=wearableOn]', 1500);
+  const wtxt = await p.textContent('#cyWearable');
+  check('cycle: demo wearable labelled synthetic, skin temp not core temp, DS07 unavailable', /synthetic demo/.test(wtxt) && /°C/.test(wtxt) && /Not core body temperature/.test(wtxt) && /SWL DS07 \(not available\)/.test(wtxt), wtxt.slice(0, 200));
+  await cy('#cySettings [data-flag=phaseEducation]', 500);
+  check('cycle: phase education (opt-in) has a "not enough data" state, no day-14 assumption', /Not enough data|Menstruation/.test(await p.textContent('#cyPhase')) && !/day 14/i.test(await p.textContent('#cyPhase')));
+  // Encrypted record now lives in IndexedDB (transactional store); read it raw, as an attacker with storage access would.
+  const rawRecord = pg => pg.evaluate(async () => { const m = await import('/js/cycle/store.js'); return m.indexedDbStorage().snapshot(localStorage.getItem('shred_cycle_uid')); });
+  const ls = await p.evaluate(() => Object.fromEntries(Object.entries(localStorage)));
+  const rec = await rawRecord(p);
+  check('cycle: stored encrypted in IndexedDB (no dates or words in the stored value)', !!rec.text && /AES-GCM/.test(rec.text) && !/20\d\d-|spotting|energy/.test(rec.text));
+  check('cycle: no cycle record left in localStorage', !Object.keys(ls).some(k => k.startsWith('shred_cycle_v1:')));
+  check('cycle: nothing cycle-related in the main store or error log', !/spotting|period|energy|cycle/i.test((ls.shred_qk_v1 || '') + (ls.shred_errors_v1 || '')));
+  const [cdl] = await Promise.all([p.waitForEvent('download'), tap('[data-act=export]')]);
+  const exp = JSON.parse(fs.readFileSync(await cdl.path(), 'utf8'));
+  check('cycle: export contains the user\'s data', exp.format === 'shred-cycle-export' && exp.data.periods.length === 6);
+  await cy('[data-act=deleteAll]', 800);
+  const after = await rawRecord(p);
+  check('cycle: delete all → data gone and consent asked again', await p.isVisible('#cyConsent') && after.text === null);
+
+  // Two tabs (audit of 9f87b83, findings 1.1 and 1.3): no lost updates, and a deletion can't be undone by another tab
+  await p.check('#cyAgree'); await cy('[data-act=consent]', 600);
+  const q = await ctx.newPage(); q.on('dialog', d => d.accept()); q.on('pageerror', e => errs.push('tab2: ' + e.message));
+  await q.goto('https://shred.local/'); await openCycleScreen(q); await q.waitForSelector('#cyLog');
+  await p.fill('#cyDate', dayStr(-40)); await cy('[data-act=logStart]', 500);
+  await q.fill('#cyDate', dayStr(-10)); await q.click('[data-act=logStart]'); await q.waitForTimeout(600);
+  await p.waitForTimeout(400); if (!(await p.$('#cyHistory[open]'))) await tap('#cyHistory summary');
+  const both = await p.$$eval('#cyHistory [data-edit=start]', els => els.map(e => e.value).sort());
+  check('two tabs: entries from both tabs are kept (no lost update)', JSON.stringify(both) === JSON.stringify([dayStr(-40), dayStr(-10)].sort()), JSON.stringify(both));
+  if (!(await p.$('#cySettings[open]'))) await tap('#cySettings summary');
+  await cy('[data-act=deleteAll]', 800);
+  await q.waitForTimeout(600);
+  check('two tabs: the other tab clears itself after a delete elsewhere', await q.isVisible('#cyConsent'));
+  const slotsAfter = (await rawRecord(p)).text === null ? 0 : 1;
+  await p.reload(); await openCycleScreen(p); await p.waitForTimeout(700);
+  check('two tabs: after delete + reload, nothing comes back and no "can\'t unlock" error', slotsAfter === 0 && await p.isVisible('#cyConsent') && !(await p.$('#cyUnavailable')));
+  await q.close();
+  // Recovery path (finding 1.4): unreadable data → reset button → consent screen
+  await p.evaluate(async () => { // write an unreadable record straight into IndexedDB
+    const uid = localStorage.getItem('shred_cycle_uid'), m = await import('/js/cycle/store.js'), snap = await m.indexedDbStorage().snapshot(uid);
+    await new Promise((res, rej) => { const r = indexedDB.open('shred_cycle_keys', 2); r.onsuccess = () => { const db = r.result, t = db.transaction('records', 'readwrite');
+      t.objectStore('records').put(JSON.stringify({ v: 2, gen: snap.gen, rev: 1, alg: 'AES-GCM-256', iv: 'AAAAAAAAAAAAAAAA', ct: 'AAAAAAAAAAAAAAAAAAAAAA==' }), uid); t.oncomplete = () => { db.close(); res(); }; t.onerror = rej; }; r.onerror = rej; });
+  });
+  await p.reload(); await openCycleScreen(p); await p.waitForTimeout(700);
+  const stuck = await p.isVisible('#cyUnavailable') && await p.isVisible('[data-act=resetStorage]');
+  await cy('[data-act=resetStorage]', 800);
+  check('unreadable data: a reset button is offered and returns to the consent screen', stuck && await p.isVisible('#cyConsent'));
+
+
+  // Purge in the real UI (issue 3 reproduced in 0f26696): a mood pattern reminder and its text disappear from the
+  // reminders list, the due list and the export when mood history is purged.
+  await p.check('#cyAgree'); await cy('[data-act=consent]', 600);
+  await p.evaluate(async (d) => {
+    const S = await import('/js/cycle/store.js'), M = await import('/js/cycle/model.js'), R = await import('/js/cycle/reminders.js');
+    const uid = localStorage.getItem('shred_cycle_uid');
+    const repo = await S.openCycleRepo({ storage: S.indexedDbStorage(), keys: S.indexedDbKeys(), userId: uid });
+    await repo.update(s => { s.settings.quietHours = { start: '00:00', end: '00:00' }; // no quiet hours, so the 00:00 reminder is due now
+      M.setCategory(s, 'mood', true); M.setScopeConsent(s, 'reminders', true); M.logPeriodStart(s, d.start, { today: d.today });
+      M.logDay(s, d.yday, { mood: 'irritable' }, { today: d.today });
+      R.addReminder(s, { kind: 'pattern', time: '00:00', cycleDay: 3, category: 'mood', origin: 'You logged low, anxious or irritable mood around cycle days 2–4 in 3 of your last 3 recorded cycles.' }); });
+  }, { start: dayStr(-2), yday: dayStr(-1), today: dayStr(0) });
+  await p.reload(); await openCycleScreen(p); await p.waitForTimeout(800);
+  const seeded = /one of your patterns/.test(await p.textContent('#cyReminders')) && await p.isVisible('#cyDue');
+  if (!(await p.$('#cySettings[open]'))) await tap('#cySettings summary');
+  await cy('#cySettings [data-cat=mood]', 900); // untick → confirm (accepted) = stop and delete
+  const remText = await p.textContent('#cyReminders');
+  const [pdl] = await Promise.all([p.waitForEvent('download'), tap('[data-act=export]')]);
+  const pexp = fs.readFileSync(await pdl.path(), 'utf8');
+  check('purge (browser): mood pattern reminder shown before purge, gone from reminders, due list and export after',
+    seeded && !/one of your patterns/.test(remText) && !(await p.$('#cyDue')) && !/irritable/.test(pexp) && !/"category":\s*"mood"/.test(pexp), JSON.stringify({ seeded }));
+
+  // Fresh contexts for concurrency tests (synthetic data only)
+  const newCtx = async ({ noLocks = false } = {}) => {
+    const c = await b.newContext({ viewport: { width: 400, height: 860 }, acceptDownloads: true, serviceWorkers: 'block' });
+    await c.route('https://shred.local/**', serve);
+    await c.addInitScript(() => localStorage.setItem('shred_flags_v1', JSON.stringify({ cycleTracking: true })));
+    if (noLocks) await c.addInitScript(() => Object.defineProperty(Navigator.prototype, 'locks', { get: () => undefined, configurable: true }));
+    return c;
+  };
+  const openCycle = async c => { const pg = await c.newPage(); pg.on('dialog', d => d.accept()); pg.on('pageerror', e => errs.push('ctx: ' + e.message));
+    await pg.goto('https://shred.local/'); await openCycleScreen(pg); await pg.waitForTimeout(500); return pg; };
+  const starts = pg => pg.evaluate(async () => { const S = await import('/js/cycle/store.js'); const uid = localStorage.getItem('shred_cycle_uid');
+    const r = await S.openCycleRepo({ storage: S.indexedDbStorage(), keys: S.indexedDbKeys(), userId: uid }); return r.read().periods.map(x => x.start).sort(); });
+
+  // Simultaneous first opens (issue 2 reproduced in 0f26696): two tabs open cycle tracking for the first time at once
+  for (const noLocks of [false, true]) {
+    const tag = noLocks ? '(Web Locks removed)' : '(Web Locks available)';
+    const c = await newCtx({ noLocks });
+    const [A, B] = await Promise.all([openCycle(c), openCycle(c)]);
+    const ids = await Promise.all([A, B].map(pg => pg.evaluate(() => localStorage.getItem('shred_cycle_uid'))));
+    await A.check('#cyAgree'); await A.click('[data-act=consent]'); await A.waitForTimeout(700);
+    await B.waitForSelector('#cyLog', { timeout: 5000 }).catch(() => {});
+    await B.fill('#cyDate', dayStr(-20)); await B.click('[data-act=logStart]'); await B.waitForTimeout(600);
+    await A.reload(); await openCycleScreen(A); await A.waitForTimeout(700);
+    check(`simultaneous first opens ${tag}: one user ID, one key; a save from the second tab decrypts after reload`,
+      ids[0] === ids[1] && !(await A.$('#cyUnavailable')) && JSON.stringify(await starts(A)) === JSON.stringify([dayStr(-20)]), JSON.stringify(ids));
+    // Simultaneous saves (issue 1): both tabs press "Period started" at the same moment
+    await A.fill('#cyDate', dayStr(-80)); await B.fill('#cyDate', dayStr(-50));
+    await Promise.all([A.click('[data-act=logStart]'), B.click('[data-act=logStart]')]); await A.waitForTimeout(900);
+    const got = await starts(A);
+    check(`simultaneous saves ${tag}: neither period is lost`, JSON.stringify(got) === JSON.stringify([dayStr(-80), dayStr(-50), dayStr(-20)].sort()), JSON.stringify(got));
+    // A redraw caused by the other tab must not change what this tab has typed but not saved (defect found here)
+    await B.fill('#cyDate', dayStr(-95)); await A.fill('#cyDate', dayStr(-3)); await A.click('[data-act=logSpotting]'); await B.waitForTimeout(900);
+    check(`other tab saves while this tab is typing ${tag}: the typed date is kept`, (await B.inputValue('#cyDate')) === dayStr(-95), await B.inputValue('#cyDate'));
+    // Simultaneous save + delete: deletion wins, nothing written back
+    await B.fill('#cyDate', dayStr(-110));
+    if (!(await A.$('#cySettings[open]'))) { await A.$eval('#cySettings summary', e => e.scrollIntoView({ block: 'center' })); await A.click('#cySettings summary'); }
+    await Promise.all([A.click('[data-act=deleteAll]'), B.click('[data-act=logStart]')]); await A.waitForTimeout(900);
+    const rec2 = await rawRecord(A);
+    await B.reload(); await openCycleScreen(B); await B.waitForTimeout(700);
+    check(`simultaneous save + delete ${tag}: nothing survives, both tabs ask for consent again`, rec2.text === null && await B.isVisible('#cyConsent') && !(await B.$('#cyUnavailable')));
+    await c.close();
+  }
   // 8. Sukoon calm session (recitation is blocked here, so the session must fall through to the dua)
   for (const host of ['everyayah.com', 'verses.quran.com', 'verses.quran.foundation']) await ctx.route(`https://${host}/**`, r => r.fulfill({ status: 200, body: '', headers: { 'content-type': 'audio/mpeg' } }));
   await go('calm');
@@ -266,7 +436,10 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('sukoon: tension 10 → support with emergency numbers first', /Get support now/.test(await p.textContent('#calmSheetBody')) && /116 123/.test(await p.textContent('#calmSheetBody')));
   await p.click('#cCont'); await p.waitForTimeout(1500);
   check('sukoon: breathing pacer runs', await p.isVisible('#calmPacer') && /Breathe (in|out)/.test(await p.textContent('#calmWord')));
-  await p.click('#calmSkip'); await p.waitForTimeout(1500);
+  await p.click('#calmSkip');
+  // 2026-11-28: waits up to 10 s, not a fixed 1.5 s. Chromium and WebKit report the failed audio at once; Firefox
+  // reports nothing, so the link comes from the 8 s safety net (STALL_MS in js/calm.js; see tests/sukoon-fallback.cjs).
+  await p.waitForSelector('#calmLinks a[href="https://quran.com/94/1-8"]', { timeout: 10000 }).catch(() => {});
   check('sukoon: recitation failure offers the passage on Quran.com', await p.isVisible('#calmLinks a[href="https://quran.com/94/1-8"]'));
   await p.click('#calmSkip');
   check('sukoon: dua shown with its source', await p.isVisible('#calmDua') && /Bukhari 6369/.test(await p.textContent('#calmDua')));
@@ -421,10 +594,16 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   await p.waitForSelector('#mTap:not([hidden])', { timeout: 12000 }).catch(() => {});
   check('camera pulse: after 8 s with no finger, explains and offers tap-along', await p.isVisible('#mTap') && /finger|dark/i.test(await p.textContent('#mStatus')), await p.textContent('#mStatus'));
   await p.click('#mTap');
+  // 2026-11-28: the browser's own tap times are recorded, because the gap between taps is the 750 ms wait PLUS the
+  // time each click takes, which is longer in WebKit and Firefox (the old check expected 80 bpm and failed there with
+  // a correct 76). The app must match the pulse those taps really give, to within 1 bpm, and the taps must really
+  // have been about 750 ms apart (70-82 bpm).
+  await p.evaluate(() => { window.__taps = []; document.querySelector('#tpArea').addEventListener('pointerdown', e => window.__taps.push(e.timeStamp), true); });
   for (let i = 0; i < 12; i++) { await p.click('#tpArea'); await p.waitForTimeout(750); }
   await p.waitForSelector('#tpDone:not([hidden])', { timeout: 12000 }).catch(() => {});
   const tapBpm = parseInt(await p.textContent('#tpCount'));
-  check('tap-along pulse: 12 taps 750 ms apart → about 80 bpm', Math.abs(tapBpm - 80) <= 3, `${tapBpm}`);
+  const expectBpm = await p.evaluate(() => { const t = window.__taps, g = t.slice(1).map((x, i) => x - t[i]).sort((a, b) => a - b); return Math.round(60000 / g[g.length >> 1]); });
+  check('tap-along pulse: 12 taps about 750 ms apart → the pulse those taps give (±1 bpm)', Math.abs(tapBpm - expectBpm) <= 1 && expectBpm >= 70 && expectBpm <= 82, `app ${tapBpm}, taps ${expectBpm}`);
   await p.click('#tpDone');
   check('tap-along pulse: saved to Body check', /\d+ bpm/.test(await p.textContent('#vHrLast')));
   await tap('#vHr'); await p.waitForTimeout(1500); await p.click('#mCancel');
@@ -485,7 +664,8 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   check('progression: first weighted set asks for a starting weight', /First time/.test(await p.textContent('#rxLine')), await p.textContent('#rxLine'));
   await p.click('#startCam'); await p.waitForTimeout(1500);
   const spoken = await p.textContent('[data-coach-caption]');
-  check('set start: QK tells you what to do ("Bar close to your shins ... Brace, and go.")', /Bar close to your shins/.test(spoken) && /Brace, and go/.test(spoken), spoken);
+  // 2026-11-28: needs WebGL, like the other camera checks (the camera coaching can't start without it; see the note above).
+  if (webgl) check('set start: QK tells you what to do ("Bar close to your shins ... Brace, and go.")', /Bar close to your shins/.test(spoken) && /Brace, and go/.test(spoken), spoken);
   check('no "NSCA" anywhere on screen', !/NSCA/.test(await p.textContent('body')));
   await p.click('#endLive'); await p.waitForTimeout(400);
   if (await p.isVisible('#doneBtn')) await p.click('#doneBtn');

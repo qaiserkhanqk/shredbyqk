@@ -1,0 +1,8 @@
+FAIL module research/server/tls.js exists  — Cannot find module '/home/user/shredbyqk/research/server/tls.js' imported from /home/user/shredbyqk/research/tests/https.test.mjs
+FAIL local certificate ran to the end  — TypeError: T.makeLocalCert is not a function     at file:///home/user/shredbyqk/research/tests/https.test.mjs:21:15
+FAIL loading ran to the end  — TypeError: T.loadTls is not a function     at file:///home/user/shredbyqk/research/tests/https.test.mjs:31:44
+(node:297) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+FAIL start() reports an https:// address
+FAIL serving ran to the end  — Error: ENOENT: no such file or directory, open '/tmp/rs-tls-Cp7RFq/cert.pem'     at Object.openSync (node:fs:560:18)
+5 FAILED of 5

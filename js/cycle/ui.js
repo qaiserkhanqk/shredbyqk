@@ -1,0 +1,633 @@
+// Cycle tracking screen. Talks only to the encrypted repository. Cycle content is never passed to the coach
+// voice (which may use a remote TTS endpoint), the main app store, the session recorder or the error log.
+import * as M from './model.js';
+import { estimateNext, typicalPeriodLength, DISCLAIMER } from './predict.js';
+import { findPatterns, patternStatus, evidenceText, insightForToday, forecastCheckins } from './patterns.js';
+import { phaseInfo, PHASE_EDUCATION } from './phase.js';
+import { KINDS, addReminder, updateReminder, deleteReminder, nextFire, dueNow, markDelivered, notificationContent } from './reminders.js';
+import { MockWearable, SwlDs07Adapter, HumeBandAdapter, normalise, summariseNights, mergeNights, nightTable, METRICS } from './wearables.js';
+import { retrospectiveShift } from './tempshift.js';
+import { openCycleRepo, indexedDbKeys, indexedDbStorage, migrateLegacyLocalStorage, webLock, resetCycleStorage } from './store.js';
+import { today as localToday, localMinutes, addDays, diffDays, human, deviceTimeZone } from './dates.js';
+import { readFlags, setFlag, FLAG_DEFS } from './flags.js';
+import { clinicianSummary, summaryText, SUMMARY_MONTHS } from './summary.js';
+import { learningStage } from './learning.js';
+import { companionToday, answerCheckIn, dismissCompanion, setCompanionName, companionName } from './companion.js';
+import { adjustedEstimate, cardLines } from './adjust.js';
+import { periodCheckIn, answerPeriodCheckIn, missedLogQuestion, answerMissedLog, gapReview, confirmGap, dismissGapReview, answerNotYet, answerSpotting } from './checkins.js';
+import * as PG from './pregnancy.js';
+import { premenstrualPatterns, premenstrualNow, saveQuickLog, dismissPremenstrual, SOURCES as PM_SOURCES } from './premenstrual.js';
+import { askLevel, setAskLevel, ASK_LEVELS } from './asks.js';
+import { ZARA_WELCOME } from '../onboarding.js';
+import { midlifeObservations, SOURCES as MIDLIFE_SOURCES, INTRO as MIDLIFE_INTRO } from './midlife.js';
+import { comfortSuggestions, pendingComfortQuestions, logComfortTry, answerComfort, deleteComfort, ANSWERS, REVIEW_STATUS } from './comfort.js';
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const MSG = {
+  NO_CONSENT: 'Please agree to the terms first.', CATEGORY_OFF: 'Turn this category on in settings first.', FUTURE_DATE: 'That date is in the future.',
+  END_BEFORE_START: 'The end can\'t be before the start.', OVERLAP: 'That overlaps a period you already logged. Edit that one instead.', INVALID_DATE: 'Choose a valid date.',
+  NOT_VERIFIED: 'This device isn\'t available: its integration is not verified.', CRYPTO_UNAVAILABLE: 'This browser can\'t encrypt data, so cycle tracking is unavailable here.',
+  DECRYPT_FAILED: 'Your saved cycle data could not be unlocked on this device.', CORRUPT: 'Your saved cycle data is damaged.',
+  CONFLICT: 'Another tab kept saving at the same moment, so this change was not saved. Please try again.', STORAGE_NOT_ATOMIC: 'This browser can\'t store cycle data safely.',
+  LH_OFF: 'Turn on ovulation test logging in settings first.', LMP_BEFORE_LOGGED_PERIOD: 'You logged a period after that date. Check the first day of your last period, or correct your history first.', OUT_OF_RANGE: 'That date doesn\'t look right. Check it and try again.', INVALID_INPUT: 'Please fill in one of the dates.',
+  STALE_SESSION: 'Your cycle data was changed or deleted in another tab. The screen has been refreshed; nothing was saved.', KEYSTORE_UNAVAILABLE: 'Secure storage is blocked in this browser (private mode?).',
+};
+let repo = null, root = null, toast = () => {}, openErr = null, notified = new Set(), timer = null;
+let summaryMonths = null; // the doctor summary is shown only after the person asks; it is rebuilt on each render and never stored
+const flags = () => readFlags();
+const now = () => ({ today: localToday(), nowMin: localMinutes(Date.now(), deviceTimeZone()) });
+
+export async function initCycle(opts) {
+  root = opts.root; toast = opts.toast;
+  root.addEventListener('click', onClick); root.addEventListener('change', onChange);
+  // Never swap the page under her finger: a redraw between press and release means the browser fires no click, so
+  // her tap was silently lost (found investigating the intermittent Firefox two-tab failures, 2026-11-27). A redraw
+  // asked for by another tab waits until the press ends, then runs after the click has been handled.
+  root.addEventListener('pointerdown', () => { pressing = true; clearTimeout(pressTimer); pressTimer = setTimeout(release, 5000); }, true);
+  for (const k of ['pointerup', 'pointercancel']) window.addEventListener(k, release, true);
+  // Another tab saved or deleted: re-read instead of overwriting. IndexedDB writes don't fire 'storage' events,
+  // so tabs tell each other through a BroadcastChannel; 'storage' still covers a cleared localStorage.
+  if (typeof BroadcastChannel !== 'undefined') { channel = new BroadcastChannel('shred-cycle'); channel.onmessage = () => fromOtherTab(); }
+  window.addEventListener('storage', e => {
+    if (e.key !== null && !/^shred_cycle_/.test(e.key)) return; // null = storage cleared
+    if (e.key === null || e.key === 'shred_cycle_uid') reopen();
+    fromOtherTab();
+  });
+}
+let pressing = false, pendingRedraw = false, pressTimer = null;
+function fromOtherTab() { if (pressing) { pendingRedraw = true; return; } if (root.closest('.screen.on')) renderCycle(); }
+function release() {
+  clearTimeout(pressTimer);
+  if (!pressing) return;
+  pressing = false;
+  if (pendingRedraw) { pendingRedraw = false; setTimeout(fromOtherTab, 0); } // after this tap's click has run
+}
+let channel = null;
+const storage = indexedDbStorage(), keys = indexedDbKeys();
+/** The device's user ID, created atomically in IndexedDB (an existing localStorage ID is kept), mirrored to localStorage. */
+async function deviceUserId() {
+  const id = await storage.userId(localStorage.getItem('shred_cycle_uid') || undefined);
+  if (localStorage.getItem('shred_cycle_uid') !== id) localStorage.setItem('shred_cycle_uid', id);
+  return id;
+}
+const repoOpts = async () => { const userId = await deviceUserId(); return { storage, keys, userId, lock: webLock(`shred-cycle-${userId}`), notify: () => channel?.postMessage('changed') }; };
+async function reopen() { repo = null; openErr = null; }
+async function ensureRepo() {
+  if (repo && repo.userId !== localStorage.getItem('shred_cycle_uid')) repo = null; // user switched elsewhere
+  if (repo || openErr) return;
+  try {
+    const o = await repoOpts();
+    await migrateLegacyLocalStorage({ storage, userId: o.userId }); // records from earlier prototype versions
+    repo = await openCycleRepo(o);
+  } catch (e) { openErr = e.code || 'UNKNOWN'; }
+}
+async function act(fn, ok) {
+  try { await repo.update(s => fn(s, now().today)); if (ok) toast(ok); }
+  catch (e) {
+    toast(MSG[e.code] || 'That didn\'t work. Nothing was changed.'); // codes only: no data in messages
+    if (e.code === 'STALE_SESSION') { await reopen(); return renderCycle(); }
+  }
+  render();
+}
+
+export async function renderCycle() {
+  if (!root) return;
+  if (!flags().cycleTracking) { root.innerHTML = '<p class="muted small">This prototype is switched off.</p>'; return; }
+  await ensureRepo();
+  if (repo && !(await repo.refresh().catch(e => { openErr = e.code || 'UNKNOWN'; repo = null; return true; }))) { await reopen(); await ensureRepo(); }
+  if (openErr) {
+    const canReset = ['DECRYPT_FAILED', 'CORRUPT'].includes(openErr);
+    root.innerHTML = `<div class="card stack" id="cyUnavailable"><b>Cycle tracking is unavailable</b><p class="muted small">${esc(MSG[openErr] || 'Secure storage could not be opened.')}</p>
+      ${canReset ? '<p class="muted small">You can reset cycle tracking on this device. This deletes the unreadable data and its key; it can\'t be recovered.</p><button class="stop" type="button" data-act="resetStorage">Reset cycle data on this device</button>' : ''}</div>`;
+    return;
+  }
+  // The re-read above may have finished while her finger is down (it started just before the press): wait for it.
+  if (pressing) { pendingRedraw = true; return; }
+  render();
+  clearInterval(timer); timer = setInterval(() => { if (root.closest('.screen.on')) notifyDue(); }, 60e3);
+}
+
+function render() {
+  const s = repo.read(), { today, nowMin } = now(), f = flags();
+  if (!M.hasConsent(s)) { root.innerHTML = consentHTML(f); return; }
+  const open = [...root.querySelectorAll('details[id][open]')].map(d => d.id); // keep sections the user opened
+  const unsaved = unsavedInputs(); // a redraw (e.g. another tab saved) must never change what the person typed
+  const est = estimateNext(s, today);
+  const tempShift = f.temperatureResearch && est.lastStart ? retrospectiveShift(s, est.lastStart, addDays(today, 1)) : null;
+  // One check-in a day (product owner, 2026-11-27): on a day she gets "Has your period started?" or her premenstrual
+  // questions, Zara does not ask as well.
+  const pmNow = f.premenstrualPatterns ? premenstrualNow(s, today, est) : null;
+  const askedToday = !!pmNow || !!periodCheckIn(s, today);
+  root.innerHTML = [banner(), f.companion ? zaraFirstHTML(s, today) : '', f.companion && !askedToday ? companionHTML(s, today, est, f) : '', f.premenstrualPatterns ? premenstrualHTML(s, today, pmNow) : '', f.pregnancyMode ? pregnancyCardsHTML(s, today) : '', summaryMonths ? summaryHTML(s, today) : '', promptsHTML(s, est, today), dueHTML(s, est, today, nowMin), estimateHTML(s, est), f.temperatureEstimate ? adjustHTML(s, today) : '', learningHTML(s, today), f.midlifeMode && s.situation?.perimenopause ? midlifeHTML(s, today) : '', logHTML(s, today), f.comfortSuggestions ? comfortHTML(s, today) : '', f.patternInsights ? insightHTML(s, today) : '',
+    f.phaseEducation ? phaseHTML(s, today, tempShift, est) : '', historyHTML(s), f.patternInsights ? patternsHTML(s, today, f) : '', remindersHTML(s, est, today, nowMin),
+    wearableHTML(s, today, f, tempShift), situationHTML(s, f), settingsHTML(s, f)].join('');
+  for (const id of open) { const d = root.querySelector('#' + id); if (d) d.open = true; }
+  restoreInputs(unsaved);
+  checkPickedDate(unsaved);
+  showCheckDateNote();
+  notifyDue();
+}
+/* An unsaved "Another day" date (check-in) survives a redraw, but if it is no longer possible (for example her last
+   start was corrected to a later day) it is cleared with a visible note, never kept or silently dropped
+   (reported against a531ff2). */
+let checkDateNote = null; // stays through later redraws until she picks a new day or the question closes
+function checkPickedDate(saved) {
+  const v = saved.cyCheckDate?.value; if (!v) return;
+  const el = root.querySelector('#cyCheckDate');
+  if (!el) { if (!repo.read().periods.some(p => p.start === v)) toast(`The day you picked (${human(v)}) was not saved: the question has closed. Check your history if you need to.`); return; }
+  const why = el.min && v < el.min ? 'it is on or before your last logged start' : el.max && v > el.max ? 'it is in the future' : null;
+  if (!why) return;
+  el.value = '';
+  checkDateNote = `The day you picked (${human(v)}) was not saved and can't be used now: ${why}. Please pick the day again.`;
+}
+function showCheckDateNote() {
+  const el = root.querySelector('#cyCheckDate');
+  if (!el) { checkDateNote = null; return; }
+  if (checkDateNote && !root.querySelector('#cyCheckDateNote')) el.closest('.btn-row').insertAdjacentHTML('afterend', `<p class="small" id="cyCheckDateNote" role="status">${esc(checkDateNote)}</p>`);
+}
+
+/* Unsaved form input survives redraws (defect found by the simultaneous-save browser test on this fix: a redraw
+   triggered by another tab reset the date field to today, so the person's click saved today instead of their date). */
+const FORM = '#cyDate, #cyCheckDate, #cyZaraLast, #cyZaraBefore, #cyUnwell, #cyTravel, #cyAlcohol, #cyLateNight, #cyRoomTemp, #cyRemKind, #cyRemTime, #cyLh, #cySumMonths, [data-sym]';
+const inputKey = el => el.id || `sym:${el.dataset.sym}`;
+function unsavedInputs() {
+  const out = {};
+  for (const el of root.querySelectorAll(FORM)) {
+    if (el.type === 'checkbox') { if (el.checked !== el.defaultChecked) out[inputKey(el)] = { checked: el.checked }; }
+    else if (el.tagName === 'SELECT') { const def = [...el.options].find(o => o.defaultSelected)?.value ?? el.options[0]?.value; if (el.value !== def) out[inputKey(el)] = { value: el.value }; }
+    else if (el.value !== el.defaultValue) out[inputKey(el)] = { value: el.value };
+  }
+  return out;
+}
+function restoreInputs(saved) {
+  for (const el of root.querySelectorAll(FORM)) { const v = saved[inputKey(el)]; if (!v) continue; if ('checked' in v) el.checked = v.checked; else el.value = v.value; }
+}
+
+/* ---------- Sections ---------- */
+const banner = () => `<p class="cy-banner">Prototype. Estimates are not clinically validated. Use demo data, not real client data.</p>`;
+
+/* What she chose at sign-up when it was "Not right now" (js/onboarding.js): opens that mode after consent. */
+const onboardIntent = () => { try { return localStorage.getItem('shred_onboard_intent'); } catch { return null; } };
+function consentHTML(f = {}) {
+  const hello = f.companion ? `<div class="card stack" id="cyZaraHello"><span class="eyebrow">Your cycle companion</span><p>${esc(ZARA_WELCOME)}</p><p class="muted small">First, please read how your cycle data is kept.</p></div>` : '';
+  return `${banner()}${hello}<div class="card stack" id="cyConsent">
+  <span class="eyebrow">Before you start</span><h2 class="display h2">Cycle tracking</h2>
+  <ul class="issues">
+    <li><b>What we keep:</b> the period dates you log, spotting, and only the symptom categories you switch on, one by one.</li>
+    <li><b>Where:</b> on this device only, encrypted. Nothing is uploaded, shared, sent by SMS or used for ads. Nothing is shared with a partner, coach or anyone else.</li>
+    <li><b>What it is:</b> estimates from your own logged dates. Not medical advice, not clinically validated, not contraception, and it can't detect pregnancy or diagnose conditions.</li>
+    <li><b>A watch can't detect bleeding.</b> Periods are only ever what you log or confirm.</li>
+    <li><b>Your control:</b> edit or delete any entry, export everything, or delete it all at any time.</li>
+  </ul>
+  <label class="check"><input type="checkbox" id="cyAgree"> I understand and want to start</label>
+  <button class="cta" type="button" data-act="consent">Agree and start</button></div>`;
+}
+
+/* Her premenstrual pattern (js/cycle/premenstrual.js; flag premenstrualPatterns). In the days before her expected
+   period, at most 3 one-tap questions about her own pattern symptoms; otherwise a short summary. In the app only. */
+function premenstrualHTML(s, today, now) {
+  const r = premenstrualPatterns(s, today); if (!r) return '';
+  const list = r.patterns.length ? `<ul class="issues">${r.patterns.map(p => `<li>${esc(p.text)}</li>`).join('')}</ul>` : '';
+  const qs = now ? `<p class="small">${esc(now.text)}</p><div class="stack">${now.questions.map(q => `<label class="field">${esc(q.label)} today<select data-pmq="${q.category}"><option value="">—</option>${q.options.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')}</select></label>`).join('')}</div>
+    <div class="btn-row"><button class="cta" type="button" data-act="pmSave">Save</button><button class="ghost" type="button" data-act="pmNotNow">Not now</button></div>` : '';
+  return `<div class="card stack" id="cyPremenstrual"><span class="eyebrow">Your premenstrual pattern · research</span>
+    ${now ? '' : `<p class="small">${esc(r.text)}</p>`}${qs}${list}
+    ${r.note ? `<p class="small"><b>${esc(r.note)}</b></p>` : ''}
+    <details><summary class="linkbtn">How this works</summary><p class="muted small">A symptom counts only if, in each of your last 3 cycles where you logged it, it was clearly stronger in the 7 days before your period than in the week after it (days 4 to 10 of your cycle). This follows published research methods (${PM_SOURCES.map(x => esc(x.title.split('.')[0])).join('; ')}). It comes only from your own logs, has not been tested on real people yet, and is not a diagnosis. Shown in the app only, never in a notification.</p></details></div>`;
+}
+
+/* Zara's first question after sign-up: when did her last period start (and the one before, if she remembers)?
+   Only what she enters is saved. Not shown in pregnancy or after a birth, or once she has logged a period. */
+function zaraFirstHTML(s, today) {
+  const intent = onboardIntent();
+  if (s.periods.length || s.situation?.pregnant || s.pregnancy || s.postpartum || (s.pregnancies || []).length || intent === 'pregnant' || intent === 'postpartum' || s.promptsDismissed?.zaraFirst) return '';
+  const name = esc(companionName(s));
+  return `<div class="card stack" id="cyZaraFirst"><span class="eyebrow">${name}</span><b>Let's get started. When did your last period start?</b>
+    <label class="field">First day of your last period<input type="date" id="cyZaraLast" max="${today}"></label>
+    <label class="field">And the one before, if you remember (optional)<input type="date" id="cyZaraBefore" max="${today}"></label>
+    <p class="muted small">Only the dates you enter are saved. With two dates, you get a first, rough estimate straight away.</p>
+    <div class="btn-row"><button class="cta" type="button" data-act="zaraFirstSave">Save</button><button class="ghost" type="button" data-act="zaraFirstSkip">I'll log it later</button></div></div>`;
+}
+
+function promptsHTML(s, est, today) {
+  const out = M.pendingPrompts(s, today).map(p => `<div class="card cy-ask" data-key="${esc(p.key)}"><b>${esc(p.kind === 'confirmStart' ? `Did a period start on ${human(p.date)}?` : 'Has your period ended?')}</b>
+    <p class="muted small">${p.kind === 'confirmStart' ? 'You logged bleeding that day. We won\'t assume it was a period.' : 'Your period is still open. We won\'t close it for you.'}</p>
+    <div class="btn-row">${p.kind === 'confirmStart' ? `<button class="ghost" type="button" data-act="confirmStart" data-date="${p.date}">Yes, it started</button><button class="ghost" type="button" data-act="wasSpotting" data-date="${p.date}">It was spotting</button>`
+      : `<label class="field">Last day<input type="date" id="endFor-${esc(p.id)}" max="${today}" value="${today}"></label><button class="ghost" type="button" data-act="endPeriod" data-id="${esc(p.id)}">Save end</button>`}
+    <button class="ghost" type="button" data-act="dismissPrompt" data-key="${esc(p.key)}">Not now</button></div></div>`);
+  // Smarter period-start check-in (js/cycle/checkins.js): she says the REAL start day; nothing is logged for her.
+  const ci = periodCheckIn(s, today);
+  if (ci) out.unshift(`<div class="card cy-ask" id="cyCheck"><b>${esc(ci.title)}</b><p class="muted small">${esc(ci.text)} Only you can tell us; a missing entry is never read as "no bleeding".</p>
+    <div class="btn-row">${ci.options.filter(o => o.date).map(o => `<button class="ghost" type="button" data-act="logStartOn" data-date="${o.date}">${esc(o.label)}</button>`).join('')}</div>
+    <div class="btn-row"><label class="field">Another day<input type="date" id="cyCheckDate" min="${ci.pick.min}" max="${ci.pick.max}"></label><button class="ghost" type="button" data-act="logStartPicked">Save that day</button></div>
+    <div class="btn-row"><button class="ghost" type="button" data-act="spottingToday">Spotting only</button><button class="ghost" type="button" data-act="notYet">Not yet</button></div></div>`);
+  const mq = missedLogQuestion(s, today);
+  if (mq) out.push(`<div class="card cy-ask" id="cyMissed"><b>Did you miss logging a period?</b><p class="muted small">${esc(mq.text)} If yes, that gap won't be used as one long cycle in your estimate.</p>
+    <div class="btn-row"><button class="ghost" type="button" data-act="missedYes" data-id="${esc(mq.periodId)}">Yes, I missed one</button><button class="ghost" type="button" data-act="missedNo" data-id="${esc(mq.periodId)}">No, it was one long cycle</button></div></div>`);
+  // After "No, it was one long cycle" for a gap outside the app's 15-90 day check: say so, and let her review or confirm.
+  const g = gapReview(s, today);
+  if (g) out.push(`<div class="card cy-ask" id="cyGap"><b>This long gap isn't used in your estimate</b><p class="muted small">${esc(g.text)}</p>
+    <div class="btn-row"><button class="ghost" type="button" data-act="gapReview" data-id="${esc(g.periodId)}">Review dates</button><button class="ghost" type="button" data-act="gapConfirm" data-id="${esc(g.periodId)}">Use this gap in my estimate</button><button class="ghost" type="button" data-act="gapKeep" data-id="${esc(g.periodId)}">Keep it out</button></div></div>`);
+  return out.join('');
+}
+
+const dueFiltered = (s, o) => dueNow(s, o).filter(d => d.reminder.kind !== 'companion' || flags().companion);
+function dueHTML(s, est, today, nowMin) {
+  const due = dueFiltered(s, { today, nowMin, estimate: est }); if (!due.length) return '';
+  return `<div class="card" id="cyDue"><span class="eyebrow">Check-ins due</span>${due.map(d => `<div class="row cy-row"><div><b>${esc(KINDS[d.reminder.kind])}</b><details><summary class="linkbtn">Why am I seeing this?</summary><p class="muted small">${esc(d.why)}</p></details></div><button class="ghost" type="button" data-act="ackDue" data-id="${d.reminder.id}">Done</button></div>`).join('')}</div>`;
+}
+
+/* Band-adjusted estimate (js/cycle/adjust.js, research flag temperatureEstimate). Shown next to the dates-only estimate,
+   never instead of it, and labelled as research with the evidence stated (synthetic only). */
+function adjustHTML(s, today) {
+  const l = cardLines(adjustedEstimate(s, today));
+  return `<div class="card stack" id="cyAdjusted"><span class="eyebrow">Band-adjusted estimate · research</span>${l.range ? `<div class="num cy-range">${esc(l.range)}</div>` : ''}
+    ${l.overdue ? `<p class="small cy-alert" id="cyAdjustedOverdue"><b>${esc(l.overdue)}</b></p>` : ''}
+    <p class="small">${esc(l.text)}</p>${l.fallback ? `<p class="small" id="cyAdjustedFallback"><b>${esc(l.fallback)}</b></p>` : ''}
+    ${l.askToLog ? '<button class="ghost" type="button" data-act="goLog">Log my period</button>' : ''}
+    ${l.lastReading ? `<p class="muted small" id="cyAdjustedLastReading">${esc(l.lastReading)}</p>` : ''}<p class="muted small">${esc(l.why)}</p></div>`;
+}
+
+function estimateHTML(s, est) {
+  const range = est.rangeStart ? `<div class="num cy-range">${est.singleDate ? human(est.rangeStart) : `${human(est.rangeStart)} – ${human(est.rangeEnd)}`}</div><p class="small" id="cyOutside"><b>Most likely around ${human(est.typicalDate)}. About 8 in 10 periods start inside a range like this, but yours may come earlier or later.</b></p>` : '';
+  const pl = typicalPeriodLength(s);
+  return `<div class="card stack" id="cyEstimate"><div><span class="eyebrow">Next period · ${esc(est.overdue ? 'overdue' : est.status === 'estimate' ? 'past cycles' : est.status.replace('_', ' '))}</span><h2 class="display h2" id="cyHeadline">${esc(est.headline)}</h2></div>
+    ${range}<p class="small" id="cyDetail">${esc(est.detail)}</p>
+    ${est.cycleDay ? `<p class="muted small">Today is day ${est.cycleDay} since your last logged start (${human(est.lastStart)}).${pl ? ` Your logged periods usually last ${pl} days.` : ''}</p>` : ''}
+    ${est.notes.map(n => `<p class="muted small">${esc(n)}</p>`).join('')}
+    <details><summary class="linkbtn">Why this estimate?</summary><div class="stack small" style="margin-top:8px">
+      <p>Used: ${est.lengths?.length ? est.lengths.map(l => `${l} days`).join(', ') : 'nothing yet'}.</p>
+      ${est.excluded.length ? `<p>Left out:</p><ul class="issues">${est.excluded.map(c => `<li>${human(c.start)} – ${human(c.nextStart)} (${c.length} d): ${esc(c.reason)}</li>`).join('')}</ul>` : ''}
+      <p class="muted">Method: the date is your last start plus the typical length (median) of your last 6 usable cycles. The range around it depends on how much your cycles vary, steadied by a typical figure from research data when you have few cycles; it was set so that, in a research dataset of real cycles (Marquette, 1,637 cycles), about 8 in 10 next periods started inside it. It has not been validated for you or in a clinical study. No 28-day default and no assumed ovulation day. Wearable data is not used.</p>
+      <p class="muted">${esc(DISCLAIMER)}</p></div></details></div>`;
+}
+
+function logHTML(s, today) {
+  const cats = Object.entries(M.CATEGORIES).filter(([k]) => M.categoryOn(s, k));
+  const d = s.days[today] || {};
+  return `<div class="card stack" id="cyLog"><span class="eyebrow">Log</span>
+    <label class="field">Date<input type="date" id="cyDate" max="${today}" value="${today}"></label>
+    <div class="btn-row"><button class="ghost" type="button" data-act="logStart">Period started</button><button class="ghost" type="button" data-act="logEnd">Period ended</button><button class="ghost" type="button" data-act="logSpotting">Spotting</button></div>
+    ${cats.length ? `<div class="grid2">${cats.map(([k, c]) => `<label class="field">${c.label}<select data-sym="${k}"><option value="">Not logged</option>${c.options.map(([v, l]) => `<option value="${v}" ${d[k] === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`).join('')}</div>` : '<p class="muted small">Symptom logging is off. You can switch categories on in settings below.</p>'}
+    ${lhOn(s) ? `<label class="field">Ovulation test (LH), as you read it<select id="cyLh"><option value="">Not logged</option>${Object.entries(M.LH_RESULTS).map(([v, l]) => `<option value="${v}" ${d.lh === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>` : ''}
+    <div class="btn-row"><label class="check"><input type="checkbox" id="cyUnwell" ${d.unwell ? 'checked' : ''}> Unwell</label><label class="check"><input type="checkbox" id="cyTravel" ${d.travel ? 'checked' : ''}> Travelling</label></div>
+    ${s.consent.wearable ? `<div class="stack" id="cyNight"><b class="small">The night of this date (optional)</b><div class="btn-row"><label class="check"><input type="checkbox" id="cyAlcohol" ${d.alcohol ? 'checked' : ''}> Alcohol</label><label class="check"><input type="checkbox" id="cyLateNight" ${d.lateNight ? 'checked' : ''}> Late night</label><label class="check"><input type="checkbox" id="cyRoomTemp" ${d.hotOrColdRoom ? 'checked' : ''}> Very hot or cold room</label></div>
+      <p class="muted small">These can change skin temperature, so the temperature research leaves those nights out. Nothing else uses them.</p></div>` : ''}
+    <button class="cta" type="button" data-act="saveDay">Save this day</button>
+    <p class="muted small">Days you don't log stay blank. Blank never means "no bleeding" or "no symptoms".</p></div>`;
+}
+
+const lhOn = s => flags().lhTests && !!s.consent.lhTests;
+
+/* Learning stage (js/cycle/learning.js): how much the app has learned from her own logs, and, with a band, how many
+   nights were recorded and whether last night was. Missing nights are never filled in. */
+function learningHTML(s, today) {
+  const l = learningStage(s, today);
+  return `<div class="card stack" id="cyLearning"><span class="eyebrow">Learning your cycle${l.stage === 'learning' ? ` · ${l.usableCycles} of ${l.needed}` : ''}</span><p class="small">${esc(l.text)}</p>
+    ${l.band ? `<p class="small${l.band.lastNight === 'recorded' ? ' muted' : ''}">${esc(l.band.text)}</p>` : ''}</div>`;
+}
+
+/* Companion check-in, "Zara" by default (js/cycle/companion.js, flag companion): one caring question on the days that matter for her. It asks;
+   nothing is saved until she taps. Shown first on the screen. */
+function companionHTML(s, today, est, f) {
+  const m = companionToday(s, today, { estimate: est, patternsOn: !!f.patternInsights, patterns: f.patternInsights ? findPatterns(s) : [] });
+  if (!m) return '';
+  const cr = m.quick.find(q => q.id === 'cramps');
+  return `<div class="card stack cy-companion" id="cyCompanion"><span class="eyebrow">${esc(m.from)} · check-in</span><b>${esc(m.title)}</b><p class="small">${esc(m.text)}</p>
+    <div class="btn-row">${m.quick.map(q => `<button class="ghost" type="button" data-act="companionAnswer" data-ans="${esc(q.id)}">${esc(q.label)}</button>`).join('')}</div>
+    ${m.quick.some(q => q.id === 'periodStarted') ? `<div class="btn-row" id="cyCompanionStart" hidden><span class="small">Which day did it start?</span>${[['Today', 0], ['Yesterday', 1], ['2 days ago', 2]].map(([l, n]) => addDays(today, -n)).map((d, i) => d > (est.lastStart || '') ? `<button class="ghost" type="button" data-act="companionStartOn" data-date="${d}">${['Today', 'Yesterday', '2 days ago'][i]}</button>` : '').join('')}</div>` : ''}
+    ${cr ? `<div class="btn-row" id="cyCompanionSev" hidden><span class="small">How strong?</span>${cr.severities.map(([v, l]) => `<button class="ghost" type="button" data-act="companionSeverity" data-sev="${v}">${esc(l)}</button>`).join('')}</div>` : ''}
+    <div class="row"><details><summary class="linkbtn">Why am I seeing this?</summary><p class="muted small">${esc(m.why)} Wording awaiting clinician review.</p></details><button class="linkbtn" type="button" data-act="companionDismiss">Not now</button></div>
+    <p class="muted small" id="cyCompanionPrivacy">${esc(m.privacy)}</p></div>`;
+}
+
+/* Perimenopause and menopause mode (js/cycle/midlife.js, flag midlifeMode, only when she marked the situation).
+   Describes her own entries against published criteria; never diagnoses; awaiting clinician review. */
+/* Pregnancy and postpartum modes (js/cycle/pregnancy.js, flag pregnancyMode). Prototype; wording awaiting clinician
+   review. Warning signs are always one tap away; sources are shown. */
+const srcList = xs => `<details><summary class="linkbtn">Where this comes from</summary><ul class="issues small">${xs.map(x => `<li>${x.doi ? `<a href="https://doi.org/${esc(x.doi)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a>` : `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a>`}</li>`).join('')}</ul></details>`;
+const warnList = (id, intro, signs) => `<details id="${id}"><summary class="linkbtn"><b>Urgent warning signs</b></summary><div class="stack small" style="margin-top:6px"><p class="cy-alert"><b>${esc(intro)}</b></p><ul class="issues">${signs.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div></details>`;
+function pregnancyCardsHTML(s, today) {
+  const out = [], p = PG.pregnancyToday(s, today), pp = PG.postpartumToday(s, today), day = s.days[today] || {};
+  if (p) out.push(`<div class="card stack" id="cyPregnancy"><span class="eyebrow">Pregnancy · prototype · awaiting clinician review</span>
+    <h2 class="display h2">${esc(p.weeksText)}</h2><p class="small">Trimester ${p.trimester} · due date ${esc(human(p.dueDate))} (${p.daysToDue >= 0 ? `${p.daysToDue} days to go` : `${-p.daysToDue} days ago`})</p>
+    ${p.stageNote ? `<p class="small"><b>${esc(p.stageNote)}</b></p>` : ''}
+    ${PG.pregnancyAlerts(s, day).map(a => `<p class="small cy-alert" role="alert"><b>${esc(a.text)}</b></p>`).join('')}
+    <p class="muted small">${esc(p.dueNote)}</p>
+    ${warnList('cyPregWarn', p.warningIntro, p.warningSigns)}
+    <div class="grid2"><label class="field">Birth date<input type="date" id="cyBirthDate" value="${today}" max="${today}"></label><button class="ghost" type="button" data-act="pregBirth">My baby was born</button></div>
+    <div class="grid2"><label class="field">Date<input type="date" id="cyEndDate" value="${today}" max="${today}"></label><button class="ghost" type="button" data-act="pregEnded">My pregnancy ended</button></div>
+    <details><summary class="linkbtn">Change due date or delete</summary><div class="stack" style="margin-top:8px">
+      <div class="grid2"><label class="field">New due date from your midwife or doctor<input type="date" id="cyPregNewDue"></label><button class="ghost" type="button" data-act="pregDue">Save due date</button></div>
+      <button class="linkbtn" type="button" data-act="pregDelete">Delete my pregnancy records</button></div></details>
+    ${srcList(p.sources)}</div>`);
+  if (pp) out.push(`<div class="card stack" id="cyPostpartum"><span class="eyebrow">After the birth · prototype · awaiting clinician review</span>
+    <h2 class="display h2">${esc(pp.weeksText)} since the birth</h2>
+    ${PG.postpartumAlerts(s, day).map(a => `<p class="small cy-alert" role="alert"><b>${esc(a.text)}</b></p>`).join('')}
+    ${[pp.bleedingNote, pp.moodNote, pp.checkNote, pp.periodsNote, pp.yearNote].filter(Boolean).map(t => `<p class="small">${esc(t)}</p>`).join('')}
+    <p class="muted small">Switch on "Bleeding after birth" and "Pain where you are healing" in settings to log them.</p>
+    ${warnList('cyPpWarn', pp.warningIntro, pp.warningSigns)}
+    <div class="btn-row"><button class="linkbtn" type="button" data-act="ppEnd">Turn off postpartum mode</button><button class="linkbtn" type="button" data-act="pregDelete">Delete my pregnancy records</button></div>
+    ${srcList(pp.sources)}</div>`);
+  const last = s.pregnancies?.at(-1);
+  if (!p && !pp && last?.outcome === 'ended' && !last.ackd && diffDays(last.endDate, today) <= 14) out.push(`<div class="card stack" id="cyPregEnded" role="status"><p class="small">We're so sorry. Pregnancy mode is off. If you'd like support, your midwife or doctor can help, as can a pregnancy loss support charity, or someone you trust. Your period estimates will start again from your next period, and Zara's check-ins are paused until then.</p><button class="ghost" type="button" data-act="pregEndedAck">OK</button></div>`);
+  return out.join('');
+}
+
+function midlifeHTML(s, today) {
+  const o = midlifeObservations(s, today); if (!o) return '';
+  const rows = o.applicable ? [o.variability.text, o.longGap.text, o.sinceLastPeriod?.text].filter(Boolean) : [o.why];
+  return `<div class="card stack" id="cyMidlife"><span class="eyebrow">Perimenopause and menopause · prototype · awaiting clinician review</span>
+    <p class="small">${esc(MIDLIFE_INTRO)}</p>
+    ${o.alerts.map(a => `<p class="small cy-alert" role="alert"><b>${esc(a)}</b></p>`).join('')}
+    <div class="list">${rows.map(r => `<p class="small">${esc(r)}</p>`).join('')}</div>
+    <p class="muted small">Track symptoms such as hot flushes, sleep, concentration or aches by switching them on in settings below. The doctor summary includes them.</p>
+    <div class="stack" id="cyMidlifeFlags"><b class="small">See a doctor if you notice</b><ul class="issues">${o.redFlags.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>
+    <details><summary class="linkbtn">Where this comes from</summary><ul class="issues small">${MIDLIFE_SOURCES.map(x => `<li><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.authors)} ${esc(x.title)}. ${esc(x.journal)}.</a> <span class="muted">${esc(x.used)}</span></li>`).join('')}</ul></details></div>`;
+}
+
+/* Comfort suggestions that learn what helps her (js/cycle/comfort.js, flag comfortSuggestions). Wording is a
+   placeholder awaiting clinician review; warning signs come first when pain is severe. */
+function comfortHTML(s, today) {
+  const g = comfortSuggestions(s, today), pend = pendingComfortQuestions(s, today);
+  if (!g && !pend.length) return '';
+  const flagsHTML = `<div class="stack" id="cyComfortFlags"><b class="small">See a doctor if you notice</b><ul class="issues">${(g?.redFlags || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>`;
+  const ask = pend.length ? `<div class="stack" id="cyComfortAsk">${pend.map(t => `<div class="row cy-row"><b class="small">Did ${esc(t.label.toLowerCase())} help? <span class="muted">(${human(t.date)})</span></b><div class="btn-row">${Object.entries(ANSWERS).map(([k, l]) => `<button class="ghost" type="button" data-act="comfortAnswer" data-id="${esc(t.id)}" data-ans="${k}">${l}</button>`).join('')}</div></div>`).join('')}</div>` : '';
+  const opts = g ? g.options.map(o => `<div class="row cy-row"><div><b>${esc(o.label)}</b><p class="small">${esc(o.text)}</p><p class="muted small">Your record: ${esc(o.own.text)}</p>
+      <p class="muted small">Evidence: ${o.evidence.map(e => `<a href="${esc(e.url)}" target="_blank" rel="noopener noreferrer">${esc(e.label)}</a>`).join('; ')}</p></div>
+      <button class="ghost" type="button" data-act="comfortTry" data-opt="${esc(o.id)}">I'll try this</button></div>`).join('') : '';
+  return `<div class="card stack" id="cyComfort"><span class="eyebrow">Comfort · prototype · ${REVIEW_STATUS === 'awaiting_clinician_review' ? 'awaiting clinician review' : ''}</span>
+    ${g?.severe ? flagsHTML : ''}${ask}${opts ? `<div class="list">${opts}</div>` : ''}${g && !g.severe ? flagsHTML : ''}
+    ${g ? `<p class="muted small">${esc(g.note)}</p>` : ''}</div>`;
+}
+
+/* Summary for a doctor: built from the person's own entries on request (js/cycle/summary.js). Shown here, printable,
+   or saved as a local text file. Nothing is sent or stored; a printed or saved copy is not encrypted. */
+function summaryHTML(s, today) {
+  const txt = summaryText(clinicianSummary(s, { today, months: summaryMonths }));
+  return `<div class="card stack" id="cySummary"><span class="eyebrow">Summary for a doctor</span><pre class="cy-summary">${esc(txt)}</pre>
+    <div class="btn-row cy-noprint"><button class="ghost" type="button" data-act="printSummary">Print</button><button class="ghost" type="button" data-act="downloadSummary">Save as text file</button><button class="ghost" type="button" data-act="closeSummary">Close</button></div>
+    <p class="muted small cy-noprint">Made only because you asked. It isn't saved or sent anywhere. A printed or saved copy isn't encrypted, so keep it private.</p></div>`;
+}
+
+function insightHTML(s, today) {
+  const p = insightForToday(s, today); if (!p) return '';
+  return `<div class="card" id="cyInsight"><span class="eyebrow">From your own logs</span><p>${esc(p.text)} Would a check-in reminder help?</p>
+    <div class="btn-row"><button class="ghost" type="button" data-act="patternReminder" data-key="${esc(p.key)}">Remind me next cycle</button><button class="ghost" type="button" data-act="dismissInsight" data-key="${esc(p.key)}">Dismiss</button></div></div>`;
+}
+
+function phaseHTML(s, today, tempShift, est) {
+  const p = phaseInfo(s, today, { tempShift, estimate: est });
+  return `<div class="card" id="cyPhase"><span class="eyebrow">Phase · ${esc(p.status.replace(/_/g, ' '))}</span><h2 class="display h2">${esc(p.label)}</h2><p class="small">${esc(p.text)}</p><p class="muted small">${esc(PHASE_EDUCATION)}</p></div>`;
+}
+
+function historyHTML(s) {
+  const cs = M.cycles(s);
+  const periods = [...s.periods].reverse().map(p => `<div class="row cy-row" data-pid="${esc(p.id)}"><div class="grid2">
+      <label class="field">Start<input type="date" data-edit="start" value="${p.start}"></label><label class="field">End<input type="date" data-edit="end" value="${p.end || ''}"></label></div>
+      <div class="stack" style="flex:0 0 auto"><label class="check small"><input type="checkbox" data-edit="missedBefore" ${p.missedBefore ? 'checked' : ''}> Missed a log before this</label>
+      ${cs.find(c => c.nextStart === p.start && !c.usable && !p.missedBefore) ? `<label class="check small"><input type="checkbox" data-edit="lengthConfirmed" ${p.lengthConfirmed ? 'checked' : ''}> Gap before is correct</label>` : ''}
+      <button class="linkbtn" type="button" data-act="deletePeriod">Delete</button></div></div>`).join('');
+  const cyc = cs.slice(-8).reverse().map(c => `<div class="row"><div>${human(c.start)} → ${human(c.nextStart)}</div><span class="r">${c.length} days${c.usable ? '' : ' · not used'}</span></div>`).join('');
+  const lastStart = s.periods.at(-1)?.start, t = localToday();
+  const current = lastStart && (!cs.length || cs.at(-1).nextStart === lastStart) ? [{ start: lastStart, length: diffDays(lastStart, t) + 1, current: true }] : [];
+  const syms = [...cs.slice(-4), ...current].reverse().map(c => {
+    const e = []; for (let i = 0; i < c.length; i++) { const day = s.days[addDays(c.start, i)]; if (!day) continue; const parts = Object.entries(day).filter(([k]) => k in M.CATEGORIES || k === 'bleeding' || (k === 'lh' && flags().lhTests)).map(([k, v]) => `${k === 'bleeding' ? v : k === 'lh' ? `LH test ${M.LH_RESULTS[v].toLowerCase()}` : M.CATEGORIES[k].label.toLowerCase() + ' ' + v}`); if (parts.length) e.push(`d${i + 1}: ${parts.join(', ')}`); }
+    return `<div class="row"><div><b>${human(c.start)}${c.current ? ' (current)' : ''}</b><div class="muted small">${e.length ? esc(e.join(' · ')) : 'No day logs in this cycle'}</div></div></div>`;
+  }).join('');
+  return `<details class="card" id="cyHistory"><summary><span class="eyebrow">Your history</span></summary><div class="stack" style="margin-top:10px">
+    <b class="small">Periods (edit to correct)</b><div class="list">${periods || '<p class="empty">No periods logged yet.</p>'}</div>
+    <b class="small">Cycles</b><div class="list">${cyc || '<p class="empty">A cycle appears once two starts are logged.</p>'}</div>
+    <b class="small">Day logs by cycle</b><div class="list">${syms || '<p class="empty">Nothing yet.</p>'}</div></div></details>`;
+}
+
+function patternsHTML(s, today, f) {
+  const st = patternStatus(s); if (!st.length) return '';
+  const rows = st.map(x => x.status === 'found' ? x.patterns.map(p => `<div class="row cy-row"><div><b>${esc(p.text)}</b><p class="muted small">${esc(evidenceText(p))}</p>${s.dismissed[p.key] ? '<span class="muted small">Dismissed</span>' : `<div class="btn-row"><button class="linkbtn" type="button" data-act="patternReminder" data-key="${esc(p.key)}">Remind me</button><button class="linkbtn" type="button" data-act="dismissInsight" data-key="${esc(p.key)}">Dismiss</button></div>`}</div></div>`).join('')
+    : `<div class="row cy-row"><div><b>${esc(M.CATEGORIES[x.category].label)}: ${x.status === 'insufficient' ? 'not enough data' : 'no consistent pattern'}</b><p class="muted small">${esc(x.why)}</p></div><button class="linkbtn" type="button" data-act="checkinReminder">Daily check-in</button></div>`).join('');
+  const fc = f.symptomForecast ? forecastCheckins(s, today) : [];
+  return `<div class="card" id="cyPatterns"><span class="eyebrow">Your patterns · research, unvalidated</span><div class="list">${rows}</div>
+    <p class="muted small">Observations from your own complete cycles only, never a prediction of how you will feel. This is an unvalidated research feature: in synthetic tests, about 1 in 4 people with no real pattern still got one, so a finding may be chance.</p>
+    ${f.symptomForecast ? `<p class="small"><b>Experimental:</b> ${fc.length ? esc(`past logs suggest a check-in about ${[...new Set(fc.map(x => M.CATEGORIES[x.category].label.toLowerCase()))].join(', ')} around ${human(fc[0].date)}.`) : 'nothing to suggest this week.'}</p>` : ''}</div>`;
+}
+
+function remindersHTML(s, est, today, nowMin) {
+  if (!s.consent.reminders) return `<div class="card stack" id="cyReminders"><span class="eyebrow">Reminders · off</span><p class="small">Optional. They appear in the app, and as a notification only while the app is open, with neutral text by default. Nothing is sent by SMS or shared.</p><button class="ghost" type="button" data-act="remindersOn">Turn on reminders</button></div>`;
+  const list = s.reminders.map(r => { const n = nextFire(r, s, { today, nowMin, estimate: est });
+    return `<div class="row cy-row" data-rid="${r.id}"><div><b>${esc(KINDS[r.kind])}</b><div class="muted small">${n.next ? `Next: ${human(n.next.date)} ${n.next.time}${n.next.shiftedForQuietHours ? ' (moved for quiet hours)' : ''}` : esc(n.why)}</div><div class="muted small">${esc(n.why === 'Paused.' ? '' : n.why)}</div></div>
+      <div class="stack" style="flex:0 0 auto"><input type="time" data-rtime value="${r.time}"><button class="linkbtn" type="button" data-act="pauseRem">${r.pausedUntil && r.pausedUntil >= today ? 'Resume' : 'Pause 7 days'}</button><button class="linkbtn" type="button" data-act="delRem">Delete</button></div></div>`; }).join('');
+  const q = s.settings.quietHours;
+  return `<div class="card stack" id="cyReminders"><span class="eyebrow">Reminders</span><div class="list">${list || '<p class="empty">No reminders.</p>'}</div>
+    <div class="grid2"><label class="field">Add<select id="cyRemKind"><option value="dailyLog">Daily log</option><option value="weeklyLog">Weekly check-in (Mondays)</option><option value="periodCheck">When my range begins</option>${flags().companion ? `<option value="companion">${esc(companionName(s))} check-in on my period days</option>` : ''}</select></label><label class="field">Time<input type="time" id="cyRemTime" value="09:00"></label></div>
+    <button class="ghost" type="button" data-act="addRem">Add reminder</button>
+    <div class="grid2"><label class="field">Quiet from<input type="time" id="cyQs" value="${q.start}"></label><label class="field">Quiet until<input type="time" id="cyQe" value="${q.end}"></label></div>
+    <label class="check"><input type="checkbox" id="cyLockDetail" ${s.settings.lockScreenDetail ? 'checked' : ''}> Show what the reminder is about on the lock screen (off = "You have a check-in")</label>
+    <div class="btn-row"><button class="ghost" type="button" data-act="pauseAll">${s.settings.remindersPausedUntil && s.settings.remindersPausedUntil >= today ? 'Resume all' : 'Pause all 7 days'}</button><button class="ghost" type="button" data-act="notifPerm">Allow notifications</button><button class="ghost" type="button" data-act="remindersOff">Turn off &amp; delete reminders</button></div>
+    <p class="muted small">Times follow your phone's current time zone. With no server, reminders can't arrive while the app is closed.</p></div>`;
+}
+
+function wearableHTML(s, today, f, tempShift) {
+  const ds07 = new SwlDs07Adapter(), hume = new HumeBandAdapter();
+  if (!s.consent.wearable) return `<div class="card stack" id="cyWearable"><span class="eyebrow">Wearable · off</span><p class="small">Optional. Adds nightly wrist skin temperature and heart data, kept as nightly summaries. A watch can't detect a period and isn't used for your estimate.</p>
+    <button class="ghost" type="button" data-act="wearableOn">Turn on and connect demo device (synthetic data)</button><p class="muted small"><b>${esc(ds07.displayName)}:</b> ${esc(ds07.status)}</p><p class="muted small"><b>${esc(hume.displayName)}:</b> ${esc(hume.status)}</p></div>`;
+  const dev = s.wearable.devices[0], from = addDays(today, -7), tbl = nightTable(s.wearable.nights, from, addDays(today, -1));
+  const hr = new Map(s.wearable.nights.filter(n => n.metric === 'heart_rate').map(n => [n.night, n]));
+  return `<div class="card stack" id="cyWearable"><span class="eyebrow">Wearable · last 7 nights</span>
+    ${dev ? `<p class="small"><b>${esc(dev.model)}</b> · firmware ${esc(dev.firmware)} · ${dev.verified ? 'verified' : '<b>synthetic demo, not your measurements</b>'}</p>` : '<p class="small">No device connected.</p>'}
+    <div class="kv" id="cyNights">${tbl.map(n => `<span>${human(n.night)}</span><span>${n.status === 'ok' ? `${n.value.toFixed(2)} °C${hr.get(n.night)?.value ? ` · ${Math.round(hr.get(n.night).value)} bpm` : ''}` : n.status === 'no_data' ? 'No data' : n.status === 'insufficient_wear' ? 'Too little wear' : 'No usable data'}${n.rejected ? ` · ${n.rejected} rejected` : ''}${(n.flags || []).filter(x => ['tz_change', 'device_change', 'firmware_change'].includes(x)).map(x => ' · ' + ({ tz_change: 'time zone changed', device_change: 'new device', firmware_change: 'new firmware' })[x]).join('')}</span>`).join('')}</div>
+    <p class="muted small">${esc(METRICS.skin_temp.note)} Raw values as reported by the device; heart-rate variability is vendor-derived. Gaps are never filled in.</p>
+    ${f.temperatureResearch ? `<p class="small" id="cyShift"><b>Research:</b> ${esc(tempShift?.detected ? `A sustained rise in wrist skin temperature was seen from ${human(tempShift.firstHighNight)}. This may be consistent with ovulation having already happened. It is not proof, it is not a warning in advance, and it is not used for your period estimate.` : tempShift?.why || 'No data.')}</p>` : ''}
+    <div class="btn-row"><button class="ghost" type="button" data-act="syncWearable">Sync demo data</button><button class="ghost" type="button" data-act="wearableOff">Disconnect &amp; delete wearable data</button></div>
+    <p class="muted small"><b>${esc(ds07.displayName)}:</b> ${esc(ds07.status)}</p><p class="muted small"><b>${esc(hume.displayName)}:</b> ${esc(hume.status)}</p></div>`;
+}
+
+function situationHTML(s, f = {}) {
+  const pm = !!f.pregnancyMode, hide = k => pm && (k === 'pregnant' || k === 'postpartum'); // pregnancy mode replaces the two ticks
+  const form = pm && !s.pregnancy && !s.situation.pregnant ? `<div class="stack" id="cyPregStart"><b class="small">Pregnancy mode</b>
+      <p class="muted small">Pregnant? Use the due date from your midwife or doctor if you have one. If not, enter the first day of your last period and the app adds 280 days (ACOG). Period estimates pause while you're pregnant.</p>
+      <div class="grid2"><label class="field">Due date<input type="date" id="cyPregDue"></label><label class="field">Or first day of last period<input type="date" id="cyPregLmp"></label></div>
+      <button class="ghost" type="button" data-act="pregStart">Start pregnancy mode</button>
+      ${s.postpartum ? '' : `<p class="muted small">Already had your baby?</p><div class="grid2"><label class="field">Birth date<input type="date" id="cyPpBirth"></label><button class="ghost" type="button" data-act="ppStart">Start postpartum mode</button></div>`}</div>` : '';
+  return `<details class="card" id="cySituation"><summary><span class="eyebrow">Situations that change how cycles work</span></summary><div class="stack" style="margin-top:10px">${form}
+    <p class="muted small">Optional. Used only to add caveats, pause estimates in pregnancy and hide phase information.</p>
+    ${Object.entries(M.SITUATIONS).filter(([k]) => !hide(k)).map(([k, v]) => `<div class="btn-row" style="align-items:center"><label class="check"><input type="checkbox" data-sit="${k}" ${s.situation[k] ? 'checked' : ''}> ${esc(v.label)}</label>${(s.situationLog || []).some(e => e.key === k) ? `<button class="linkbtn" type="button" data-act="eraseSit" data-key="${k}">Delete (entered by mistake)</button>` : ''}</div>`).join('')}
+    <p class="muted small">Unticking records a change from that day. "Delete" removes the entry and its history, as if it was never entered.</p></div></details>`;
+}
+
+function settingsHTML(s, f) {
+  return `<details class="card" id="cySettings"><summary><span class="eyebrow">Settings, export &amp; delete</span></summary><div class="stack" style="margin-top:10px">
+    <label class="field">How often may ${esc(companionName(s))} ask you questions?<select id="cyAskLevel">${ASK_LEVELS.map(l => `<option value="${l}" ${askLevel(s) === l ? 'selected' : ''}>${l === 'light' ? 'Light: only before my period and on its first day' : 'Normal'}</option>`).join('')}</select></label>
+    <p class="muted small">At most one check-in a day. After a few "Not now" taps in a row, questions come less often until you answer again.</p>
+    <b class="small">Symptom categories (each is optional)</b>
+    ${catRows(s, Object.entries(M.CATEGORIES).filter(([, c]) => !c.group))}
+    ${[['pregnancy', 'Pregnancy symptoms', s.situation?.pregnant], ['postpartum', 'After the birth', s.postpartum]].map(([g, title, active]) => { const cs = Object.entries(M.CATEGORIES).filter(([k, c]) => c.group === g && ((f.pregnancyMode && active) || M.categoryOn(s, k))); return cs.length ? `<b class="small">${title}</b>${catRows(s, cs)}` : ''; }).join('')}
+    ${(() => { const mid = Object.entries(M.CATEGORIES).filter(([k, c]) => c.group === 'midlife' && ((f.midlifeMode && s.situation?.perimenopause) || M.categoryOn(s, k))); return mid.length ? `<b class="small">Perimenopause and menopause symptoms</b>${catRows(s, mid)}` : ''; })()}
+    <p class="muted small">Turning a category off stops collecting it. You'll be asked whether to delete what you logged.</p>
+    <b class="small">Optional features</b>
+    ${['phaseEducation', 'pregnancyMode', 'midlifeMode', 'comfortSuggestions', 'patternInsights', 'symptomForecast', 'temperatureResearch', 'temperatureEstimate', 'lhTests'].map(k => `<label class="check"><input type="checkbox" data-flag="${k}" ${f[k] ? 'checked' : ''}> <span><b>${esc(FLAG_DEFS[k].label)}</b> <span class="muted small">${esc(FLAG_DEFS[k].desc)}</span></span></label>`).join('')}
+    ${f.companion ? `<div class="stack" id="cyCompanionNameRow"><label class="field">Your companion's name<input id="cyCompanionName" maxlength="20" autocomplete="off" value="${esc(companionName(s))}"></label><button class="ghost" type="button" data-act="companionName">Save name</button><p class="muted small">Letters, spaces, apostrophes and hyphens, up to 20. Leave empty to go back to Zara.</p></div>` : ''}
+    ${f.lhTests && !s.consent.lhTests ? `<div class="stack" id="cyLhConsent"><b class="small">Ovulation test (LH) results · research</b><p class="muted small">Optional. Record home ovulation test results exactly as you read them. The app doesn't interpret them, doesn't use them for your estimate and doesn't give fertility advice. Not contraception.</p><button class="ghost" type="button" data-act="lhOn">Turn on ovulation test logging</button></div>` : ''}
+    ${s.consent.lhTests ? '<button class="ghost" type="button" data-act="lhOff">Turn off &amp; delete ovulation test results</button>' : ''}
+    <b class="small">Summary for a doctor</b>
+    <p class="muted small">Your logged periods, cycle lengths and the symptoms you switched on, as plain figures. No estimates. Made only when you ask; nothing is sent.</p>
+    <div class="btn-row"><label class="field">Covering<select id="cySumMonths">${SUMMARY_MONTHS.map(m => `<option value="${m}" ${m === 12 ? 'selected' : ''}>Last ${m} months</option>`).join('')}</select></label><button class="ghost" type="button" data-act="summary">Make summary</button></div>
+    ${s.comfort?.tries?.length ? '<button class="ghost" type="button" data-act="deleteComfort">Delete my comfort records</button>' : ''}
+    <div class="btn-row"><button class="ghost" type="button" data-act="export">Export my data</button><button class="stop" type="button" data-act="deleteAll">Delete all cycle data</button></div>
+    <p class="muted small">Deleting removes your records and destroys the encryption key on this device. It can't reach files you exported or device backups made earlier (they hold encrypted data, but may also hold the key).</p>
+    <details><summary class="linkbtn">Consent record</summary><ul class="issues">${s.consent.log.map(l => `<li>${esc(l.at.slice(0, 10))}: ${esc(l.change)}</li>`).join('')}</ul></details></div></details>`;
+}
+
+const catRows = (s, list) => list.map(([k, c]) => `<label class="check"><input type="checkbox" data-cat="${k}" ${M.categoryOn(s, k) ? 'checked' : ''}> <span><b>${c.label}</b> <span class="muted small">${esc(c.why)}</span></span></label>`).join('');
+
+/* ---------- Local notifications (only while the app is open) ---------- */
+async function notifyDue() {
+  if (!repo || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  const s = repo.read(); if (!M.hasConsent(s)) return;
+  const { today, nowMin } = now();
+  for (const d of dueFiltered(s, { today, nowMin, estimate: estimateNext(s, today) })) {
+    const tag = `${d.reminder.id}:${today}`; if (notified.has(tag)) continue; notified.add(tag);
+    const c = notificationContent(d.reminder, s.settings);
+    try { const reg = await navigator.serviceWorker?.getRegistration?.(); reg ? reg.showNotification(c.title, { body: c.body, tag }) : new Notification(c.title, { body: c.body, tag }); } catch { /* ignore */ }
+  }
+}
+
+/* ---------- Events ---------- */
+const val = sel => root.querySelector(sel)?.value;
+async function onClick(e) {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  if (b.dataset.act === 'resetStorage') { // recovery path (audit 1.4): works without an open repository
+    if (!confirm('Reset cycle tracking on this device? Unreadable data and its key are deleted.')) return;
+    await resetCycleStorage(await repoOpts()); channel?.postMessage('changed'); await reopen(); toast('Cycle data reset'); return renderCycle();
+  }
+  if (!repo) return;
+  // Snapshot EVERYTHING the action needs now, synchronously, when the person acts (finding 2b reported against 21317c5).
+  // The repository transaction may wait for another tab's lock or be retried after a conflict; it must never read the
+  // page again, because by then the person may have changed the date or the fields.
+  const a = b.dataset.act, ds = { ...b.dataset }, snapDate = val('#cyDate'), date = () => snapDate;
+  const pid = b.closest('[data-pid]')?.dataset.pid, rid = b.closest('[data-rid]')?.dataset.rid;
+  const endFor = ds.id && root.querySelector(`#endFor-${CSS.escape(ds.id)}`) ? val(`#endFor-${CSS.escape(ds.id)}`) : undefined;
+  const dayForm = a === 'saveDay' ? daySnapshot() : null, remKind = val('#cyRemKind'), remTime = val('#cyRemTime'), sumMonths = val('#cySumMonths');
+  const run = {
+    consent: async () => {
+      if (!root.querySelector('#cyAgree')?.checked) return toast('Tick the box to agree first.');
+      await act(s => M.giveConsent(s), 'Cycle tracking is on');
+      // "Not right now" at sign-up: open the mode she chose, ready to fill in (she still fills it in herself).
+      const intent = onboardIntent(), sit = root.querySelector('#cySituation');
+      if (sit && ['pregnant', 'postpartum', 'menopause'].includes(intent)) { sit.open = true; (root.querySelector('#cyPregStart') || sit).scrollIntoView?.({ block: 'center' }); }
+    },
+    zaraFirstSave: () => {
+      const last = root.querySelector('#cyZaraLast')?.value, before = root.querySelector('#cyZaraBefore')?.value; // read now (finding 2b)
+      if (!last) return toast('Pick the day your last period started.');
+      return act((s, t) => { if (before && before >= last) throw new M.CycleError('INVALID_DATE');
+        if (before) M.logPeriodStart(s, before, { today: t, source: 'companion' }); M.logPeriodStart(s, last, { today: t, source: 'companion' }); }, 'Saved. Thank you.');
+    },
+    zaraFirstSkip: () => act((s, t) => M.dismissPrompt(s, 'zaraFirst', t), 'No problem. Log your next period when it starts.'),
+    logStart: () => act((s, t) => M.logPeriodStart(s, date(), { today: t }), 'Period start saved'),
+    logStartToday: () => act((s, t) => M.logPeriodStart(s, t, { today: t }), 'Period start saved'),
+    logStartOn: () => act((s, t) => answerPeriodCheckIn(s, t, ds.date), 'Period start saved'),
+    logStartPicked: () => { const d = root.querySelector('#cyCheckDate')?.value; if (!d) return; return act((s, t) => answerPeriodCheckIn(s, t, d), 'Period start saved'); },
+    missedYes: () => act((s, t) => answerMissedLog(s, ds.id, true, { today: t }), 'Thanks. That gap won\'t be used as one cycle.'),
+    missedNo: () => act((s, t) => answerMissedLog(s, ds.id, false, { today: t }), 'Thanks, noted. Your dates are saved as you entered them.'),
+    gapReview: () => { const h = root.querySelector('#cyHistory'); if (!h) return; h.open = true; const row = h.querySelector(`[data-pid="${CSS.escape(ds.id)}"]`) || h; row.scrollIntoView?.({ block: 'center' }); row.querySelector?.('input[data-edit=start]')?.focus(); },
+    gapConfirm: () => act((s, t) => confirmGap(s, ds.id, { today: t }), 'Confirmed. That gap is now used in your estimate.'),
+    gapKeep: () => act((s, t) => dismissGapReview(s, ds.id, { today: t }), 'Kept out of your estimate. Your dates are unchanged.'),
+    companionStartOn: () => act((s, t) => answerCheckIn(s, t, 'periodStarted', { date: ds.date, today: t }), 'Period start saved'),
+    confirmStart: () => act((s, t) => M.logPeriodStart(s, ds.date, { today: t }), 'Period start saved'),
+    wasSpotting: () => act((s, t) => M.logDay(s, ds.date, { bleeding: 'spotting' }, { today: t }), 'Saved as spotting'),
+    logEnd: () => act((s, t) => { const p = [...s.periods].reverse().find(x => x.start <= date()); if (!p) throw new M.CycleError('NOT_FOUND'); M.logPeriodEnd(s, p.id, date(), { today: t }); }, 'Period end saved'),
+    endPeriod: () => act((s, t) => M.logPeriodEnd(s, ds.id, endFor, { today: t }), 'Period end saved'),
+    logSpotting: () => act((s, t) => M.logDay(s, date(), { bleeding: 'spotting' }, { today: t }), 'Spotting saved'),
+    spottingToday: () => act((s, t) => answerSpotting(s, t), 'Spotting saved'),
+    notYet: () => act((s, t) => answerNotYet(s, t), 'Noted for today'),
+    dismissPrompt: () => act((s, t) => M.dismissPrompt(s, ds.key, t)),
+    saveDay: () => act((s, t) => M.logDay(s, snapDate, { ...dayForm }, { today: t }), 'Saved'),
+    deletePeriod: () => act(s => M.deletePeriod(s, pid), 'Period deleted'),
+    eraseSit: () => act(s => M.eraseSituation(s, ds.key), 'Deleted'),
+    companionAnswer: () => {
+      if (ds.ans === 'cramps') { const sev = root.querySelector('#cyCompanionSev'); if (sev) sev.hidden = false; return; }
+      if (ds.ans === 'periodStarted') { const row = root.querySelector('#cyCompanionStart'); if (row) { row.hidden = false; return; } }
+      if (ds.ans === 'other') { act((s, t) => answerCheckIn(s, t, 'other', { today: t })); root.querySelector('#cyLog')?.scrollIntoView?.({ block: 'start' }); return; }
+      return act((s, t) => answerCheckIn(s, t, ds.ans, { today: t }), ds.ans === 'fine' ? 'Glad to hear it' : ds.ans === 'periodStarted' ? 'Period start saved' : 'Saved. Take care of yourself today.');
+    },
+    companionSeverity: () => act((s, t) => answerCheckIn(s, t, 'cramps', { severity: ds.sev, today: t }), 'Saved. Take care of yourself today.'),
+    companionDismiss: () => act((s, t) => dismissCompanion(s, t)),
+    pmSave: () => { const vals = Object.fromEntries([...root.querySelectorAll('#cyPremenstrual [data-pmq]')].map(x => [x.dataset.pmq, x.value]).filter(([, v]) => v)); // read now
+      if (!Object.keys(vals).length) return toast('Choose at least one answer, or tap Not now.');
+      return act((s, t) => saveQuickLog(s, t, vals), 'Saved. Thank you.'); },
+    pmNotNow: () => act((s, t) => dismissPremenstrual(s, t), 'No problem.'),
+    pregStart: () => { const due = root.querySelector('#cyPregDue')?.value || undefined, lmp = root.querySelector('#cyPregLmp')?.value || undefined; return act((s, t) => PG.startPregnancy(s, { dueDate: due, lmp, today: t }), 'Pregnancy mode is on'); },
+    ppStart: () => { const b = root.querySelector('#cyPpBirth')?.value; return act((s, t) => PG.startPostpartum(s, { birthDate: b, today: t }), 'Postpartum mode is on'); },
+    pregDue: () => { const d = root.querySelector('#cyPregNewDue')?.value; return act((s, t) => PG.setDueDate(s, d, { today: t }), 'Due date saved'); },
+    pregBirth: () => { const d = root.querySelector('#cyBirthDate')?.value; return act((s, t) => PG.endPregnancy(s, { outcome: 'birth', date: d, today: t }), 'Postpartum mode is on'); },
+    pregEnded: () => { const d = root.querySelector('#cyEndDate')?.value; if (!confirm('Turn off pregnancy mode? You won\'t be asked why.')) return; return act((s, t) => PG.endPregnancy(s, { outcome: 'ended', date: d, today: t })); },
+    pregEndedAck: () => act(s => { const l = s.pregnancies?.at(-1); if (l) l.ackd = true; }),
+    ppEnd: () => act(s => PG.finishPostpartum(s), 'Postpartum mode is off'),
+    pregDelete: () => { if (!confirm('Delete all your pregnancy and postpartum records, including those symptoms? This can\'t be undone.')) return; return act(s => PG.deletePregnancyRecords(s), 'Pregnancy records deleted'); },
+    goLog: () => { const el = root.querySelector('#cyLog'); el?.scrollIntoView?.({ block: 'start' }); el?.querySelector('#cyDate')?.focus(); }, // she logs it; nothing is logged for her
+    companionName: () => { const v = root.querySelector('#cyCompanionName')?.value ?? ''; return act(s => setCompanionName(s, v), 'Name saved'); },
+    comfortTry: () => act((s, t) => logComfortTry(s, t, ds.opt, { today: t }), 'Noted. You can tell us later whether it helped.'),
+    comfortAnswer: () => act(s => answerComfort(s, ds.id, ds.ans), 'Thanks, noted'),
+    deleteComfort: () => { if (!confirm('Delete everything you recorded about what you tried and whether it helped?')) return; return act(s => deleteComfort(s), 'Comfort records deleted'); },
+    dismissInsight: () => act((s, t) => { s.dismissed[ds.key] = t; }, 'Dismissed'),
+    patternReminder: () => act(s => { if (!s.consent.reminders) M.setScopeConsent(s, 'reminders', true); const p = findPatterns(s).find(x => x.key === ds.key); addReminder(s, { kind: 'pattern', time: '09:00', cycleDay: p.from, category: p.category, origin: p.text }); }, 'Reminder set for next cycle'),
+    checkinReminder: () => act(s => { if (!s.consent.reminders) M.setScopeConsent(s, 'reminders', true); addReminder(s, { kind: 'dailyLog', time: '20:00' }); }, 'Daily check-in set for 20:00'),
+    remindersOn: () => act(s => M.setScopeConsent(s, 'reminders', true)),
+    remindersOff: () => act(s => M.setScopeConsent(s, 'reminders', false), 'Reminders deleted'),
+    addRem: () => act(s => addReminder(s, { kind: remKind, time: remTime, weekday: 1 }), 'Reminder added'),
+    delRem: () => act(s => deleteReminder(s, rid), 'Reminder deleted'),
+    pauseRem: () => act((s, t) => { const r = s.reminders.find(x => x.id === rid); updateReminder(s, r.id, { pausedUntil: r.pausedUntil && r.pausedUntil >= t ? null : addDays(t, 6) }); }),
+    pauseAll: () => act((s, t) => { s.settings.remindersPausedUntil = s.settings.remindersPausedUntil && s.settings.remindersPausedUntil >= t ? null : addDays(t, 6); }),
+    ackDue: () => act((s, t) => markDelivered(s, ds.id, t)),
+    notifPerm: async () => { if (typeof Notification === 'undefined') return toast('Notifications aren\'t supported here.'); toast((await Notification.requestPermission()) === 'granted' ? 'Notifications allowed' : 'Notifications not allowed'); },
+    lhOn: () => act(s => M.setScopeConsent(s, 'lhTests', true), 'Ovulation test logging on'),
+    lhOff: () => { if (!confirm('Turn off ovulation test logging and delete the results you recorded?')) return; return act(s => M.setScopeConsent(s, 'lhTests', false), 'Ovulation test results deleted'); },
+    summary: () => { summaryMonths = Number(sumMonths) || 12; render(); root.querySelector('#cySummary')?.scrollIntoView?.({ block: 'start' }); },
+    closeSummary: () => { summaryMonths = null; render(); },
+    printSummary: () => { document.body.classList.add('cy-printing'); const done = () => { document.body.classList.remove('cy-printing'); window.removeEventListener('afterprint', done); }; window.addEventListener('afterprint', done); window.print(); },
+    downloadSummary: () => { const t = now().today, txt = summaryText(clinicianSummary(repo.read(), { today: t, months: summaryMonths || 12 })); const url = URL.createObjectURL(new Blob([txt], { type: 'text/plain' })); const l = document.createElement('a'); l.href = url; l.download = `cycle-summary-${t}.txt`; document.body.appendChild(l); l.click(); setTimeout(() => { URL.revokeObjectURL(url); l.remove(); }, 1000); },
+    wearableOn: async () => { await act(s => M.setScopeConsent(s, 'wearable', true)); await sync(); },
+    syncWearable: () => sync(),
+    wearableOff: () => act(s => M.setScopeConsent(s, 'wearable', false), 'Wearable data deleted'),
+    export: () => { const data = repo.exportData(); const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); const l = document.createElement('a'); l.href = url; l.download = `shred-cycle-export-${now().today}.json`; document.body.appendChild(l); l.click(); setTimeout(() => { URL.revokeObjectURL(url); l.remove(); }, 1000); },
+    deleteAll: async () => { if (!confirm('Delete all cycle data on this device? This can\'t be undone.')) return; const r = await repo.deleteAll(); summaryMonths = null; toast(`Deleted. Not reachable: ${r.notReached.length} items (see settings).`); render(); },
+  }[a];
+  if (run) await run();
+}
+async function sync() {
+  const { today } = now();
+  const dev = new MockWearable({ seed: 7, highFrom: n => { const s = repo.read(); const st = s.periods.map(p => p.start).filter(x => x <= n).at(-1); return !!st && diffDays(st, n) >= 15; } });
+  const info = await dev.connect();
+  const { readings } = normalise(await dev.fetchPackets({ from: addDays(today, -21), to: addDays(today, -1) }));
+  await act(s => { if (!s.consent.wearable) throw new M.CycleError('NO_CONSENT'); s.wearable.devices = [{ ...info, adapter: dev.id, verified: dev.verified, connectedAt: today }]; s.wearable.nights = mergeNights(s.wearable.nights, summariseNights(readings)); }, 'Demo data synced (synthetic)');
+}
+/** The day form's values, read once when Save is pressed (finding 2b). */
+function daySnapshot() {
+  const f = { unwell: !!root.querySelector('#cyUnwell')?.checked, travel: !!root.querySelector('#cyTravel')?.checked };
+  for (const [id, k] of [['#cyAlcohol', 'alcohol'], ['#cyLateNight', 'lateNight'], ['#cyRoomTemp', 'hotOrColdRoom']]) { const el = root.querySelector(id); if (el) f[k] = el.checked; } // only when shown
+  root.querySelectorAll('[data-sym]').forEach(x => { f[x.dataset.sym] = x.value || null; });
+  const lh = root.querySelector('#cyLh'); if (lh) f.lh = lh.value || null;
+  return f;
+}
+async function onChange(e) {
+  const t = e.target; if (!repo) return;
+  if (t.id === 'cyCheckDate' && t.value) { checkDateNote = null; root.querySelector('#cyCheckDateNote')?.remove(); return; }
+  // As in onClick: read the changed control now, never inside the (possibly delayed or retried) transaction.
+  const checked = t.checked, value = t.value, data = { ...t.dataset }, rowRid = t.closest('[data-rid]')?.dataset.rid;
+  if (t.dataset.edit) {
+    const id = t.closest('[data-pid]').dataset.pid, k = t.dataset.edit;
+    const patch = k === 'missedBefore' || k === 'lengthConfirmed' ? { [k]: t.checked } : { [k]: t.value || (k === 'end' ? null : undefined) };
+    return act((s, d) => M.editPeriod(s, id, patch, { today: d }), 'Corrected');
+  }
+  if (t.dataset.cat) {
+    const k = t.dataset.cat;
+    if (t.checked) return act(s => M.setCategory(s, k, true), `${M.CATEGORIES[k].label} logging on`);
+    const purge = confirm(`Stop logging ${M.CATEGORIES[k].label.toLowerCase()}. Also delete what you already logged?`);
+    return act(s => M.setCategory(s, k, false, { purge }), purge ? 'Turned off and deleted' : 'Turned off');
+  }
+  if (data.sit) return act(s => M.setSituation(s, data.sit, checked)); // versioned (issue 4)
+  if (t.dataset.flag) { setFlag(t.dataset.flag, t.checked); return render(); }
+  if (data.rtime != null) return act(s => updateReminder(s, rowRid, { time: value }), 'Time changed');
+  if (t.id === 'cyQs' || t.id === 'cyQe') { const qh = { start: val('#cyQs'), end: val('#cyQe') }; return act(s => { s.settings.quietHours = qh; }, 'Quiet hours saved'); }
+  if (t.id === 'cyLockDetail') return act(s => { s.settings.lockScreenDetail = checked; });
+  if (t.id === 'cyAskLevel') return act(s => setAskLevel(s, value), 'Saved');
+}

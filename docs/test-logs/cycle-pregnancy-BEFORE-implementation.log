@@ -1,0 +1,13 @@
+FAIL module js/cycle/pregnancy.js exists  — Cannot find module '/home/user/shredbyqk/js/cycle/pregnancy.js' imported from /home/user/shredbyqk/tests/cycle-pregnancy.test.mjs
+FAIL a separate flag, off by default
+FAIL due date from the first day of her last period = +280 days (ACOG CO 700)
+FAIL starting pregnancy mode ran to the end  — TypeError: P.startPregnancy is not a function     at file:///home/user/shredbyqk/tests/cycle-pregnancy.test.mjs:33:5
+FAIL weeks and trimesters ran to the end  — TypeError: P.startPregnancy is not a function     at file:///home/user/shredbyqk/tests/cycle-pregnancy.test.mjs:46:24
+FAIL pregnancy symptom categories exist (group "pregnancy")
+FAIL swelling says sudden swelling of face or hands needs a call now
+FAIL postpartum categories exist (bleeding after birth, healing pain)
+FAIL birth → postpartum ran to the end  — TypeError: P.startPregnancy is not a function     at file:///home/user/shredbyqk/tests/cycle-pregnancy.test.mjs:74:29
+FAIL estimates restart after a pregnancy ran to the end  — TypeError: P.startPregnancy is not a function     at file:///home/user/shredbyqk/tests/cycle-pregnancy.test.mjs:89:29
+FAIL a pregnancy that ended ran to the end  — TypeError: P.startPregnancy is not a function     at file:///home/user/shredbyqk/tests/cycle-pregnancy.test.mjs:102:29
+FAIL companion in pregnancy and after birth ran to the end  — Error: cycle:INVALID_INPUT     at Module.setCategory (file:///home/user/shredbyqk/js/cycle/model.js:88:35)
+12 FAILED of 12

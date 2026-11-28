@@ -1,0 +1,17 @@
+FAIL learning: before any period, the card says to log the first period
+FAIL learning: after one start, it says the first cycle is in progress
+FAIL training: "Training" is an optional category in settings, off by default
+ok   comfort: with its flag off there is no comfort card
+FAIL Hume Band: the wearable card lists it as not available (unverified)
+ok   comfort: nothing before pain is logged
+FAIL comfort: moderate pain shows the card with heat, gentle movement and a warm drink
+FAIL comfort: warning signs are listed
+FAIL comfort: marked as awaiting clinician review, and not a treatment
+FAIL comfort: each option links its evidence
+FAIL run completed  — page.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-act=comfortTry][data-opt=heat]')[22m
+
+    at /home/user/shredbyqk/tests/cycle-ui-missing-links.cjs:50:15
+ok   no JavaScript errors
+9 FAILED of 12

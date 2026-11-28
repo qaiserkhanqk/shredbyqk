@@ -1,0 +1,91 @@
+FAIL module server/totp.js exists  — Cannot find module '/home/user/shredbyqk/research/server/totp.js' imported from /home/user/shredbyqk/research/tests/security.test.mjs
+FAIL module server/keys.js exists  — Cannot find module '/home/user/shredbyqk/research/server/keys.js' imported from /home/user/shredbyqk/research/tests/security.test.mjs
+FAIL module server/backup.js exists  — Cannot find module '/home/user/shredbyqk/research/server/backup.js' imported from /home/user/shredbyqk/research/tests/security.test.mjs
+(node:508) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+FAIL encryption: a store opened with a key reports encryption on  — undefined
+ok   encryption: imports still preview and commit
+ok   encryption: the malformed row is quarantined with its cells
+ok   encryption: analysis is identical to the unencrypted store (same inputs, same outputs, same input hash)
+ok   encryption: re-sent identical rows are exact duplicates
+ok   encryption: a changed reading for a stored timestamp is a conflict (quarantined)
+ok   encryption: the same source file is still recognised as already imported
+ok   encryption: corrections apply to encrypted observations
+ok   encryption: quarantined verbatim cells are readable by the researcher
+ok   encryption: export contains the decrypted annotations
+ok   encryption: withdrawing LH consent still deletes LH annotations
+FAIL encryption: no sensitive payload is readable in the database files (main, WAL, SHM)  — manufacturer, serial, entry id, hormonal type, bleeding value, cycle start date, quarantined cell, night label
+FAIL encryption: the MFA secret is not stored in plaintext
+ok   encryption: the database file is still a valid SQLite file (metadata such as refs stays queryable)
+FAIL encryption: opening an encrypted database without a key is refused (db_key_required)  — null
+FAIL encryption: opening it with the wrong key is refused (db_key_invalid)
+FAIL encryption: a key that is not 32 bytes is refused (key_invalid)
+FAIL rotation: rotateKey is available  — storeMod.rotateKey is not a function
+ok   upgrade: the unencrypted database really does contain readable payloads (control)
+FAIL upgrade: after opening with a key, no sensitive payload is readable in the files  — manufacturer, serial, entry id, LH type, hormonal type, LH value, bleeding value, cycle start date, quarantined cell, night label
+ok   upgrade: the analysis is unchanged after encryption
+FAIL upgrade: the upgraded database now refuses to open without the key
+FAIL server: refuses to start on a file database without an encryption key
+FAIL server: starts with a key and encrypts
+FAIL totp: matches the RFC 6238 test vectors  — 000000,000000,000000,000000,000000,000000
+FAIL totp: base32 round trip
+FAIL mfa: a researcher without two-factor set up cannot sign in when it is required (403 mfa_enrolment_required)  — 200 undefined
+FAIL mfa: the refused sign-in sets no session cookie
+FAIL mfa: enrolment returns a base32 secret and an otpauth URI  — {}
+ok   mfa: an unconfirmed enrolment does not turn two-factor on
+FAIL mfa: confirming with a wrong code fails
+FAIL mfa: confirming with a valid code enables it and returns 10 one-time recovery codes  — {}
+ok   mfa: recovery codes are stored only as hashes
+FAIL mfa: correct password without a code → 401 mfa_code_required, no session  — 200 undefined
+FAIL mfa: a wrong code → 401 login_failed
+ok   mfa: a valid code with a wrong password → 401 login_failed (no hint)
+ok   mfa: password + valid code → signed in
+FAIL mfa: the same code cannot be used twice (replay refused)
+ok   mfa: the next time step's code works
+ok   mfa: a recovery code signs in once
+FAIL mfa: a used recovery code is refused
+FAIL mfa: the status shows 9 recovery codes left
+FAIL mfa: five wrong codes lock the account (even a valid code is then refused)
+ok   mfa: a participant can sign in without two-factor (optional for participants)
+FAIL mfa: self-enrolment needs the current password (401 password_incorrect)  — 404 not_found
+FAIL mfa: self-enrolment returns a secret and otpauth URI  — 404 {"error":"not_found","label":"Research prototype. Not for contraception, diagnosis or medical decisions."}
+FAIL mfa: self-enrolment is confirmed with a code and returns recovery codes  — 404 {"error":"not_found","label":"Research prototype. Not for contraception, diagnosis or medical decisions."}
+FAIL mfa: turning on two-factor ends the account's other sessions
+FAIL mfa: after self-enrolment, sign-in needs a code
+FAIL mfa: turning it off needs password and a code
+FAIL mfa: a participant can turn it off with password and code
+FAIL mfa: a researcher cannot turn it off while it is required (403 mfa_required_for_role)  — 404 not_found
+FAIL mfa: the account endpoint shows two-factor status without the secret  — {"error":"not_found","label":"Research prototype. Not for contraception, diagnosis or medical decisions."}
+FAIL mfa: no secret, code or recovery code appears in logs or the audit trail
+FAIL mfa: sign-in outcomes are audited (codes only)  — login,login_failed
+FAIL sessions: lists the account's sessions, exactly one marked current  — 404 {"error":"not_found","label":"Research prototype. Not for contraception, diagnosis or medical decisions."}
+ok   sessions: each has a short opaque id and times, never a token
+FAIL sessions: revoking needs the CSRF token
+FAIL sessions: "sign out other sessions" ends them and keeps this one  — 404 {"error":"not_found","label":"Research prototype. Not for contraception, diagnosis or medical decisions."}
+FAIL password: a wrong current password → 401 password_incorrect  — 404 not_found
+FAIL password: a new password under 12 characters → 400 password_too_short
+FAIL password: the same password → 400 password_unchanged
+FAIL password: a password containing the username → 400 password_contains_username  — 404 not_found
+FAIL password: change succeeds and ends the other sessions  — 404 {"error":"not_found","label":"Research prototype. Not for contraception, diagnosis or medical decisions."}
+FAIL password: the old password no longer works, the new one does
+FAIL password: the change is audited without any password
+ok   password: five wrong current passwords lock the account
+FAIL cli: generate-key writes owner-only key files  — usage: RESEARCH_NEW_PASSWORD=… node research/server/cli.mjs create-user --role admin|researcher --username NAME
+
+ok   cli: generate-key refuses to overwrite an existing key
+ok   cli: create-user works on an encrypted database
+FAIL cli: enroll-mfa prints an otpauth URI for the operator to pass on  — usage: RESEARCH_NEW_PASSWORD=… node research/server/cli.mjs create-user --role admin|researcher --username NAME
+
+FAIL cli: confirm-mfa enables it with a code and prints recovery codes  — usage: RESEARCH_NEW_PASSWORD=… node research/server/cli.mjs create-user --role admin|researcher --username NAME
+
+FAIL cli: backup writes an encrypted backup  — usage: RESEARCH_NEW_PASSWORD=… node research/server/cli.mjs create-user --role admin|researcher --username NAME
+
+FAIL cli: verify-backup confirms it  — usage: RESEARCH_NEW_PASSWORD=… node research/server/cli.mjs create-user --role admin|researcher --username NAME
+
+FAIL cli: restore writes a new database  — usage: RESEARCH_NEW_PASSWORD=… node research/server/cli.mjs create-user --role admin|researcher --username NAME
+
+ok   cli: rotate-key needs an existing new key file (refuses a missing one)
+FAIL cli: rotate-key re-wraps the data key  — usage: RESEARCH_NEW_PASSWORD=… node research/server/cli.mjs create-user --role admin|researcher --username NAME
+
+ok   cli: nothing secret is printed by backup or restore
+55 FAILED of 81

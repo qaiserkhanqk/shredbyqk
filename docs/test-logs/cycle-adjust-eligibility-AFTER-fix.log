@@ -1,0 +1,26 @@
+ok   same band and firmware throughout, a lasting rise: adjusted
+ok   …and the research evaluator gives the same range
+ok   one period since the pregnancy: the dates-only model gives no date
+ok   …and neither does the temperature model, even with a rise this cycle
+ok   …with a plain reason about the pregnancy
+ok   …and "Not enough data yet" because neither model can estimate
+ok   the evaluator agrees (no sensor use)
+ok   two eligible new cycles with a rise + a rise now: adjusts again
+ok   …using only cycles after the pregnancy (2 intervals, all 14 days, none of the old 10s)
+ok   after a birth, with postpartum mode off: still no date from one new period
+ok   newer usable nights show the rise went back to baseline: not adjusted
+ok   …with a plain reason, and no claim about what it means
+ok   …falling back to the dates-only result, which is shown
+ok   the evaluator falls back to the dates-only model too
+ok   control: the same rise, still elevated, is used
+ok   new firmware this cycle, history from the old firmware: not adjusted
+ok   …with a plain reason about the change
+ok   …and the dates-only result is shown instead
+ok   a different band of the same model: not combined either
+ok   firmware unknown for the current readings: waits (no compatibility guess)
+ok   identity unknown throughout: still not combined (unknown is never treated as the same)
+ok   one cycle of history from the new setup: still waiting
+ok   two cycles of history from the new setup: adjusts, using only that history
+ok   the evaluator applies the same rule
+ok   no forbidden wording and no ovulation, fertility or contraception claims
+ALL PASS (25)

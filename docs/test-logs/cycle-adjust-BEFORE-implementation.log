@@ -1,0 +1,12 @@
+FAIL module js/cycle/adjust.js exists  — Cannot find module '/home/user/shredbyqk/js/cycle/adjust.js' imported from /home/user/shredbyqk/tests/cycle-adjust.test.mjs
+FAIL a separate research flag, off by default
+FAIL rise this cycle + 2 or more past rises: the estimate is adjusted  — {}
+FAIL adjusts ran to the end  — TypeError: Cannot read properties of null (reading '1')     at toUTC (file:///home/user/shredbyqk/js/cycle/dates.js:16:62)
+FAIL no rise yet this cycle: not adjusted, with that reason  — {}
+FAIL fewer than 2 past cycles with a rise: not adjusted  — {}
+FAIL band not worn in this cycle's second half: not adjusted, no guessing  — {}
+FAIL band switched off (data deleted): not adjusted
+FAIL pregnant: not adjusted
+FAIL hormonal contraception: not adjusted (no natural temperature pattern to use)
+FAIL identical ranges to the evaluated sensor candidate wherever it used the band  — 0/50
+11 FAILED of 11

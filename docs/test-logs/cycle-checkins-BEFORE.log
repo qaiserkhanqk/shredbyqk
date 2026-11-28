@@ -1,0 +1,7 @@
+FAIL module js/cycle/checkins.js exists  — Cannot find module '/home/user/shredbyqk/js/cycle/checkins.js' imported from /home/user/shredbyqk/tests/cycle-checkins.test.mjs
+FAIL when it asks ran to the end  — TypeError: C.periodCheckIn is not a function     at file:///home/user/shredbyqk/tests/cycle-checkins.test.mjs:28:42
+FAIL how often, when late ran to the end  — TypeError: C.periodCheckIn is not a function     at file:///home/user/shredbyqk/tests/cycle-checkins.test.mjs:41:88
+FAIL answering with the real day ran to the end  — TypeError: C.answerPeriodCheckIn is not a function     at file:///home/user/shredbyqk/tests/cycle-checkins.test.mjs:51:5
+FAIL a forgotten period ran to the end  — TypeError: C.missedLogQuestion is not a function     at file:///home/user/shredbyqk/tests/cycle-checkins.test.mjs:63:15
+FAIL wording ran to the end  — TypeError: C.periodCheckIn is not a function     at file:///home/user/shredbyqk/tests/cycle-checkins.test.mjs:80:15
+6 FAILED of 6

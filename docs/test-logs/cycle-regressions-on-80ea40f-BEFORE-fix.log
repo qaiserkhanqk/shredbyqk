@@ -1,0 +1,24 @@
+FAIL 1 six contiguous 30-min readings all marked poor: not an "ok" night, all 6 rejected  — {"status":"ok","rejected":0}
+FAIL 1 rejection reasons are recorded per reason
+FAIL 1 mixed night: only the good readings are used, poor ones counted as rejected  — {"samples":12,"rejected":0}
+FAIL 1 nights made only of poor readings cannot trigger a temperature shift
+FAIL 2 a temporary August rise that returned to baseline is not shown in November as "possibly after ovulation"  — {"status":"estimate","label":"Possibly after ovulation (estimate)","text":"A sustained rise in wrist skin temperature was seen from 2026-08-15. That can be consistent with ovulation having already happened, but it is not proof and it was only visible afterwards."}
+FAIL 2 contradictory evidence (rise, then back to baseline): abstains
+FAIL 2 missing recent evidence (no readings for the last nights): abstains
+ok   2 control: a rise still present last night, within usual cycle length, can still be shown as an estimate
+FAIL 3 no logs outside the window: the outside rate is unknown (null), not 0  — 0
+FAIL 3 …and no pattern is surfaced without comparative evidence
+FAIL 3 the explanation never says "0% of your logs at other times"
+FAIL 3 the status says the comparison is missing  — {"category":"energy","status":"found","patterns":[{"category":"energy","from":24,"to":24,"found":true,"observed":3,"notable":3,"completeCycles":6,"daysLogged":3,"fromSuggestions":0,"outsideRate":0,"evidence":[{"cycleStart":"2026-03-01","observed":true,"notable":true,"entries":[{"day":24,"date":"2026-03-24","value":"low","source":"typed"}]},{"cycleStart":"2026-03-31","observed":false,"entries":[]},{"cycleStart":"2026-04-30","observed":true,"notable":true,"entries":[{"day":24,"date":"2026-05-23","value":"low","source":"typed"}]},{"cycleStart":"2026-05-30","observed":false,"entries":[]},{"cycleStart":"2026-06-29","observed":true,"notable":true,"entries":[{"day":24,"date":"2026-07-22","value":"low","source":"typed"}]},{"cycleStart":"2026-07-29","observed":false,"entries":[]}],"key":"energy:24-24","text":"You logged lower energy around cycle days 24–24 in 3 of your last 3 recorded cycles with energy logs there."}]}
+FAIL 4 six identical 28-day cycles: a single date is not called an "estimated range"  — {"headline":"Estimated range","from":"2026-07-22","to":"2026-07-22"}
+FAIL 4 the text always says the period can fall outside what past cycles show  — Your last 6 cycles were between 28 and 28 days long (typical: 28). The range covers that spread.
+FAIL 4 the result declares it is not a calibrated interval
+FAIL 4 no invented padding: one 40-day cycle shows day 40 only, not a ±2-day "range"  — 2026-12-07–2026-12-11
+FAIL 5 identical resync keeps the January sync time  — 2026-06-01T08:00:00.000Z
+FAIL 5 the January historical view still has the night
+FAIL 5 a later material change: January view shows the January value, current view the new one  — []
+ok   6 current view shows the corrected value
+FAIL 6 the January historical view keeps what was known in January
+ok   6 a deleted entry is gone from current AND historical views (deletion honoured)
+ok   6 purge (consent withdrawal for mood) removes the value and its history everywhere
+19 FAILED

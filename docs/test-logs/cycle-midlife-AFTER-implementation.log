@@ -1,0 +1,36 @@
+ok   a separate flag, off by default
+ok   six midlife symptom categories exist
+ok   they are grouped as "midlife" (shown only in perimenopause mode)
+ok   each uses none / mild / moderate / severe, moderate or severe being notable
+ok   each explanation says what it is in plain words
+ok   hot flushes include night sweats
+ok   heart racing says to get urgent help for chest pain, breathlessness or fainting
+ok   off until switched on, like every category
+ok   once on, logged and counted in the doctor summary
+ok   the older categories are not in the midlife group
+ok   nothing unless she marked perimenopause or menopause
+ok   STRAW+10 numbers are the published ones, kept in one place
+ok   steady cycles: no variability observation
+ok   one odd cycle (28, 36, 29) is a single episode, not described as persistent
+ok   a difference of 7+ days that recurs within 10 cycles is described
+ok   the description gives her own cycle lengths and the published criterion, with the source
+ok   it never says she IS in perimenopause or menopause (no diagnosis)
+ok   it says other things can cause it
+ok   a single change that has not recurred is not described as persistent
+ok   60+ days without a logged period (64-day cycle, no end logged → 63 days) is described
+ok   a gap she marked as a missed log is not counted
+ok   12+ months since the last logged period: milestone, explained as looked back on
+ok   and it says any bleeding from now on should be checked by a doctor
+ok   under 12 months: counts the months, no milestone
+ok   bleeding logged after 12+ months without a period: a prominent "see a doctor" warning
+ok   spotting after 12+ months counts too
+ok   not applicable with "hormonalContraception": no bleeding-pattern observations, and it says why
+ok   not applicable with "other": no bleeding-pattern observations, and it says why
+ok   not applicable while pregnant
+ok   warning signs always included
+ok   marked as awaiting clinician review
+ok   sources are listed with DOI links (at least 8)
+ok   no hormone, medicine or dose advice
+ok   no forbidden wording (output policy)
+ok   the intro says experiences vary widely and she is the expert in her own experience
+ALL PASS (35)

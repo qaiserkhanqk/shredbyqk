@@ -1,0 +1,24 @@
+ok   not before her range starts
+ok   from the first day of her range: "Has your period started?"
+ok   …offering the real start day: today, yesterday, 2 days ago, or another date
+ok   …never a day on or before her last logged start
+ok   …plus "Spotting only" and "Not yet"
+ok   asking never changes her data
+ok   "Not yet": quiet for the rest of the day, asks again tomorrow
+ok   daily for 7 days after her range, then every 3 days (less nagging)
+ok   when late: gentle, no alarm, no pregnancy or medical claims
+ok   once she logs a start, it stops
+ok   "Yesterday" logs yesterday (the real start), marked as from the check-in
+ok   a future date is refused
+ok   a date on or before her last start is refused
+ok   Zara's "My period started" can take the real day too (2 days ago)
+ok   a gap of about two of her usual cycles: asks whether she missed logging one
+ok   …asking never changes her data
+ok   "Yes": that gap is no longer used as one long cycle in her estimate
+ok   "No": the gap is kept as a real cycle, and she is not asked again
+ok   a normal cycle (30 days) is not questioned
+ok   a long cycle that is not near two of hers (40 days) is not questioned
+ok   with fewer than 2 earlier cycles it does not ask (too little to compare)
+ok   the rule is a data-quality question, documented, not a physiological threshold
+ok   no forbidden wording, no fertility or pregnancy claims
+ALL PASS (23)

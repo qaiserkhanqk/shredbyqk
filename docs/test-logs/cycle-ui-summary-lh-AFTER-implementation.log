@@ -1,0 +1,24 @@
+ok   S1 a "summary for a doctor" button is offered
+ok   S1 no summary is shown until the person asks
+ok   S2 the summary appears on request, with periods, cycle lengths and pain counts  — Summary for a doctorCycle summary for a health professional
+Made on 2026-11-18, on request, from your own entries in Shred by QK (prototype). Covers 2025-11-18 to 2026-11-18.
+This is not a diagnosis a
+ok   S2 it says it is not a diagnosis and comes from the person's own entries
+ok   S2 it contains no estimate or fertility wording
+ok   S3 print and download-as-text buttons are offered; nothing is sent anywhere  — https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap https://fonts.gstatic.com/l/font?kit=k3k6o8UDI-1M0wlSV9XA35FckqWY8Q82se6RE-NWIDdgffTTnTRZ9xdp&skey=8131191f4580dfcb&v=v25 https://fonts.gstatic.com/l/font?kit=_XmG-HUzqDCFdgfMsYiV_F7wfS-Bs_d_QDxV4LHMfNf0Ye72ZD46KIt9&skey=3eaac920d8b62e62&v=v9 https://fonts.gstatic.com/s/ibmplexmono/v23/-F6qfjptAgt5VM-kVkqdyU8n3twJwlBFgg.woff2 https://fonts.gstatic.com/s/ibmplexmono/v23/-F6qfjptAgt5VM-kVkqdyU8n3vAOwlBFgg.woff2 https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap https://fonts.gstatic.com/s/archivo/v25/k3kQo8UDI-1M0wlSfdnoLg.woff2 https://fonts.gstatic.com/s/figtree/v9/_Xms-HUzqDCFdgfMm4S9DQ.woff2 https://fonts.gstatic.com/s/ibmplexmono/v23/-F6qfjptAgt5VM-kVkqdyU8n3twJwlBFgg.woff2 https://fonts.gstatic.com/s/ibmplexmono/v23/-F6qfjptAgt5VM-kVkqdyU8n3vAOwlBFgg.woff2
+ok   S3 the download is a local plain-text file with the same summary  — cycle-summary-2026-11-18.txt
+ok   S4 the summary is not stored in plain localStorage
+ok   S4 the summary can be closed
+ok   L1 with the LH research flag off, there is no LH field or opt-in
+ok   L2 with the flag on, LH logging needs its own opt-in first
+ok   L3 after opting in, the log form has an LH result field
+ok   L3 the result is saved in the encrypted store  — positive
+ok   L4 a positive result adds no fertility or ovulation wording to the page  — 1 → 1
+ok   L5 the doctor summary lists the LH result as recorded, not interpreted  —  (not interpreted)
+  2026-11-18: Positive
+    PrintSave as text fileClose
+    Made only because you asked. It isn't saved or sent anywhere. A printed or saved copy isn't encrypted, so keep it private.
+ok   L6 turning LH logging off deletes the results  — 0
+ok   no JavaScript errors
+ALL PASS
+exit 0

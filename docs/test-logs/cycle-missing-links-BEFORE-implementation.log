@@ -1,0 +1,43 @@
+FAIL module ../js/cycle/learning.js exists  — Cannot find module '/home/user/shredbyqk/js/cycle/learning.js' imported from /home/user/shredbyqk/tests/cycle-missing-links.test.mjs
+FAIL module ../js/cycle/comfort.js exists  — Cannot find module '/home/user/shredbyqk/js/cycle/comfort.js' imported from /home/user/shredbyqk/tests/cycle-missing-links.test.mjs
+FAIL A no period logged: stage "not_started", tells her what to do first  — {}
+FAIL A one start: "first_cycle", an estimate appears after the next start  — {}
+FAIL A one complete cycle: "learning", 1 of 3 cycles  — {}
+FAIL A three complete cycles: "learned", and it keeps updating  — {}
+FAIL A the 3-cycle threshold is the estimate's own (no new number)
+FAIL A a cycle with a missed log does not count towards learning  — {}
+FAIL A pregnancy pauses the learning message too
+ok   B no band consent: no band section
+FAIL B counts nights recorded this cycle (usable ones only)  — {}
+FAIL B says how many nights the temperature research needs (its own 6 + 3)  — {}
+FAIL B last night (29th) not recorded: says so plainly  — {}
+FAIL B and says nothing is filled in, and the period estimate does not depend on the band
+FAIL B last night too short: "too little wear"
+FAIL B last night recorded: "recorded", no warning
+FAIL C alcohol, late night and hot or cold room can be logged per night (true/false)  — INVALID_INPUT
+ok   C only true or false is accepted
+FAIL C section ran to the end  — Error: cycle:INVALID_INPUT     at Module.logDay (file:///home/user/shredbyqk/js/cycle/model.js:216:18)
+FAIL D a separate flag, off by default
+ok   D nothing without the pain category on
+ok   D nothing when no pain is logged today
+ok   D nothing for mild pain (only moderate or severe, the category's own "notable" values)
+FAIL D moderate pain: offers heat, gentle movement and a warm drink  — []
+ok   D every option cites published evidence (DOI links)
+FAIL D warning signs are always included
+FAIL D the wording is marked as awaiting clinician review
+FAIL D says it is not treatment and that results differ between people
+ok   D never suggests medicines, supplements, doses, calories or weight
+ok   D no forbidden wording (output policy)
+FAIL D severe pain: warning signs come first
+FAIL D only the listed options can be logged
+FAIL D not in the future
+FAIL D section ran to the end  — TypeError: C.logComfortTry is not a function     at tryIt (file:///home/user/shredbyqk/tests/cycle-missing-links.test.mjs:117:58)
+FAIL E "training" is an optional category: easier / usual / harder
+FAIL E its explanation says no training advice is given by cycle phase
+FAIL E off until switched on, like every category
+FAIL E section ran to the end  — Error: cycle:INVALID_INPUT     at Module.setCategory (file:///home/user/shredbyqk/js/cycle/model.js:71:35)
+FAIL F app: a Hume Band adapter exists and is not verified
+FAIL F app: it refuses to connect (NOT_VERIFIED) and says why
+FAIL F app: listed with the other adapters
+FAIL F research prototype: a Hume Band stub that refuses to import and returns the supplier questions
+34 FAILED of 42

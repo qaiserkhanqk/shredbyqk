@@ -1,0 +1,24 @@
+ok   first launch: "Which best describes you?" is on the welcome screen
+ok   man: no age or period question appears
+ok   man: lands on Today, with no Cycle tab and no cycle tile
+ok   second launch: the questions are not asked again
+ok   woman: asked her age
+ok   …then asked whether she would like to track her periods
+ok   yes: she goes straight to her cycle screen, with a Cycle tab in the bottom bar
+ok   …and the bottom bar stays on one row with five tabs (found in a screenshot)
+ok   …and the cycle screen has no "Body" back link when it has its own tab
+ok   Zara introduces herself on screen as her cycle companion (not clinical)
+ok   …and the consent terms are still there, unchanged
+ok   after consent, Zara asks when her last period started
+ok   …saving both dates gives her a first, early estimate, and Zara's question goes away
+ok   the period answer is not stored in the main app data (only her profile answers are)
+ok   nothing about periods was put in a notification
+FAIL the age choices are "Under 18" and "18 or over"
+FAIL run completed  — page.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('#aboutYou [data-about=age][data-val="under18"]')[22m
+
+    at pick (/home/user/shredbyqk/tests/onboarding-ui.cjs:21:31)
+    at /home/user/shredbyqk/tests/onboarding-ui.cjs:66:13
+ok   no JavaScript errors
+2 FAILED of 18

@@ -17,6 +17,11 @@ function preferredLiveModel() {
   return (navigator.hardwareConcurrency || 4) >= 6 ? 'full' : 'lite';
 }
 
+/** True when this browser can create a WebGL context (needed by MediaPipe's GPU delegate). */
+export function hasWebGL() {
+  try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch { return false; }
+}
+
 async function create(mode, model) {
   fileset ||= await FilesetResolver.forVisionTasks(new URL('../vendor/wasm', import.meta.url).href);
   const opts = delegate => ({
@@ -24,6 +29,10 @@ async function create(mode, model) {
     runningMode: mode, numPoses: 1,
     minPoseDetectionConfidence: 0.5, minPosePresenceConfidence: 0.5, minTrackingConfidence: 0.5,
   });
+  // MediaPipe's web tasks need WebGL even with the CPU delegate: without it, creation still "succeeds" and the first
+  // detect() throws "GLctx is undefined" (found in headless Firefox, 2026-11-25). Fail early with a clear reason so
+  // the app can say what is wrong instead of "that file couldn't be read".
+  if (!hasWebGL()) throw new Error('webgl_unavailable');
   try { return await PoseLandmarker.createFromOptions(fileset, opts('GPU')); }
   catch { return await PoseLandmarker.createFromOptions(fileset, opts('CPU')); }
 }

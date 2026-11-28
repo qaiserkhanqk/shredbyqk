@@ -1,0 +1,11 @@
+ok   flag off: no companion card
+FAIL day 1 of a period: QK asks how she is feeling
+FAIL the companion card is the first card on the screen (above the estimate)
+FAIL it says why it is asking
+FAIL run completed  — page.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('#cyCompanion [data-act=companionAnswer][data-ans=cramps]')[22m
+
+    at /home/user/shredbyqk/tests/cycle-ui-companion.cjs:37:15
+ok   no JavaScript errors
+4 FAILED of 6

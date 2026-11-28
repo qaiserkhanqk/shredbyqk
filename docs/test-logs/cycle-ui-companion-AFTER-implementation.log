@@ -1,0 +1,12 @@
+ok   flag off: no companion card
+ok   day 1 of a period: QK asks how she is feeling
+ok   the companion card is the first card on the screen (above the estimate)
+ok   it says why it is asking
+ok   "Cramps" asks how strong, in one tap
+ok   after answering, the check-in closes for today
+ok   her answer is saved in today's log
+ok   and what helped her before is offered (comfort card)
+ok   "Not now" hides it
+ok   …and it stays hidden for the rest of today
+ok   no JavaScript errors
+ALL PASS (11)

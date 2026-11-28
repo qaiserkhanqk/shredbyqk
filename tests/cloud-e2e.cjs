@@ -79,7 +79,7 @@ function fakeSupabase(route) {
   // Client: sign up, log two sets (injected), connect to the coach.
   const c = await ctx.newPage(); c.on('pageerror', e => errs.push('client: ' + e.message));
   await c.goto('https://shred.local/');
-  await c.fill('#welcomeName', 'Sara'); await c.click('#welcomeBtn'); await c.click('[data-focus=train]'); await c.click('[data-goal=hyrox]'); await c.click('#obDone');
+  await c.fill('#welcomeName', 'Sara'); await c.click('#welcomeBtn'); await c.click('#aboutNext'); /* merge 2026-11-27: skip the optional "about you" step */ await c.click('[data-focus=train]'); await c.click('[data-goal=hyrox]'); await c.click('#obDone');
   await c.evaluate(() => { const S = JSON.parse(localStorage.getItem('shred_qk_v1')); const now = Date.now(); S.sessions = [0, 1].map(i => ({ at: now - 3600e3 + i * 6e4, ex: 'squat', name: 'Back Squat', reps: 8, good: 8 - i, kg: 60 })); localStorage.setItem('shred_qk_v1', JSON.stringify(S)); });
   await c.reload(); await c.waitForTimeout(400);
   await c.click('.tabs [data-tab=progress]'); await c.click('#coachLink summary');

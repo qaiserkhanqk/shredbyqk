@@ -1,0 +1,5 @@
+FAIL 3 the version string differs from the version before night aggregation  — three-over-six-skin-0.1.0-research
+FAIL 3 the version string names the night-aggregation change  — three-over-six-skin-0.1.0-research
+ok   3 every result reports the new version
+2 FAILED
+exit 1
