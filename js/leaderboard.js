@@ -52,7 +52,7 @@ export function displayName(p = {}) {
   const nick = (p.nickname || '').trim();
   if (nick) return nick.slice(0, 24);
   const [f, l] = (p.name || '').trim().split(/\s+/);
-  return f ? `${f}${l ? ' ' + l[0].toUpperCase() + '.' : ''}` : 'Shredder';
+  return f ? `${f}${l && /^\p{L}/u.test(l) ? ' ' + l[0].toUpperCase() + '.' : ''}` : 'Shredder';
 }
 
 /** Rank among rows [{ score, me }], ties share a rank (1, 2, 2, 4). */

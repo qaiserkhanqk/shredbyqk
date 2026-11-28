@@ -45,7 +45,7 @@ check('bench: shoulders rolling off the bench detected on reps 1–2', bp.reps[0
 check('bench: no leg drive detected on reps 4–5', bp.reps[3]?.includes('bp_legs') && bp.reps[4]?.includes('bp_legs'));
 check('bench: hips off the bench detected on rep 7', bp.reps[6]?.includes('bp_butt'));
 check('bench: clean reps have no faults', [2, 5, 7].every(i => bp.reps[i]?.length === 0), JSON.stringify([2, 5, 7].map(i => bp.reps[i])));
-check('bench: cues shoulder blades and leg drive', bp.said.some(x => x.includes('shoulder blades')) && bp.said.some(x => x.includes('drive them into the floor')));
+check('bench: cues shoulder blades and leg drive', bp.said.some(x => x.includes('pin your back into the bench')) && bp.said.some(x => x.includes('drive them into the floor')));
 
 // Rules limited with `only` must not fire on machines where they don't apply.
 const lp = new RepEngine(exFor('legPress'), 'side');

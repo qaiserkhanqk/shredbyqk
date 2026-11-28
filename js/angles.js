@@ -65,3 +65,36 @@ export class Smoother {
   }
   reset() { this.v = {}; }
 }
+
+// One Euro filter (Casiez, Roussel & Vogel, CHI 2012): smooths hard when the joint is still (no jitter at the
+// bottom of a squat) and barely at all when it moves fast (no lag on the way up). Same push(key, val) API as
+// Smoother, plus an optional time in ms. minCutoff (Hz) sets the smoothing at rest; beta how fast it lets go.
+export class OneEuro {
+  constructor({ minCutoff = 1.2, beta = 0.05, dCutoff = 1 } = {}) { this.o = { minCutoff, beta, dCutoff }; this.s = {}; }
+  push(key, val, t = (typeof performance !== 'undefined' ? performance.now() : Date.now())) {
+    if (val == null || Number.isNaN(val)) return this.s[key]?.x;
+    const st = this.s[key], a = (dt, fc) => { const r = 2 * Math.PI * fc * dt; return r / (r + 1); };
+    if (!st) { this.s[key] = { x: val, dx: 0, t }; return val; }
+    const dt = Math.max(1e-3, (t - st.t) / 1000), dx = (val - st.x) / dt;
+    const edx = st.dx + a(dt, this.o.dCutoff) * (dx - st.dx);
+    const fc = this.o.minCutoff + this.o.beta * Math.abs(edx);
+    const x = st.x + a(dt, fc) * (val - st.x);
+    this.s[key] = { x, dx: edx, t }; return x;
+  }
+  reset() { this.s = {}; }
+}
+
+// Joints each measurement depends on (BlazePose indices, left/right).
+const JOINTS = { knee: [[23, 25, 27], [24, 26, 28]], hip: [[11, 23, 25], [12, 24, 26]], elbow: [[11, 13, 15], [12, 14, 16]] };
+/**
+ * How clearly the camera sees the joints this exercise is judged on (0–1, the worst one).
+ * Research: gating out low-confidence frames lifted squat-angle agreement from ICC 0.43 to 0.77 (Yue 2026).
+ * Side view: the side facing the camera. Front view: both sides (knee-cave needs both knees).
+ */
+export function jointVisibility(px, primary, view = 'side') {
+  const set = JOINTS[primary] || [[11, 23, 25, 27, 13, 15], [12, 24, 26, 28, 14, 16]];
+  const v = side => Math.min(...side.map(i => px[i]?.v ?? 0));
+  if (view === 'front') return Math.min(v(set[0]), v(set[1]));
+  return Math.max(v(set[0]), v(set[1]));
+}
+export const VIS_MIN = 0.5;

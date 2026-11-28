@@ -634,3 +634,76 @@ After the last set of a guided workout, a full-screen summary shows before the c
 - Monday is a "fresh start", when people are most likely to begin goals (Dai, Milkman & Riis 2014). Whoop sends its weekly assessment on Monday.
 - One focus, not a list, follows MacroFactor's weekly check-in approach.
 - A missed week opens with "A quiet week happens…", never a broken streak. Rewarding a return after a miss raised gym visits by 27% in a 61,000-person megastudy (Milkman et al. 2021), and broken-streak messages lower re-engagement (Silverman & Barasch 2023).
+
+## Camera accuracy (`js/angles.js`, `js/exercises.js`, `js/accuracy.js`)
+
+**What the evidence says a single phone camera can do.**
+- Rep counting from pose landmarks is about 97% accurate (1,513 videos, 12 exercises; Sousa 2026, doi:10.3390/jfmk11020162).
+- Side-view hip and knee angles are the most valid (meta-analysis, Scataglini 2024, doi:10.3390/s24113686). Front and rotation angles are not valid as measurements: MediaPipe knee valgus was about 19° off 3D, while the *change* from the start position was valid (Asaeda 2024, doi:10.1016/j.heliyon.2024.e36338).
+- Against marker-based motion capture, errors range from 0.2° to 28.6° (review of 53 studies, Yoma 2025, doi:10.1080/02640414.2025.2518359).
+- Heavier models are not automatically better: in one study the high-complexity model distorted the skeleton more (Ferraris 2026, doi:10.3390/s26041146).
+
+So QK's job is to be a trustworthy coach: count accurately, give the big side-view cues, flag the rest as checks, and say nothing when it can't see.
+
+**What changed, and why:**
+1. **Per-joint gate.** Each frame records how clearly the camera sees the joints the exercise is judged on: the clearer side for side-view lifts, and both sides for front-view lifts (`jointVisibility`, threshold 0.5). On unclear frames the rep is still counted but not judged. It never counts as clean or as a fault, and QK says "I couldn't see clearly". In one study, gating low-confidence frames raised squat-angle agreement from ICC 0.43 to 0.77 (Yue 2026, doi:10.2196/102399).
+2. **Front-view knee cave is a screening check, not a fault.** It is judged against the client's own standing knee/ankle-gap ratio, so a 20% drop from their own start. It is said once per set as "Worth a look on the replay", and never reduces the clean-rep score.
+3. **"Was QK right?"** One tap after each camera set: Spot on / Rep count off / That cue was wrong. Using − and + to fix the count records it too. Each answer is a label with numbers only (exercise, counted vs real reps, cue id, view, visibility), synced to `form_labels`. The coach dashboard shows:
+   - rep counts exactly right, and within one rep
+   - % of cues confirmed
+   - counting accuracy by exercise
+   - share of sets with unclear reps
+   - **cues to retune**: called wrong on 30%+ of 5+ sets
+
+   This is how the thresholds get tuned on real lifts (the step SCIENCE.md §13 called most important).
+4. **Effect-focused cues.** 15 body-focused cues were rewritten to point at the effect ("Pull the bar down to your collarbone", "Bend the bar into a smile"). External focus beats internal focus for performance (g = 0.26) and retention (g = 0.58) (Chua 2021 meta-analysis, doi:10.1037/bul0000335).
+5. **Visual feedback after every rep.** A bar per rep (height = range against the best rep in the set; green clean, amber fault, grey unclear) and a line such as "Rep 5 · full range · speed holding". Visual feedback beat verbal (g = 1.11 vs 0.47) in a 20-study meta-analysis (Weakley 2023, doi:10.1007/s40279-023-01877-2).
+6. **Adaptive smoothing (One Euro filter, Casiez et al. CHI 2012).** It smooths hard when a joint is still and lightly when it moves fast. Tested on the demo athletes: same reps and faults as before, jitter at rest more than halved, and no more lag on a fast descent than the old smoothing.
+7. **Setup check, a second into each set:** right view, head and feet in frame, not too far away (body at least 35% of the frame height), camera at 20 fps or more. QK says the first problem.
+8. **Personal range.** Each lifter's usual full range per exercise (median of clean reps, updated slowly) is kept. A set where every rep is a half rep is now caught as partial, not just reps short of that set's best.
+
+**Still true:** camera bar speed from the hips or wrists is not validated as m/s, so QK uses only its *change* within a set (velocity loss). Dedicated apps vary widely: Qwik VBT matched a transducer, while MyLift missed 175 of 589 reps (Renner 2024, doi:10.1371/journal.pone.0313919). No trial yet shows that camera form apps improve lifters' results; programming and consistency do. That's why the camera is optional and quick log is the default.
+
+## 3D Lab: two cameras (`js/lab3d.js`, `js/lab-ui.js`, `js/lab-demo.js`)
+
+**Method: the two-camera orthogonal setup of sports biomechanics.**
+- Camera A films side-on, which gives depth (Z, forward) and height (Y).
+- Camera B films from the front or back, which gives left/right (X) and height (Y).
+- Each landmark seen by both cameras at the same moment becomes one 3D point, with Y averaged and weighted by each camera's visibility.
+- **Scale:** the athlete's height (nose-to-ankle ≈ 88% of stature, from the tallest 20% of frames). The second camera is scaled so its vertical matches the first, because vertical is the axis both cameras share.
+- **No calibration object.** Assumptions: cameras about 90° apart, level, 3–5 m away (so perspective is small), whole body in view.
+
+**Why two cameras.** One camera can't see depth. Combining views roughly halved the error compared with guessing 3D from one camera (Dill 2024, doi:10.3390/s24237772). Three synced cameras reached about 6.4° mean angle error against Vicon, and 4.6° with per-subject correction (Chen 2026, doi:10.3390/s26216773). Markerless and marker-based systems are still not interchangeable (Amdi 2026, doi:10.1080/02640414.2026.2760586). So the lab is coaching and screening grade, and says so on screen.
+
+**Sync:**
+- **Clap first:** the loudest moment in each video's audio (more than 30× the median energy, first 12 s).
+- **Otherwise the movement:** the hip-height signal of one video is slid over the other's (±4 s, needs 1 s+ overlap). Repeated reps match at several offsets one rep apart, so among the top peaks (within 0.02) the smallest offset wins, because both cameras start within seconds of each other. A match under 80% tells the user to clap next time.
+
+**Measurements (3D):**
+- knee, hip and elbow bend (0 = straight)
+- trunk lean (sagittal) and side-bend (frontal)
+- pelvis and shoulder rotation about the vertical, and hip–shoulder separation (only possible in 3D)
+- frontal-plane knee alignment (positive = knee inside the hip–ankle line)
+- left–right differences (flagged at 10°+ and 10%+)
+
+**Movements:**
+- **Squat / landing:** values at the deepest point. Knee-in of 10°+ is a screening flag (Hewett 2005).
+- **Cricket fast bowling:**
+  - Release is when the bowling hand is highest.
+  - Elbow straightening in the last 0.15 s before release is compared with the ICC's 15° line, always labelled "screening only: official tests use accredited labs".
+  - Side-bend at release over 45° is flagged (Bayne 2016).
+  - Shoulder-line rotation range is linked to mixed-action back injury (Elliott 2000).
+- **Sprint, football kick, any movement:** min, max and range.
+
+**Tested on a synthetic athlete with known 3D angles** (`tests/lab3d.test.mjs`, 16 checks). It is filmed by two virtual cameras with different resolutions, zoom and placement, ±1.5 px jitter, and the front camera started 0.5 s late. Results:
+- sync found exactly (0.500 s)
+- knee bend within 1.1° on average (worst 5.8°)
+- hip–shoulder separation range 61° vs 60° true
+- knee-in seen and flagged, straight knees not flagged
+- asymmetry flagged
+
+That proves the maths. **Real-world accuracy must be measured** on 10–20 athletes against a known reference before claims are made to a team.
+
+**Privacy:** videos are read on the device and never uploaded. History keeps only the summary (athlete, movement, key numbers, flags), never video or frames. CSV export gives every frame's 3D points and measurements, for physios or other software.
+
+**Not 3D:** four videos from four angles recorded at different times are four 2D views of four different reps. 3D needs the same moment from at least two cameras.

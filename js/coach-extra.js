@@ -1,6 +1,8 @@
 // Coach dashboard extras: broadcast a notification to everyone (or a group), and the leaderboard with monthly prizes.
 import { AUDIENCES, AWAY, awayText, audienceOf, BROADCAST_TEMPLATES, BROADCAST_MAX, fill } from './dash.js';
 import { weekKey, monthTotals, ranked, displayName } from './leaderboard.js';
+import { accuracy, needsTuning } from './accuracy.js';
+import { WRONG as RULE_NAMES } from './exercises.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -82,6 +84,23 @@ async function send() {
 }
 
 /* ---------- Leaderboard and prizes ---------- */
+export async function loadAccuracy() {
+  const { state } = X, ids = (state.raw?.profiles || []).map(p => p.id);
+  let labels = [];
+  if (state.demo) { try { labels = JSON.parse(localStorage.getItem('shred_qk_v1') || '{}').labels || []; } catch {} }
+  else labels = (await X.cloud.labels(ids, new Date(Date.now() - 90 * D).toISOString()).catch(() => [])).map(l => ({ ...l, at: Date.parse(l.at) }));
+  const a = accuracy(labels), el = $('#accBody');
+  if (!a) { el.innerHTML = '<p class="empty">No answers yet. After each camera set clients see "Was QK right?". Do a few sets yourself to start.</p>'; return; }
+  const tune = needsTuning(a), name = id => RULE_NAMES?.[id] || id;
+  el.innerHTML = `<div class="cd-stats">
+      <div class="cd-stat good"><b>${a.countExact ?? '–'}%</b><span>rep counts exactly right</span></div>
+      <div class="cd-stat"><b>${a.countWithin1 ?? '–'}%</b><span>within 1 rep</span></div>
+      <div class="cd-stat ${a.cueRight >= 80 ? 'good' : 'warn'}"><b>${a.cueRight ?? '–'}%</b><span>cues confirmed</span></div>
+      <div class="cd-stat"><b>${a.sets}</b><span>sets answered</span></div></div>
+    ${tune.length ? `<p style="margin:6px 0 0"><b>Retune:</b> ${tune.map(c => `${esc(name(c.id))} (called wrong ${c.wrongPct}% of ${c.n})`).join(' · ')}</p>` : '<p class="muted small" style="margin:6px 0 0">No cue is being called wrong often (needs 5+ answers each).</p>'}
+    ${a.byExercise.length ? `<p class="muted small" style="margin:4px 0 0">Counting by exercise: ${a.byExercise.slice(0, 6).map(e => `${esc(e.ex)} ${e.exactPct}% (${e.n})`).join(' · ')}</p>` : ''}
+    ${a.unclearShare ? `<p class="muted small" style="margin:4px 0 0">${a.unclearShare}% of sets had reps QK couldn't see clearly (not judged). Better phone placement fixes these.</p>` : ''}`;
+}
 export async function loadBoard() {
   const { state } = X, ids = (state.raw?.profiles || []).map(p => p.id);
   if (state.demo) {
